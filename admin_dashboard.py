@@ -1,7 +1,10 @@
 import pandas as pd
 import streamlit as st
 import psycopg2
+<<<<<<< HEAD
 import ast
+=======
+>>>>>>> 689a270607c7f4c4061fcf6abbf9c4d0e19fe1ec
 
 st.set_page_config(page_title="AP-48 – panel administratora", layout="wide")
 
@@ -30,7 +33,11 @@ def load():
         df["created_at"] = pd.to_datetime(df["created_at"])
     # Rozbij kolumnę 'scores' (jsonb) na kolumny
     if "scores" in df.columns:
+<<<<<<< HEAD
         scores_df = df["scores"].apply(lambda x: pd.Series(ast.literal_eval(x)) if pd.notnull(x) else None)
+=======
+        scores_df = df["scores"].apply(lambda x: pd.Series(eval(x)) if pd.notnull(x) else None)
+>>>>>>> 689a270607c7f4c4061fcf6abbf9c4d0e19fe1ec
         df = pd.concat([df, scores_df], axis=1)
     return df
 
@@ -50,4 +57,8 @@ for col in ["Skala_A", "Skala_B", "Skala_C", "Skala_D"]:
         st.bar_chart(data[col])
 
 # Eksport CSV
+<<<<<<< HEAD
 st.download_button("Pobierz dane CSV", data.to_csv(index=False), "ap48.csv")
+=======
+st.download_button("Pobierz dane CSV", data.to_csv(index=False), "ap48.csv")
+>>>>>>> 689a270607c7f4c4061fcf6abbf9c4d0e19fe1ec
