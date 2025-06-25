@@ -21,7 +21,8 @@ def load():
         database=db_name,
         user=db_user,
         password=db_pass,
-        port=db_port
+        port=db_port,
+        sslmode="require"
     )
     df = pd.read_sql("SELECT * FROM ap48_responses", con=conn)
     conn.close()
