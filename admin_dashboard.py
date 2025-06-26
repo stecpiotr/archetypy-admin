@@ -5,39 +5,37 @@ import ast
 
 st.set_page_config(page_title="AP-48 – panel administratora", layout="wide")
 
-# ------------ USTAWIENIA POŁĄCZENIA (z .streamlit/secrets.toml na Streamlit Cloud) ------------
+# ------- POŁĄCZENIE Z BAZĄ (SEKRETY STREAMLIT/POOLER SUPABASE) -------
 db_host = st.secrets["db_host"]
 db_name = st.secrets["db_name"]
 db_user = st.secrets["db_user"]
 db_pass = st.secrets["db_pass"]
-db_port = st.secrets.get("db_port", 5432)  # jeśli ustawiasz własny port
+db_port = st.secrets.get("db_port", 5432)  # Z poolera zazwyczaj 5432
 
-# ------------ FUNKCJA POBIERANIA ------------
+# ------- FUNKCJA POBIERANIA -------
 @st.cache_data(ttl=30)
 def load():
-    # Połącz z bazą PostgreSQL (Supabase)
     conn = psycopg2.connect(
         host=db_host,
         database=db_name,
         user=db_user,
         password=db_pass,
         port=db_port,
-        sslmode="require"
+        sslmode="require"          # zawsze używaj SSL na produkcji!
     )
     df = pd.read_sql("SELECT * FROM ap48_responses", con=conn)
     conn.close()
-    # Przerób timestamps na datetime
+    # Przerób 'created_at' na datetime, jeśli jest taka kolumna
     if "created_at" in df.columns:
         df["created_at"] = pd.to_datetime(df["created_at"])
-    # Rozbij kolumnę 'scores' (jsonb) na kolumny
+    # Rozbij kolumnę 'scores' (jsonb) na kolumny liczbowe, jeśli istnieje
     if "scores" in df.columns:
         scores_df = df["scores"].apply(lambda x: pd.Series(ast.literal_eval(x)) if pd.notnull(x) else None)
         df = pd.concat([df, scores_df], axis=1)
     return df
 
-# ------------ INTERFEJS ------------
+# ------- INTERFEJS -------
 st.title("AP-48 – panel administratora")
-
 data = load()
 
 st.metric("Łączna liczba ankiet", len(data))
@@ -50,5 +48,4 @@ for col in ["Skala_A", "Skala_B", "Skala_C", "Skala_D"]:
         st.subheader(col)
         st.bar_chart(data[col])
 
-# Eksport CSV
 st.download_button("Pobierz dane CSV", data.to_csv(index=False), "ap48.csv")
