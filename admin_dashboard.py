@@ -11,6 +11,8 @@ import requests
 from PIL import Image, ImageDraw
 import io
 import re
+from datetime import datetime
+import pytz
 
 st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
 
@@ -48,7 +50,8 @@ archetype_features = {
     "Niewinny": "Optymizm, ufność, unikanie konfliktów, pozytywne nastawienie.",
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
 }
-# W TYM MIEJSCU WSTAW SWÓJ SŁOWNIK archetype_extended = {...}
+
+# tutaj wklej swój archetype_extended = {...}  <-- SKOPIUJ Z POPRZEDNIEGO KODU!
 
 archetype_extended = {
     "Władca": {
@@ -774,6 +777,7 @@ def render_archetype_card(archetype_data, main=True):
     """, unsafe_allow_html=True)
 
 data = load()
+
 num_ankiet = len(data) if not data.empty else 0
 
 header_col1, header_col2 = st.columns([0.77, 0.23])
@@ -805,8 +809,16 @@ if "answers" in data.columns and not data.empty:
         main_type, second_type = pick_main_and_aux_archetype(arcsums, ARCHE_NAMES_ORDER)
         main = archetype_extended.get(main_type, {})
         second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
+        czas_ankiety = None
+        if pd.notna(row.get("created_at", None)):
+            try:
+                czas_ankiety = row["created_at"].astimezone(pytz.timezone('Europe/Warsaw')).strftime('%Y-%m-%d %H:%M:%S')
+            except Exception:
+                czas_ankiety = row["created_at"].strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            czas_ankiety = ""
         results.append({
-            "ID": row.get("id", idx+1),
+            "Czas ankiety": czas_ankiety,
             **arcsums,
             **{f"{k}_%" : v for k,v in arcper.items()},
             "Główny archetyp": main_type,
@@ -822,67 +834,73 @@ if "answers" in data.columns and not data.empty:
         })
     results_df = pd.DataFrame(results)
 
-    if not results_df.empty and "ID" in results_df.columns:
-        results_df = results_df.sort_values("ID")
+    if not results_df.empty and "Czas ankiety" in results_df.columns:
+        results_df = results_df.sort_values("Czas ankiety", ascending=True)
+
+        st.markdown(
+            '<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypu Krzysztofa Hetmana</div>',
+            unsafe_allow_html=True)
+
+        # --- Statystyki i wykres radarowy ---
         archetype_names = ARCHE_NAMES_ORDER
         counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
         counts_aux = results_df['Archetyp pomocniczy'].value_counts().reindex(archetype_names, fill_value=0)
-        archetype_emoji = {
-            "Władca":"👑", "Bohater":"🦸", "Mędrzec":"📖", "Opiekun":"🤝", "Kochanek":"❤️",
-            "Błazen":"😂", "Twórca":"🧩", "Odkrywca":"🗺️", "Czarodziej":"⭐", "Towarzysz":"🏡",
-            "Niewinny":"🕊️", "Buntownik":"⚡"
-        }
-        def zero_to_dash(val): return "-" if val == 0 else str(val)
-        archetype_table = pd.DataFrame({
-            "Archetyp": [f"{archetype_emoji.get(n,n)} {n}" for n in archetype_names],
-            "Główny archetyp": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
-            "Pomocniczy archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names]
-        })
-        archetype_table_html = archetype_table.to_html(escape=False, index=False)
-        archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
-        archetype_table_html = archetype_table_html.replace('<td>', '<td style="text-align:center">')
+        mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
+        main_type, second_type = pick_main_and_aux_archetype(mean_archetype_scores, archetype_names)
 
-
-        def align_first_column_to_left_with_width(html):
-            html = re.sub(
-                r'(<tr[^>]*>)(\s*<td style="text-align:center">)',
-                lambda m: m.group(1) + m.group(2).replace('text-align:center', 'text-align:left;width:24%;'), html
-            )
-            html = html.replace(
-                '<th style="text-align:center">Archetyp</th>',
-                '<th style="text-align:center;width:24%;">Archetyp</th>'
-            )
-            html = html.replace(
-                '<th style="text-align:center">Główny archetyp</th>',
-                '<th style="text-align:center;width:18%;">Główny archetyp</th>'
-            ).replace(
-                '<th style="text-align:center">Pomocniczy archetyp</th>',
-                '<th style="text-align:center;width:18%;">Pomocniczy archetyp</th>'
-            )
-            html = re.sub(
-                r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
-                r'(\s*<td style="text-align:center">)',
-                r'<tr>\1<td style="text-align:center;width:18%">', html
-            )
-            html = re.sub(
-                r'(<td style="text-align:center;width:18%">.*?</td>)'
-                r'(\s*<td style="text-align:center">)',
-                r'\1<td style="text-align:center;width:18%">', html
-            )
-            return html
-        archetype_table_html = align_first_column_to_left_with_width(archetype_table_html)
-        archetype_table_html = archetype_table_html.replace(
-            '<table ',
-            '<table style="margin-left:0px;margin-right:0px;width:99%;" '
-        )
-        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypu Krzysztofa Hetmana</div>', unsafe_allow_html=True)
         col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
+
         with col1:
             st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych i pomocniczych</div>', unsafe_allow_html=True)
+            archetype_emoji = {
+                "Władca":"👑", "Bohater":"🦸", "Mędrzec":"📖", "Opiekun":"🤝", "Kochanek":"❤️",
+                "Błazen":"😂", "Twórca":"🧩", "Odkrywca":"🗺️", "Czarodziej":"⭐", "Towarzysz":"🏡",
+                "Niewinny":"🕊️", "Buntownik":"⚡"
+            }
+            def zero_to_dash(val): return "-" if val == 0 else str(val)
+            archetype_table = pd.DataFrame({
+                "Archetyp": [f"{archetype_emoji.get(n,n)} {n}" for n in archetype_names],
+                "Główny archetyp": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
+                "Pomocniczy archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names]
+            })
+            archetype_table_html = archetype_table.to_html(escape=False, index=False)
+            archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
+            archetype_table_html = archetype_table_html.replace('<td>', '<td style="text-align:center">')
+            def align_first_column_to_left_with_width(html):
+                html = re.sub(
+                    r'(<tr[^>]*>)(\s*<td style="text-align:center">)',
+                    lambda m: m.group(1) + m.group(2).replace('text-align:center', 'text-align:left;width:24%;'), html
+                )
+                html = html.replace(
+                    '<th style="text-align:center">Archetyp</th>',
+                    '<th style="text-align:center;width:24%;">Archetyp</th>'
+                )
+                html = html.replace(
+                    '<th style="text-align:center">Główny archetyp</th>',
+                    '<th style="text-align:center;width:18%;">Główny archetyp</th>'
+                ).replace(
+                    '<th style="text-align:center">Pomocniczy archetyp</th>',
+                    '<th style="text-align:center;width:18%;">Pomocniczy archetyp</th>'
+                )
+                html = re.sub(
+                    r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
+                    r'(\s*<td style="text-align:center">)',
+                    r'<tr>\1<td style="text-align:center;width:18%">', html
+                )
+                html = re.sub(
+                    r'(<td style="text-align:center;width:18%">.*?</td>)'
+                    r'(\s*<td style="text-align:center">)',
+                    r'\1<td style="text-align:center;width:18%">', html
+                )
+                return html
+            archetype_table_html = align_first_column_to_left_with_width(archetype_table_html)
+            archetype_table_html = archetype_table_html.replace(
+                '<table ',
+                '<table style="margin-left:0px;margin-right:0px;width:99%;" '
+            )
             st.markdown(archetype_table_html, unsafe_allow_html=True)
+
         with col2:
-            mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
-            main_type, second_type = pick_main_and_aux_archetype(mean_archetype_scores, archetype_names)
             theta_labels = []
             for n in archetype_names:
                 if n == main_type:
@@ -951,7 +969,7 @@ if "answers" in data.columns and not data.empty:
                 st.image(
                     kola_img,
                     caption="Podświetlenie: główny – czerwony, pomocniczy – żółty",
-                    width=700  # ← tu wpisujesz dokładnie, ile chcesz pikseli szerokości (np. 450, 512, 600)
+                    width=700
                 )
 
         st.markdown("""
@@ -974,33 +992,22 @@ if "answers" in data.columns and not data.empty:
         """, unsafe_allow_html=True)
 
         st.markdown('<div style="font-size:1.13em;font-weight:600;margin-bottom:13px;">Tabela odpowiedzi respondentów (pełne wyniki)</div>', unsafe_allow_html=True)
-
-        # --- FINALNY BLOK: TABELA Z PODSUMOWANIEM I EKSPORTEM XLSX ---
-
         final_df = results_df.copy()
-
         try:
             col_to_exclude = [
-                "ID", "Archetyp", "Główny archetyp", "Cechy kluczowe", "Opis", "Storyline",
+                "Czas ankiety", "Archetyp", "Główny archetyp", "Cechy kluczowe", "Opis", "Storyline",
                 "Rekomendacje", "Archetyp pomocniczy", "Cechy pomocniczy", "Opis pomocniczy",
                 "Storyline pomocniczy", "Rekomendacje pomocniczy"
             ]
             means = final_df.drop(columns=col_to_exclude, errors="ignore").mean(numeric_only=True)
             summary_row = {col: round(means[col], 2) if col in means else "-" for col in final_df.columns}
-            summary_row["ID"] = "ŚREDNIA"
-            final_df = final_df.iloc[::-1]  # Odwróć kolejność wierszy (najnowsze na górze)
-            final_df = pd.concat([final_df, pd.DataFrame([summary_row])], ignore_index=True)  # Dodaj średnią na koniec
+            summary_row["Czas ankiety"] = "ŚREDNIA"
+            final_df = pd.concat([final_df, pd.DataFrame([summary_row])], ignore_index=True)
         except Exception as e:
-            pass  # Jeśli coś pójdzie nie tak, po prostu nie dodawaj podsumowania
+            pass
 
         st.dataframe(final_df, hide_index=True)
-
-        # Eksport CSV
         st.download_button("Pobierz wyniki archetypów (CSV)", final_df.to_csv(index=False), "ap48_archetypy.csv")
-
-        # Eksport XLSX
-        import io
-
         buffer = io.BytesIO()
         final_df.to_excel(buffer, index=False)
         st.download_button(
@@ -1009,5 +1016,6 @@ if "answers" in data.columns and not data.empty:
             file_name="ap48_archetypy.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
 else:
     st.info("Brak danych 'answers' – nie wykryto odpowiedzi w bazie danych.")
