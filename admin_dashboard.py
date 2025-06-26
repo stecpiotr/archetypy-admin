@@ -12,7 +12,6 @@ db_user = st.secrets["db_user"]
 db_pass = st.secrets["db_pass"]
 db_port = st.secrets.get("db_port", 5432)  # Z poolera zazwyczaj 5432
 
-# ------- FUNKCJA POBIERANIA -------
 @st.cache_data(ttl=30)
 def load():
     conn = psycopg2.connect(
@@ -21,21 +20,25 @@ def load():
         user=db_user,
         password=db_pass,
         port=db_port,
-        sslmode="require"          # zawsze używaj SSL na produkcji!
+        sslmode="require" 
     )
     df = pd.read_sql("SELECT * FROM ap48_responses", con=conn)
     conn.close()
-    # Przerób 'created_at' na datetime, jeśli jest taka kolumna
     if "created_at" in df.columns:
         df["created_at"] = pd.to_datetime(df["created_at"])
-    # Rozbij kolumnę 'scores' (jsonb) na kolumny liczbowe, jeśli istnieje
+    # Naprawa obsługi błędnych danych w kolumnie scores:
+    def try_parse_scores(x):
+        try:
+            return pd.Series(ast.literal_eval(x)) if pd.notnull(x) else None
+        except Exception:
+            return None
     if "scores" in df.columns:
-        scores_df = df["scores"].apply(lambda x: pd.Series(ast.literal_eval(x)) if pd.notnull(x) else None)
+        scores_df = df["scores"].apply(try_parse_scores)
         df = pd.concat([df, scores_df], axis=1)
     return df
 
-# ------- INTERFEJS -------
 st.title("AP-48 – panel administratora")
+
 data = load()
 
 st.metric("Łączna liczba ankiet", len(data))
