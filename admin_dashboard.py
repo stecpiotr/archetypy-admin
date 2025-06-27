@@ -789,7 +789,7 @@ def render_archetype_card(archetype_data, main=True):
     color_desc_html = ""
     if color_palette and isinstance(color_palette, list):
         items = [f"{n} ({h})" for n, h in zip(color_names, color_palette)]
-        color_desc_html = '<div style="color:#444;font-size:0.98em;margin-top:3px;margin-bottom:7px;">(' + ', '.join(items) + ')</div>'
+        color_desc_html = '<div style="color:#222;font-size:0.98em;margin-top:3px;margin-bottom:7px;">(' + ', '.join(items) + ')</div>'
 
     # --- Pytania archetypowe ---
     questions = archetype_data.get('questions', [])
@@ -816,17 +816,17 @@ def render_archetype_card(archetype_data, main=True):
             <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-bottom:1px; color:{text_color};">
                 {archetype_data.get('name','?')}
             </div>
-            <div style="font-size:1.22em; font-style:italic; color:{tagline_color}; margin-bottom:18px; margin-top:4px;">
+            <div style="font-size:1.3em; font-style:italic; color:{tagline_color}; margin-bottom:18px; margin-top:4px;">
                 {tagline}
-            </div>
-            <div style="margin-top:21px;"><b>Opis:</b> {archetype_data.get('description','')}</div>
-            <div style="margin-top:24px;font-weight:600;">Storyline:</div>
-            <div style="margin-bottom:9px; margin-top:4px;">{archetype_data.get('storyline','')}</div>
-            <div style="color:#666;font-size:1em; margin-top:21px;"><b>Cechy:</b> {", ".join(archetype_data.get('core_traits',[]))}</div>
-            <div style="margin-top:24px;font-weight:600;">Rekomendacje:</div>
-            <ul style="padding-left:24px; margin-bottom:9px;">
-                {''.join(f'<li style="margin-bottom:2px;">{r}</li>' for r in archetype_data.get('recommendations',[]))}
-            </ul>
+        </div>
+        <div style="margin-top:21px; font-size:18px;"><b>Opis:</b><br><i>{archetype_data.get('description','')}</i></div>
+        <div style="color:#222;font-size:1.1em; margin-top:21px;"><b>Cechy:</b> {", ".join(archetype_data.get('core_traits',[]))}</div>
+        <div style="margin-top:24px;font-weight:600;">Storyline:</div>
+        <div style="margin-bottom:9px; margin-top:4px;">{archetype_data.get('storyline','')}</div>
+        <div style="margin-top:24px;font-weight:600;">Rekomendacje:</div>
+        <ul style="padding-left:24px; margin-bottom:9px;">
+             {''.join(f'<li style="margin-bottom:2px;">{r}</li>' for r in archetype_data.get('recommendations',[]))}
+        </ul>
             <div style="margin-top:29px;font-weight:600;">Słowa kluczowe:</div>
             <div style="margin-bottom:8px;">{', '.join(archetype_data.get('keyword_messaging',[]))}</div>
             <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
