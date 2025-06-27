@@ -16,6 +16,45 @@ import pytz
 
 st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
 
+COLOR_NAME_MAP = {
+    "#000000": "Czerń",
+    "#FFD700": "Złoto",
+    "#282C34": "Granat (antracyt)",
+    "#800020": "Burgund",
+    "#E10600": "Czerwień",
+    "#2E3141": "Grafitowy granat",
+    "#FFFFFF": "Biel",
+    "#4682B4": "Stalowy błękit",
+    "#B0C4DE": "Jasny niebieskoszary",
+    "#6C7A89": "Popielaty szary",
+    "#B4D6B4": "Miętowa zieleń",
+    "#A7C7E7": "Pastelowy błękit",
+    "#FFD580": "Pastelowy żółty / beżowy",
+    "#FA709A": "Róż malinowy",
+    "#FEE140": "Jasny żółty",
+    "#FFD6E0": "Bardzo jasny róż",
+    "#FFB300": "Mocna żółć",
+    "#FF8300": "Pomarańcz",
+    "#FFD93D": "Pastelowa żółć",
+    "#7C53C3": "Fiolet",
+    "#3BE8B0": "Miętowy cyjan",
+    "#87CEEB": "Błękit (Sky Blue)",
+    "#43C6DB": "Turkusowy błękit",
+    "#A0E8AF": "Seledyn",
+    "#F9D371": "Złocisty żółty",
+    "#8F00FF": "Fiolet (intensywny)",
+    "#181C3A": "Granat bardzo ciemny",
+    "#E0BBE4": "Pastelowy fiolet",
+    "#F9F9F9": "Biel bardzo jasna",
+    "#6CA0DC": "Pastelowy błękit",
+    "#A3C1AD": "Pastelowa zieleń",
+    "#FFF6C3": "Jasny kremowy",
+    "#AAC9CE": "Pastelowy niebieskoszary",
+    "#FFF200": "Żółty (cytrynowy)",
+    "#FF0000": "Czerwień intensywna",
+    "#FF6F61": "Łososiowy róż",
+}
+
 ARCHE_NAMES_ORDER = [
     "Niewinny", "Mędrzec", "Odkrywca", "Buntownik", "Czarodziej", "Bohater",
     "Kochanek", "Błazen", "Towarzysz", "Opiekun", "Władca", "Twórca"
@@ -51,7 +90,7 @@ archetype_features = {
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
 }
 
-# tutaj wklej swój archetype_extended = {...}  <-- SKOPIUJ Z POPRZEDNIEGO KODU!
+# <<<--- TUTAJ WKLEJ własne archetype_extended = {...}
 
 archetype_extended = {
     "Władca": {
@@ -737,6 +776,30 @@ def render_archetype_card(archetype_data, main=True):
     if main and is_color_dark(bg_color):
         text_color = "#fff"
         tagline_color = "#FFD22F" if archetype_data.get('name','').lower() == "bohater" else "#fffbea"
+
+    # --- Kolory ---
+    color_palette = archetype_data.get('color_palette', [])
+    color_names = [COLOR_NAME_MAP.get(c.upper(), c) for c in color_palette] if color_palette else []
+    color_icons_html = ""
+    if color_palette and isinstance(color_palette, list):
+        color_icons_html = ''.join(
+            f'<span style="display:inline-block;width:23px;height:23px;border-radius:50%;background:{c};margin-right:6px;border:2px solid #222;vertical-align:middle;"></span>'
+            for c in color_palette
+        )
+    color_desc_html = ""
+    if color_palette and isinstance(color_palette, list):
+        items = [f"{n} ({h})" for n, h in zip(color_names, color_palette)]
+        color_desc_html = '<div style="color:#444;font-size:0.98em;margin-top:3px;margin-bottom:7px;">(' + ', '.join(items) + ')</div>'
+
+    # --- Pytania archetypowe ---
+    questions = archetype_data.get('questions', [])
+    questions_html = ""
+    if questions and isinstance(questions, list):
+        questions_html = "<ul style='margin-left:20px;margin-top:5px;'>"
+        for q in questions:
+            questions_html += f"<li style='margin-bottom:3px; font-size:1.07em;'>{q}</li>"
+        questions_html += "</ul>"
+
     st.markdown(f"""
     <div style="
         max-width:{width_card};
@@ -745,12 +808,10 @@ def render_archetype_card(archetype_data, main=True):
         background: {bg_color};
         box-shadow: {box_shadow};
         padding: 2.1em 2.2em 1.3em 2.2em;
-        margin-bottom: 16px;
+        margin-bottom: 32px;
         color: {text_color};
         display: flex; align-items: flex-start;">
-        <div style="font-size:2.6em; margin-right:23px; margin-top:3px; flex-shrink:0;">
-            {icon}
-        </div>
+        <div style="font-size:2.6em; margin-right:23px; margin-top:3px; flex-shrink:0;">{icon}</div>
         <div>
             <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-bottom:1px; color:{text_color};">
                 {archetype_data.get('name','?')}
@@ -771,10 +832,17 @@ def render_archetype_card(archetype_data, main=True):
             <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
             <div style="margin-bottom:8px;">{', '.join(archetype_data.get('visual_elements',[]))}</div>
             <div style="margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
-            <div>{', '.join(archetype_data.get('example_brands',[]))}</div>
+            <div style="margin-bottom:36px;">{', '.join(archetype_data.get('example_brands',[]))}</div>
+            {"<div style='margin-top:10px;font-weight:600;'>Kolory:</div>" if color_palette else ""}
+            {"<div style='margin-bottom:2px; margin-top:7px;'>" + color_icons_html + "</div>" if color_icons_html else ""}
+            {color_desc_html}
+            {"<div style='margin-top:22px;font-weight:600;'>Pytania archetypowe:</div>" if questions else ""}
+            {questions_html}
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+# ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
 
 data = load()
 
@@ -833,23 +901,15 @@ if "answers" in data.columns and not data.empty:
             "Rekomendacje pomocniczy": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
         })
     results_df = pd.DataFrame(results)
-
     if not results_df.empty and "Czas ankiety" in results_df.columns:
         results_df = results_df.sort_values("Czas ankiety", ascending=True)
-
-        st.markdown(
-            '<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypu Krzysztofa Hetmana</div>',
-            unsafe_allow_html=True)
-
-        # --- Statystyki i wykres radarowy ---
+        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypu Krzysztofa Hetmana</div>', unsafe_allow_html=True)
         archetype_names = ARCHE_NAMES_ORDER
         counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
         counts_aux = results_df['Archetyp pomocniczy'].value_counts().reindex(archetype_names, fill_value=0)
         mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
         main_type, second_type = pick_main_and_aux_archetype(mean_archetype_scores, archetype_names)
-
         col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
-
         with col1:
             st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych i pomocniczych</div>', unsafe_allow_html=True)
             archetype_emoji = {
@@ -899,7 +959,6 @@ if "answers" in data.columns and not data.empty:
                 '<table style="margin-left:0px;margin-right:0px;width:99%;" '
             )
             st.markdown(archetype_table_html, unsafe_allow_html=True)
-
         with col2:
             theta_labels = []
             for n in archetype_names:
@@ -971,26 +1030,67 @@ if "answers" in data.columns and not data.empty:
                     caption="Podświetlenie: główny – czerwony, pomocniczy – żółty",
                     width=700
                 )
-
         st.markdown("""
         <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
         """, unsafe_allow_html=True)
-
         st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny Krzysztofa Hetmana</div>', unsafe_allow_html=True)
         render_archetype_card(archetype_extended.get(main_type, {}), main=True)
-
         if second_type and second_type != main_type:
-            st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True) # większy margines górny
             st.markdown("""
             <hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />
             """, unsafe_allow_html=True)
             st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp pomocniczy Krzysztofa Hetmana</div>", unsafe_allow_html=True)
             render_archetype_card(archetype_extended.get(second_type, {}), main=False)
 
+        # ----------- ODDZIELACZ I NAGŁÓWEK dla raportów -----------
+        st.markdown("""
+        <div style='height:44px;'></div>
+        <hr style="height:1px; border:none; background:#e5e5e5; margin-bottom:26px;" />
+        <div style="font-size:1.2em; font-weight:600; margin-bottom:23px;">
+            Pobierz raporty archetypu Krzysztofa Hetmana
+        </div>
+        """, unsafe_allow_html=True)
+        # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
+        docx_buf = export_word(main_type, second_type, archetype_features, main, second)
+        pdf_buf = export_pdf(main_type, second_type, archetype_features, main, second)
+        word_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#185abd'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>W</text></svg>"
+        pdf_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#d32f2f'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>PDF</text></svg>"
+        st.markdown(
+            f"""
+            <div style="display:flex;flex-direction:column;align-items:flex-start;">
+                <div style="margin-bottom:11px;">
+                    {word_icon}
+                    <span style="vertical-align:middle;">
+                        <b>Eksport do Word (.docx)</b>
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
+        st.download_button(
+            "Pobierz raport (Word)",
+            data=docx_buf,
+            file_name="ap48_raport.docx",
+            key="word_button"
+        )
+        st.markdown(
+            f"""
+                <div style="margin-top:21px; margin-bottom:11px;">
+                    {pdf_icon}
+                    <span style="vertical-align:middle;">
+                        <b>Eksport do PDF (.pdf)</b>
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
+        st.download_button(
+            "Pobierz raport (PDF)",
+            data=pdf_buf,
+            file_name="ap48_raport.pdf",
+            key="pdf_button"
+        )
+
         st.markdown("""
         <hr style="height:1px; border:none; background:#eee; margin-top:38px; margin-bottom:24px;" />
         """, unsafe_allow_html=True)
-
         st.markdown('<div style="font-size:1.13em;font-weight:600;margin-bottom:13px;">Tabela odpowiedzi respondentów (pełne wyniki)</div>', unsafe_allow_html=True)
         final_df = results_df.copy()
         try:
@@ -1005,7 +1105,6 @@ if "answers" in data.columns and not data.empty:
             final_df = pd.concat([final_df, pd.DataFrame([summary_row])], ignore_index=True)
         except Exception as e:
             pass
-
         st.dataframe(final_df, hide_index=True)
         st.download_button("Pobierz wyniki archetypów (CSV)", final_df.to_csv(index=False), "ap48_archetypy.csv")
         buffer = io.BytesIO()
