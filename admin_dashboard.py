@@ -1047,7 +1047,7 @@ def render_archetype_card(archetype_data, main=True):
         margin-bottom: 32px;
         color: {text_color};
         display: flex; align-items: flex-start;">
-        <div style="font-size:2.6em; margin-right:23px; margin-top:7px; flex-shrink:0;">{icon}</div>
+        <div style="font-size:2.6em; margin-right:23px; margin-top:1px; flex-shrink:0;">{icon}</div>
         <div>
             <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
                 {archetype_data.get('name','?')}
