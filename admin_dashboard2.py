@@ -5,6 +5,10 @@ import ast
 import plotly.graph_objects as go
 from fpdf import FPDF
 from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 from io import BytesIO
 import unicodedata
 import requests
@@ -13,6 +17,8 @@ import io
 import re
 from datetime import datetime
 import pytz
+import tempfile
+import os
 
 st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
 
@@ -101,7 +107,6 @@ archetype_features = {
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
 }
 
-# <<<--- TUTAJ WKLEJ własne archetype_extended = {...}
 archetype_extended = {
     "Władca": {
         "name": "Władca",
@@ -109,6 +114,7 @@ archetype_extended = {
         "description": (
             "Archetyp Władcy w polityce uosabia siłę przywództwa, stabilność, pewność działania,kontrolę i odpowiedzialność za porządek społeczny. "
             "Władcy dążą do stabilności, bezpieczeństwa i efektywnego zarządzania. Politycy o tym archetypie często podkreślają swoją zdolność do podejmowania trudnych decyzji i utrzymywania porządku, nawet w trudnych czasach. "
+
             "Jako kandydat na prezydenta Lublina Władca stawia na porządek, wyznaczanie standardów rozwoju i podejmowanie stanowczych decyzji dla dobra wspólnego. "
             "Jest symbolem autentycznego autorytetu, przewodzenia i skutecznego zarządzania miastem. "
             "Buduje zaufanie, komunikując skuteczność, odpowiedzialność i gwarantując bezpieczeństwo mieszkańcom."
@@ -171,6 +177,7 @@ archetype_extended = {
         "description": (
             "Bohater w polityce to archetyp waleczności, determinacji i odwagi w podejmowaniu trudnych decyzji dla społeczności. "
             "Bohaterowie są gotowi stawić czoła wyzwaniom, pokonywać przeszkody i walczyć o lepszą przyszłość dla wszystkich. Ich celem jest udowodnienie swojej wartości poprzez odważne działania i inspirowanie innych do przekraczania własnych granic. Politycy o tym archetypie często podkreślają swoją gotowość do podejmowania trudnych decyzji i stawiania czoła przeciwnościom w imię dobra wspólnego. "
+
             "Kandydat Bohater mobilizuje mieszkańców do działania, bierze odpowiedzialność w najtrudniejszych momentach i broni interesów Lublina nawet pod presją."
         ),
         "storyline": (
@@ -226,6 +233,7 @@ archetype_extended = {
         "description": (
             "Mędrzec w polityce opiera komunikację na wiedzy, argumentacji i logicznym rozumowaniu oraz analitycznym podejściu. "
             "Mędrcy poszukują prawdy i wiedzy, wierząc, że informacja i zrozumienie są kluczem do rozwiązywania problemów. Politycy o tym archetypie często prezentują się jako eksperci, którzy podejmują decyzje w oparciu o fakty i analizy, a nie emocje czy ideologię. "
+
             "Kandydat Mędrzec wykorzystuje rozsądne analizy, doświadczenie oraz ekspercką wiedzę, by podejmować najlepsze decyzje dla całej społeczności."
         ),
         "storyline": (
@@ -445,6 +453,7 @@ archetype_extended = {
         "description": (
             "Twórca charakteryzuje się innowacyjnością, kreatywnością i wizją. "
             "Twórcy dążą do budowania nowych rozwiązań i struktur, które odpowiadają na wyzwania przyszłości. Politycy o tym archetypie często podkreślają swoje innowacyjne podejście do rządzenia i zdolność do wprowadzania pozytywnych zmian. "
+
             "Jako prezydent Twórca nie boi się wdrażać oryginalnych, często nieszablonowych strategii."
         ),
         "storyline": (
@@ -498,6 +507,7 @@ archetype_extended = {
         "description": (
             "Archetyp Odkrywcy charakteryzuje się ciekawością, poszukiwaniem nowych możliwości i pragnieniem wolności. "
             "Odkrywcy pragną przełamywać granice i eksplorować nieznane terytoria. Politycy o tym archetypie często prezentują się jako wizjonerzy, którzy mogą poprowadzić społeczeństwo ku nowym horyzontom i możliwościom. "
+
             "Odkrywca poszukuje nowych rozwiązań, jest otwarty na zmiany i śledzi światowe trendy, które wdraża w Lublinie. "
             "Wybiera nowatorskie, nieoczywiste drogi dla rozwoju miasta i jego mieszkańców."
         ),
@@ -551,6 +561,7 @@ archetype_extended = {
         "description": (
             "Czarodziej w polityce to wizjoner i transformator – wytycza nowy kierunek i inspiruje do zmian niemożliwych na pierwszy rzut oka. "
             "Czarodziej obiecuje głęboką przemianę społeczeństwa i nadaje wydarzeniom niemal magiczny sens. "
+
             "Dzięki jego inicjatywom Lublin przechodzi metamorfozy, w których niemożliwe staje się możliwe."
         ),
         "storyline": (
@@ -711,6 +722,7 @@ archetype_extended = {
             "Archetyp Buntownika charakteryzuje się odwagą w kwestionowaniu status quo i dążeniem do fundamentalnych zmian. "
             "Buntownicy sprzeciwiają się istniejącym strukturom władzy i konwencjom, proponując radykalne rozwiązania."
             "Politycy o tym archetypie często prezentują się jako outsiderzy, którzy chcą zburzyć skorumpowany system i wprowadzić nowy porządek."
+
             "Kandydat Buntownik odważnie kwestionuje zastane układy, nawołuje do zmiany i walczy o nowe, lepsze reguły gry w mieście. "
             "Potrafi ściągnąć uwagę i zjednoczyć mieszkańców wokół śmiałych idei. "
         ),
@@ -759,7 +771,6 @@ archetype_extended = {
         ]
     }
 }
-# --- KONIEC archetype_extended ---
 
 ARCHE_IMG_URL = "https://justynakopec.pl/wp-content/uploads/2024/08/Archetypy-marki-Justyna-Kopec.png"
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
@@ -821,7 +832,6 @@ def load():
         conn.close()
         if "created_at" in df.columns:
             df["created_at"] = pd.to_datetime(df["created_at"])
-
         def parse_answers(x):
             if isinstance(x, list):
                 return x
@@ -833,11 +843,9 @@ def load():
                     return ast.literal_eval(x)
                 except:
                     return None
-
         if "answers" in df.columns:
             df["answers"] = df["answers"].apply(parse_answers)
         return df
-
     except Exception as e:
         st.warning(f"Błąd podczas ładowania danych: {e}")
         return pd.DataFrame()
@@ -868,512 +876,452 @@ def pick_main_and_aux_archetype(archetype_means, archetype_order):
     second_type = next((k for k in archetype_order if k in aux_candidates), None)
     return main_type, second_type
 
-def export_word(main_type, second_type, features, main, second):
+def add_hyperlink(paragraph, url, text, color="0000EE", underline=True):
+    part = paragraph.part
+    r_id = part.relate_to(url, reltype="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True)
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+    new_run = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    if color:
+        c = OxmlElement("w:color")
+        c.set(qn("w:val"), color)
+        rPr.append(c)
+    if underline:
+        u = OxmlElement("w:u")
+        u.set(qn("w:val"), "single")
+        rPr.append(u)
+    new_run.append(rPr)
+    t = OxmlElement("w:t")
+    t.text = text
+    new_run.append(t)
+    hyperlink.append(new_run)
+    paragraph._p.append(hyperlink)
+
+def pil_to_bytesio(img, format='PNG'):
+    buf = BytesIO()
+    img.save(buf, format=format)
+    buf.seek(0)
+    return buf
+
+def radar_pil_img(fig):
+    buf = BytesIO()
+    fig.write_image(buf, format="png")
+    buf.seek(0)
+    return Image.open(buf)
+
+def archetype_table_img(table_df):
+    from matplotlib import pyplot as plt
+    import matplotlib
+    matplotlib.rcParams['font.size'] = 18
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.axis('off')
+    t = ax.table(cellText=table_df.values,
+                colLabels=table_df.columns,
+                cellLoc='center', loc='center')
+    t.auto_set_font_size(False)
+    t.set_fontsize(17)
+    t.auto_set_column_width(col=list(range(len(table_df.columns))))
+    fig.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', dpi=160)
+    plt.close(fig)
+    buf.seek(0)
+    return Image.open(buf)
+def get_image_bytesio_from_url(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    return BytesIO(response.content)
+
+def add_two_column_table_atuty_slabosci(doc, strengths, weaknesses):
+    table = doc.add_table(rows=1, cols=2)
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = "Atuty"
+    hdr_cells[1].text = "Słabości"
+    # Format nagłówków
+    for i, cell in enumerate(hdr_cells):
+        for p in cell.paragraphs:
+            run = p.runs[0]
+            run.bold = True
+            run.font.size = Pt(11)
+            if i == 0:
+                run.font.color.rgb = RGBColor(20, 80, 200)  # niebieski
+            else:
+                run.font.color.rgb = RGBColor(200, 20, 20)  # czerwony
+    max_rows = max(len(strengths or []), len(weaknesses or []))
+    for i in range(max_rows):
+        row_cells = table.add_row().cells
+        # Atuty (lewa kolumna)
+        if strengths and i < len(strengths):
+            p = row_cells[0].paragraphs[0]
+            run = p.add_run("● ")
+            run.font.color.rgb = RGBColor(15, 90, 180)
+            run.bold = True
+            p.add_run(str(strengths[i]))
+        # Słabości (prawa kolumna)
+        if weaknesses and i < len(weaknesses):
+            p = row_cells[1].paragraphs[0]
+            run = p.add_run("● ")
+            run.font.color.rgb = RGBColor(220, 30, 30)
+            run.bold = True
+            p.add_run(str(weaknesses[i]))
+    table.style = "Table Grid"
+
+def add_examples_person_with_images(doc, persons):
+    p = doc.add_paragraph("Przykłady polityków: ")
+    if not persons:
+        p.add_run("brak danych")
+        return
+    for name in persons:
+        p.add_run(name)
+        p.add_run(", ")
+    # Nie ma automatycznego wstawiania miniaturek do każdego nazwiska bez ręcznej mapy imię->foto
+    # Jeśli chcesz, możesz dodać słownik np. {"Angela Merkel": "url_do_foto"}, i w pętli pobrać i wstawić miniaturkę
+
+def export_word(main_type, second_type, features, main, second,
+                mean_archetype_scores=None, main_img=None, radar_img=None, table_img=None, num_ankiet=None):
     doc = Document()
-    doc.add_heading("Raport AP-48 – Archetypy", 0)
-    doc.add_heading(f"Główny archetyp: {main_type}", level=1)
-    doc.add_paragraph(f"Cechy kluczowe: {features.get(main_type, '-')}")
-    doc.add_paragraph(main.get("description", ""))
-    doc.add_paragraph("Storyline: " + main.get("storyline", ""))
-    doc.add_paragraph("Rekomendacje: " + "\n".join(main.get("recommendations", [])))
+    section = doc.sections[0]
+    section.page_height = 16840  # A4
+    section.page_width = 11900
+    section.left_margin = section.right_margin = 900000 // 20
+
+    # Okładka z obrazkiem z URL
+    cover_bytes = get_image_bytesio_from_url(ARCHE_IMG_URL)
+    doc.add_picture(cover_bytes, width=Inches(3.2))
+    title = doc.add_heading("Raport archetypowy Krzysztofa Hetmana", 0)
+    title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    doc.add_paragraph("Wybory na Prezydenta Miasta Lublin").alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    doc.add_paragraph("Data wygenerowania raportu: " + datetime.now().strftime("%Y-%m-%d %H:%M")).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    doc.add_page_break()
+    intro = doc.add_paragraph()
+    intro.add_run(
+        "Archetypy to uniwersalne wzorce osobowości, które od wieków pomagają ludziom rozumieć świat i budować autentyczną tożsamość. "
+        "Współczesna psychologia, marketing i polityka potwierdzają, że trafnie zdefiniowany archetyp jest potężnym narzędziem komunikacji, pozwalającym budować rozpoznawalność, zaufanie i emocjonalny kontakt. "
+        "\n\nW polityce archetyp pomaga wyeksponować najważniejsze cechy lidera, porządkuje przekaz, wzmacnia spójność strategii oraz wyraźnie różnicuje kandydata na tle konkurencji. "
+        "Wyniki badań archetypowych stanowią dziś istotny fundament do tworzenia skutecznej narracji wyborczej, strategii wizerunkowej i komunikacji z wyborcami.\n\n"
+        "Badanie AP-48 zrealizowane dla Krzysztofa Hetmana pozwala zidentyfikować archetyp główny oraz archetyp wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie w walce o urząd Prezydenta Miasta Lublin."
+    )
+    doc.add_paragraph()
+    pimg = doc.add_paragraph("Koło archetypów (źródło: justynakopec.pl):")
+    add_hyperlink(pimg, ARCHE_IMG_URL, "Zobacz w przeglądarce")
+    wheel_bytes = get_image_bytesio_from_url(ARCHE_IMG_URL)
+    doc.add_picture(wheel_bytes, width=Inches(5))
+    doc.add_page_break()
+    doc.add_heading("Podsumowanie wyników badań archetypowych", 1)
+    doc.add_paragraph(f"W badaniu udział wzięło {num_ankiet} osób. Na podstawie analiz średnich wyników dla wszystkich archetypów zdefiniowano profil główny i pomocniczy kandydata.")
+    doc.add_paragraph("Wizualizacja profilu archetypowego – wykres radarowy:")
+    if radar_img:
+        doc.add_picture(radar_img, width=Inches(5.5))
+    doc.add_paragraph("Podświetlenie głównego (czerwony) i pomocniczego (żółty) archetypu (grafika na bazie koła Justyny Kopeć):")
+    if main_img:
+        doc.add_picture(main_img, width=Inches(4.2))
+    doc.add_paragraph("Liczebność archetypów wśród uczestników badania:")
+    if table_img:
+        doc.add_picture(table_img, width=Inches(5.6))
+    doc.add_page_break()
+
+    # --- GŁÓWNY ARCHETYP ---
+    doc.add_heading(f"GŁÓWNY ARCHETYP: {main_type}", 1)
+    doc.add_paragraph(f"Cechy kluczowe: {features.get(main_type, '-')}", style="List Bullet")
+    doc.add_paragraph(main.get("description", ""), style="Normal")
+    doc.add_paragraph("Storyline: " + main.get("storyline", ""), style="Normal")
+    # Tabela Atuty/Słabości
+    add_two_column_table_atuty_slabosci(doc, main.get("strengths", []), main.get("weaknesses", []))
+    # Slogan
+    if main.get("watchword"):
+        doc.add_paragraph("Slogan: " + "; ".join(main.get("watchword")), style="Intense Quote")
+    # Kolory
+    if main.get("color_palette"):
+        doc.add_paragraph("Kolory: " + ", ".join([COLOR_NAME_MAP.get(c, c) for c in main.get("color_palette")]), style="Normal")
+    # Elementy wizualne
+    doc.add_paragraph("Elementy wizualne: " + ", ".join(main.get("visual_elements", [])), style="Normal")
+    # Przykłady polityków (z miniaturkami, jeśli chcesz rozwinąć – tutaj nazwy)
+    add_examples_person_with_images(doc, main.get("examples_person", []))
+    # Przykłady marek
+    if main.get("example_brands"):
+        doc.add_paragraph("Przykłady marek: " + ", ".join(main.get("example_brands")), style="Normal")
+    # Rekomendacje
+    doc.add_paragraph("Rekomendacje:").bold = True
+    for rec in main.get("recommendations", []):
+        doc.add_paragraph(rec, style="List Bullet 2")
+    # Ciekawostki
+    doc.add_paragraph("Ciekawostki:").bold = True
+    for kw in main.get("keyword_messaging", []):
+        doc.add_paragraph(kw, style="List Bullet 2")
+    doc.add_paragraph()  # odstęp
+
+    # --- ARCHETYP POMOCNICZY ---
     if second_type and second_type != main_type:
-        doc.add_heading(f"Archetyp pomocniczy: {second_type}", level=2)
-        doc.add_paragraph(f"Cechy kluczowe: {features.get(second_type, '-')}")
-        doc.add_paragraph(second.get("description", ""))
-        doc.add_paragraph("Storyline: " + second.get("storyline", ""))
-        doc.add_paragraph("Rekomendacje: " + "\n".join(second.get("recommendations", [])))
+        doc.add_page_break()
+        doc.add_heading(f"ARCHETYP POMOCNICZY: {second_type}", 1)
+        doc.add_paragraph(f"Cechy kluczowe: {features.get(second_type, '-')}", style="List Bullet")
+        doc.add_paragraph(second.get("description", ""), style="Normal")
+        doc.add_paragraph("Storyline: " + second.get("storyline", ""), style="Normal")
+        # Tabela Atuty/Słabości
+        add_two_column_table_atuty_slabosci(doc, second.get("strengths", []), second.get("weaknesses", []))
+        # Slogan
+        if second.get("watchword"):
+            doc.add_paragraph("Slogan: " + "; ".join(second.get("watchword")), style="Intense Quote")
+        # Kolory
+        if second.get("color_palette"):
+            doc.add_paragraph("Kolory: " + ", ".join([COLOR_NAME_MAP.get(c, c) for c in second.get("color_palette")]), style="Normal")
+        # Elementy wizualne
+        doc.add_paragraph("Elementy wizualne: " + ", ".join(second.get("visual_elements", [])), style="Normal")
+        # Przykłady polityków
+        add_examples_person_with_images(doc, second.get("examples_person", []))
+        # Przykłady marek
+        if second.get("example_brands"):
+            doc.add_paragraph("Przykłady marek: " + ", ".join(second.get("example_brands")), style="Normal")
+        # Rekomendacje
+        doc.add_paragraph("Rekomendacje:").bold = True
+        for rec in second.get("recommendations", []):
+            doc.add_paragraph(rec, style="List Bullet 2")
+        # Ciekawostki
+        doc.add_paragraph("Ciekawostki:").bold = True
+        for kw in second.get("keyword_messaging", []):
+            doc.add_paragraph(kw, style="List Bullet 2")
+    doc.add_page_break()
+    doc.add_paragraph(
+        "Raport został automatycznie wygenerowany na podstawie wyników testu AP-48 oraz aktualnych opracowań z zakresu archetypów liderów i psychologii komunikacji."
+    )
     buf = BytesIO()
     doc.save(buf)
     buf.seek(0)
     return buf
 
-def export_pdf(main_type, second_type, features, main, second):
+def export_pdf(main_type, second_type, features, main, second,
+               mean_archetype_scores=None, main_img=None, radar_img=None, table_img=None, num_ankiet=None):
     pdf = FPDF()
+    # Rejestracja wszystkich wariantów czcionki (ważne!)
+    pdf.add_font('DejaVu', '', 'fonts/DejaVuSans.ttf', uni=True)
+    pdf.add_font('DejaVu', 'B', 'fonts/DejaVuSans-Bold.ttf', uni=True)
+    pdf.add_font('DejaVu', 'I', 'fonts/DejaVuSans-Oblique.ttf', uni=True)
+    pdf.add_font('DejaVu', 'BI', 'fonts/DejaVuSans-BoldOblique.ttf', uni=True)
+    pdf.set_font("DejaVu", "", 22)
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, clean_pdf_text("Raport AP-48 – Archetypy"), ln=1)
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 8, clean_pdf_text(f"Główny archetyp: {main_type}"), ln=1)
-    pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(
-        0, 7, clean_pdf_text(
-            f"Cechy kluczowe: {features.get(main_type, '-')}\n\n"
-            f"{main.get('description', '')}\n\n"
-            f"Storyline: {main.get('storyline', '')}\n\n"
-            f"Rekomendacje: " + "\n".join(main.get("recommendations", [])) + "\n"
-        )
+    pdf.set_text_color(13,85,185)
+    pdf.cell(0, 16, "RAPORT ARCHETYPÓW: KRZYSZTOF HETMAN", ln=1, align='C')
+    pdf.set_font("DejaVu", "", 14)
+    pdf.set_text_color(0)
+    pdf.cell(0, 10, "Wybory na Prezydenta Miasta Lublin", ln=1, align='C')
+    pdf.set_font("DejaVu", "", 10)
+    pdf.cell(0, 9, f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1, align='C')
+    pdf.ln(9)
+    pdf.set_font("DejaVu", "B", 16)
+    pdf.cell(0, 12, "Wstęp: Czym są archetypy i jak je wykorzystywać?", ln=1)
+    pdf.set_font("DejaVu", "", 11)
+    pdf.multi_cell(0, 8,
+        "Archetypy to uniwersalne wzorce osobowości, które pomagają budować autentyczną tożsamość oraz rozpoznawalność lidera. "
+        "W polityce archetypy pomagają zrozumieć, jak kandydat jest postrzegany i jakie emocje budzi jego komunikacja. "
+        "Stanowią praktyczne narzędzie do precyzyjnego pozycjonowania, budowy strategii i skutecznego dialogu z wyborcami.\n\n"
+        "W badaniu AP-48 przeanalizowano, które archetypy dominują u Krzysztofa Hetmana. Pozwala to tworzyć spójny, inspirujący wizerunek, osadzony w realnych oczekiwaniach społecznych."
     )
+    pdf.ln(3)
+    pdf.set_font("DejaVu", "I", 10)
+    pdf.set_text_color(13, 85, 185)
+    pdf.cell(0, 8, "Zobacz wizualizację koła archetypów: https://justynakopec.pl/wp-content/uploads/2024/08/Archetypy-marki-Justyna-Kopec.png", ln=1, align='L')
+    pdf.set_text_color(0)
+    pdf.ln(4)
+    pdf.set_font("DejaVu", "B", 15)
+    pdf.cell(0, 11, "Podsumowanie wyników badania:", ln=1)
+    pdf.set_font("DejaVu", "", 11)
+    pdf.multi_cell(0, 8, f"W badaniu udział wzięło {num_ankiet} osób. Zidentyfikowano następujący profil archetypowy dla kandydata.")
+    pdf.ln(1)
+    if radar_img:
+        radar_img.seek(0)
+        img = Image.open(radar_img)
+        tmp_radar = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        img.save(tmp_radar, "PNG")
+        tmp_radar.flush()
+        pdf.image(tmp_radar.name, w=120)
+    pdf.ln(2)
+    if main_img:
+        main_img.seek(0)
+        img = Image.open(main_img)
+        tmp_main = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        img.save(tmp_main, "PNG")
+        tmp_main.flush()
+        pdf.image(tmp_main.name, w=72)
+    pdf.ln(2)
+    if table_img:
+        table_img.seek(0)
+        img = Image.open(table_img)
+        tmp_tbl = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        img.save(tmp_tbl, "PNG")
+        tmp_tbl.flush()
+        pdf.image(tmp_tbl.name, w=140)
+    pdf.ln(3)
+    pdf.set_font("DejaVu", "B", 13)
+    pdf.set_text_color(210, 0, 0)
+    pdf.cell(0, 9, f"Główny archetyp: {main_type}", ln=1)
+    pdf.set_font("DejaVu", "", 11)
+    pdf.set_text_color(0)
+    pdf.multi_cell(0, 7, f"Cechy kluczowe: {features.get(main_type, '-')}")
+    pdf.multi_cell(0, 7, main.get('description', ""))
+    pdf.multi_cell(0, 7, "Storyline: " + main.get('storyline', ""))
+
+    # Tabela Atuty/Słabości
+    strengths = main.get("strengths", [])
+    weaknesses = main.get("weaknesses", [])
+    pdf.set_font("DejaVu", "B", 11)
+    pdf.cell(0, 7, "Atuty         Słabości", ln=1)
+    pdf.set_font("DejaVu", "", 10)
+    for i in range(max(len(strengths), len(weaknesses))):
+        left = f"● {strengths[i]}" if i < len(strengths) else ""
+        right = f"● {weaknesses[i]}" if i < len(weaknesses) else ""
+        pdf.set_text_color(15, 90, 180)
+        pdf.cell(60, 7, left)
+        pdf.set_text_color(220, 30, 30)
+        pdf.cell(0, 7, right, ln=1)
+        pdf.set_text_color(0)
+    # Slogan
+    if main.get("watchword"):
+        pdf.set_font("DejaVu", "I", 11)
+        pdf.multi_cell(0, 7, "Slogan: " + "; ".join(main.get("watchword")))
+    # Kolory
+    if main.get("color_palette"):
+        pdf.set_font("DejaVu", "", 10)
+        pdf.multi_cell(0, 7, "Kolory: " + ", ".join([COLOR_NAME_MAP.get(c, c) for c in main.get("color_palette")]))
+    # Elementy wizualne
+    pdf.multi_cell(0, 7, "Elementy wizualne: " + ", ".join(main.get("visual_elements", [])))
+    # Przykłady polityków
+    if main.get("examples_person"):
+        pdf.set_font("DejaVu", "B", 10)
+        pdf.cell(0, 7, "Przykłady polityków: " + ", ".join(main.get("examples_person")), ln=1)
+    # Przykłady marek
+    if main.get("example_brands"):
+        pdf.set_font("DejaVu", "", 10)
+        pdf.multi_cell(0, 7, "Przykłady marek: " + ", ".join(main.get("example_brands")))
+    pdf.set_font("DejaVu", "B", 11)
+    pdf.cell(0, 7, "Rekomendacje:", ln=1)
+    pdf.set_font("DejaVu", "", 10)
+    for rec in main.get('recommendations', []):
+        pdf.multi_cell(0, 7, "- " + rec)
+    pdf.set_font("DejaVu", "B", 11)
+    pdf.cell(0, 7, "Ciekawostki:", ln=1)
+    pdf.set_font("DejaVu", "", 10)
+    for kw in main.get('keyword_messaging', []):
+        pdf.multi_cell(0, 7, "- " + kw)
+    pdf.ln(1)
+
     if second_type and second_type != main_type:
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, clean_pdf_text(f"Archetyp pomocniczy: {second_type}"), ln=1)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(
-            0, 7, clean_pdf_text(
-                f"Cechy kluczowe: {features.get(second_type, '-')}\n\n"
-                f"{second.get('description', '')}\n\n"
-                f"Storyline: {second.get('storyline', '')}\n\n"
-                f"Rekomendacje: " + "\n".join(second.get("recommendations", []))
-            )
-        )
-    pdf_bytes = pdf.output(dest='S').encode('latin1')
+        pdf.set_font("DejaVu", "B", 12)
+        pdf.set_text_color(210, 165, 31)
+        pdf.cell(0, 9, f"Archetyp pomocniczy: {second_type}", ln=1)
+        pdf.set_text_color(0)
+        pdf.set_font("DejaVu", "", 11)
+        pdf.multi_cell(0, 7, f"Cechy kluczowe: {features.get(second_type, '-')}")
+        pdf.multi_cell(0, 7, second.get('description', ""))
+        pdf.multi_cell(0, 7, "Storyline: " + second.get('storyline', ""))
+        strengths = second.get("strengths", [])
+        weaknesses = second.get("weaknesses", [])
+        pdf.set_font("DejaVu", "B", 11)
+        pdf.cell(0, 7, "Atuty         Słabości", ln=1)
+        pdf.set_font("DejaVu", "", 10)
+        for i in range(max(len(strengths), len(weaknesses))):
+            left = f"● {strengths[i]}" if i < len(strengths) else ""
+            right = f"● {weaknesses[i]}" if i < len(weaknesses) else ""
+            pdf.set_text_color(15, 90, 180)
+            pdf.cell(60, 7, left)
+            pdf.set_text_color(220, 30, 30)
+            pdf.cell(0, 7, right, ln=1)
+            pdf.set_text_color(0)
+        if second.get("watchword"):
+            pdf.set_font("DejaVu", "I", 11)
+            pdf.multi_cell(0, 7, "Slogan: " + "; ".join(second.get("watchword")))
+        if second.get("color_palette"):
+            pdf.set_font("DejaVu", "", 10)
+            pdf.multi_cell(0, 7, "Kolory: " + ", ".join([COLOR_NAME_MAP.get(c, c) for c in second.get("color_palette")]))
+        pdf.multi_cell(0, 7, "Elementy wizualne: " + ", ".join(second.get("visual_elements", [])))
+        if second.get("examples_person"):
+            pdf.set_font("DejaVu", "B", 10)
+            pdf.cell(0, 7, "Przykłady polityków: " + ", ".join(second.get("examples_person")), ln=1)
+        if second.get("example_brands"):
+            pdf.set_font("DejaVu", "", 10)
+            pdf.multi_cell(0, 7, "Przykłady marek: " + ", ".join(second.get("example_brands")))
+        pdf.set_font("DejaVu", "B", 11)
+        pdf.cell(0, 7, "Rekomendacje:", ln=1)
+        pdf.set_font("DejaVu", "", 10)
+        for rec in second.get('recommendations', []):
+            pdf.multi_cell(0, 7, "- " + rec)
+        pdf.set_font("DejaVu", "B", 11)
+        pdf.cell(0, 7, "Ciekawostki:", ln=1)
+        pdf.set_font("DejaVu", "", 10)
+        for kw in second.get('keyword_messaging', []):
+            pdf.multi_cell(0, 7, "- " + kw)
+        pdf.ln(2)
+    pdf.set_font("DejaVu", "I", 9)
+    pdf.cell(0, 7, "Raport automatycznie wygenerowany na podstawie testu AP-48 oraz aktualnych badań nad archetypami liderów.", ln=1)
+    # NIE kodujemy .encode('latin1'), tylko .encode('utf-8')!
+    pdf_bytes = bytes(pdf.output(dest='S'), encoding='utf-8')
     buf = BytesIO(pdf_bytes)
     buf.seek(0)
     return buf
 
-def is_color_dark(color_hex):
-    if color_hex is None:
-        return False
-    if not color_hex.startswith('#') or len(color_hex) not in (7, 4):
-        return False
-    h = color_hex.lstrip('#')
-    if len(h) == 3:
-        h = ''.join([c*2 for c in h])
-    r, g, b = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-    lum = 0.2126*r + 0.7152*g + 0.0722*b
-    return lum < 110
+# ================= PANEL ADMINA + RAPORTY ===================
 
-def render_archetype_card(archetype_data, main=True):
-    if not archetype_data:
-        st.warning("Brak danych o archetypie.")
-        return
+with st.expander("Panel administracyjny"):
+    df = load()
+    st.write("Dane z bazy (ostatnie 500):", df.tail(500))
+    if st.button("Eksportuj wszystkie dane do CSV"):
+        st.download_button("Pobierz plik CSV", df.to_csv(index=False), file_name="ap48_all_data.csv")
 
-    border_color = archetype_data.get('color_palette', ['#888'])[0]
-    tagline = archetype_data.get('tagline','')
-    if (archetype_data.get('name','').strip().lower() == 'niewinny') and not main:
-        tagline = "Niesie nadzieję, inspiruje do współpracy, buduje zaufanie szczerością i apeluje o wspólne dobro, otwarcie komunikuje pozytywne wartości."
-    symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
-    symbol_emoji = {
-        "Korona": "👑", "Herb Lublina": "🛡️", "Peleryna": "🦸", "Serce": "❤️","Uśmiech": "😊","Dłonie": "🤝",
-        "Księga": "📖", "Mapa": "🗺️","Gwiazda": "⭐", "Gołąb": "🕊️","Piorun": "⚡", "Rubika": "🧩", "Dom": "🏡"
-    }
-    icon = symbol_emoji.get(symbol, "🔹")
-    box_shadow = f"0 4px 14px 0 {border_color}44" if main else f"0 2px 6px 0 {border_color}22"
-    bg_color = "#FAFAFA" if not main else (archetype_data.get('color_palette', ['#FFF', '#FAFAFA'])[1])
-    width_card = "70vw"
-    text_color = "#222"
-    tagline_color = "#88894A" if archetype_data.get('name','').lower() == "niewinny" else border_color
-    if main and is_color_dark(bg_color):
-        text_color = "#fff"
-        tagline_color = "#FFD22F" if archetype_data.get('name','').lower() == "bohater" else "#fffbea"
-
-    # Kolory, wyświetlane z małej litery i bez nawiasów wokół całości:
-    color_palette = archetype_data.get('color_palette', [])
-    color_names = [COLOR_NAME_MAP.get(c.upper(), c).lower() for c in color_palette] if color_palette else []
-    color_icons_html = ""
-    if color_palette and isinstance(color_palette, list):
-        color_icons_html = ''.join(
-            f'<span style="display:inline-block;width:23px;height:23px;border-radius:50%;background:{c};margin-right:6px;border:2px solid #222;vertical-align:middle;"></span>'
-            for c in color_palette
+results_df = df
+if not results_df.empty and "answers" in results_df.columns:
+    results_df["archetype_scores"] = results_df["answers"].apply(archetype_scores)
+    for name in archetypes:
+        results_df[name] = results_df["archetype_scores"].apply(lambda x: x[name] if x else None)
+    archetype_names = list(archetypes.keys())
+    mean_archetype_scores = results_df[archetype_names].mean().round(2).to_dict()
+    num_ankiet = len(results_df)
+    main_type, second_type = pick_main_and_aux_archetype(mean_archetype_scores, ARCHE_NAMES_ORDER)
+    main = archetype_extended.get(main_type, {})
+    second = archetype_extended.get(second_type, {}) if second_type else {}
+    archetype_table = results_df[archetype_names].apply(lambda row: pd.Series(row), axis=1)
+    archetype_table["Główny archetyp"] = archetype_table[archetype_names].idxmax(axis=1)
+    table_counts = archetype_table["Główny archetyp"].value_counts().reset_index()
+    table_counts.columns = ["Archetyp", "Liczba osób"]
+    table_counts = table_counts.merge(pd.DataFrame({"Archetyp": ARCHE_NAMES_ORDER}), how="right").fillna(0).astype({"Liczba osób": int})
+    table_img = pil_to_bytesio(archetype_table_img(table_counts[["Archetyp","Liczba osób"]]))
+    fig_radar = go.Figure(
+        data=[
+            go.Scatterpolar(
+                r=list(mean_archetype_scores.values()) + [list(mean_archetype_scores.values())[0]],
+                theta=archetype_names + [archetype_names[0]],
+                fill='toself',
+                name='Średnia wszystkich',
+                line=dict(color="royalblue", width=3),
+                marker=dict(size=6)
+            ),
+        ],
+        layout=go.Layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 20]),
+                angularaxis=dict(tickfont=dict(size=16), tickvals=archetype_names)
+            ),
+            width=480, height=480,
+            margin=dict(l=10, r=10, t=20, b=20),
+            showlegend=False
         )
-    color_desc_html = ""
-    if color_palette and isinstance(color_palette, list) and color_names:
-        color_items = [f"{n} ({h})" for n, h in zip(color_names, color_palette)]
-        color_desc_html = '<div style="color:#222;font-size:0.98em;margin-top:3px;margin-bottom:7px;">' + ', '.join(color_items) + '</div>'
-
-    # Pytania archetypowe
-    questions = archetype_data.get('questions', [])
-    questions_html = ""
-    if questions and isinstance(questions, list):
-        questions_html = "<ul style='margin-left:20px;margin-top:5px;'>"
-        for q in questions:
-            questions_html += f"<li style='margin-bottom:3px; font-size:1.07em;'>{q}</li>"
-        questions_html += "</ul>"
-
-    # Atuty/Słabości – punktory w tej samej linii co rekomendacje (padding-left:24px)
-    strengths = archetype_data.get('strengths', [])
-    weaknesses = archetype_data.get('weaknesses', [])
-
-    strengths_html = "" if not strengths else (
-        "<div style='padding-left:24px;'>"
-        + ''.join(
-            "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
-            "<span style='color: green !important; font-size:1.14em; margin-right:9px; vertical-align:middle;'>✅</span>"
-            f"<span style='font-size:1.07em; color:#111'>{s[0].lower()+s[1:]}</span>"
-            "</div>"
-            for s in strengths
-        )
-        + "</div>"
     )
-
-    weaknesses_html = "" if not weaknesses else (
-        "<div style='padding-left:24px;'>"
-        + ''.join(
-            "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
-            "<span style='color:#d32f2f !important; font-size:1.02em; margin-right:9px; vertical-align:middle;'>❌</span>"
-            f"<span style='font-size:1.07em; color:#111'>{w[0].lower()+w[1:]}</span>"
-            "</div>"
-            for w in weaknesses
-        )
-        + "</div>"
-    )
-
-    # Przykłady polityków
-    examples_person = archetype_data.get('examples_person', [])
-    examples_person_html = ""
-    if examples_person:
-        examples_person_html = (
-            "<div style='margin-top:24px;font-weight:600;'>Przykłady polityków:</div>\n" +
-            "<div style='margin-bottom:8px;'>" + ', '.join(examples_person) + "</div>"
-        )
-
-    # Slogan
-    watchword = archetype_data.get('watchword', [])
-    watchword_html = ""
-    if watchword and isinstance(watchword, list) and watchword[0].strip():
-        watchword_html = (
-            "<div style='margin-top:24px;font-weight:600;'>Slogan:</div>"
-            f"<div style='margin-bottom:8px; margin-top:4px;'>{watchword[0]}</div>"
-        )
-
-    # Cechy, słowa kluczowe, elementy wizualne – tylko pierwszy element z dużej litery, reszta z małej
-    def smart_list(lst):
-        return ', '.join(
-            [lst[0][0].upper() + lst[0][1:]] +
-            [x[0].lower() + x[1:] if x else "" for x in lst[1:]]
-        ) if lst else ""
-
-    traits_str = smart_list(archetype_data.get('core_traits', []))
-    keywords_str = smart_list(archetype_data.get('keyword_messaging', []))
-    visuals_str = smart_list(archetype_data.get('visual_elements', []))
-
-    st.markdown(f"""
-    <div style="
-        max-width:{width_card};
-        border: 3px solid {border_color if main else '#CCC'};
-        border-radius: 20px;
-        background: {bg_color};
-        box-shadow: {box_shadow};
-        padding: 2.1em 2.2em 1.3em 2.2em;
-        margin-bottom: 32px;
-        color: {text_color};
-        display: flex; align-items: flex-start;">
-        <div style="font-size:2.6em; margin-right:23px; margin-top:7px; flex-shrink:0;">{icon}</div>
-        <div>
-            <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
-                {archetype_data.get('name','?')}
-            </div>
-            <div style="font-size:1.3em; font-style:italic; color:{tagline_color}; margin-bottom:38px; margin-top:4px;">
-                {tagline}
-            </div>
-            <div style="margin-top:21px; font-size:1.07em;">
-                <b>Opis:</b><br>
-                <span style="font-weight:400 !important;">
-                    <i>{archetype_data.get('description','')}</i>
-                </span>
-            </div>
-            <div style="color:#222;font-size:1.07em; margin-top:21px;">
-                <b>Cechy:</b> <span style="font-weight:400;">{traits_str}</span>
-            </div>
-            <div style="margin-top:24px;font-weight:600;">Storyline:</div>
-            <div style="margin-bottom:9px; margin-top:4px; font-size:1.07em;">{archetype_data.get('storyline','')}</div>
-            <div style="margin-top:16px;font-weight:600;">Atuty:</div>
-            {strengths_html if strengths_html else '<div style="color:#888; padding-left:24px;">-</div>'}
-            <div style="margin-top:2px;font-weight:600;">Słabości:</div>
-            {weaknesses_html if weaknesses_html else '<div style="color:#888; padding-left:24px;">-</div>'}
-            <div style="margin-top:24px;font-weight:600;">Rekomendacje:</div>
-            <ul style="padding-left:24px; margin-bottom:9px;">
-                 {''.join(f'<li style="margin-bottom:2px; font-size:1.07em;">{r}</li>' for r in archetype_data.get('recommendations',[]))}
-            </ul>
-            <div style="margin-top:29px;font-weight:600;">Słowa kluczowe:</div>
-            <div style="margin-bottom:8px;">{keywords_str}</div>
-            <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
-            <div style="margin-bottom:8px;">{visuals_str}</div>
-            {examples_person_html}
-            <div style="margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
-            <div style="margin-bottom:24px;">{', '.join(archetype_data.get('example_brands',[]))}</div>
-            {watchword_html}
-            {"<div style='margin-top:32px;font-weight:600;'>Kolory:</div>" if color_palette else ""}
-            {"<div style='margin-bottom:2px; margin-top:7px;'>" + color_icons_html + "</div>" if color_icons_html else ""}
-            {color_desc_html}
-            {"<div style='margin-top:22px;font-weight:600;'>Pytania archetypowe:</div>" if questions else ""}
-            {questions_html}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
-
-data = load()
-num_ankiet = len(data) if not data.empty else 0
-
-header_col1, header_col2 = st.columns([0.77, 0.23])
-with header_col1:
-    st.markdown("""
-    <div style="font-size:2.3em; font-weight:bold; background:#1a93e3; color:#fff; 
-        padding:14px 32px 10px 24px; border-radius:2px; width:fit-content; display:inline-block;">
-        Archetypy Krzysztofa Hetmana – panel administratora
-    </div>
-    """, unsafe_allow_html=True)
-with header_col2:
-    st.markdown(f"""
-    <div style="display:flex;align-items:center;justify-content:flex-end;height:100%;"><div style="font-size:1.23em;text-align:right;background:#f3f3fa;padding:12px 29px 8px 29px; border-radius:17px; border:2px solid #d1d9ed;color:#195299;font-weight:600;box-shadow:0 2px 10px 0 #b5c9e399;">
-        <span style="font-size:1.8em;font-weight:bold;">{num_ankiet}</span><br/>uczestników badania
-    </div></div>
-    """, unsafe_allow_html=True)
-
-st.markdown("""
-<hr style="height:1.3px;background:#eaeaec; margin-top:1.8em; margin-bottom:3.8em; border:none;" />
-""", unsafe_allow_html=True)
-
-if "answers" in data.columns and not data.empty:
-    results = []
-    for idx, row in data.iterrows():
-        if not isinstance(row.get("answers", None), list):
-            continue
-        arcsums = archetype_scores(row["answers"])
-        arcper = {k: archetype_percent(v) for k, v in arcsums.items()}
-        main_type, second_type = pick_main_and_aux_archetype(arcsums, ARCHE_NAMES_ORDER)
-        main = archetype_extended.get(main_type, {})
-        second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
-        czas_ankiety = None
-        if pd.notna(row.get("created_at", None)):
-            try:
-                czas_ankiety = row["created_at"].astimezone(pytz.timezone('Europe/Warsaw')).strftime('%Y-%m-%d %H:%M:%S')
-            except Exception:
-                czas_ankiety = row["created_at"].strftime('%Y-%m-%d %H:%M:%S')
-        else:
-            czas_ankiety = ""
-        results.append({
-            "Czas ankiety": czas_ankiety,
-            **arcsums,
-            **{f"{k}_%" : v for k,v in arcper.items()},
-            "Główny archetyp": main_type,
-            "Cechy kluczowe": archetype_features.get(main_type,""),
-            "Opis": main.get("description", ""),
-            "Storyline": main.get("storyline", ""),
-            "Rekomendacje": "\n".join(main.get("recommendations", [])),
-            "Archetyp pomocniczy": second_type if second_type != main_type else "",
-            "Cechy pomocniczy": archetype_features.get(second_type,"") if second_type != main_type else "",
-            "Opis pomocniczy": second.get("description", "") if second_type != main_type else "",
-            "Storyline pomocniczy": second.get("storyline", "") if second_type != main_type else "",
-            "Rekomendacje pomocniczy": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
-        })
-    results_df = pd.DataFrame(results)
-    if not results_df.empty and "Czas ankiety" in results_df.columns:
-        results_df = results_df.sort_values("Czas ankiety", ascending=True)
-        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypu Krzysztofa Hetmana</div>', unsafe_allow_html=True)
-        archetype_names = ARCHE_NAMES_ORDER
-        counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
-        counts_aux = results_df['Archetyp pomocniczy'].value_counts().reindex(archetype_names, fill_value=0)
-        mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
-        main_type, second_type = pick_main_and_aux_archetype(mean_archetype_scores, archetype_names)
-        col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
-
-        with col1:
-            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych i pomocniczych</div>', unsafe_allow_html=True)
-            archetype_emoji = {
-                "Władca":"👑", "Bohater":"🦸", "Mędrzec":"📖", "Opiekun":"🤝", "Kochanek":"❤️",
-                "Błazen":"😂", "Twórca":"🧩", "Odkrywca":"🗺️", "Czarodziej":"⭐", "Towarzysz":"🏡",
-                "Niewinny":"🕊️", "Buntownik":"⚡"
-            }
-            def zero_to_dash(val): return "-" if val == 0 else str(val)
-            archetype_table = pd.DataFrame({
-                "Archetyp": [f"{archetype_emoji.get(n,n)} {n}" for n in archetype_names],
-                "Główny archetyp": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
-                "Pomocniczy archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names]
-            })
-            archetype_table_html = archetype_table.to_html(escape=False, index=False)
-            archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
-            archetype_table_html = archetype_table_html.replace('<td>', '<td style="text-align:center">')
-            def align_first_column_to_left_with_width(html):
-                html = re.sub(
-                    r'(<tr[^>]*>)(\s*<td style="text-align:center">)',
-                    lambda m: m.group(1) + m.group(2).replace('text-align:center', 'text-align:left;width:24%;'), html
-                )
-                html = html.replace(
-                    '<th style="text-align:center">Archetyp</th>',
-                    '<th style="text-align:center;width:24%;">Archetyp</th>'
-                )
-                html = html.replace(
-                    '<th style="text-align:center">Główny archetyp</th>',
-                    '<th style="text-align:center;width:18%;">Główny archetyp</th>'
-                ).replace(
-                    '<th style="text-align:center">Pomocniczy archetyp</th>',
-                    '<th style="text-align:center;width:18%;">Pomocniczy archetyp</th>'
-                )
-                html = re.sub(
-                    r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
-                    r'(\s*<td style="text-align:center">)',
-                    r'<tr>\1<td style="text-align:center;width:18%">', html
-                )
-                html = re.sub(
-                    r'(<td style="text-align:center;width:18%">.*?</td>)'
-                    r'(\s*<td style="text-align:center">)',
-                    r'\1<td style="text-align:center;width:18%">', html
-                )
-                return html
-            archetype_table_html = align_first_column_to_left_with_width(archetype_table_html)
-            archetype_table_html = archetype_table_html.replace(
-                '<table ',
-                '<table style="margin-left:0px;margin-right:0px;width:99%;" '
-            )
-            st.markdown(archetype_table_html, unsafe_allow_html=True)
-
-        with col2:
-            theta_labels = []
-            for n in archetype_names:
-                if n == main_type:
-                    theta_labels.append(f"<b><span style='color:red;'>{n}</span></b>")
-                elif n == second_type:
-                    theta_labels.append(f"<b><span style='color:#FFD22F;'>{n}</span></b>")
-                else:
-                    theta_labels.append(f"<span style='color:#656565;'>{n}</span>")
-            highlight_r = []
-            highlight_marker_color = []
-            for i, name in enumerate(archetype_names):
-                if name == main_type:
-                    highlight_r.append(mean_archetype_scores[name])
-                    highlight_marker_color.append("red")
-                elif name == second_type:
-                    highlight_r.append(mean_archetype_scores[name])
-                    highlight_marker_color.append("#FFD22F")
-                else:
-                    highlight_r.append(None)
-                    highlight_marker_color.append("rgba(0,0,0,0)")
-            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px; text-align:center;">Profil archetypów Krzysztofa Hetmana</div>', unsafe_allow_html=True)
-            fig = go.Figure(
-                data=[
-                    go.Scatterpolar(
-                        r=list(mean_archetype_scores.values()) + [list(mean_archetype_scores.values())[0]],
-                        theta=archetype_names + [archetype_names[0]],
-                        fill='toself',
-                        name='Średnia wszystkich',
-                        line=dict(color="royalblue", width=3),
-                        marker=dict(size=6)
-                    ),
-                    go.Scatterpolar(
-                        r=highlight_r,
-                        theta=archetype_names,
-                        mode='markers',
-                        marker=dict(size=18, color=highlight_marker_color, opacity=0.95, line=dict(color="black", width=2)),
-                        name='Archetyp główny / pomocniczy',
-                        showlegend=False,
-                    )
-                ],
-                layout=go.Layout(
-                    polar=dict(
-                        radialaxis=dict(visible=True, range=[0, 20]),
-                        angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels)
-                    ),
-                    width=550, height=550,
-                    margin=dict(l=20, r=20, t=32, b=32),
-                    showlegend=False
-                )
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            st.markdown("""
-            <div style="display: flex; justify-content: center; align-items: center; margin:10px 0 3px 0;">
-            <span style="display:inline-block;vertical-align:middle;width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;margin-right:6px"></span>
-            <span style="font-size:0.80em;vertical-align:middle;margin-right:18px; color:#111;">Archetyp główny</span>
-            <span style="display:inline-block;vertical-align:middle;width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;margin-right:6px"></span>
-            <span style="font-size:0.80em;vertical-align:middle;color:#555;">Archetyp pomocniczy</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-            if main_type is not None:
-                kola_img = compose_archetype_highlight(
-                    archetype_name_to_img_idx(main_type),
-                    archetype_name_to_img_idx(second_type) if second_type != main_type else None
-                )
-                st.image(
-                    kola_img,
-                    caption="Podświetlenie: główny – czerwony, pomocniczy – żółty",
-                    width=700
-                )
-
-        st.markdown("""
-        <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
-        """, unsafe_allow_html=True)
-
-        st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny Krzysztofa Hetmana</div>', unsafe_allow_html=True)
-        render_archetype_card(archetype_extended.get(main_type, {}), main=True)
-
-        if second_type and second_type != main_type:
-            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True) # większy margines górny
-            st.markdown("""
-            <hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />
-            """, unsafe_allow_html=True)
-            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp pomocniczy Krzysztofa Hetmana</div>", unsafe_allow_html=True)
-            render_archetype_card(archetype_extended.get(second_type, {}), main=False)
-
-        # ----------- ODDZIELACZ I NAGŁÓWEK dla raportów -----------
-        st.markdown("""
-        <div style='height:44px;'></div>
-        <hr style="height:1px; border:none; background:#e5e5e5; margin-bottom:26px;" />
-        <div style="font-size:1.2em; font-weight:600; margin-bottom:23px;">
-            Pobierz raporty archetypu Krzysztofa Hetmana
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
-        docx_buf = export_word(main_type, second_type, archetype_features, main, second)
-        pdf_buf = export_pdf(main_type, second_type, archetype_features, main, second)
-
-        word_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#185abd'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>W</text></svg>"
-        pdf_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#d32f2f'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>PDF</text></svg>"
-
-        st.markdown(
-            f"""
-            <div style="display:flex;flex-direction:column;align-items:flex-start;">
-                <div style="margin-bottom:11px;">
-                    {word_icon}
-                    <span style="vertical-align:middle;">
-                        <b>Eksport do Word (.docx)</b>
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-        st.download_button(
-            "Pobierz raport (Word)",
-            data=docx_buf,
-            file_name="ap48_raport.docx",
-            key="word_button"
-        )
-
-        st.markdown(
-            f"""
-                <div style="margin-top:21px; margin-bottom:11px;">
-                    {pdf_icon}
-                    <span style="vertical-align:middle;">
-                        <b>Eksport do PDF (.pdf)</b>
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-
-        st.download_button(
-            "Pobierz raport (PDF)",
-            data=pdf_buf,
-            file_name="ap48_raport.pdf",
-            key="pdf_button"
-        )
-
-        st.markdown("""
-        <hr style="height:1px; border:none; background:#eee; margin-top:38px; margin-bottom:24px;" />
-        """, unsafe_allow_html=True)
-
-        st.markdown('<div style="font-size:1.13em;font-weight:600;margin-bottom:13px;">Tabela odpowiedzi respondentów (pełne wyniki)</div>', unsafe_allow_html=True)
-        final_df = results_df.copy()
-        try:
-            col_to_exclude = [
-                "Czas ankiety", "Archetyp", "Główny archetyp", "Cechy kluczowe", "Opis", "Storyline",
-                "Rekomendacje", "Archetyp pomocniczy", "Cechy pomocniczy", "Opis pomocniczy",
-                "Storyline pomocniczy", "Rekomendacje pomocniczy"
-            ]
-            means = final_df.drop(columns=col_to_exclude, errors="ignore").mean(numeric_only=True)
-            summary_row = {col: round(means[col], 2) if col in means else "-" for col in final_df.columns}
-            summary_row["Czas ankiety"] = "ŚREDNIA"
-            final_df = pd.concat([final_df, pd.DataFrame([summary_row])], ignore_index=True)
-        except Exception as e:
-            pass
-        st.dataframe(final_df, hide_index=True)
-        st.download_button("Pobierz wyniki archetypów (CSV)", final_df.to_csv(index=False), "ap48_archetypy.csv")
-        buffer = io.BytesIO()
-        final_df.to_excel(buffer, index=False)
-        st.download_button(
-            label="Pobierz wyniki archetypów (XLSX)",
-            data=buffer.getvalue(),
-            file_name="ap48_archetypy.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-else:
-    st.info("Brak danych 'answers' – nie wykryto odpowiedzi w bazie danych.")
+    radar_img = pil_to_bytesio(radar_pil_img(fig_radar))
+    kola_img = pil_to_bytesio(compose_archetype_highlight(
+        archetype_name_to_img_idx(main_type),
+        archetype_name_to_img_idx(second_type) if second_type != main_type else None
+    ))
+    docx_buf = export_word(main_type, second_type, archetype_features, main, second,
+                           mean_archetype_scores, kola_img, radar_img, table_img, num_ankiet)
+    pdf_buf = export_pdf(main_type, second_type, archetype_features, main, second,
+                        mean_archetype_scores, kola_img, radar_img, table_img, num_ankiet)
+    st.download_button("Pobierz raport DOCX", docx_buf, file_name="Raport_archetypowy_Hetman.docx")
+    st.download_button("Pobierz raport PDF", pdf_buf, file_name="Raport_archetypowy_Hetman.pdf")
+    st.header("Podsumowanie głównych archetypów:")
+    st.plotly_chart(fig_radar, use_container_width=False)
+    st.image(kola_img, caption="Główny i pomocniczy archetyp na kole archetypów", width=400)
+    st.image(table_img, caption="Liczebność poszczególnych archetypów")
+    st.write("Profil Hetmana:")
+    st.write(f"Główny archetyp: **{main_type}**")
+    if second_type and second_type != main_type:
+        st.write(f"Archetyp pomocniczy: **{second_type}**")
+    st.write(f"Liczba ankietowanych: {num_ankiet}")

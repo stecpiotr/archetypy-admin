@@ -1,2 +1,5 @@
 .streamlit/secrets.toml
+admin_dashboard2.py
+backup_admin.py
+ext.py
 .idea/

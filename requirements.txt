@@ -7,5 +7,6 @@ python-docx
 requests
 Pillow
 openpyxl
+kaleido
+matplotlib
 numpy
-
