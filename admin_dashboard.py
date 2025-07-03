@@ -28,7 +28,7 @@ else:
 from docxtpl import InlineImage
 from docx.shared import Mm
 
-def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
+def get_logo_svg_path(brand_name, logos_dir="logos_local"):
     filename = (
         brand_name.lower()
             .replace(" ", "-")
@@ -55,19 +55,33 @@ def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
         return path2
     return None
 
-def svg_to_png_bytes(svg_path, width_mm=15):
-    try:
-        import cairosvg
-        with open(svg_path, "rb") as svg_file:
-            svg_bytes = svg_file.read()
-        width_px = int(width_mm * 3.78 * 4)  # Skaluje ×4 dla lepszej jakości
-        return cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
-    except Exception:
-        # Fallback gdy cairosvg niedostępny lub błąd przy konwersji
-        with open("static/placeholder.png", "rb") as f:
-            return f.read()
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 
-def build_brands_for_word(doc, brand_list, logos_dir=r"C:\ap48\ap48-admin\logos_local", width_mm=15):
+def svg_to_png_bytes(svg_path, width_mm=15, placeholder_path="static/placeholder.png"):
+    width_px = int(width_mm * 3.78)
+    # Najpierw spróbuj wczytać własny PNG/placeholder z projektu (jeśli taki masz)
+    try:
+        with open(placeholder_path, "rb") as f:
+            return f.read()
+    except Exception:
+        pass
+    # Jeśli plik placeholder.png nie istnieje: generuj graficzny placeholder programowo
+    im = Image.new("RGBA", (width_px, width_px), (230, 230, 230, 255))
+    draw = ImageDraw.Draw(im)
+    text = "SVG"
+    try:
+        font = ImageFont.truetype("arial.ttf", int(width_px / 4))
+    except Exception:
+        font = ImageFont.load_default()
+    textwidth, textheight = draw.textsize(text, font)
+    position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
+    draw.text(position, text, fill="black", font=font)
+    out = BytesIO()
+    im.save(out, format="PNG")
+    return out.getvalue()
+
+def build_brands_for_word(doc, brand_list, logos_dir="logos_local", width_mm=15):
     out = []
     for brand in brand_list:
         logo_path = get_logo_svg_path(brand, logos_dir)
@@ -1180,7 +1194,7 @@ def is_color_dark(color_hex):
 
 import base64
 
-def build_brand_icons_html(brand_names, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
+def build_brand_icons_html(brand_names, logos_dir="logos_local"):
     import os
     html = '<div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;margin-top:6px;margin-bottom:8px;">'
     for brand in brand_names:
