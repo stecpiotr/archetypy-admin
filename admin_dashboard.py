@@ -95,8 +95,6 @@ def zapobiegaj_wdowie(text):
         out.append(f"{before_last}\u00A0{last}")
     return '\n'.join(out)
 
-import cairosvg
-
 st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
 
 COLOR_NAME_MAP = {
