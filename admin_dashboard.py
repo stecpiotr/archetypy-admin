@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 from fpdf import FPDF
 import unicodedata
 import requests
-from PIL import Image, ImageDraw
 import io
 import re
 from datetime import datetime
@@ -71,28 +70,29 @@ def make_placeholder_png(panel_img_path, width_px=300):
     im.save(panel_img_path)
     return panel_img_path
 
-def svg_to_png_bytes(svg_path, width_mm=15, placeholder_path="static/placeholder.png"):
+def svg_to_png_bytes(svg_path, width_mm=15):
     width_px = int(width_mm * 3.78)
-    # Najpierw spróbuj wczytać własny PNG/placeholder z projektu (jeśli taki masz)
     try:
-        with open(placeholder_path, "rb") as f:
-            return f.read()
-    except Exception:
-        pass
-    # Jeśli plik placeholder.png nie istnieje: generuj graficzny placeholder programowo
-    im = Image.new("RGBA", (width_px, width_px), (230, 230, 230, 255))
-    draw = ImageDraw.Draw(im)
-    text = "SVG"
-    try:
-        font = ImageFont.truetype("arial.ttf", int(width_px / 4))
-    except Exception:
+        # Spróbuj konwertować SVG na PNG – CAIROSVG!
+        import cairosvg
+        return cairosvg.svg2png(url=svg_path, output_width=width_px, output_height=width_px)
+    except Exception as e:
+        print(f"Nie udała się konwersja SVG ({svg_path}) do PNG: {e}")
+        # jeśli się nie udało, wygeneruj placeholder
+        from PIL import Image, ImageDraw, ImageFont
+        im = Image.new("RGBA", (width_px, width_px), (230, 230, 230, 255))
+        draw = ImageDraw.Draw(im)
+        text = "SVG"
         font = ImageFont.load_default()
-    textwidth, textheight = draw.textsize(text, font)
-    position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
-    draw.text(position, text, fill="black", font=font)
-    out = BytesIO()
-    im.save(out, format="PNG")
-    return out.getvalue()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        textwidth = bbox[2] - bbox[0]
+        textheight = bbox[3] - bbox[1]
+        position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
+        draw.text(position, text, fill="black", font=font)
+        out = BytesIO()
+        im.save(out, format="PNG")
+        out.seek(0)
+        return out.getvalue()
 
 def build_brands_for_word(doc, brand_list, logos_dir="logos_local", width_mm=15):
     out = []
