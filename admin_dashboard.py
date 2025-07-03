@@ -18,10 +18,15 @@ from io import BytesIO
 import tempfile
 import shutil
 import sys
+
+# Platform-specific import
 if sys.platform.startswith("linux"):
     import subprocess
 else:
     from docx2pdf import convert
+
+from docxtpl import InlineImage
+from docx.shared import Mm
 
 def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
     # Konwersja dla strategii zapisu plików: "Alfa Romeo" → "alfa-romeo.svg"
@@ -51,13 +56,6 @@ def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
         return path2
     return None
 
-from io import BytesIO
-from docxtpl import InlineImage
-from docx.shared import Mm
-
-import subprocess
-from io import BytesIO
-
 def svg_to_png_bytes(svg_path, width_mm=15):
     try:
         import cairosvg
@@ -66,6 +64,7 @@ def svg_to_png_bytes(svg_path, width_mm=15):
         width_px = int(width_mm * 3.78 * 4)  # Skaluje ×4 dla lepszej jakości
         return cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
     except Exception:
+        # Fallback gdy cairosvg niedostępny lub błąd przy konwersji
         with open("static/placeholder.png", "rb") as f:
             return f.read()
 
