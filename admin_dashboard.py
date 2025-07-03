@@ -4,8 +4,6 @@ import psycopg2
 import ast
 import plotly.graph_objects as go
 from fpdf import FPDF
-from docx import Document
-from io import BytesIO
 import unicodedata
 import requests
 from PIL import Image, ImageDraw
@@ -13,6 +11,91 @@ import io
 import re
 from datetime import datetime
 import pytz
+from docx.shared import Pt
+import os
+from docxtpl import DocxTemplate, InlineImage
+from io import BytesIO
+import tempfile
+import shutil
+import sys
+if sys.platform.startswith("linux"):
+    import subprocess
+else:
+    from docx2pdf import convert
+
+def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
+    # Konwersja dla strategii zapisu plików: "Alfa Romeo" → "alfa-romeo.svg"
+    filename = (
+        brand_name.lower()
+            .replace(" ", "-")
+            .replace("'", "")
+            .replace("’", "")
+            .replace("ł", "l")
+            .replace("ś", "s")
+            .replace("ż", "z")
+            .replace("ó", "o")
+            .replace("ć", "c")
+            .replace("ń", "n")
+            .replace("ę", "e")
+            .replace("ą", "a")
+            .replace("ś", "s") +
+        ".svg"
+    )
+    path = os.path.join(logos_dir, filename)
+    if os.path.exists(path):
+        return path
+    # fallback: spróbuj bez myślnika, wersje alternatywne
+    filename_nodash = brand_name.lower().replace(" ", "").replace("'", "").replace("’", "") + ".svg"
+    path2 = os.path.join(logos_dir, filename_nodash)
+    if os.path.exists(path2):
+        return path2
+    return None
+
+from io import BytesIO
+from docxtpl import InlineImage
+from docx.shared import Mm
+
+import subprocess
+from io import BytesIO
+
+def svg_to_png_bytes(svg_path, width_mm=15):
+    import cairosvg
+    with open(svg_path, "rb") as svg_file:
+        svg_bytes = svg_file.read()
+    # Przelicz szerokość mm na px (96 dpi ≈ 3.78 px/mm)
+    width_px = int(width_mm * 3.78 * 4)  # Skaluje ×4, zwiększa ostrość
+    png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
+    return png_bytes
+
+def build_brands_for_word(doc, brand_list, logos_dir=r"C:\ap48\ap48-admin\logos_local", width_mm=15):
+    out = []
+    for brand in brand_list:
+        logo_path = get_logo_svg_path(brand, logos_dir)
+        if logo_path:
+            img_bytes = svg_to_png_bytes(logo_path, width_mm=width_mm)
+            img_stream = BytesIO(img_bytes)
+            img = InlineImage(doc, img_stream, width=Mm(width_mm))
+            out.append({"brand": brand, "logo": img})
+        else:
+            out.append({"brand": brand, "logo": ""})
+    return out
+
+def zapobiegaj_wdowie(text):
+    # Twarda spacja przed ostatnim wyrazem każdego akapitu
+    # Obsługuje \n\n jako koniec akapitu
+    paras = text.split('\n')
+    out = []
+    for para in paras:
+        para = para.rstrip()
+        # Jeśli za krótko, pomiń
+        if len(para.split(' ')) < 2:
+            out.append(para)
+            continue
+        before_last, last = para.rsplit(' ', 1)
+        out.append(f"{before_last}\u00A0{last}")
+    return '\n'.join(out)
+
+import cairosvg
 
 st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
 
@@ -107,7 +190,7 @@ archetype_extended = {
         "name": "Władca",
         "tagline": "Autorytet. Kontrola. Doskonałość.",
         "description": (
-            "Archetyp Władcy w polityce uosabia siłę przywództwa, stabilność, pewność działania,kontrolę i odpowiedzialność za porządek społeczny. "
+            "Archetyp Władcy w polityce uosabia siłę przywództwa, stabilność, pewność działania, kontrolę i odpowiedzialność za porządek społeczny. "
             "Władcy dążą do stabilności, bezpieczeństwa i efektywnego zarządzania. Politycy o tym archetypie często podkreślają swoją zdolność do podejmowania trudnych decyzji i utrzymywania porządku, nawet w trudnych czasach. "
             "Jako kandydat na prezydenta Lublina Władca stawia na porządek, wyznaczanie standardów rozwoju i podejmowanie stanowczych decyzji dla dobra wspólnego. "
             "Jest symbolem autentycznego autorytetu, przewodzenia i skutecznego zarządzania miastem. "
@@ -133,17 +216,17 @@ archetype_extended = {
             "Przywództwo", "Autorytet", "Stabilność", "Prestiż", "Kontrola", "Inspiracja", "Mistrzostwo"
         ],
         "strengths": [
-            "Przywództwo", "zdecydowanie", "umiejętności organizacyjne"
+            "przywództwo", "zdecydowanie", "umiejętności organizacyjne"
         ],
         "weaknesses": [
-            "Autorytaryzm", "kontrola", "oderwanie od rzeczywistości"
+            "autorytaryzm", "kontrola", "oderwanie od rzeczywistości"
         ],
         "examples_person": [
             "Vladimir Putin", "Margaret Thatcher", "Xi Jinping", "Ludwik XIV", "Napoleon Bonaparte",
             "Jarosław Kaczyński"
         ],
         "example_brands": [
-            "Rolex", "Mercedes-Benz", "IBM", "Microsoft", "Hugo Boss", "Silny samorząd"
+            "Rolex", "Mercedes-Benz", "IBM", "Microsoft", "Hugo Boss", "BMW", "Silny samorząd"
         ],
         "color_palette": [
             "#000000", "#FFD700", "#282C34", "#800020", "#8C564B"
@@ -190,16 +273,16 @@ archetype_extended = {
             "Odwaga", "Siła", "Determinacja", "Poświęcenie", "Sukces", "Inspiracja"
         ],
         "strengths": [
-            "Odwaga", "determinacja", "kompetencja", "inspirowanie innych"
+            "odwaga", "determinacja", "kompetencja", "inspirowanie innych"
         ],
         "weaknesses": [
-            "Arogancja", "obsesja na punkcie zwycięstwa", "skłonność do przechwalania się",
+            "arogancja", "obsesja na punkcie zwycięstwa", "skłonność do przechwalania się",
         ],
         "examples_person": [
             "Winston Churchill", "Wołodymyr Zełenski", "George Washington", "Józef Piłsudski"
         ],
         "example_brands": [
-            "Nike", "Duracell", "FedEx", "Polska Husaria", "Patriotyczny samorząd"
+            "Nike", "Duracell", "FedEx", "Ferrari", "Polska Husaria", "Patriotyczny samorząd"
         ],
         "color_palette": [
             "#E10600", "#2E3141", "#FFFFFF", "#D62728"
@@ -245,10 +328,10 @@ archetype_extended = {
             "Wiedza", "Rozwój", "Analiza", "Strategia", "Refleksja"
         ],
         "strengths": [
-            "Inteligencja", "obiektywizm", "umiejętność analizy złożonych problemów"
+            "inteligencja", "obiektywizm", "umiejętność analizy złożonych problemów"
         ],
         "weaknesses": [
-            "Nadmierna rozwaga", "brak zdecydowania", "oderwanie od codziennych problemów"
+            "nadmierna rozwaga", "brak zdecydowania", "oderwanie od codziennych problemów"
         ],
         "examples_person": [
             "Angela Merkel", "Thomas Jefferson", "Lee Kuan Yew", "Bronisław Geremek"
@@ -301,16 +384,16 @@ archetype_extended = {
             "Empatia", "Troska", "Wspólnota", "Bezpieczeństwo", "Solidarność"
         ],
         "strengths": [
-            "Empatia", "troska o innych", "budowanie zaufania"
+            "empatia", "troska o innych", "budowanie zaufania"
         ],
         "weaknesses": [
-            "Nadopiekuńczość", "unikanie trudnych decyzji", "podatność na manipulację"
+            "nadopiekuńczość", "unikanie trudnych decyzji", "podatność na manipulację"
         ],
         "examples_person": [
             "Jacinda Ardern", "Franklin D. Roosevelt", "Clement Attlee", "Władysław Kosiniak-Kamysz", "Jacek Kuroń"
         ],
         "example_brands": [
-            "UNICEF", "Nivea", "Caritas", "WOŚP", "Pampers", "hospicja"
+            "UNICEF", "Nivea", "Caritas", "WOŚP", "Pampers", "Volvo", "hospicja"
         ],
         "color_palette": [
             "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD"
@@ -356,17 +439,17 @@ archetype_extended = {
             "Ciepło", "Relacje", "Bliskość", "Pasja", "Akceptacja"
         ],
         "strengths": [
-            "Empatia", "bliskość", "autentyczność", "pasja"
+            "empatia", "bliskość", "autentyczność", "pasja"
         ],
         "weaknesses": [
-            "Nadmierna emocjonalność", "faworyzowanie bliskich grup", "podatność na krytykę"
+            "nadmierna emocjonalność", "faworyzowanie bliskich grup", "podatność na krytykę"
         ],
         "examples_person": [
             "Justin Trudeau", "Sanna Marin", "Eva Perón", "John F. Kennedy", "Benito Juárez", "François Mitterrand",
             "Aleksandra Dulkiewicz"
         ],
         "example_brands": [
-            "Playboy", "Magnum", "Victoria's Secrets"
+            "Playboy", "Magnum", "Victoria's Secrets", "Alfa Romeo"
         ],
         "color_palette": [
             "#FA709A", "#FEE140", "#FFD6E0", "#FA709A"
@@ -410,10 +493,10 @@ archetype_extended = {
             "Poczucie humoru", "Entuzjazm", "Dystans", "Optymizm"
         ],
         "strengths": [
-            "Buduje rozpoznawalność", "umie odwrócić uwagę od trudnych tematów", "kreuje wizerunek 'swojskiego' lidera"
+            "buduje rozpoznawalność", "umie odwrócić uwagę od trudnych tematów", "kreuje wizerunek 'swojskiego' lidera"
         ],
         "weaknesses": [
-            "Łatwo przekracza granicę powagi", "ryzyko, że wyborcy nie odbiorą go serio"
+            "łatwo przekracza granicę powagi", "ryzyko, że wyborcy nie odbiorą go serio"
         ],
         "examples_person": [
             "Boris Johnson", "Silvio Berlusconi", "Janusz Palikot",
@@ -463,16 +546,16 @@ archetype_extended = {
             "Kreatywność", "Odwaga twórcza", "Inspiracja", "Wizja", "Nowatorstwo"
         ],
         "strengths": [
-            "Innowacyjność", "wizjonerstwo", "kreatywność"
+            "innowacyjność", "wizjonerstwo", "kreatywność"
         ],
         "weaknesses": [
-            "Brak realizmu", "ignorowanie praktycznych ograniczeń", "perfekcjonizm"
+            "brak realizmu", "ignorowanie praktycznych ograniczeń", "perfekcjonizm"
         ],
         "examples_person": [
             "Emmanuel Macron", "Tony Blair", "Konrad Adenauer", "Deng Xiaoping", "Mustafa Kemal Atatürk"
         ],
         "example_brands": [
-            "Apple", "Tesla", "Lego", "Adobe", "startupy"
+            "Apple", "Lego", "Adobe", "Toyota", "startupy"
         ],
         "color_palette": [
             "#7C53C3", "#3BE8B0", "#87CEEB", "#17BECF"
@@ -516,10 +599,10 @@ archetype_extended = {
             "Odwaga", "Ciekawość", "Niezależność", "Nowatorstwo"
         ],
         "strengths": [
-            "Innowacyjność", "adaptacyjność", "odwaga w podejmowaniu ryzyka"
+            "innowacyjność", "adaptacyjność", "odwaga w podejmowaniu ryzyka"
         ],
         "weaknesses": [
-            "Brak cierpliwości", "trudności z dokończeniem projektów", "ignorowanie tradycji"
+            "brak cierpliwości", "trudności z dokończeniem projektów", "ignorowanie tradycji"
         ],
         "examples_person": [
             "Olof Palme", "Shimon Peres", "Theodore Roosevelt", "Jawaharlal Nehru", "Elon Musk"
@@ -568,16 +651,16 @@ archetype_extended = {
             "Inspiracja", "Przemiana", "Wyobraźnia", "Transcendencja"
         ],
         "strengths": [
-            "Porywa wielką ideą", "motywuje do zmian", "potrafi łączyć symbole i narracje w spójny mit założycielski"
+            "porywa wielką ideą", "motywuje do zmian", "potrafi łączyć symbole i narracje w spójny mit założycielski"
         ],
         "weaknesses": [
-            "Oczekiwania mogą przerosnąć realne możliwości", "ryzyko oskarżeń o 'czcze zaklęcia'"
+            "oczekiwania mogą przerosnąć realne możliwości", "ryzyko oskarżeń o 'czcze zaklęcia'"
         ],
         "examples_person": [
             "Barack Obama", "Václav Klaus", "Nelson Mandela", "Martin Luther King"
         ],
         "example_brands": [
-            "Intel", "Disney", "XBox", "Sony", "Polaroid", "Nowoczesny Lublin"
+            "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla", "Nowoczesny Lublin"
         ],
         "color_palette": [
             "#8F00FF", "#181C3A", "#E0BBE4", "#7C46C5"
@@ -622,16 +705,16 @@ archetype_extended = {
             "Autentyczność", "Wspólnota", "Prostota", "Równość"
         ],
         "strengths": [
-            "Autentyczność", "empatia", "umiejętność komunikacji z obywatelami"
+            "autentyczność", "empatia", "umiejętność komunikacji z obywatelami"
         ],
         "weaknesses": [
-            "Brak wizji", "ograniczona perspektywa", "unikanie trudnych decyzji"
+            "brak wizji", "ograniczona perspektywa", "unikanie trudnych decyzji"
         ],
         "examples_person": [
             "Joe Biden", "Bernie Sanders", "Andrzej Duda", "Pedro Sánchez", "Jeremy Corbyn"
         ],
         "example_brands": [
-            "Ikea", "Skoda", "Żabka"
+            "Ikea", "Skoda", "Żabka", "Ford", "VW"
         ],
         "color_palette": [
             "#F9F9F9", "#6CA0DC", "#A3C1AD", "#2CA02C"
@@ -674,10 +757,10 @@ archetype_extended = {
             "Optymizm", "Nadzieja", "Współpraca", "Szlachetność"
         ],
         "strengths": [
-            "Łatwo zyskuje zaufanie", "łagodzi polaryzację", "odwołuje się do uniwersalnych wartości."
+            "łatwo zyskuje zaufanie", "łagodzi polaryzację", "odwołuje się do uniwersalnych wartości."
         ],
         "weaknesses": [
-            "Może być postrzegany jako naiwny", "trudniej mu prowadzić twarde negocjacje"
+            "może być postrzegany jako naiwny", "trudniej mu prowadzić twarde negocjacje"
         ],
         "examples_person": [
             "Jimmy Carter", "Václav Havel", "Szymon Hołownia"
@@ -729,10 +812,10 @@ archetype_extended = {
             "Odwaga", "Bezpardonowość", "Radykalizm", "Niepokorność"
         ],
         "strengths": [
-            "Odwaga", "autentyczność", "zdolność inspirowania do zmian"
+            "odwaga", "autentyczność", "zdolność inspirowania do zmian"
         ],
         "weaknesses": [
-            "Nadmierna konfrontacyjność", "brak kompromisu", "trudności w budowaniu koalicji"
+            "nadmierna konfrontacyjność", "brak kompromisu", "trudności w budowaniu koalicji"
         ],
         "examples_person": [
             "Donald Trump", "Marine Le Pen", "Sławomir Mentzen", "Lech Wałęsa", "Aleksiej Nawalny"
@@ -868,57 +951,216 @@ def pick_main_and_aux_archetype(archetype_means, archetype_order):
     second_type = next((k for k in archetype_order if k in aux_candidates), None)
     return main_type, second_type
 
-def export_word(main_type, second_type, features, main, second):
-    doc = Document()
-    doc.add_heading("Raport AP-48 – Archetypy", 0)
-    doc.add_heading(f"Główny archetyp: {main_type}", level=1)
-    doc.add_paragraph(f"Cechy kluczowe: {features.get(main_type, '-')}")
-    doc.add_paragraph(main.get("description", ""))
-    doc.add_paragraph("Storyline: " + main.get("storyline", ""))
-    doc.add_paragraph("Rekomendacje: " + "\n".join(main.get("recommendations", [])))
-    if second_type and second_type != main_type:
-        doc.add_heading(f"Archetyp pomocniczy: {second_type}", level=2)
-        doc.add_paragraph(f"Cechy kluczowe: {features.get(second_type, '-')}")
-        doc.add_paragraph(second.get("description", ""))
-        doc.add_paragraph("Storyline: " + second.get("storyline", ""))
-        doc.add_paragraph("Rekomendacje: " + "\n".join(second.get("recommendations", [])))
+def add_image(paragraph, img, width):
+    # img może być ścieżką lub BytesIO/file-like
+    if img is None:
+        return
+    run = paragraph.add_run()
+    try:
+        if isinstance(img, (str, os.PathLike)) and os.path.exists(img):
+            run.add_picture(img, width=width)
+        elif hasattr(img, "read"):
+            img.seek(0)
+            run.add_picture(img, width=width)
+    except Exception:
+        pass
+
+from docxtpl import DocxTemplate, InlineImage
+from docx.shared import Mm
+from io import BytesIO
+import os
+
+TEMPLATE_PATH = r"C:\ap48\ap48-admin\ap48_raport_template.docx"
+
+def build_word_context(
+    main_type, second_type, features, main, second,
+    mean_scores=None, radar_image=None, archetype_table=None, num_ankiet=None
+):
+    COLOR_NAME_MAP = {
+        "#000000": "Czerń",
+        "#FFD700": "Złoto",
+        "#282C34": "Granat (antracyt)",
+        "#800020": "Burgund",
+        "#E10600": "Czerwień",
+        "#2E3141": "Grafitowy granat",
+        "#FFFFFF": "Biel",
+        "#4682B4": "Stalowy błękit",
+        "#B0C4DE": "Jasny niebieskoszary",
+        "#6C7A89": "Popielaty szary",
+        "#B4D6B4": "Miętowa zieleń",
+        "#A7C7E7": "Pastelowy błękit",
+        "#FFD580": "Pastelowy żółty / beżowy",
+        "#FA709A": "Róż malinowy",
+        "#FEE140": "Jasny żółty",
+        "#FFD6E0": "Bardzo jasny róż",
+        "#FFB300": "Mocna żółć",
+        "#FF8300": "Pomarańcz",
+        "#FFD93D": "Pastelowa żółć",
+        "#7C53C3": "Fiolet",
+        "#3BE8B0": "Miętowy cyjan",
+        "#87CEEB": "Błękit (Sky Blue)",
+        "#43C6DB": "Turkusowy błękit",
+        "#A0E8AF": "Seledyn",
+        "#F9D371": "Złocisty żółty",
+        "#8F00FF": "Fiolet (intensywny)",
+        "#181C3A": "Granat bardzo ciemny",
+        "#E0BBE4": "Pastelowy fiolet",
+        "#F9F9F9": "Biel bardzo jasna",
+        "#6CA0DC": "Pastelowy błękit",
+        "#A3C1AD": "Pastelowa zieleń",
+        "#FFF6C3": "Jasny kremowy",
+        "#AAC9CE": "Pastelowy niebieskoszary",
+        "#FFF200": "Żółty (cytrynowy)",
+        "#FF0000": "Czerwień intensywna",
+        "#FF6F61": "Łososiowy róż",
+        "#8C564B": "Ciemy brąz",
+        "#D62728": "Czerwień karmazynowa",
+        "#1F77B4": "Chabrowy",
+        "#9467BD": "Fiolet śliwkowy",
+        "#F2A93B": "Miodowy żółty",
+        "#17BECF": "Niebieski morski",
+        "#E377C2": "Pastelowy róż fioletowy",
+        "#7C46C5": "Fiolet szafirowy",
+        "#2CA02C": "Zieleń trawiasta",
+        "#9BD6F4": "Pastelowy błękit jasny",
+        "#FF7F0E": "Jaskrawy pomarańcz",
+        # Dodaj kolejne w razie potrzeby
+    }
+
+    def kolor_label_list(palette):
+        if not isinstance(palette, list):
+            return ""
+        out = []
+        for code in palette:
+            name = COLOR_NAME_MAP.get(code.upper(), code)
+            out.append(f"{name} ({code})")
+        return ', '.join(out)
+
+    context = {
+        "TYTUL": "Raport Archetypów",
+        "IMIE_NAZWISKO": "dla Krzysztofa Hetman",
+        "AUTOR": "Piotr Stec",
+        "DATA": datetime.now().strftime("%Y-%m-%d"),
+        "WSTEP": zapobiegaj_wdowie(
+            "Archetypy to uniwersalne wzorce osobowości, które od wieków pomagają ludziom rozumieć świat i budować autentyczną tożsamość. "
+            "Współczesna psychologia i marketing potwierdzają, że trafnie zdefiniowany archetyp jest potężnym narzędziem komunikacji, pozwalającym budować rozpoznawalność, zaufanie i emocjonalny kontakt. Czas wykorzystać to także w polityce! "
+            "\n\nW polityce archetyp pomaga wyeksponować najważniejsze cechy lidera, porządkuje przekaz, wzmacnia spójność strategii oraz wyraźnie różnicuje kandydata na tle konkurencji. "
+            "Analiza archetypów pozwala lepiej zrozumieć sposób odbioru polityka przez otoczenie, a co się z tym wiąże także motywacje i aspiracje. "
+            "Wyniki badań archetypowych stanowią istotny fundament do tworzenia skutecznej narracji wyborczej, strategii wizerunkowej i komunikacji z wyborcami.\n\n"
+            "W modelu przez nas opracowanym wykorzystano klasyfikację Mark and Pearson, obejmującą 12 uniwersalnych typów osobowościowych. "
+            "Raport przedstawia wyniki i profil archetypowy dla Krzysztofa Hetmana w oparciu o dane z przeprowadzonego badania. "
+            "Badanie to pozwoliło zidentyfikować archetyp główny oraz archetyp wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie w walce o urząd Prezydenta Miasta Lublin.\n\n"
+            "Dzięki analizie archetypów można precyzyjnie dopasować komunikację do oczekiwań wyborców, podkreślić atuty, a także przewidzieć skuteczność strategii politycznej w dynamicznym środowisku publicznym. "
+        ),
+        "TABELA_LICZEBNOSCI": archetype_table.to_dict('records') if archetype_table is not None else [],
+        "RADAR_IMG": radar_image if radar_image is not None else "",
+        # --- NOWOŚĆ: liczebność osob ---
+        "LICZEBNOSC_OSOB": (
+            f"W badaniu udział wzięło {num_ankiet} {'osób' if (num_ankiet is None or num_ankiet != 1) else 'osoba'}."
+            if num_ankiet is not None else ""
+        ),
+        # --- GŁÓWNY ARCHETYP ---
+        "ARCHETYPE_MAIN_NAME": main.get("name") or "",
+        "ARCHETYPE_MAIN_TAGLINE": main.get("tagline") or "",
+        "ARCHETYPE_MAIN_DESC": main.get("description") or "",
+        "ARCHETYPE_MAIN_STORYLINE": main.get("storyline") or "",
+        "ARCHETYPE_MAIN_TRAITS": main.get("core_traits") or [],
+        "ARCHETYPE_MAIN_STRENGTHS": main.get("strengths") or [],
+        "ARCHETYPE_MAIN_WEAKNESSES": main.get("weaknesses") or [],
+        "ARCHETYPE_MAIN_RECOMMENDATIONS": main.get("recommendations") or [],
+        "ARCHETYPE_MAIN_POLITICIANS": main.get("examples_person") or [],
+        "ARCHETYPE_MAIN_BRANDS_IMG": [],
+        "ARCHETYPE_MAIN_COLORS": main.get("color_palette") or [],
+        "ARCHETYPE_MAIN_COLORS_LABEL": kolor_label_list(main.get("color_palette", [])),
+        "ARCHETYPE_MAIN_VISUALS": main.get("visual_elements") or [],
+        "ARCHETYPE_MAIN_KEYWORDS": main.get("keyword_messaging") or [],
+        "ARCHETYPE_MAIN_SLOGANS": main.get("watchword") or [],
+        "ARCHETYPE_MAIN_QUESTIONS": main.get("questions") or [],
+        # --- ARCHETYP POMOCNICZY ---
+        "ARCHETYPE_AUX_NAME": second.get("name") or "",
+        "ARCHETYPE_AUX_TAGLINE": second.get("tagline") or "",
+        "ARCHETYPE_AUX_DESC": second.get("description") or "",
+        "ARCHETYPE_AUX_STORYLINE": second.get("storyline") or "",
+        "ARCHETYPE_AUX_TRAITS": second.get("core_traits") or [],
+        "ARCHETYPE_AUX_STRENGTHS": second.get("strengths") or [],
+        "ARCHETYPE_AUX_WEAKNESSES": second.get("weaknesses") or [],
+        "ARCHETYPE_AUX_RECOMMENDATIONS": second.get("recommendations") or [],
+        "ARCHETYPE_AUX_POLITICIANS": second.get("examples_person") or [],
+        "ARCHETYPE_AUX_BRANDS_IMG": [],
+        "ARCHETYPE_AUX_COLORS": second.get("color_palette") or [],
+        "ARCHETYPE_AUX_COLORS_LABEL": kolor_label_list(second.get("color_palette", [])),
+        "ARCHETYPE_AUX_VISUALS": second.get("visual_elements") or [],
+        "ARCHETYPE_AUX_KEYWORDS": second.get("keyword_messaging") or [],
+        "ARCHETYPE_AUX_SLOGANS": second.get("watchword") or [],
+        "ARCHETYPE_AUX_QUESTIONS": second.get("questions") or [],
+    }
+
+    return context
+
+# --- POBIERANIE OBRAZU PANELU DO RAPORTU WORD ---
+import requests
+
+image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/14bfd7959da97de1afbb1bf220c93704b1e5f2fa5440fce8a54a812d.png"
+panel_img_path = r"C:\ap48\ap48-admin\panel_img.png"
+
+response = requests.get(image_url)
+response.raise_for_status()
+with open(panel_img_path, "wb") as f:
+    f.write(response.content)
+
+def export_word_docxtpl(main_type, second_type, features, main, second,
+                       mean_scores=None,
+                       radar_img_path=None,
+                       archetype_table=None,
+                       num_ankiet=None,
+                       panel_img_path=None):
+    doc = DocxTemplate(TEMPLATE_PATH)
+
+    # Radar image
+    radar_image = InlineImage(doc, radar_img_path, width=Mm(160)) if radar_img_path and os.path.exists(radar_img_path) else ""
+
+    # TWÓRZ panel_image DOPIERO TERAZ
+    panel_image = InlineImage(doc, panel_img_path, width=Mm(150)) if panel_img_path and os.path.exists(panel_img_path) else ""
+
+    context = build_word_context(
+        main_type, second_type, features, main, second, mean_scores,
+        radar_image, archetype_table, num_ankiet
+    )
+    # Najważniejsze! Przekaż doc do build_brands_for_word!
+    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), width_mm=15)
+    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), width_mm=15)
+    context["PANEL_IMG"] = panel_image
+    doc.render(context)
     buf = BytesIO()
     doc.save(buf)
     buf.seek(0)
     return buf
 
-def export_pdf(main_type, second_type, features, main, second):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, clean_pdf_text("Raport AP-48 – Archetypy"), ln=1)
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 8, clean_pdf_text(f"Główny archetyp: {main_type}"), ln=1)
-    pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(
-        0, 7, clean_pdf_text(
-            f"Cechy kluczowe: {features.get(main_type, '-')}\n\n"
-            f"{main.get('description', '')}\n\n"
-            f"Storyline: {main.get('storyline', '')}\n\n"
-            f"Rekomendacje: " + "\n".join(main.get("recommendations", [])) + "\n"
-        )
-    )
-    if second_type and second_type != main_type:
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, clean_pdf_text(f"Archetyp pomocniczy: {second_type}"), ln=1)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(
-            0, 7, clean_pdf_text(
-                f"Cechy kluczowe: {features.get(second_type, '-')}\n\n"
-                f"{second.get('description', '')}\n\n"
-                f"Storyline: {second.get('storyline', '')}\n\n"
-                f"Rekomendacje: " + "\n".join(second.get("recommendations", []))
-            )
-        )
-    pdf_bytes = pdf.output(dest='S').encode('latin1')
-    buf = BytesIO(pdf_bytes)
-    buf.seek(0)
-    return buf
+
+def word_to_pdf(docx_bytes_io):
+    import sys
+    import tempfile, os
+    from io import BytesIO
+    with tempfile.TemporaryDirectory() as tmpdir:
+        docx_path = os.path.join(tmpdir, "raport.docx")
+        pdf_path = os.path.join(tmpdir, "raport.pdf")
+        with open(docx_path, "wb") as f:
+            f.write(docx_bytes_io.getbuffer())
+        if sys.platform.startswith("win32"):
+            import pythoncom
+            from docx2pdf import convert
+            pythoncom.CoInitialize()     # ← TU!
+            convert(docx_path, pdf_path)
+        else:
+            import subprocess
+            result = subprocess.run([
+                "soffice", "--headless", "--convert-to", "pdf", "--outdir", tmpdir, docx_path
+            ], capture_output=True)
+            if result.returncode != 0 or not os.path.isfile(pdf_path):
+                raise RuntimeError("LibreOffice PDF error: " + result.stderr.decode())
+        with open(pdf_path, "rb") as f:
+            return BytesIO(f.read())
+
 
 def is_color_dark(color_hex):
     if color_hex is None:
@@ -932,6 +1174,24 @@ def is_color_dark(color_hex):
     lum = 0.2126*r + 0.7152*g + 0.0722*b
     return lum < 110
 
+import base64
+
+def build_brand_icons_html(brand_names, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
+    import os
+    html = '<div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;margin-top:6px;margin-bottom:8px;">'
+    for brand in brand_names:
+        path = get_logo_svg_path(brand, logos_dir)
+        if path and os.path.exists(path):
+            with open(path, "rb") as f:
+                svg_code = f.read().decode("utf-8", errors="replace")
+            svg_b64 = base64.b64encode(svg_code.encode("utf-8")).decode("ascii")
+            svg_img_tag = f'<img src="data:image/svg+xml;base64,{svg_b64}" alt="{brand}" style="height:32px;vertical-align:middle;margin-right:5px;">'
+            html += f'<span title="{brand}" style="display:flex;flex-direction:column;align-items:center;min-width:55px;"><span>{svg_img_tag}</span><span style="font-size:0.93em; margin-top:1px;">{brand}</span></span>'
+        else:
+            html += f'<span style="font-size:1.05em;color:#aaa;margin-right:15px;">{brand}</span>'
+    html += '</div>'
+    return html
+
 def render_archetype_card(archetype_data, main=True):
     if not archetype_data:
         st.warning("Brak danych o archetypie.")
@@ -939,14 +1199,17 @@ def render_archetype_card(archetype_data, main=True):
 
     border_color = archetype_data.get('color_palette', ['#888'])[0]
     tagline = archetype_data.get('tagline','')
+
     if (archetype_data.get('name','').strip().lower() == 'niewinny') and not main:
         tagline = "Niesie nadzieję, inspiruje do współpracy, buduje zaufanie szczerością i apeluje o wspólne dobro, otwarcie komunikuje pozytywne wartości."
+
     symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
     symbol_emoji = {
         "Korona": "👑", "Herb Lublina": "🛡️", "Peleryna": "🦸", "Serce": "❤️","Uśmiech": "😊","Dłonie": "🤝",
         "Księga": "📖", "Mapa": "🗺️","Gwiazda": "⭐", "Gołąb": "🕊️","Piorun": "⚡", "Rubika": "🧩", "Dom": "🏡"
     }
     icon = symbol_emoji.get(symbol, "🔹")
+
     box_shadow = f"0 4px 14px 0 {border_color}44" if main else f"0 2px 6px 0 {border_color}22"
     bg_color = "#FAFAFA" if not main else (archetype_data.get('color_palette', ['#FFF', '#FAFAFA'])[1])
     width_card = "70vw"
@@ -956,7 +1219,6 @@ def render_archetype_card(archetype_data, main=True):
         text_color = "#fff"
         tagline_color = "#FFD22F" if archetype_data.get('name','').lower() == "bohater" else "#fffbea"
 
-    # Kolory, wyświetlane z małej litery i bez nawiasów wokół całości:
     color_palette = archetype_data.get('color_palette', [])
     color_names = [COLOR_NAME_MAP.get(c.upper(), c).lower() for c in color_palette] if color_palette else []
     color_icons_html = ""
@@ -970,7 +1232,6 @@ def render_archetype_card(archetype_data, main=True):
         color_items = [f"{n} ({h})" for n, h in zip(color_names, color_palette)]
         color_desc_html = '<div style="color:#222;font-size:0.98em;margin-top:3px;margin-bottom:7px;">' + ', '.join(color_items) + '</div>'
 
-    # Pytania archetypowe
     questions = archetype_data.get('questions', [])
     questions_html = ""
     if questions and isinstance(questions, list):
@@ -979,10 +1240,8 @@ def render_archetype_card(archetype_data, main=True):
             questions_html += f"<li style='margin-bottom:3px; font-size:1.07em;'>{q}</li>"
         questions_html += "</ul>"
 
-    # Atuty/Słabości – punktory w tej samej linii co rekomendacje (padding-left:24px)
     strengths = archetype_data.get('strengths', [])
     weaknesses = archetype_data.get('weaknesses', [])
-
     strengths_html = "" if not strengths else (
         "<div style='padding-left:24px;'>"
         + ''.join(
@@ -994,7 +1253,6 @@ def render_archetype_card(archetype_data, main=True):
         )
         + "</div>"
     )
-
     weaknesses_html = "" if not weaknesses else (
         "<div style='padding-left:24px;'>"
         + ''.join(
@@ -1007,7 +1265,6 @@ def render_archetype_card(archetype_data, main=True):
         + "</div>"
     )
 
-    # Przykłady polityków
     examples_person = archetype_data.get('examples_person', [])
     examples_person_html = ""
     if examples_person:
@@ -1015,8 +1272,6 @@ def render_archetype_card(archetype_data, main=True):
             "<div style='margin-top:24px;font-weight:600;'>Przykłady polityków:</div>\n" +
             "<div style='margin-bottom:8px;'>" + ', '.join(examples_person) + "</div>"
         )
-
-    # Slogan
     watchword = archetype_data.get('watchword', [])
     watchword_html = ""
     if watchword and isinstance(watchword, list) and watchword[0].strip():
@@ -1025,7 +1280,6 @@ def render_archetype_card(archetype_data, main=True):
             f"<div style='margin-bottom:8px; margin-top:4px;'>{watchword[0]}</div>"
         )
 
-    # Cechy, słowa kluczowe, elementy wizualne – tylko pierwszy element z dużej litery, reszta z małej
     def smart_list(lst):
         return ', '.join(
             [lst[0][0].upper() + lst[0][1:]] +
@@ -1037,58 +1291,58 @@ def render_archetype_card(archetype_data, main=True):
     visuals_str = smart_list(archetype_data.get('visual_elements', []))
 
     st.markdown(f"""
-    <div style="
-        max-width:{width_card};
-        border: 3px solid {border_color if main else '#CCC'};
-        border-radius: 20px;
-        background: {bg_color};
-        box-shadow: {box_shadow};
-        padding: 2.1em 2.2em 1.3em 2.2em;
-        margin-bottom: 32px;
-        color: {text_color};
-        display: flex; align-items: flex-start;">
-        <div style="font-size:2.6em; margin-right:23px; margin-top:1px; flex-shrink:0;">{icon}</div>
-        <div>
-            <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
-                {archetype_data.get('name','?')}
+        <div style="
+            max-width:{width_card};
+            border: 3px solid {border_color if main else '#CCC'};
+            border-radius: 20px;
+            background: {bg_color};
+            box-shadow: {box_shadow};
+            padding: 2.1em 2.2em 1.3em 2.2em;
+            margin-bottom: 32px;
+            color: {text_color};
+            display: flex; align-items: flex-start;">
+            <div style="font-size:2.6em; margin-right:23px; margin-top:1px; flex-shrink:0;">{icon}</div>
+            <div>
+                <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
+                    {archetype_data.get('name','?')}
+                </div>
+                <div style="font-size:1.3em; font-style:italic; color:{tagline_color}; margin-bottom:38px; margin-top:4px;">
+                    {tagline}
+                </div>
+                <div style="margin-top:21px; font-size:1.07em;">
+                    <b>Opis:</b><br>
+                    <span style="font-weight:400 !important;">
+                        <i>{archetype_data.get('description','')}</i>
+                    </span>
+                </div>
+                <div style="color:#222;font-size:1.07em; margin-top:21px;">
+                    <b>Cechy:</b> <span style="font-weight:400;">{traits_str}</span>
+                </div>
+                <div style="margin-top:24px;font-weight:600;">Storyline:</div>
+                <div style="margin-bottom:9px; margin-top:4px; font-size:1.07em;">{archetype_data.get('storyline','')}</div>
+                <div style="margin-top:16px;font-weight:600;">Atuty:</div>
+                {strengths_html if strengths_html else '<div style="color:#888; padding-left:24px;">-</div>'}
+                <div style="margin-top:2px;font-weight:600;">Słabości:</div>
+                {weaknesses_html if weaknesses_html else '<div style="color:#888; padding-left:24px;">-</div>'}
+                <div style="margin-top:24px;font-weight:600;">Rekomendacje:</div>
+                <ul style="padding-left:24px; margin-bottom:9px;">
+                     {''.join(f'<li style="margin-bottom:2px; font-size:1.07em;">{r}</li>' for r in archetype_data.get('recommendations',[]))}
+                </ul>
+                <div style="margin-top:29px;font-weight:600;">Słowa kluczowe:</div>
+                <div style="margin-bottom:8px;">{keywords_str}</div>
+                <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
+                <div style="margin-bottom:8px;">{visuals_str}</div>
+                {examples_person_html}
+                <div style="margin-bottom:10px; margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
+                {build_brand_icons_html(archetype_data.get('example_brands', []))}
+                {watchword_html}
+                {"<div style='margin-top:32px;font-weight:600;'>Kolory:</div>" if color_palette else ""}
+                {"<div style='margin-bottom:2px; margin-top:7px;'>" + color_icons_html + "</div>" if color_icons_html else ""}
+                {color_desc_html}
+                {"<div style='margin-top:22px;font-weight:600;'>Pytania archetypowe:</div>" if questions else ""}
+                {questions_html}
             </div>
-            <div style="font-size:1.3em; font-style:italic; color:{tagline_color}; margin-bottom:38px; margin-top:4px;">
-                {tagline}
-            </div>
-            <div style="margin-top:21px; font-size:1.07em;">
-                <b>Opis:</b><br>
-                <span style="font-weight:400 !important;">
-                    <i>{archetype_data.get('description','')}</i>
-                </span>
-            </div>
-            <div style="color:#222;font-size:1.07em; margin-top:21px;">
-                <b>Cechy:</b> <span style="font-weight:400;">{traits_str}</span>
-            </div>
-            <div style="margin-top:24px;font-weight:600;">Storyline:</div>
-            <div style="margin-bottom:9px; margin-top:4px; font-size:1.07em;">{archetype_data.get('storyline','')}</div>
-            <div style="margin-top:16px;font-weight:600;">Atuty:</div>
-            {strengths_html if strengths_html else '<div style="color:#888; padding-left:24px;">-</div>'}
-            <div style="margin-top:2px;font-weight:600;">Słabości:</div>
-            {weaknesses_html if weaknesses_html else '<div style="color:#888; padding-left:24px;">-</div>'}
-            <div style="margin-top:24px;font-weight:600;">Rekomendacje:</div>
-            <ul style="padding-left:24px; margin-bottom:9px;">
-                 {''.join(f'<li style="margin-bottom:2px; font-size:1.07em;">{r}</li>' for r in archetype_data.get('recommendations',[]))}
-            </ul>
-            <div style="margin-top:29px;font-weight:600;">Słowa kluczowe:</div>
-            <div style="margin-bottom:8px;">{keywords_str}</div>
-            <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
-            <div style="margin-bottom:8px;">{visuals_str}</div>
-            {examples_person_html}
-            <div style="margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
-            <div style="margin-bottom:24px;">{', '.join(archetype_data.get('example_brands',[]))}</div>
-            {watchword_html}
-            {"<div style='margin-top:32px;font-weight:600;'>Kolory:</div>" if color_palette else ""}
-            {"<div style='margin-bottom:2px; margin-top:7px;'>" + color_icons_html + "</div>" if color_icons_html else ""}
-            {color_desc_html}
-            {"<div style='margin-top:22px;font-weight:600;'>Pytania archetypowe:</div>" if questions else ""}
-            {questions_html}
         </div>
-    </div>
     """, unsafe_allow_html=True)
 
 # ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
@@ -1157,14 +1411,16 @@ if "answers" in data.columns and not data.empty:
         counts_aux = results_df['Archetyp pomocniczy'].value_counts().reindex(archetype_names, fill_value=0)
         mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
         main_type, second_type = pick_main_and_aux_archetype(mean_archetype_scores, archetype_names)
+        main = archetype_extended.get(main_type, {})
+        second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
         col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
 
         with col1:
             st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych i pomocniczych</div>', unsafe_allow_html=True)
             archetype_emoji = {
                 "Władca":"👑", "Bohater":"🦸", "Mędrzec":"📖", "Opiekun":"🤝", "Kochanek":"❤️",
-                "Błazen":"😂", "Twórca":"🧩", "Odkrywca":"🗺️", "Czarodziej":"⭐", "Towarzysz":"🏡",
-                "Niewinny":"🕊️", "Buntownik":"⚡"
+                "Błazen":"🤪", "Twórca":"🧩", "Odkrywca":"🗺️", "Czarodziej":"⭐", "Towarzysz":"🏡",
+                "Niewinny":"🕊️", "Buntownik":"🔥"
             }
             def zero_to_dash(val): return "-" if val == 0 else str(val)
             archetype_table = pd.DataFrame({
@@ -1260,6 +1516,10 @@ if "answers" in data.columns and not data.empty:
                     showlegend=False
                 )
             )
+            # --- DODAJ TĘ LINIĘ (z aktualną ścieżką do eksportu) ---
+
+            fig.write_image("C:\\ap48\\ap48-admin\\radar.png", scale=4)
+
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("""
             <div style="display: flex; justify-content: center; align-items: center; margin:10px 0 3px 0;">
@@ -1307,8 +1567,14 @@ if "answers" in data.columns and not data.empty:
         """, unsafe_allow_html=True)
 
         # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
-        docx_buf = export_word(main_type, second_type, archetype_features, main, second)
-        pdf_buf = export_pdf(main_type, second_type, archetype_features, main, second)
+        docx_buf = export_word_docxtpl(
+            main_type, second_type, archetype_features, main, second,
+            radar_img_path="C:\\ap48\\ap48-admin\\radar.png",
+            archetype_table=archetype_table,
+            num_ankiet=num_ankiet,
+            panel_img_path=panel_img_path
+        )
+        pdf_buf = word_to_pdf(docx_buf)
 
         word_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#185abd'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>W</text></svg>"
         pdf_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#d32f2f'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>PDF</text></svg>"
