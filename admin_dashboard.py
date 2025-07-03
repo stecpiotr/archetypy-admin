@@ -56,14 +56,16 @@ def get_logo_svg_path(brand_name, logos_dir="logos_local"):
     return None
 
 from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
 
 def make_placeholder_png(panel_img_path, width_px=300):
     im = Image.new("RGBA", (width_px, width_px), (220, 220, 220, 255))
     draw = ImageDraw.Draw(im)
     text = "SVG"
     font = ImageFont.load_default()
-    textwidth, textheight = draw.textsize(text, font)
+    # Użyj textbbox zamiast textsize!
+    bbox = draw.textbbox((0, 0), text, font=font)  # zwraca (x1, y1, x2, y2)
+    textwidth = bbox[2] - bbox[0]
+    textheight = bbox[3] - bbox[1]
     position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
     draw.text(position, text, fill="black", font=font)
     im.save(panel_img_path)
@@ -1122,20 +1124,22 @@ def build_word_context(
 
 # --- POBIERANIE OBRAZU PANELU DO RAPORTU WORD ---
 import requests
-import shutil
 
 image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/14bfd7959da97de1afbb1bf220c93704b1e5f2fa5440fce8a54a812d.png"
-panel_img_path = r"C:\ap48\ap48-admin\panel_img.png"
-placeholder_img_path = r"C:\ap48\ap48-admin\placeholder.png"  # Przygotuj taki plik PNG, nawet pusty!
+panel_img_path = "panel_img.png"  # Użyj względnej ścieżki!
 
-try:
-    response = requests.get(image_url, timeout=10)
-    response.raise_for_status()
-    with open(panel_img_path, "wb") as f:
-        f.write(response.content)
-except Exception as e:
-    print(f"Nie udało się pobrać obrazka: {e}\nUżywam placeholdera.")
-    shutil.copy(placeholder_img_path, panel_img_path)
+def safe_download_panel_image(image_url, panel_img_path, width_px=300):
+    try:
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
+        with open(panel_img_path, "wb") as f:
+            f.write(response.content)
+    except Exception as e:
+        print(f"Nie udało się pobrać obrazka: {e}\nTworzę placeholder.")
+        make_placeholder_png(panel_img_path, width_px=width_px)
+
+# Użycie:
+safe_download_panel_image(image_url, panel_img_path, width_px=300)
 
 def export_word_docxtpl(main_type, second_type, features, main, second,
                        mean_scores=None,
