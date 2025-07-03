@@ -1099,14 +1099,20 @@ def build_word_context(
 
 # --- POBIERANIE OBRAZU PANELU DO RAPORTU WORD ---
 import requests
+import shutil
 
 image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/14bfd7959da97de1afbb1bf220c93704b1e5f2fa5440fce8a54a812d.png"
 panel_img_path = r"C:\ap48\ap48-admin\panel_img.png"
+placeholder_img_path = r"C:\ap48\ap48-admin\placeholder.png"  # Przygotuj taki plik PNG, nawet pusty!
 
-response = requests.get(image_url)
-response.raise_for_status()
-with open(panel_img_path, "wb") as f:
-    f.write(response.content)
+try:
+    response = requests.get(image_url, timeout=10)
+    response.raise_for_status()
+    with open(panel_img_path, "wb") as f:
+        f.write(response.content)
+except Exception as e:
+    print(f"Nie udało się pobrać obrazka: {e}\nUżywam placeholdera.")
+    shutil.copy(placeholder_img_path, panel_img_path)
 
 def export_word_docxtpl(main_type, second_type, features, main, second,
                        mean_scores=None,
