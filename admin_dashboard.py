@@ -59,13 +59,15 @@ import subprocess
 from io import BytesIO
 
 def svg_to_png_bytes(svg_path, width_mm=15):
-    import cairosvg
-    with open(svg_path, "rb") as svg_file:
-        svg_bytes = svg_file.read()
-    # Przelicz szerokość mm na px (96 dpi ≈ 3.78 px/mm)
-    width_px = int(width_mm * 3.78 * 4)  # Skaluje ×4, zwiększa ostrość
-    png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
-    return png_bytes
+    try:
+        import cairosvg
+        with open(svg_path, "rb") as svg_file:
+            svg_bytes = svg_file.read()
+        width_px = int(width_mm * 3.78 * 4)  # Skaluje ×4 dla lepszej jakości
+        return cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
+    except Exception:
+        with open("static/placeholder.png", "rb") as f:
+            return f.read()
 
 def build_brands_for_word(doc, brand_list, logos_dir=r"C:\ap48\ap48-admin\logos_local", width_mm=15):
     out = []
