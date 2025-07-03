@@ -1,6 +1,6 @@
 streamlit
 pandas
-psycopg2
+psycopg2-binary
 plotly
 fpdf
 pytz
@@ -11,7 +11,6 @@ tinycss2
 cssselect2
 pillow
 requests
-psycopg2-binary
 openpyxl
 docx2pdf
 kaleido
