@@ -19,7 +19,7 @@ import tempfile
 import shutil
 import sys
 
-# Platform-specific import
+# Import platformowy
 if sys.platform.startswith("linux"):
     import subprocess
 else:
@@ -29,7 +29,6 @@ from docxtpl import InlineImage
 from docx.shared import Mm
 
 def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
-    # Konwersja dla strategii zapisu plików: "Alfa Romeo" → "alfa-romeo.svg"
     filename = (
         brand_name.lower()
             .replace(" ", "-")
