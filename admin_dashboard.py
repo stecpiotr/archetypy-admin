@@ -16,8 +16,8 @@ import os
 from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
-import shutil
 import sys
+
 
 # Import platformowy
 if sys.platform.startswith("linux"):
@@ -57,6 +57,17 @@ def get_logo_svg_path(brand_name, logos_dir="logos_local"):
 
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
+
+def make_placeholder_png(panel_img_path, width_px=300):
+    im = Image.new("RGBA", (width_px, width_px), (220, 220, 220, 255))
+    draw = ImageDraw.Draw(im)
+    text = "SVG"
+    font = ImageFont.load_default()
+    textwidth, textheight = draw.textsize(text, font)
+    position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
+    draw.text(position, text, fill="black", font=font)
+    im.save(panel_img_path)
+    return panel_img_path
 
 def svg_to_png_bytes(svg_path, width_mm=15, placeholder_path="static/placeholder.png"):
     width_px = int(width_mm * 3.78)
