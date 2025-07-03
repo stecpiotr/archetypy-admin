@@ -16,7 +16,8 @@ from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
 import sys
-
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Import platformowy
 if sys.platform.startswith("linux"):
@@ -56,19 +57,21 @@ def get_logo_svg_path(brand_name, logos_dir="logos_local"):
 
 from PIL import Image, ImageDraw, ImageFont
 
-def make_placeholder_png(panel_img_path, width_px=300):
+def make_placeholder_png(width_px=300):
+    from PIL import Image, ImageDraw, ImageFont
     im = Image.new("RGBA", (width_px, width_px), (220, 220, 220, 255))
     draw = ImageDraw.Draw(im)
     text = "SVG"
     font = ImageFont.load_default()
-    # Użyj textbbox zamiast textsize!
-    bbox = draw.textbbox((0, 0), text, font=font)  # zwraca (x1, y1, x2, y2)
+    bbox = draw.textbbox((0, 0), text, font=font)
     textwidth = bbox[2] - bbox[0]
     textheight = bbox[3] - bbox[1]
     position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
     draw.text(position, text, fill="black", font=font)
-    im.save(panel_img_path)
-    return panel_img_path
+    out = BytesIO()
+    im.save(out, format="PNG")
+    out.seek(0)
+    return out.getvalue()
 
 def svg_to_png_bytes(svg_path, width_mm=15):
     width_px = int(width_mm * 3.78)
@@ -94,18 +97,57 @@ def svg_to_png_bytes(svg_path, width_mm=15):
         out.seek(0)
         return out.getvalue()
 
+from io import BytesIO
+from docx.shared import Mm
+from docxtpl import InlineImage
+
 def build_brands_for_word(doc, brand_list, logos_dir="logos_local", width_mm=15):
     out = []
     for brand in brand_list:
         logo_path = get_logo_svg_path(brand, logos_dir)
         if logo_path:
             img_bytes = svg_to_png_bytes(logo_path, width_mm=width_mm)
-            img_stream = BytesIO(img_bytes)
-            img = InlineImage(doc, img_stream, width=Mm(width_mm))
-            out.append({"brand": brand, "logo": img})
         else:
-            out.append({"brand": brand, "logo": ""})
+            # Generowanie placeholdera w locie
+            img_bytes = make_placeholder_png(width_px=round(width_mm * 3.78))
+        img_stream = BytesIO(img_bytes)
+        img = InlineImage(doc, img_stream, width=Mm(width_mm))
+        out.append({"brand": brand, "logo": img})
     return out
+
+def make_placeholder_png_to_file(panel_img_path, width_px=300):
+    from PIL import Image, ImageDraw, ImageFont
+    im = Image.new("RGBA", (width_px, width_px), (220, 220, 220, 255))
+    draw = ImageDraw.Draw(im)
+    text = "SVG"
+    font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), text, font=font)
+    textwidth = bbox[2] - bbox[0]
+    textheight = bbox[3] - bbox[1]
+    position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
+    draw.text(position, text, fill="black", font=font)
+    im.save(panel_img_path)
+
+def save_radar_matplotlib(mean_archetype_scores, archetype_names, output_path):
+    # Dane wejściowe: dict {archetyp: wynik}
+    labels = list(archetype_names)
+    values = [mean_archetype_scores[n] for n in labels]
+    num_vars = len(labels)
+    # Zamknięcie koła
+    values += [values[0]]
+    angles = np.linspace(0, 2 * np.pi, num_vars + 1)
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    ax.plot(angles, values, color='royalblue', linewidth=3, marker='o')
+    ax.fill(angles, values, color='royalblue', alpha=0.18)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels, fontweight='bold', fontsize=12)
+    ax.set_yticks(np.arange(0, 21, 5))
+    ax.set_ylim(0, 20)
+    ax.grid(linestyle='dashed', alpha=0.5)
+    plt.title('Archetypy Krzysztofa Hetmana', size=16, y=1.11)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=180, bbox_inches='tight')
+    plt.close()
 
 def zapobiegaj_wdowie(text):
     # Twarda spacja przed ostatnim wyrazem każdego akapitu
@@ -1136,7 +1178,7 @@ def safe_download_panel_image(image_url, panel_img_path, width_px=300):
             f.write(response.content)
     except Exception as e:
         print(f"Nie udało się pobrać obrazka: {e}\nTworzę placeholder.")
-        make_placeholder_png(panel_img_path, width_px=width_px)
+        make_placeholder_png_to_file(panel_img_path, width_px=width_px)
 
 # Użycie:
 safe_download_panel_image(image_url, panel_img_path, width_px=300)
@@ -1550,8 +1592,7 @@ if "answers" in data.columns and not data.empty:
                 )
             )
             # --- DODAJ TĘ LINIĘ (z aktualną ścieżką do eksportu) ---
-
-            fig.write_image("C:\\ap48\\ap48-admin\\radar.png", scale=4)
+            save_radar_matplotlib(mean_archetype_scores, archetype_names, "C:\\ap48\\ap48-admin\\radar.png")
 
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("""
