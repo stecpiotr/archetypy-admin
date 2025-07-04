@@ -11,6 +11,3 @@ cairosvg
 openpyxl
 markdown
 pytz
-shutilwhich
-docx2pdf
-pywin32
