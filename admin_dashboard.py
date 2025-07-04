@@ -1145,8 +1145,8 @@ def export_word_docxtpl(main_type, second_type, features, main, second,
         radar_image, archetype_table, num_ankiet
     )
     # Najważniejsze! Przekaż doc do build_brands_for_word!
-    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), width_mm=15)
-    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), width_mm=15)
+    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, width_mm=15)
+    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, width_mm=15)
     context["PANEL_IMG"] = panel_image
     doc.render(context)
     buf = BytesIO()
@@ -1352,7 +1352,7 @@ def render_archetype_card(archetype_data, main=True):
                 <div style="margin-bottom:8px;">{visuals_str}</div>
                 {examples_person_html}
                 <div style="margin-bottom:10px; margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
-                {build_brand_icons_html(archetype_data.get('example_brands', []))}
+                {build_brand_icons_html(archetype_data.get('example_brands', []), logos_dir)}
                 {watchword_html}
                 {"<div style='margin-top:32px;font-weight:600;'>Kolory:</div>" if color_palette else ""}
                 {"<div style='margin-bottom:2px; margin-top:7px;'>" + color_icons_html + "</div>" if color_icons_html else ""}
