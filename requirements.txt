@@ -11,3 +11,4 @@ cairosvg
 openpyxl
 markdown
 pytz
+kaleido>=0.2.1
