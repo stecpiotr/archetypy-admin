@@ -1043,7 +1043,7 @@ def build_word_context(
 
     context = {
         "TYTUL": "Raport Archetypów",
-        "IMIE_NAZWISKO": "dla Krzysztofa Hetman",
+        "IMIE_NAZWISKO": "Krzysztofa Hetmana",
         "AUTOR": "Piotr Stec",
         "DATA": datetime.now().strftime("%Y-%m-%d"),
         "WSTEP": zapobiegaj_wdowie(
@@ -1248,7 +1248,7 @@ def render_archetype_card(archetype_data, main=True):
     color_desc_html = ""
     if color_palette and isinstance(color_palette, list) and color_names:
         color_items = [f"{n} ({h})" for n, h in zip(color_names, color_palette)]
-        color_desc_html = '<div style="color:#222;font-size:0.98em;margin-top:3px;margin-bottom:7px;">' + ', '.join(color_items) + '</div>'
+        color_desc_html = f'<div style="color:{text_color};font-size:0.98em;margin-top:3px;margin-bottom:7px;">' + ', '.join(color_items) + '</div>'
 
     questions = archetype_data.get('questions', [])
     questions_html = ""
@@ -1265,7 +1265,7 @@ def render_archetype_card(archetype_data, main=True):
         + ''.join(
             "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
             "<span style='color: green !important; font-size:1.14em; margin-right:9px; vertical-align:middle;'>✅</span>"
-            f"<span style='font-size:1.07em; color:#111'>{s[0].lower()+s[1:]}</span>"
+            f"<span style='font-size:1.07em; color:{text_color}'>{s[0].lower()+s[1:]}</span>"
             "</div>"
             for s in strengths
         )
@@ -1276,7 +1276,7 @@ def render_archetype_card(archetype_data, main=True):
         + ''.join(
             "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
             "<span style='color:#d32f2f !important; font-size:1.02em; margin-right:9px; vertical-align:middle;'>❌</span>"
-            f"<span style='font-size:1.07em; color:#111'>{w[0].lower()+w[1:]}</span>"
+            f"<span style='font-size:1.07em; color:{text_color}'>{w[0].lower()+w[1:]}</span>"
             "</div>"
             for w in weaknesses
         )
@@ -1333,7 +1333,7 @@ def render_archetype_card(archetype_data, main=True):
                         <i>{archetype_data.get('description','')}</i>
                     </span>
                 </div>
-                <div style="color:#222;font-size:1.07em; margin-top:21px;">
+                <div style="color:{text_color};font-size:1.07em; margin-top:21px;">
                     <b>Cechy:</b> <span style="font-weight:400;">{traits_str}</span>
                 </div>
                 <div style="margin-top:24px;font-weight:600;">Storyline:</div>
@@ -1542,7 +1542,7 @@ if "answers" in data.columns and not data.empty:
             st.markdown("""
             <div style="display: flex; justify-content: center; align-items: center; margin:10px 0 3px 0;">
             <span style="display:inline-block;vertical-align:middle;width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;margin-right:6px"></span>
-            <span style="font-size:0.80em;vertical-align:middle;margin-right:18px; color:#111;">Archetyp główny</span>
+            <span style="font-size:0.80em;vertical-align:middle;margin-right:18px; color:{text_color};">Archetyp główny</span>
             <span style="display:inline-block;vertical-align:middle;width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;margin-right:6px"></span>
             <span style="font-size:0.80em;vertical-align:middle;color:#555;">Archetyp pomocniczy</span>
             </div>
