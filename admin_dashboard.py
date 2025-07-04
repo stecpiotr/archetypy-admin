@@ -23,7 +23,12 @@ if sys.platform.startswith("linux"):
 else:
     from docx2pdf import convert
 
-def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
+TEMPLATE_PATH = "ap48_raport_template.docx"
+logos_dir = "logos_local"
+
+def get_logo_svg_path(brand_name, logos_dir=None):
+    if logos_dir is None:
+        logos_dir = "logos_local"
     # Konwersja dla strategii zapisu plików: "Alfa Romeo" → "alfa-romeo.svg"
     filename = (
         brand_name.lower()
@@ -67,7 +72,7 @@ def svg_to_png_bytes(svg_path, width_mm=15):
     png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
     return png_bytes
 
-def build_brands_for_word(doc, brand_list, logos_dir=r"C:\ap48\ap48-admin\logos_local", width_mm=15):
+def build_brands_for_word(doc, brand_list, logos_dir, width_mm=15):
     out = []
     for brand in brand_list:
         logo_path = get_logo_svg_path(brand, logos_dir)
@@ -970,7 +975,7 @@ from docx.shared import Mm
 from io import BytesIO
 import os
 
-TEMPLATE_PATH = r"C:\ap48\ap48-admin\ap48_raport_template.docx"
+TEMPLATE_PATH = "ap48_raport_template.docx"
 
 def build_word_context(
     main_type, second_type, features, main, second,
@@ -1102,8 +1107,8 @@ import requests
 import os
 
 image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/14bfd7959da97de1afbb1bf220c93704b1e5f2fa5440fce8a54a812d.png"
-panel_img_path = r"C:\ap48\ap48-admin\panel_img.png"
-placeholder_path = r"C:\ap48\ap48-admin\placeholder2.png"  # <-- Upewnij się, że działa!
+panel_img_path = "panel_img.png"
+placeholder_path = "placeholder2.png"  # <-- Upewnij się, że działa!
 
 def get_panel_img(panel_img_path, image_url, placeholder_path):
     try:
@@ -1189,7 +1194,7 @@ def is_color_dark(color_hex):
 
 import base64
 
-def build_brand_icons_html(brand_names, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
+def build_brand_icons_html(brand_names, logos_dir):
     import os
     html = '<div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;margin-top:6px;margin-bottom:8px;">'
     for brand in brand_names:
@@ -1531,7 +1536,7 @@ if "answers" in data.columns and not data.empty:
             )
             # --- DODAJ TĘ LINIĘ (z aktualną ścieżką do eksportu) ---
 
-            fig.write_image("C:\\ap48\\ap48-admin\\radar.png", scale=4)
+            fig.write_image("radar.png", scale=4)
 
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("""
@@ -1582,7 +1587,7 @@ if "answers" in data.columns and not data.empty:
         # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
         docx_buf = export_word_docxtpl(
             main_type, second_type, archetype_features, main, second,
-            radar_img_path="C:\\ap48\\ap48-admin\\radar.png",
+            radar_img_path="radar.png",
             archetype_table=archetype_table,
             num_ankiet=num_ankiet,
             panel_img_path=panel_img_path
