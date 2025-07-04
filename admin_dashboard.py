@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from fpdf import FPDF
 import unicodedata
 import requests
+from PIL import Image, ImageDraw
 import io
 import re
 from datetime import datetime
@@ -15,20 +16,15 @@ import os
 from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
+import shutil
 import sys
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Import platformowy
 if sys.platform.startswith("linux"):
     import subprocess
 else:
     from docx2pdf import convert
 
-from docxtpl import InlineImage
-from docx.shared import Mm
-
-def get_logo_svg_path(brand_name, logos_dir="logos_local"):
+def get_logo_svg_path(brand_name, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
+    # Konwersja dla strategii zapisu plików: "Alfa Romeo" → "alfa-romeo.svg"
     filename = (
         brand_name.lower()
             .replace(" ", "-")
@@ -55,99 +51,34 @@ def get_logo_svg_path(brand_name, logos_dir="logos_local"):
         return path2
     return None
 
-from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
+from docxtpl import InlineImage
+from docx.shared import Mm
 
-def make_placeholder_png(width_px=300):
-    from PIL import Image, ImageDraw, ImageFont
-    im = Image.new("RGBA", (width_px, width_px), (220, 220, 220, 255))
-    draw = ImageDraw.Draw(im)
-    text = "SVG"
-    font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), text, font=font)
-    textwidth = bbox[2] - bbox[0]
-    textheight = bbox[3] - bbox[1]
-    position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
-    draw.text(position, text, fill="black", font=font)
-    out = BytesIO()
-    im.save(out, format="PNG")
-    out.seek(0)
-    return out.getvalue()
+import subprocess
+from io import BytesIO
 
 def svg_to_png_bytes(svg_path, width_mm=15):
-    width_px = int(width_mm * 3.78)
-    try:
-        # Spróbuj konwertować SVG na PNG – CAIROSVG!
-        import cairosvg
-        return cairosvg.svg2png(url=svg_path, output_width=width_px, output_height=width_px)
-    except Exception as e:
-        print(f"Nie udała się konwersja SVG ({svg_path}) do PNG: {e}")
-        # jeśli się nie udało, wygeneruj placeholder
-        from PIL import Image, ImageDraw, ImageFont
-        im = Image.new("RGBA", (width_px, width_px), (230, 230, 230, 255))
-        draw = ImageDraw.Draw(im)
-        text = "SVG"
-        font = ImageFont.load_default()
-        bbox = draw.textbbox((0, 0), text, font=font)
-        textwidth = bbox[2] - bbox[0]
-        textheight = bbox[3] - bbox[1]
-        position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
-        draw.text(position, text, fill="black", font=font)
-        out = BytesIO()
-        im.save(out, format="PNG")
-        out.seek(0)
-        return out.getvalue()
+    import cairosvg
+    with open(svg_path, "rb") as svg_file:
+        svg_bytes = svg_file.read()
+    # Przelicz szerokość mm na px (96 dpi ≈ 3.78 px/mm)
+    width_px = int(width_mm * 3.78 * 4)  # Skaluje ×4, zwiększa ostrość
+    png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
+    return png_bytes
 
-from io import BytesIO
-from docx.shared import Mm
-from docxtpl import InlineImage
-
-def build_brands_for_word(doc, brand_list, logos_dir="logos_local", width_mm=15):
+def build_brands_for_word(doc, brand_list, logos_dir=r"C:\ap48\ap48-admin\logos_local", width_mm=15):
     out = []
     for brand in brand_list:
         logo_path = get_logo_svg_path(brand, logos_dir)
         if logo_path:
             img_bytes = svg_to_png_bytes(logo_path, width_mm=width_mm)
+            img_stream = BytesIO(img_bytes)
+            img = InlineImage(doc, img_stream, width=Mm(width_mm))
+            out.append({"brand": brand, "logo": img})
         else:
-            # Generowanie placeholdera w locie
-            img_bytes = make_placeholder_png(width_px=round(width_mm * 3.78))
-        img_stream = BytesIO(img_bytes)
-        img = InlineImage(doc, img_stream, width=Mm(width_mm))
-        out.append({"brand": brand, "logo": img})
+            out.append({"brand": brand, "logo": ""})
     return out
-
-def make_placeholder_png_to_file(panel_img_path, width_px=300):
-    from PIL import Image, ImageDraw, ImageFont
-    im = Image.new("RGBA", (width_px, width_px), (220, 220, 220, 255))
-    draw = ImageDraw.Draw(im)
-    text = "SVG"
-    font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), text, font=font)
-    textwidth = bbox[2] - bbox[0]
-    textheight = bbox[3] - bbox[1]
-    position = ((width_px - textwidth) // 2, (width_px - textheight) // 2)
-    draw.text(position, text, fill="black", font=font)
-    im.save(panel_img_path)
-
-def save_radar_matplotlib(mean_archetype_scores, archetype_names, output_path):
-    # Dane wejściowe: dict {archetyp: wynik}
-    labels = list(archetype_names)
-    values = [mean_archetype_scores[n] for n in labels]
-    num_vars = len(labels)
-    # Zamknięcie koła
-    values += [values[0]]
-    angles = np.linspace(0, 2 * np.pi, num_vars + 1)
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.plot(angles, values, color='royalblue', linewidth=3, marker='o')
-    ax.fill(angles, values, color='royalblue', alpha=0.18)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels, fontweight='bold', fontsize=12)
-    ax.set_yticks(np.arange(0, 21, 5))
-    ax.set_ylim(0, 20)
-    ax.grid(linestyle='dashed', alpha=0.5)
-    plt.title('Archetypy Krzysztofa Hetmana', size=16, y=1.11)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=180, bbox_inches='tight')
-    plt.close()
 
 def zapobiegaj_wdowie(text):
     # Twarda spacja przed ostatnim wyrazem każdego akapitu
@@ -163,6 +94,8 @@ def zapobiegaj_wdowie(text):
         before_last, last = para.rsplit(' ', 1)
         out.append(f"{before_last}\u00A0{last}")
     return '\n'.join(out)
+
+import cairosvg
 
 st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
 
@@ -1166,22 +1099,27 @@ def build_word_context(
 
 # --- POBIERANIE OBRAZU PANELU DO RAPORTU WORD ---
 import requests
+import os
 
 image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/14bfd7959da97de1afbb1bf220c93704b1e5f2fa5440fce8a54a812d.png"
-panel_img_path = "panel_img.png"  # Użyj względnej ścieżki!
+panel_img_path = r"C:\ap48\ap48-admin\panel_img.png"
+placeholder_path = r"C:\ap48\ap48-admin\placeholder2.png"  # <-- Upewnij się, że działa!
 
-def safe_download_panel_image(image_url, panel_img_path, width_px=300):
+def get_panel_img(panel_img_path, image_url, placeholder_path):
     try:
         response = requests.get(image_url, timeout=10)
         response.raise_for_status()
         with open(panel_img_path, "wb") as f:
             f.write(response.content)
-    except Exception as e:
-        print(f"Nie udało się pobrać obrazka: {e}\nTworzę placeholder.")
-        make_placeholder_png_to_file(panel_img_path, width_px=width_px)
+        # Jeśli plik faktycznie powstał, zwracamy tę ścieżkę
+        if os.path.exists(panel_img_path):
+            return panel_img_path
+    except Exception:
+        pass
+    # Jeśli był wyjątek (404, 500, brak sieci itp.) – bierzemy placeholder!
+    return placeholder_path
 
-# Użycie:
-safe_download_panel_image(image_url, panel_img_path, width_px=300)
+panel_img_to_use = get_panel_img(panel_img_path, image_url, placeholder_path)
 
 def export_word_docxtpl(main_type, second_type, features, main, second,
                        mean_scores=None,
@@ -1195,7 +1133,7 @@ def export_word_docxtpl(main_type, second_type, features, main, second,
     radar_image = InlineImage(doc, radar_img_path, width=Mm(160)) if radar_img_path and os.path.exists(radar_img_path) else ""
 
     # TWÓRZ panel_image DOPIERO TERAZ
-    panel_image = InlineImage(doc, panel_img_path, width=Mm(150)) if panel_img_path and os.path.exists(panel_img_path) else ""
+    panel_image = InlineImage(doc, panel_img_to_use, width=Mm(150))
 
     context = build_word_context(
         main_type, second_type, features, main, second, mean_scores,
@@ -1251,7 +1189,7 @@ def is_color_dark(color_hex):
 
 import base64
 
-def build_brand_icons_html(brand_names, logos_dir="logos_local"):
+def build_brand_icons_html(brand_names, logos_dir=r"C:\ap48\ap48-admin\logos_local"):
     import os
     html = '<div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;margin-top:6px;margin-bottom:8px;">'
     for brand in brand_names:
@@ -1592,7 +1530,8 @@ if "answers" in data.columns and not data.empty:
                 )
             )
             # --- DODAJ TĘ LINIĘ (z aktualną ścieżką do eksportu) ---
-            save_radar_matplotlib(mean_archetype_scores, archetype_names, "C:\\ap48\\ap48-admin\\radar.png")
+
+            fig.write_image("C:\\ap48\\ap48-admin\\radar.png", scale=4)
 
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("""
