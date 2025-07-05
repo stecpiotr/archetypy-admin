@@ -116,53 +116,53 @@ import cairosvg
 st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
 
 COLOR_NAME_MAP = {
-    "#000000": "Czerń",
-    "#FFD700": "Złoto",
-    "#282C34": "Granat (antracyt)",
-    "#800020": "Burgund",
-    "#E10600": "Czerwień",
-    "#2E3141": "Grafitowy granat",
-    "#FFFFFF": "Biel",
-    "#4682B4": "Stalowy błękit",
-    "#B0C4DE": "Jasny niebieskoszary",
-    "#6C7A89": "Popielaty szary",
-    "#B4D6B4": "Miętowa zieleń",
-    "#A7C7E7": "Pastelowy błękit",
-    "#FFD580": "Pastelowy żółty / beżowy",
-    "#FA709A": "Róż malinowy",
-    "#FEE140": "Jasny żółty",
-    "#FFD6E0": "Bardzo jasny róż",
-    "#FFB300": "Mocna żółć",
-    "#FF8300": "Pomarańcz",
-    "#FFD93D": "Pastelowa żółć",
-    "#7C53C3": "Fiolet",
-    "#3BE8B0": "Miętowy cyjan",
-    "#87CEEB": "Błękit (Sky Blue)",
-    "#43C6DB": "Turkusowy błękit",
-    "#A0E8AF": "Seledyn",
-    "#F9D371": "Złocisty żółty",
-    "#8F00FF": "Fiolet (intensywny)",
-    "#181C3A": "Granat bardzo ciemny",
-    "#E0BBE4": "Pastelowy fiolet",
-    "#F9F9F9": "Biel bardzo jasna",
-    "#6CA0DC": "Pastelowy błękit",
-    "#A3C1AD": "Pastelowa zieleń",
-    "#FFF6C3": "Jasny kremowy",
-    "#AAC9CE": "Pastelowy niebieskoszary",
-    "#FFF200": "Żółty (cytrynowy)",
-    "#FF0000": "Czerwień intensywna",
-    "#FF6F61": "Łososiowy róż",
-    "#8C564B": "Ciemy brąz",
-    "#D62728": "Czerwień karmazynowa",
-    "#1F77B4": "Chabrowy",
-    "#9467BD": "Fiolet śliwkowy",
-    "#F2A93B": "Miodowy żółty",
-    "#17BECF": "Niebieski morski",
-    "#E377C2": "Pastelowy róż fioletowy",
-    "#7C46C5": "Fiolet szafirowy",
-    "#2CA02C": "Zieleń trawiasta",
-    "#9BD6F4": "Pastelowy błękit jasny",
-    "#FF7F0E": "Jaskrawy pomarańcz",
+        "#000000": "czerń",
+        "#FFD700": "złoto",
+        "#282C34": "granat /antracyt/",
+        "#800020": "burgund",
+        "#E10600": "czerwień",
+        "#2E3141": "grafitowy granat",
+        "#FFFFFF": "biel",
+        "#4682B4": "stalowy błękit",
+        "#B0C4DE": "jasny niebieskoszary",
+        "#6C7A89": "popielaty szary",
+        "#B4D6B4": "miętowa zieleń",
+        "#A7C7E7": "pastelowy błękit",
+        "#FFD580": "pastelowy żółty / beżowy",
+        "#FA709A": "róż malinowy",
+        "#FEE140": "jasny żółty",
+        "#FFD6E0": "bardzo jasny róż",
+        "#FFB300": "mocna żółć",
+        "#FF8300": "pomarańcz",
+        "#FFD93D": "pastelowa żółć",
+        "#7C53C3": "fiolet",
+        "#3BE8B0": "miętowy cyjan",
+        "#87CEEB": "błękit /sky blue/",
+        "#43C6DB": "turkusowy błękit",
+        "#A0E8AF": "seledyn",
+        "#F9D371": "złocisty żółty",
+        "#8F00FF": "fiolet intensywny",
+        "#181C3A": "granat bardzo ciemny",
+        "#E0BBE4": "pastelowy fiolet",
+        "#F9F9F9": "biel bardzo jasna",
+        "#6CA0DC": "pastelowy błękit",
+        "#A3C1AD": "pastelowa zieleń",
+        "#FFF6C3": "jasny kremowy",
+        "#AAC9CE": "pastelowy niebieskoszary",
+        "#FFF200": "żółty (cytrynowy)",
+        "#FF0000": "czerwień intensywna",
+        "#FF6F61": "łososiowy róż",
+        "#8C564B": "ciemny brąz",
+        "#D62728": "czerwień karmazynowa",
+        "#1F77B4": "chabrowy",
+        "#9467BD": "fiolet śliwkowy",
+        "#F2A93B": "miodowy żółty",
+        "#17BECF": "niebieski morski",
+        "#E377C2": "pastelowy róż fioletowy",
+        "#7C46C5": "fiolet szafirowy",
+        "#2CA02C": "zieleń trawiasta",
+        "#9BD6F4": "pastelowy błękit jasny",
+        "#FF7F0E": "jaskrawy pomarańcz"
 }
 
 ARCHE_NAMES_ORDER = [
@@ -1117,7 +1117,7 @@ def build_word_context(
 import requests
 import os
 
-image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/14bfd7959da97de1afbb1bf220c93704b1e5f2fa5440fce8a54a812d.png"
+image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/8e8ea438502096c3c0737cf0c840659c368f3ea53f1c504ce11b448d.png"
 panel_img_path = "panel_img.png"
 placeholder_path = "placeholder2.png"  # <-- Upewnij się, że działa!
 
@@ -1146,18 +1146,18 @@ def export_word_docxtpl(main_type, second_type, features, main, second,
     doc = DocxTemplate(TEMPLATE_PATH)
 
     # Radar image
-    radar_image = InlineImage(doc, radar_img_path, width=Mm(160)) if radar_img_path and os.path.exists(radar_img_path) else ""
+    radar_image = InlineImage(doc, radar_img_path, width=Mm(150)) if radar_img_path and os.path.exists(radar_img_path) else ""
 
     # TWÓRZ panel_image DOPIERO TERAZ
-    panel_image = InlineImage(doc, panel_img_to_use, width=Mm(150))
+    panel_image = InlineImage(doc, panel_img_to_use, width=Mm(140))
 
     context = build_word_context(
         main_type, second_type, features, main, second, mean_scores,
         radar_image, archetype_table, num_ankiet
     )
     # Najważniejsze! Przekaż doc do build_brands_for_word!
-    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, height_mm=8)
-    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, height_mm=8)
+    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
+    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
     context["PANEL_IMG"] = panel_image
     doc.render(context)
     buf = BytesIO()
