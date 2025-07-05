@@ -63,6 +63,93 @@ from docx.shared import Mm
 import subprocess
 from io import BytesIO
 
+person_wikipedia_links = {
+    "Aleksandra Dulkiewicz": "https://pl.wikipedia.org/wiki/Aleksandra_Dulkiewicz",
+    "Aleksiej Nawalny": "https://pl.wikipedia.org/wiki/Aleksiej_Nawalny",
+    "Angela Merkel": "https://pl.wikipedia.org/wiki/Angela_Merkel",
+    "Andrzej Duda": "https://pl.wikipedia.org/wiki/Andrzej_Duda",
+    "Barack Obama": "https://pl.wikipedia.org/wiki/Barack_Obama",
+    "Benito Juárez": "https://pl.wikipedia.org/wiki/Benito_Ju%C3%A1rez",
+    "Bernie Sanders": "https://pl.wikipedia.org/wiki/Bernie_Sanders",
+    "Boris Johnson": "https://pl.wikipedia.org/wiki/Boris_Johnson",
+    "Bronisław Geremek": "https://pl.wikipedia.org/wiki/Bronis%C5%82aw_Geremek",
+    "Clement Attlee": "https://pl.wikipedia.org/wiki/Clement_Attlee",
+    "Donald Trump": "https://pl.wikipedia.org/wiki/Donald_Trump",
+    "Elon Musk": "https://pl.wikipedia.org/wiki/Elon_Musk",
+    "Emmanuel Macron": "https://pl.wikipedia.org/wiki/Emmanuel_Macron",
+    "Eva Perón": "https://pl.wikipedia.org/wiki/Eva_Per%C3%B3n",
+    "François Mitterrand": "https://pl.wikipedia.org/wiki/Fran%C3%A7ois_Mitterrand",
+    "Franklin D. Roosevelt": "https://pl.wikipedia.org/wiki/Franklin_D._Roosevelt",
+    "George Washington": "https://pl.wikipedia.org/wiki/George_Washington",
+    "Jacek Kuroń": "https://pl.wikipedia.org/wiki/Jacek_Kuro%C5%84",
+    "Jacinda Ardern": "https://pl.wikipedia.org/wiki/Jacinda_Ardern",
+    "Jarosław Kaczyński": "https://pl.wikipedia.org/wiki/Jaros%C5%82aw_Kaczy%C5%84ski",
+    "Jawaharlal Nehru": "https://pl.wikipedia.org/wiki/Jawaharlal_Nehru",
+    "Janusz Palikot": "https://pl.wikipedia.org/wiki/Janusz_Palikot",
+    "Jeremy Corbyn": "https://pl.wikipedia.org/wiki/Jeremy_Corbyn",
+    "Jimmy Carter": "https://pl.wikipedia.org/wiki/Jimmy_Carter",
+    "Joe Biden": "https://pl.wikipedia.org/wiki/Joe_Biden",
+    "John F. Kennedy": "https://pl.wikipedia.org/wiki/John_F._Kennedy",
+    "Józef Piłsudski": "https://pl.wikipedia.org/wiki/J%C3%B3zef_Pi%C5%82sudski",
+    "Justin Trudeau": "https://pl.wikipedia.org/wiki/Justin_Trudeau",
+    "Konrad Adenauer": "https://pl.wikipedia.org/wiki/Konrad_Adenauer",
+    "Lee Kuan Yew": "https://pl.wikipedia.org/wiki/Lee_Kuan_Yew",
+    "Lech Wałęsa": "https://pl.wikipedia.org/wiki/Lech_Wa%C5%82%C4%99sa",
+    "Ludwik XIV": "https://pl.wikipedia.org/wiki/Ludwik_XIV_Burbonski",
+    "Margaret Thatcher": "https://pl.wikipedia.org/wiki/Margaret_Thatcher",
+    "Marine Le Pen": "https://pl.wikipedia.org/wiki/Marine_Le_Pen",
+    "Martin Luther King": "https://pl.wikipedia.org/wiki/Martin_Luther_King",
+    "Mustafa Kemal Atatürk": "https://pl.wikipedia.org/wiki/Mustafa_Kemal_Atat%C3%BCrk",
+    "Napoleon Bonaparte": "https://pl.wikipedia.org/wiki/Napoleon_Bonaparte",
+    "Nelson Mandela": "https://pl.wikipedia.org/wiki/Nelson_Mandela",
+    "Olof Palme": "https://pl.wikipedia.org/wiki/Olof_Palme",
+    "Pedro Sánchez": "https://pl.wikipedia.org/wiki/Pedro_S%C3%A1nchez",
+    "Sanna Marin": "https://pl.wikipedia.org/wiki/Sanna_Marin",
+    "Shimon Peres": "https://pl.wikipedia.org/wiki/Shimon_Peres",
+    "Silvio Berlusconi": "https://pl.wikipedia.org/wiki/Silvio_Berlusconi",
+    "Sławomir Mentzen": "https://pl.wikipedia.org/wiki/S%C5%82awomir_Mentzen",
+    "Szymon Hołownia": "https://pl.wikipedia.org/wiki/Szymon_Ho%C5%82ownia",
+    "Theodore Roosevelt": "https://pl.wikipedia.org/wiki/Theodore_Roosevelt",
+    "Thomas Jefferson": "https://pl.wikipedia.org/wiki/Thomas_Jefferson",
+    "Tony Blair": "https://pl.wikipedia.org/wiki/Tony_Blair",
+    "Václav Havel": "https://pl.wikipedia.org/wiki/V%C3%A1clav_Havel",
+    "Václav Klaus": "https://pl.wikipedia.org/wiki/V%C3%A1clav_Klaus",
+    "Vladimir Putin": "https://pl.wikipedia.org/wiki/W%C5%82adimir_Putin",
+    "Winston Churchill": "https://pl.wikipedia.org/wiki/Winston_Churchill",
+    "Wołodymyr Zełenski": "https://pl.wikipedia.org/wiki/Wo%C5%82odymyr_Ze%C5%82enski",
+    "Władysław Kosiniak-Kamysz": "https://pl.wikipedia.org/wiki/W%C5%82adys%C5%82aw_Kosiniak-Kamysz"
+}
+
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+
+def add_hyperlink(paragraph, text, url):
+    part = paragraph.part
+    r_id = part.relate_to(url, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
+    hyperlink = OxmlElement('w:hyperlink')
+    hyperlink.set(qn('r:id'), r_id)
+    new_run = OxmlElement('w:r')
+    rPr = OxmlElement('w:rPr')
+    c = OxmlElement('w:color')
+    c.set(qn('w:val'), "0000FF")
+    rPr.append(c)
+    u = OxmlElement('w:u')
+    u.set(qn('w:val'), "single")
+    rPr.append(u)
+    new_run.append(rPr)
+    t = OxmlElement('w:t')
+    t.text = text
+    new_run.append(t)
+    hyperlink.append(new_run)
+    paragraph._p.append(hyperlink)
+    return hyperlink
+
+def person_link(name):
+    url = person_wikipedia_links.get(name)
+    if url:
+        return f"<a href='{url}' target='_blank'>{name}</a>"
+    return name
+
 def svg_to_png_bytes(svg_path, width_mm=None, height_mm=None):
     import cairosvg
 
@@ -95,6 +182,7 @@ def build_brands_for_word(doc, brand_list, logos_dir, height_mm=20):
             out.append({"brand": brand, "logo": ""})
 
     return out
+
 
 def zapobiegaj_wdowie(text):
     # Twarda spacja przed ostatnim wyrazem każdego akapitu
@@ -1043,6 +1131,14 @@ def build_word_context(
         # Dodaj kolejne w razie potrzeby
     }
 
+    def person_links_html(person_list):
+        if not person_list:
+            return ""
+        return ', '.join(person_link(name) for name in person_list)
+
+    def person_links_plain(person_list):
+        return person_list  # czysta lista nazwisk, bez HTML
+
     def kolor_label_list(palette):
         if not isinstance(palette, list):
             return ""
@@ -1084,7 +1180,7 @@ def build_word_context(
         "ARCHETYPE_MAIN_STRENGTHS": main.get("strengths") or [],
         "ARCHETYPE_MAIN_WEAKNESSES": main.get("weaknesses") or [],
         "ARCHETYPE_MAIN_RECOMMENDATIONS": main.get("recommendations") or [],
-        "ARCHETYPE_MAIN_POLITICIANS": main.get("examples_person") or [],
+        "ARCHETYPE_MAIN_POLITICIANS": person_links_plain(main.get("examples_person", [])),
         "ARCHETYPE_MAIN_BRANDS_IMG": [],
         "ARCHETYPE_MAIN_COLORS": main.get("color_palette") or [],
         "ARCHETYPE_MAIN_COLORS_LABEL": kolor_label_list(main.get("color_palette", [])),
@@ -1101,7 +1197,7 @@ def build_word_context(
         "ARCHETYPE_AUX_STRENGTHS": second.get("strengths") or [],
         "ARCHETYPE_AUX_WEAKNESSES": second.get("weaknesses") or [],
         "ARCHETYPE_AUX_RECOMMENDATIONS": second.get("recommendations") or [],
-        "ARCHETYPE_AUX_POLITICIANS": second.get("examples_person") or [],
+        "ARCHETYPE_AUX_POLITICIANS": person_links_plain(second.get("examples_person", [])),
         "ARCHETYPE_AUX_BRANDS_IMG": [],
         "ARCHETYPE_AUX_COLORS": second.get("color_palette") or [],
         "ARCHETYPE_AUX_COLORS_LABEL": kolor_label_list(second.get("color_palette", [])),
@@ -1160,6 +1256,14 @@ def export_word_docxtpl(main_type, second_type, features, main, second,
     context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
     context["PANEL_IMG"] = panel_image
     doc.render(context)
+
+    # --- TU WSTAW PĘTLĘ PODMIENIAJĄCĄ NAZWISKA NA LINKI ---
+    for para in doc.paragraphs:
+        for name, url in person_wikipedia_links.items():
+            if name in para.text:
+                para.clear()
+                add_hyperlink(para, name, url)
+
     buf = BytesIO()
     doc.save(buf)
     buf.seek(0)
@@ -1220,6 +1324,11 @@ def build_brand_icons_html(brand_names, logos_dir):
             html += f'<span style="font-size:1.05em;color:#aaa;margin-right:15px;">{brand}</span>'
     html += '</div>'
     return html
+
+def person_links_html(person_list):
+    if not person_list:
+        return ""
+    return ', '.join(person_link(name) for name in person_list)
 
 def render_archetype_card(archetype_data, main=True):
     if not archetype_data:
@@ -1294,13 +1403,6 @@ def render_archetype_card(archetype_data, main=True):
         + "</div>"
     )
 
-    examples_person = archetype_data.get('examples_person', [])
-    examples_person_html = ""
-    if examples_person:
-        examples_person_html = (
-            "<div style='margin-top:24px;font-weight:600;'>Przykłady polityków:</div>\n" +
-            "<div style='margin-bottom:8px;'>" + ', '.join(examples_person) + "</div>"
-        )
     watchword = archetype_data.get('watchword', [])
     watchword_html = ""
     if watchword and isinstance(watchword, list) and watchword[0].strip():
@@ -1361,7 +1463,10 @@ def render_archetype_card(archetype_data, main=True):
                 <div style="margin-bottom:8px;">{keywords_str}</div>
                 <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
                 <div style="margin-bottom:8px;">{visuals_str}</div>
-                {examples_person_html}
+                {('<div style="margin-top:24px;font-weight:600;">Przykłady polityków:</div>'
+                '<div style="margin-bottom:8px;">' +
+                ', '.join(person_link(name) for name in archetype_data.get('examples_person', [])) +
+                '</div>')}
                 <div style="margin-bottom:10px; margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
                 {build_brand_icons_html(archetype_data.get('example_brands', []), logos_dir)}
                 {watchword_html}
