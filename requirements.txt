@@ -1,7 +1,6 @@
 streamlit
 pandas
 psycopg2
-plotly
 fpdf
 requests
 pillow
@@ -11,4 +10,5 @@ cairosvg
 openpyxl
 markdown
 pytz
+plotly>=5.0.0
 kaleido>=0.2.1

@@ -19,3 +19,4 @@ libpangocairo-1.0-0
 fonts-liberation
 libreoffice
 ghostscript
+chromium

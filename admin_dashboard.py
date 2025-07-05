@@ -63,26 +63,37 @@ from docx.shared import Mm
 import subprocess
 from io import BytesIO
 
-def svg_to_png_bytes(svg_path, width_mm=15):
+def svg_to_png_bytes(svg_path, width_mm=None, height_mm=None):
     import cairosvg
+
     with open(svg_path, "rb") as svg_file:
         svg_bytes = svg_file.read()
-    # Przelicz szerokość mm na px (96 dpi ≈ 3.78 px/mm)
-    width_px = int(width_mm * 3.78 * 4)  # Skaluje ×4, zwiększa ostrość
-    png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=width_px)
+
+    # Przelicz mm na px (96 dpi ≈ 3.78 px/mm)
+    arg_dict = {}
+    if width_mm is not None:
+        arg_dict['output_width'] = int(width_mm * 3.78 * 4)  # ×4 dla ostrości
+    if height_mm is not None:
+        arg_dict['output_height'] = int(height_mm * 3.78 * 4)
+
+    png_bytes = cairosvg.svg2png(bytestring=svg_bytes, **arg_dict)
     return png_bytes
 
-def build_brands_for_word(doc, brand_list, logos_dir, width_mm=15):
+def build_brands_for_word(doc, brand_list, logos_dir, height_mm=20):
     out = []
+
     for brand in brand_list:
         logo_path = get_logo_svg_path(brand, logos_dir)
+
         if logo_path:
-            img_bytes = svg_to_png_bytes(logo_path, width_mm=width_mm)
+            # Wygeneruj PNG o wysokości 20 mm (=2 cm), szerokość liczy się automatycznie
+            img_bytes = svg_to_png_bytes(logo_path, height_mm=height_mm)
             img_stream = BytesIO(img_bytes)
-            img = InlineImage(doc, img_stream, width=Mm(width_mm))
+            img = InlineImage(doc, img_stream, height=Mm(height_mm))
             out.append({"brand": brand, "logo": img})
         else:
             out.append({"brand": brand, "logo": ""})
+
     return out
 
 def zapobiegaj_wdowie(text):
@@ -1145,8 +1156,8 @@ def export_word_docxtpl(main_type, second_type, features, main, second,
         radar_image, archetype_table, num_ankiet
     )
     # Najważniejsze! Przekaż doc do build_brands_for_word!
-    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, width_mm=15)
-    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, width_mm=15)
+    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, height_mm=8)
+    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, height_mm=8)
     context["PANEL_IMG"] = panel_image
     doc.render(context)
     buf = BytesIO()
