@@ -117,7 +117,8 @@ person_wikipedia_links = {
     "Vladimir Putin": "https://pl.wikipedia.org/wiki/W%C5%82adimir_Putin",
     "Winston Churchill": "https://pl.wikipedia.org/wiki/Winston_Churchill",
     "Wołodymyr Zełenski": "https://pl.wikipedia.org/wiki/Wo%C5%82odymyr_Ze%C5%82enski",
-    "Władysław Kosiniak-Kamysz": "https://pl.wikipedia.org/wiki/W%C5%82adys%C5%82aw_Kosiniak-Kamysz"
+    "Władysław Kosiniak-Kamysz": "https://pl.wikipedia.org/wiki/W%C5%82adys%C5%82aw_Kosiniak-Kamysz",
+    "Xi Jinping": "https://pl.wikipedia.org/wiki/Xi_Jinping",
 }
 
 from docx.oxml import OxmlElement
@@ -1209,30 +1210,6 @@ def build_word_context(
 
     return context
 
-# --- POBIERANIE OBRAZU PANELU DO RAPORTU WORD ---
-import requests
-import os
-
-image_url = "https://ap48-app-6zwjcbe8tby7vreggnz5tm.streamlit.app/~/+/media/8e8ea438502096c3c0737cf0c840659c368f3ea53f1c504ce11b448d.png"
-panel_img_path = "panel_img.png"
-placeholder_path = "placeholder2.png"  # <-- Upewnij się, że działa!
-
-def get_panel_img(panel_img_path, image_url, placeholder_path):
-    try:
-        response = requests.get(image_url, timeout=10)
-        response.raise_for_status()
-        with open(panel_img_path, "wb") as f:
-            f.write(response.content)
-        # Jeśli plik faktycznie powstał, zwracamy tę ścieżkę
-        if os.path.exists(panel_img_path):
-            return panel_img_path
-    except Exception:
-        pass
-    # Jeśli był wyjątek (404, 500, brak sieci itp.) – bierzemy placeholder!
-    return placeholder_path
-
-panel_img_to_use = get_panel_img(panel_img_path, image_url, placeholder_path)
-
 def export_word_docxtpl(main_type, second_type, features, main, second,
                        mean_scores=None,
                        radar_img_path=None,
@@ -1245,7 +1222,7 @@ def export_word_docxtpl(main_type, second_type, features, main, second,
     radar_image = InlineImage(doc, radar_img_path, width=Mm(150)) if radar_img_path and os.path.exists(radar_img_path) else ""
 
     # TWÓRZ panel_image DOPIERO TERAZ
-    panel_image = InlineImage(doc, panel_img_to_use, width=Mm(140))
+    panel_image = InlineImage(doc, panel_img_path, width=Mm(140))
 
     context = build_word_context(
         main_type, second_type, features, main, second, mean_scores,
@@ -1699,6 +1676,13 @@ if "answers" in data.columns and not data.empty:
             Pobierz raporty archetypu Krzysztofa Hetmana
         </div>
         """, unsafe_allow_html=True)
+
+        # GENEROWANIE OBRAZU PANELU DYNAMICZNIE
+        idx_main = archetype_name_to_img_idx(main_type)
+        idx_aux = archetype_name_to_img_idx(second_type) if second_type != main_type else None
+        panel_img = compose_archetype_highlight(idx_main, idx_aux)
+        panel_img_path = f"panel_{main_type.lower()}_{second_type.lower() if second_type else ''}.png"
+        panel_img.save(panel_img_path)
 
         # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
         docx_buf = export_word_docxtpl(
