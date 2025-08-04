@@ -174,7 +174,7 @@ def build_brands_for_word(doc, brand_list, logos_dir, height_mm=20):
         logo_path = get_logo_svg_path(brand, logos_dir)
 
         if logo_path:
-            # Wygeneruj PNG o wysokości 20 mm (=2 cm), szerokość liczy się automatycznie
+            # Wygeneruj PNG o wysokości 20 mm, szerokość liczy się automatycznie
             img_bytes = svg_to_png_bytes(logo_path, height_mm=height_mm)
             img_stream = BytesIO(img_bytes)
             img = InlineImage(doc, img_stream, height=Mm(height_mm))
@@ -258,6 +258,12 @@ ARCHE_NAMES_ORDER = [
     "Niewinny", "Mędrzec", "Odkrywca", "Buntownik", "Czarodziej", "Bohater",
     "Kochanek", "Błazen", "Towarzysz", "Opiekun", "Władca", "Twórca"
 ]
+
+def archetype_name_to_img_idx(name):
+    try:
+        return ARCHE_NAMES_ORDER.index(name)
+    except ValueError:
+        return None
 
 archetypes = {
     "Władca":   [1, 2, 3, 4],
@@ -971,28 +977,25 @@ def mask_for(idx, color):
     draw.pieslice([cx-rad, cy-rad, cx+rad, cy+rad], start, end, fill=color)
     return mask
 
-def compose_archetype_highlight(idx_main, idx_aux=None):
+def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None):
     base = load_base_arche_img().copy()
+
+    # Najpierw uzupełniający (żeby nakryło go potem żółte/czerwone jeśli overlap)
+    if idx_supplement is not None and idx_supplement not in [idx_main, idx_aux] and idx_supplement < 12:
+        mask_supplement = mask_for(idx_supplement, (64,185,0,140))  # zielony półtransparentny
+        base.alpha_composite(mask_supplement)
+
+    # Potem pomocniczy
     if idx_aux is not None and idx_aux != idx_main and idx_aux < 12:
-        mask_aux = mask_for(idx_aux, (255,210,47,140))
+        mask_aux = mask_for(idx_aux, (255,210,47,140))  # żółty
         base.alpha_composite(mask_aux)
+
+    # Na końcu główny (przykrywa wszystko)
     if idx_main is not None:
-        mask_main = mask_for(idx_main, (255,0,0,140))
+        mask_main = mask_for(idx_main, (255,0,0,140))  # czerwony
         base.alpha_composite(mask_main)
+
     return base
-
-def archetype_name_to_img_idx(name):
-    try:
-        return ARCHE_NAMES_ORDER.index(name)
-    except ValueError:
-        return None
-
-def clean_pdf_text(text):
-    if text is None:
-        return ""
-    text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
-    text = text.replace("–", "-").replace("—", "-")
-    return text
 
 @st.cache_data(ttl=30)
 def load():
@@ -1043,18 +1046,19 @@ def archetype_percent(scoresum):
         return None
     return round(scoresum / 20 * 100, 1)
 
-def pick_main_and_aux_archetype(archetype_means, archetype_order):
-    vals = list(archetype_means.values())
-    max_val = max(vals)
-    main_candidates = [k for k, v in archetype_means.items() if v == max_val]
-    main_type = next(k for k in archetype_order if k in main_candidates)
-    aux_vals = [v for k, v in archetype_means.items() if k != main_type]
-    if not aux_vals:
-        return main_type, None
-    aux_val = max(aux_vals)
-    aux_candidates = [k for k, v in archetype_means.items() if v == aux_val and k != main_type]
-    second_type = next((k for k in archetype_order if k in aux_candidates), None)
-    return main_type, second_type
+def pick_top_3_archetypes(archetype_means, archetype_order):
+    """
+    Zwraca trzy archetypy o najwyższych wynikach, w kolejności zgodnej z archetype_order.
+    """
+    # Sortuj po wartości malejąco, a przy remisie wg porządku archetype_order
+    sorted_archetypes = sorted(
+        archetype_means.items(),
+        key=lambda kv: (-kv[1], archetype_order.index(kv[0]))
+    )
+    main_type = sorted_archetypes[0][0] if len(sorted_archetypes) > 0 else None
+    aux_type = sorted_archetypes[1][0] if len(sorted_archetypes) > 1 else None
+    supplement_type = sorted_archetypes[2][0] if len(sorted_archetypes) > 2 else None
+    return main_type, aux_type, supplement_type
 
 def add_image(paragraph, img, width):
     # img może być ścieżką lub BytesIO/file-like
@@ -1078,7 +1082,7 @@ import os
 TEMPLATE_PATH = "ap48_raport_template.docx"
 
 def build_word_context(
-    main_type, second_type, features, main, second,
+    main_type, second_type, supplement_type, features, main, second, supplement,
     mean_scores=None, radar_image=None, archetype_table=None, num_ankiet=None
 ):
     COLOR_NAME_MAP = {
@@ -1206,32 +1210,66 @@ def build_word_context(
         "ARCHETYPE_AUX_KEYWORDS": second.get("keyword_messaging") or [],
         "ARCHETYPE_AUX_SLOGANS": second.get("watchword") or [],
         "ARCHETYPE_AUX_QUESTIONS": second.get("questions") or [],
+        # --- ARCHETYP UZUPEŁNIAJĄCY ---
+        "ARCHETYPE_SUPPLEMENT_NAME": supplement.get("name") or "",
+        "ARCHETYPE_SUPPLEMENT_TAGLINE": supplement.get("tagline") or "",
+        "ARCHETYPE_SUPPLEMENT_DESC": supplement.get("description") or "",
+        "ARCHETYPE_SUPPLEMENT_STORYLINE": supplement.get("storyline") or "",
+        "ARCHETYPE_SUPPLEMENT_TRAITS": supplement.get("core_traits") or [],
+        "ARCHETYPE_SUPPLEMENT_STRENGTHS": supplement.get("strengths") or [],
+        "ARCHETYPE_SUPPLEMENT_WEAKNESSES": supplement.get("weaknesses") or [],
+        "ARCHETYPE_SUPPLEMENT_RECOMMENDATIONS": supplement.get("recommendations") or [],
+        "ARCHETYPE_SUPPLEMENT_POLITICIANS": person_links_plain(supplement.get("examples_person", [])),
+        "ARCHETYPE_SUPPLEMENT_BRANDS_IMG": [],
+        "ARCHETYPE_SUPPLEMENT_COLORS": supplement.get("color_palette") or [],
+        "ARCHETYPE_SUPPLEMENT_COLORS_LABEL": kolor_label_list(supplement.get("color_palette", [])),
+        "ARCHETYPE_SUPPLEMENT_VISUALS": supplement.get("visual_elements") or [],
+        "ARCHETYPE_SUPPLEMENT_KEYWORDS": supplement.get("keyword_messaging") or [],
+        "ARCHETYPE_SUPPLEMENT_SLOGANS": supplement.get("watchword") or [],
+        "ARCHETYPE_SUPPLEMENT_QUESTIONS": supplement.get("questions") or [],
     }
 
     return context
 
-def export_word_docxtpl(main_type, second_type, features, main, second,
-                       mean_scores=None,
-                       radar_img_path=None,
-                       archetype_table=None,
-                       num_ankiet=None,
-                       panel_img_path=None):
+def export_word_docxtpl(
+    main_type,
+    second_type,
+    supplement_type,
+    features,
+    main,
+    second,
+    supplement,
+    mean_scores=None,
+    radar_img_path=None,
+    archetype_table=None,
+    num_ankiet=None,
+    panel_img_path=None
+):
+
     doc = DocxTemplate(TEMPLATE_PATH)
 
     # Radar image
-    radar_image = InlineImage(doc, radar_img_path, width=Mm(150)) if radar_img_path and os.path.exists(radar_img_path) else ""
+    if radar_img_path and os.path.exists(radar_img_path):
+        radar_image = InlineImage(doc, radar_img_path, width=Mm(150))
+    else:
+        radar_image = ""
 
-    # TWÓRZ panel_image DOPIERO TERAZ
-    panel_image = InlineImage(doc, panel_img_path, width=Mm(140))
+    # Panel image
+    panel_image = InlineImage(doc, panel_img_path, width=Mm(140)) if panel_img_path and os.path.exists(panel_img_path) else ""
 
+    # UWAGA: przekazujemy wszystkie 3 archetypy
     context = build_word_context(
-        main_type, second_type, features, main, second, mean_scores,
-        radar_image, archetype_table, num_ankiet
+        main_type, second_type, supplement_type, features, main, second, supplement,
+        mean_scores, radar_image, archetype_table, num_ankiet
     )
+
     # Najważniejsze! Przekaż doc do build_brands_for_word!
     context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
     context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
+    context["ARCHETYPE_SUPPLEMENT_BRANDS_IMG"] = build_brands_for_word(doc, supplement.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
+
     context["PANEL_IMG"] = panel_image
+
     doc.render(context)
 
     # --- TU WSTAW PĘTLĘ PODMIENIAJĄCĄ NAZWISKA NA LINKI ---
@@ -1307,32 +1345,46 @@ def person_links_html(person_list):
         return ""
     return ', '.join(person_link(name) for name in person_list)
 
-def render_archetype_card(archetype_data, main=True):
+
+def render_archetype_card(archetype_data, main=True, supplement=False):
     if not archetype_data:
         st.warning("Brak danych o archetypie.")
         return
 
-    border_color = archetype_data.get('color_palette', ['#888'])[0]
-    tagline = archetype_data.get('tagline','')
+    # Style zależne od typu archetypu
+    if supplement:
+        border_color = "#40b900"  # zielony, np. uzupełniający
+        bg_color = "#F6FFE6"  # jasny zielony tła uzupełniającego
+        tagline_color = "#40b900"
+        box_shadow = f"0 3px 14px 0 {border_color}44"
+    elif main:
+        border_color = archetype_data.get('color_palette', ['#E99836'])[0]
+        bg_color = archetype_data.get('color_palette', ['#FFF', '#FAFAFA'])[1] if len(
+            archetype_data.get('color_palette', [])) > 1 else "#FFF8F0"
+        tagline_color = border_color
+        box_shadow = f"0 4px 14px 0 {border_color}44"
+    else:
+        border_color = archetype_data.get('color_palette', ['#FFD22F'])[0]
+        bg_color = "#FAFAFA"
+        tagline_color = border_color
+        box_shadow = f"0 2px 6px 0 {border_color}22"
 
-    if (archetype_data.get('name','').strip().lower() == 'niewinny') and not main:
+    tagline = archetype_data.get('tagline', '')
+    if (archetype_data.get('name', '').strip().lower() == 'niewinny') and not main:
         tagline = "Niesie nadzieję, inspiruje do współpracy, buduje zaufanie szczerością i apeluje o wspólne dobro, otwarcie komunikuje pozytywne wartości."
 
     symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
     symbol_emoji = {
-        "Korona": "👑", "Herb Lublina": "🛡️", "Peleryna": "🦸", "Serce": "❤️","Uśmiech": "😊","Dłonie": "🤝",
-        "Księga": "📖", "Mapa": "🗺️","Gwiazda": "⭐", "Gołąb": "🕊️","Piorun": "⚡", "Rubika": "🧩", "Dom": "🏡"
+        "Korona": "👑", "Herb Lublina": "🛡️", "Peleryna": "🦸", "Serce": "❤️", "Uśmiech": "😊", "Dłonie": "🤝",
+        "Księga": "📖", "Mapa": "🗺️", "Gwiazda": "⭐", "Gołąb": "🕊️", "Piorun": "⚡", "Rubika": "🧩", "Dom": "🏡"
     }
     icon = symbol_emoji.get(symbol, "🔹")
 
-    box_shadow = f"0 4px 14px 0 {border_color}44" if main else f"0 2px 6px 0 {border_color}22"
-    bg_color = "#FAFAFA" if not main else (archetype_data.get('color_palette', ['#FFF', '#FAFAFA'])[1])
     width_card = "70vw"
     text_color = "#222"
-    tagline_color = "#88894A" if archetype_data.get('name','').lower() == "niewinny" else border_color
     if main and is_color_dark(bg_color):
         text_color = "#fff"
-        tagline_color = "#FFD22F" if archetype_data.get('name','').lower() == "bohater" else "#fffbea"
+        tagline_color = "#FFD22F" if archetype_data.get('name', '').lower() == "bohater" else "#fffbea"
 
     color_palette = archetype_data.get('color_palette', [])
     color_names = [COLOR_NAME_MAP.get(c.upper(), c).lower() for c in color_palette] if color_palette else []
@@ -1345,7 +1397,8 @@ def render_archetype_card(archetype_data, main=True):
     color_desc_html = ""
     if color_palette and isinstance(color_palette, list) and color_names:
         color_items = [f"{n} ({h})" for n, h in zip(color_names, color_palette)]
-        color_desc_html = f'<div style="color:{text_color};font-size:0.98em;margin-top:3px;margin-bottom:7px;">' + ', '.join(color_items) + '</div>'
+        color_desc_html = f'<div style="color:{text_color};font-size:0.98em;margin-top:3px;margin-bottom:7px;">' + ', '.join(
+            color_items) + '</div>'
 
     questions = archetype_data.get('questions', [])
     questions_html = ""
@@ -1358,26 +1411,24 @@ def render_archetype_card(archetype_data, main=True):
     strengths = archetype_data.get('strengths', [])
     weaknesses = archetype_data.get('weaknesses', [])
     strengths_html = "" if not strengths else (
-        "<div style='padding-left:24px;'>"
-        + ''.join(
-            "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
-            "<span style='color: green !important; font-size:1.14em; margin-right:9px; vertical-align:middle;'>✅</span>"
-            f"<span style='font-size:1.07em; color:{text_color}'>{s[0].lower()+s[1:]}</span>"
-            "</div>"
-            for s in strengths
-        )
-        + "</div>"
+            "<div style='padding-left:24px;'>" +
+            ''.join(
+                "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
+                "<span style='color: green !important; font-size:1.14em; margin-right:9px; vertical-align:middle;'>✅</span>"
+                f"<span style='font-size:1.07em; color:{text_color}'>{s[0].lower() + s[1:]}</span>"
+                "</div>"
+                for s in strengths
+            ) + "</div>"
     )
     weaknesses_html = "" if not weaknesses else (
-        "<div style='padding-left:24px;'>"
-        + ''.join(
-            "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
-            "<span style='color:#d32f2f !important; font-size:1.02em; margin-right:9px; vertical-align:middle;'>❌</span>"
-            f"<span style='font-size:1.07em; color:{text_color}'>{w[0].lower()+w[1:]}</span>"
-            "</div>"
-            for w in weaknesses
-        )
-        + "</div>"
+            "<div style='padding-left:24px;'>" +
+            ''.join(
+                "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
+                "<span style='color:#d32f2f !important; font-size:1.02em; margin-right:9px; vertical-align:middle;'>❌</span>"
+                f"<span style='font-size:1.07em; color:{text_color}'>{w[0].lower() + w[1:]}</span>"
+                "</div>"
+                for w in weaknesses
+            ) + "</div>"
     )
 
     watchword = archetype_data.get('watchword', [])
@@ -1401,7 +1452,7 @@ def render_archetype_card(archetype_data, main=True):
     st.markdown(f"""
         <div style="
             max-width:{width_card};
-            border: 3px solid {border_color if main else '#CCC'};
+            border: 3px solid {border_color};
             border-radius: 20px;
             background: {bg_color};
             box-shadow: {box_shadow};
@@ -1412,7 +1463,7 @@ def render_archetype_card(archetype_data, main=True):
             <div style="font-size:2.6em; margin-right:23px; margin-top:1px; flex-shrink:0;">{icon}</div>
             <div>
                 <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
-                    {archetype_data.get('name','?')}
+                    {archetype_data.get('name', '?')}
                 </div>
                 <div style="font-size:1.3em; font-style:italic; color:{tagline_color}; margin-bottom:38px; margin-top:4px;">
                     {tagline}
@@ -1420,30 +1471,30 @@ def render_archetype_card(archetype_data, main=True):
                 <div style="margin-top:21px; font-size:1.07em;">
                     <b>Opis:</b><br>
                     <span style="font-weight:400 !important;">
-                        <i>{archetype_data.get('description','')}</i>
+                        <i>{archetype_data.get('description', '')}</i>
                     </span>
                 </div>
                 <div style="color:{text_color};font-size:1.07em; margin-top:21px;">
                     <b>Cechy:</b> <span style="font-weight:400;">{traits_str}</span>
                 </div>
                 <div style="margin-top:24px;font-weight:600;">Storyline:</div>
-                <div style="margin-bottom:9px; margin-top:4px; font-size:1.07em;">{archetype_data.get('storyline','')}</div>
+                <div style="margin-bottom:9px; margin-top:4px; font-size:1.07em;">{archetype_data.get('storyline', '')}</div>
                 <div style="margin-top:16px;font-weight:600;">Atuty:</div>
                 {strengths_html if strengths_html else '<div style="color:#888; padding-left:24px;">-</div>'}
                 <div style="margin-top:2px;font-weight:600;">Słabości:</div>
                 {weaknesses_html if weaknesses_html else '<div style="color:#888; padding-left:24px;">-</div>'}
                 <div style="margin-top:24px;font-weight:600;">Rekomendacje:</div>
                 <ul style="padding-left:24px; margin-bottom:9px;">
-                     {''.join(f'<li style="margin-bottom:2px; font-size:1.07em;">{r}</li>' for r in archetype_data.get('recommendations',[]))}
+                     {''.join(f'<li style="margin-bottom:2px; font-size:1.07em;">{r}</li>' for r in archetype_data.get('recommendations', []))}
                 </ul>
                 <div style="margin-top:29px;font-weight:600;">Słowa kluczowe:</div>
                 <div style="margin-bottom:8px;">{keywords_str}</div>
                 <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
                 <div style="margin-bottom:8px;">{visuals_str}</div>
                 {('<div style="margin-top:24px;font-weight:600;">Przykłady polityków:</div>'
-                '<div style="margin-bottom:8px;">' +
-                ', '.join(person_link(name) for name in archetype_data.get('examples_person', [])) +
-                '</div>')}
+                  '<div style="margin-bottom:8px;">' +
+                  ', '.join(person_link(name) for name in archetype_data.get('examples_person', [])) +
+                  '</div>')}
                 <div style="margin-bottom:10px; margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
                 {build_brand_icons_html(archetype_data.get('example_brands', []), logos_dir)}
                 {watchword_html}
@@ -1480,64 +1531,88 @@ st.markdown("""
 <hr style="height:1.3px;background:#eaeaec; margin-top:1.8em; margin-bottom:3.8em; border:none;" />
 """, unsafe_allow_html=True)
 
+# --- Analiza respondentów i agregacja ---
+
 if "answers" in data.columns and not data.empty:
+
     results = []
+
     for idx, row in data.iterrows():
+
         if not isinstance(row.get("answers", None), list):
             continue
+
         arcsums = archetype_scores(row["answers"])
         arcper = {k: archetype_percent(v) for k, v in arcsums.items()}
-        main_type, second_type = pick_main_and_aux_archetype(arcsums, ARCHE_NAMES_ORDER)
+
+        main_type, second_type, supplement_type = pick_top_3_archetypes(arcsums, ARCHE_NAMES_ORDER)
         main = archetype_extended.get(main_type, {})
         second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
-        czas_ankiety = None
+        supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
+
+        czas_ankiety = ""
         if pd.notna(row.get("created_at", None)):
             try:
                 czas_ankiety = row["created_at"].astimezone(pytz.timezone('Europe/Warsaw')).strftime('%Y-%m-%d %H:%M:%S')
             except Exception:
                 czas_ankiety = row["created_at"].strftime('%Y-%m-%d %H:%M:%S')
-        else:
-            czas_ankiety = ""
+
         results.append({
             "Czas ankiety": czas_ankiety,
             **arcsums,
-            **{f"{k}_%" : v for k,v in arcper.items()},
+            **{f"{k}_%": v for k, v in arcper.items()},
             "Główny archetyp": main_type,
-            "Cechy kluczowe": archetype_features.get(main_type,""),
+            "Cechy kluczowe": archetype_features.get(main_type, ""),
             "Opis": main.get("description", ""),
             "Storyline": main.get("storyline", ""),
             "Rekomendacje": "\n".join(main.get("recommendations", [])),
             "Archetyp pomocniczy": second_type if second_type != main_type else "",
-            "Cechy pomocniczy": archetype_features.get(second_type,"") if second_type != main_type else "",
+            "Cechy pomocniczy": archetype_features.get(second_type, "") if second_type != main_type else "",
             "Opis pomocniczy": second.get("description", "") if second_type != main_type else "",
             "Storyline pomocniczy": second.get("storyline", "") if second_type != main_type else "",
             "Rekomendacje pomocniczy": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
+            "Archetyp uzupełniający": supplement_type if supplement_type not in [main_type, second_type] else "",
+            "Cechy uzupełniający": archetype_features.get(supplement_type, "") if supplement_type not in [main_type, second_type] else "",
+            "Opis uzupełniający": supplement.get("description", "") if supplement_type not in [main_type, second_type] else "",
+            "Storyline uzupełniający": supplement.get("storyline", "") if supplement_type not in [main_type, second_type] else "",
+            "Rekomendacje uzupełniający": "\n".join(supplement.get("recommendations", [])) if supplement_type not in [main_type, second_type] else "",
         })
+
     results_df = pd.DataFrame(results)
+
     if not results_df.empty and "Czas ankiety" in results_df.columns:
+
         results_df = results_df.sort_values("Czas ankiety", ascending=True)
-        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypu Krzysztofa Hetmana</div>', unsafe_allow_html=True)
+
+        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów Krzysztofa Hetmana</div>', unsafe_allow_html=True)
+
         archetype_names = ARCHE_NAMES_ORDER
+
         counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
         counts_aux = results_df['Archetyp pomocniczy'].value_counts().reindex(archetype_names, fill_value=0)
+
         mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
-        main_type, second_type = pick_main_and_aux_archetype(mean_archetype_scores, archetype_names)
+
+        main_type, second_type, supplement_type = pick_top_3_archetypes(mean_archetype_scores, archetype_names)
         main = archetype_extended.get(main_type, {})
         second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
+        supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
+
         col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
 
         with col1:
-            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych i pomocniczych</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, pomocniczych i uzupełniających</div>', unsafe_allow_html=True)
             archetype_emoji = {
-                "Władca":"👑", "Bohater":"🦸", "Mędrzec":"📖", "Opiekun":"🤝", "Kochanek":"❤️",
-                "Błazen":"🤪", "Twórca":"🧩", "Odkrywca":"🗺️", "Czarodziej":"⭐", "Towarzysz":"🏡",
-                "Niewinny":"🕊️", "Buntownik":"🔥"
+                "Władca": "👑", "Bohater": "🦸", "Mędrzec": "📖", "Opiekun": "🤝", "Kochanek": "❤️",
+                "Błazen": "🤪", "Twórca": "🧩", "Odkrywca": "🗺️", "Czarodziej": "⭐", "Towarzysz": "🏡",
+                "Niewinny": "🕊️", "Buntownik": "🔥"
             }
             def zero_to_dash(val): return "-" if val == 0 else str(val)
             archetype_table = pd.DataFrame({
-                "Archetyp": [f"{archetype_emoji.get(n,n)} {n}" for n in archetype_names],
+                "Archetyp": [f"{archetype_emoji.get(n, n)} {n}" for n in archetype_names],
                 "Główny archetyp": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
-                "Pomocniczy archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names]
+                "Pomocniczy archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names],
+                "Uzupełniający archetyp": [zero_to_dash(results_df['Archetyp uzupełniający'].value_counts().reindex(archetype_names, fill_value=0).get(k, 0)) for k in archetype_names]
             })
             archetype_table_html = archetype_table.to_html(escape=False, index=False)
             archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
@@ -1550,13 +1625,15 @@ if "answers" in data.columns and not data.empty:
                 html = html.replace(
                     '<th style="text-align:center">Archetyp</th>',
                     '<th style="text-align:center;width:24%;">Archetyp</th>'
-                )
-                html = html.replace(
+                ).replace(
                     '<th style="text-align:center">Główny archetyp</th>',
                     '<th style="text-align:center;width:18%;">Główny archetyp</th>'
                 ).replace(
                     '<th style="text-align:center">Pomocniczy archetyp</th>',
                     '<th style="text-align:center;width:18%;">Pomocniczy archetyp</th>'
+                ).replace(
+                    '<th style="text-align:center">Uzupełniający archetyp</th>',
+                    '<th style="text-align:center;width:18%;">Uzupełniający archetyp</th>'
                 )
                 html = re.sub(
                     r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
@@ -1583,6 +1660,8 @@ if "answers" in data.columns and not data.empty:
                     theta_labels.append(f"<b><span style='color:red;'>{n}</span></b>")
                 elif n == second_type:
                     theta_labels.append(f"<b><span style='color:#FFD22F;'>{n}</span></b>")
+                elif n == supplement_type:
+                    theta_labels.append(f"<b><span style='color:#40b900;'>{n}</span></b>")
                 else:
                     theta_labels.append(f"<span style='color:#656565;'>{n}</span>")
             highlight_r = []
@@ -1594,6 +1673,9 @@ if "answers" in data.columns and not data.empty:
                 elif name == second_type:
                     highlight_r.append(mean_archetype_scores[name])
                     highlight_marker_color.append("#FFD22F")
+                elif name == supplement_type:
+                    highlight_r.append(mean_archetype_scores[name])
+                    highlight_marker_color.append("#40b900")
                 else:
                     highlight_r.append(None)
                     highlight_marker_color.append("rgba(0,0,0,0)")
@@ -1613,7 +1695,7 @@ if "answers" in data.columns and not data.empty:
                         theta=archetype_names,
                         mode='markers',
                         marker=dict(size=18, color=highlight_marker_color, opacity=0.95, line=dict(color="black", width=2)),
-                        name='Archetyp główny / pomocniczy',
+                        name='Archetyp główny/pomocniczy/uzupełniający',
                         showlegend=False,
                     )
                 ],
@@ -1627,17 +1709,25 @@ if "answers" in data.columns and not data.empty:
                     showlegend=False
                 )
             )
-            # --- DODAJ TĘ LINIĘ (z aktualną ścieżką do eksportu) ---
-
             fig.write_image("radar.png", scale=4)
-
             st.plotly_chart(fig, use_container_width=True)
+
+        # ... (tabela w col1, radar w col2, diagram w col3)
+
             st.markdown("""
-            <div style="display: flex; justify-content: center; align-items: center; margin:10px 0 3px 0;">
-            <span style="display:inline-block;vertical-align:middle;width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;margin-right:6px"></span>
-            <span style="font-size:0.80em;vertical-align:middle;margin-right:18px; color:{text_color};">Archetyp główny</span>
-            <span style="display:inline-block;vertical-align:middle;width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;margin-right:6px"></span>
-            <span style="font-size:0.80em;vertical-align:middle;color:#555;">Archetyp pomocniczy</span>
+            <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+              <span style="display:flex;align-items:center;margin-right:34px;">
+                <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                <span style="font-size:0.85em;">Archetyp główny</span>
+              </span>
+              <span style="display:flex;align-items:center;margin-right:34px;">
+                <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                <span style="font-size:0.85em;">Archetyp pomocniczy</span>
+              </span>
+              <span style="display:flex;align-items:center;">
+                <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                <span style="font-size:0.85em;">Archetyp uzupełniający</span>
+              </span>
             </div>
             """, unsafe_allow_html=True)
 
@@ -1645,11 +1735,12 @@ if "answers" in data.columns and not data.empty:
             if main_type is not None:
                 kola_img = compose_archetype_highlight(
                     archetype_name_to_img_idx(main_type),
-                    archetype_name_to_img_idx(second_type) if second_type != main_type else None
+                    archetype_name_to_img_idx(second_type) if second_type != main_type else None,
+                    archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
                 )
                 st.image(
                     kola_img,
-                    caption="Podświetlenie: główny – czerwony, pomocniczy – żółty",
+                    caption="Podświetlenie: główny – czerwony, pomocniczy – żółty, uzupełniający – zielony",
                     width=700
                 )
 
@@ -1661,14 +1752,17 @@ if "answers" in data.columns and not data.empty:
         render_archetype_card(archetype_extended.get(main_type, {}), main=True)
 
         if second_type and second_type != main_type:
-            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True) # większy margines górny
-            st.markdown("""
-            <hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />
-            """, unsafe_allow_html=True)
+            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
+            st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
             st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp pomocniczy Krzysztofa Hetmana</div>", unsafe_allow_html=True)
             render_archetype_card(archetype_extended.get(second_type, {}), main=False)
 
-        # ----------- ODDZIELACZ I NAGŁÓWEK dla raportów -----------
+        if supplement_type and supplement_type not in [main_type, second_type]:
+            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
+            st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp uzupełniający Krzysztofa Hetmana</div>", unsafe_allow_html=True)
+            render_archetype_card(archetype_extended.get(supplement_type, {}), main=False)
+
         st.markdown("""
         <div style='height:44px;'></div>
         <hr style="height:1px; border:none; background:#e5e5e5; margin-bottom:26px;" />
@@ -1680,13 +1774,21 @@ if "answers" in data.columns and not data.empty:
         # GENEROWANIE OBRAZU PANELU DYNAMICZNIE
         idx_main = archetype_name_to_img_idx(main_type)
         idx_aux = archetype_name_to_img_idx(second_type) if second_type != main_type else None
-        panel_img = compose_archetype_highlight(idx_main, idx_aux)
-        panel_img_path = f"panel_{main_type.lower()}_{second_type.lower() if second_type else ''}.png"
+        idx_supplement = archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
+
+        panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supplement)
+        panel_img_path = f"panel_{main_type.lower()}_{second_type.lower() if second_type else ''}_{supplement_type.lower() if supplement_type else ''}.png"
         panel_img.save(panel_img_path)
 
         # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
         docx_buf = export_word_docxtpl(
-            main_type, second_type, archetype_features, main, second,
+            main_type,  # str
+            second_type,  # str
+            supplement_type,  # str
+            archetype_features,  # dict
+            main,  # dict
+            second,  # dict
+            supplement,  # dict
             radar_img_path="radar.png",
             archetype_table=archetype_table,
             num_ankiet=num_ankiet,
