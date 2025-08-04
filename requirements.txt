@@ -1,0 +1,14 @@
+streamlit
+pandas
+psycopg2
+fpdf
+requests
+pillow
+docxtpl
+python-docx
+cairosvg
+openpyxl
+markdown
+pytz
+plotly>=5.0.0
+kaleido>=0.2.1
