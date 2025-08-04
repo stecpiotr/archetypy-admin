@@ -1,5 +1,12 @@
+<<<<<<< HEAD
 .streamlit/secrets.toml
 admin_dashboard2.py
 backup_admin.py
 ext.py
+=======
+.streamlit/secrets.toml
+admin_dashboard2.py
+backup_admin.py
+ext.py
+>>>>>>> 38db51a4c620c47b5cb61250da144dac7b6c7760
 .idea/

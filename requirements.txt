@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 streamlit
 pandas
 psycopg2
@@ -11,4 +12,19 @@ openpyxl
 markdown
 pytz
 plotly>=5.0.0
+=======
+streamlit
+pandas
+psycopg2
+fpdf
+requests
+pillow
+docxtpl
+python-docx
+cairosvg
+openpyxl
+markdown
+pytz
+plotly>=5.0.0
+>>>>>>> 38db51a4c620c47b5cb61250da144dac7b6c7760
 kaleido>=0.2.1

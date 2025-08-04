@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 libcairo2
 libpango1.0-0
 libgdk-pixbuf2.0-0
@@ -19,4 +20,27 @@ libpangocairo-1.0-0
 fonts-liberation
 libreoffice
 ghostscript
+=======
+libcairo2
+libpango1.0-0
+libgdk-pixbuf2.0-0
+libffi-dev
+libjpeg-dev
+libxml2
+libxml2-dev
+libxslt1-dev
+zlib1g-dev
+libpq-dev
+libfreetype6-dev
+libfontconfig1
+libglib2.0-0
+libsm6
+libxext6
+libxrender-dev
+libasound2
+libpangocairo-1.0-0
+fonts-liberation
+libreoffice
+ghostscript
+>>>>>>> 38db51a4c620c47b5cb61250da144dac7b6c7760
 chromium
