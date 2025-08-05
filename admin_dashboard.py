@@ -1352,28 +1352,38 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
         return
 
     # Style zależne od typu archetypu
+
     if supplement:
         border_color = "#40b900"  # zielony, np. uzupełniający
         bg_color = "#F6FFE6"  # jasny zielony tła uzupełniającego
         tagline_color = "#40b900"
         box_shadow = f"0 3px 14px 0 {border_color}44"
+
     elif main:
         border_color = archetype_data.get('color_palette', ['#E99836'])[0]
         bg_color = archetype_data.get('color_palette', ['#FFF', '#FAFAFA'])[1] if len(
             archetype_data.get('color_palette', [])) > 1 else "#FFF8F0"
 
-        # Dobierz tagline color zgodnie z jasnością tła:
         def is_light(color):
-            # 'color' jako hex string #RRGGBB
-            color = color.lstrip('#')
+            # color jako hex string #RRGGBB
+            if color.startswith('#'):
+                color = color[1:]
+            if len(color) != 6:
+                return True  # domyślnie traktuj błędny hex jako jasny
             r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
             return (r * 299 + g * 587 + b * 114) / 1000 > 180
 
-        if not is_light(bg_color.replace('#', '').upper() if bg_color else "FFF"):  # jeśli tło ciemne
-            tagline_color = "#222222"  # lub np. #173F5F, mocny kontrast
+        # Obsługa specjalnego koloru dla Opiekuna:
+        name = archetype_data.get('name', '').strip().lower()
+        if name == 'opiekun':
+            tagline_color = '#145A32'  # CIEMNOZIELONY tylko dla Opiekuna
+        elif not is_light(bg_color):
+            tagline_color = "#222222"  # mocny kontrast jeżeli tło ciemne
         else:
             tagline_color = border_color
+
         box_shadow = f"0 4px 14px 0 {border_color}44"
+
     else:
         border_color = archetype_data.get('color_palette', ['#FFD22F'])[0]
         bg_color = "#FAFAFA"
@@ -1381,6 +1391,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
         box_shadow = f"0 2px 6px 0 {border_color}22"
 
     tagline = archetype_data.get('tagline', '')
+
     if (archetype_data.get('name', '').strip().lower() == 'niewinny') and not main:
         tagline = "Niesie nadzieję, inspiruje do współpracy, buduje zaufanie szczerością i apeluje o wspólne dobro, otwarcie komunikuje pozytywne wartości."
 
