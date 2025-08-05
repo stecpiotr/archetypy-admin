@@ -1629,9 +1629,12 @@ if "answers" in data.columns and not data.empty:
                 "Błazen": "🤪", "Twórca": "🧩", "Odkrywca": "🗺️", "Czarodziej": "⭐", "Towarzysz": "🏡",
                 "Niewinny": "🕊️", "Buntownik": "🔥"
             }
-            def zero_to_dash(val): return "-" if val == 0 else str(val)
+            def get_emoji(archetype):
+                return archetype_emoji.get(archetype.strip().title(), "🔹")
+            def zero_to_dash(val):
+                return "-" if val == 0 else str(val)
             archetype_table = pd.DataFrame({
-                "Archetyp": [f"{archetype_emoji.get(n, n)} {n}" for n in archetype_names],
+                "Archetyp": [f"{archetype_emoji.get(n.strip().title(), n)} {n}" for n in archetype_names],
                 "Główny archetyp": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
                 "Wspierający archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names],
                 "Poboczny archetyp": [zero_to_dash(results_df['Archetyp poboczny'].value_counts().reindex(archetype_names, fill_value=0).get(k, 0)) for k in archetype_names]
