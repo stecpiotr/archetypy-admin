@@ -202,7 +202,7 @@ def zapobiegaj_wdowie(text):
 
 import cairosvg
 
-st.set_page_config(page_title="Archetypy Krzysztofa Hetmana – panel administratora", layout="wide")
+st.set_page_config(page_title="Archetypy Marcina Gołka – panel administratora", layout="wide")
 
 COLOR_NAME_MAP = {
         "#000000": "czerń",
@@ -303,18 +303,18 @@ archetype_extended = {
         "description": (
             "Archetyp Władcy w polityce uosabia siłę przywództwa, stabilność, pewność działania, kontrolę i odpowiedzialność za porządek społeczny. "
             "Władcy dążą do stabilności, bezpieczeństwa i efektywnego zarządzania. Politycy o tym archetypie często podkreślają swoją zdolność do podejmowania trudnych decyzji i utrzymywania porządku, nawet w trudnych czasach. "
-            "Jako kandydat na prezydenta Lublina Władca stawia na porządek, wyznaczanie standardów rozwoju i podejmowanie stanowczych decyzji dla dobra wspólnego. "
+            "Władca stawia na porządek, wyznaczanie standardów rozwoju i podejmowanie stanowczych decyzji dla dobra wspólnego. "
             "Jest symbolem autentycznego autorytetu, przewodzenia i skutecznego zarządzania miastem. "
             "Buduje zaufanie, komunikując skuteczność, odpowiedzialność i gwarantując bezpieczeństwo mieszkańcom."
         ),
         "storyline": (
             "Narracja kampanii oparta na Władcy podkreśla spójność działań, panowanie nad trudnymi sytuacjami i sprawność w zarządzaniu miastem. "
             "Władca nie podąża za modą – wyznacza nowe standardy w samorządzie. "
-            "Akcentuje dokonania, referencje i doświadczenie. Buduje obraz lidera odpowiadającego za przyszłość i prestiż Lublina."
+            "Akcentuje dokonania, referencje i doświadczenie. Buduje obraz lidera odpowiadającego za przyszłość i prestiż miasta."
         ),
         "recommendations": [
             "Używaj kolorystyki kojarzącej się z autorytetem – czerń, złoto, ciemny granat, burgund.",
-            "Projektuj symbole: sygnety, herby miasta Lublin, podkreślając prestiż i zarządzanie.",
+            "Projektuj symbole: sygnety, herby miasta, podkreślając prestiż i zarządzanie.",
             "Komunikuj się językiem odpowiedzialności i troski o przyszłość miasta.",
             "Przekazuj komunikaty stanowczo, jednoznacznie, jako gospodarz miasta.",
             "Pokazuj osiągnięcia, inwestycje, referencje mieszkańców.",
@@ -343,16 +343,16 @@ archetype_extended = {
             "#000000", "#FFD700", "#282C34", "#800020", "#8C564B"
         ],
         "visual_elements": [
-            "Korona", "Herb Lublina", "Sygnet", "Monogram", "Geometryczna, masywna typografia", "Symetria"
+            "Korona", "Herb Miasta", "Sygnet", "Monogram", "Geometryczna, masywna typografia", "Symetria"
         ],
         "keyword_messaging": [
-            "Lider Lublina", "Siła samorządu", "Stabilność", "Doskonałość działań", "Elita miasta", "Bezpieczeństwo"
+            "Lider miasta", "Siła samorządu", "Stabilność", "Doskonałość działań", "Elita miasta", "Bezpieczeństwo"
         ],
         "watchword": [
             "Silne przywództwo i stabilność w niepewnych czasach."
         ],
         "questions": [
-            "Jak komunikujesz mieszkańcom swoją pozycję lidera w Lublinie?",
+            "Jak komunikujesz mieszkańcom swoją pozycję lidera w mieście?",
             "W jaki sposób Twoje działania budują autorytet i zaufanie mieszkańców?",
             "Co robisz, by decyzje były stanowcze i jednoznaczne?",
             "Jak Twoje dokonania i inwestycje wzmacniają prestiż oraz bezpieczeństwo miasta?",
@@ -365,7 +365,7 @@ archetype_extended = {
         "description": (
             "Bohater w polityce to archetyp waleczności, determinacji i odwagi w podejmowaniu trudnych decyzji dla społeczności. "
             "Bohaterowie są gotowi stawić czoła wyzwaniom, pokonywać przeszkody i walczyć o lepszą przyszłość dla wszystkich. Ich celem jest udowodnienie swojej wartości poprzez odważne działania i inspirowanie innych do przekraczania własnych granic. Politycy o tym archetypie często podkreślają swoją gotowość do podejmowania trudnych decyzji i stawiania czoła przeciwnościom w imię dobra wspólnego. "
-            "Kandydat Bohater mobilizuje mieszkańców do działania, bierze odpowiedzialność w najtrudniejszych momentach i broni interesów Lublina nawet pod presją."
+            "Kandydat Bohater mobilizuje mieszkańców do działania, bierze odpowiedzialność w najtrudniejszych momentach i broni interesów miasta nawet pod presją."
         ),
         "storyline": (
             "Opowieść Bohatera to historia przezwyciężania kryzysów i stawania po stronie obywateli. "
@@ -427,7 +427,7 @@ archetype_extended = {
             "Mędrzec nie działa pod wpływem impulsu; każda decyzja jest przemyślana i poparta faktami oraz wsłuchaniem się w potrzeby miasta."
         ),
         "recommendations": [
-            "Wskazuj kompetencje, doświadczenie i eksperckość w zarządzaniu Lublinem.",
+            "Wskazuj kompetencje, doświadczenie i eksperckość w zarządzaniu maistem.",
             "Komunikuj zrozumiale zawiłości miejskich inwestycji i decyzji.",
             "Stosuj wykresy, dane, analizy i argumenty – przemawiaj do rozumu obywateli.",
             "Zachowaj spokojny, opanowany ton.",
@@ -639,10 +639,10 @@ archetype_extended = {
         "description": (
             "Twórca charakteryzuje się innowacyjnością, kreatywnością i wizją. "
             "Twórcy dążą do budowania nowych rozwiązań i struktur, które odpowiadają na wyzwania przyszłości. Politycy o tym archetypie często podkreślają swoje innowacyjne podejście do rządzenia i zdolność do wprowadzania pozytywnych zmian. "
-            "Jako prezydent Twórca nie boi się wdrażać oryginalnych, często nieszablonowych strategii."
+            "Jako polityk Twórca nie boi się wdrażać oryginalnych, często nieszablonowych strategii."
         ),
         "storyline": (
-            "Opowieść Twórcy jest oparta na zmianie, wprowadzaniu kreatywnych rozwiązań oraz inspirowaniu innych do współdziałania dla rozwoju Lublina."
+            "Opowieść Twórcy jest oparta na zmianie, wprowadzaniu kreatywnych rozwiązań oraz inspirowaniu innych do współdziałania dla rozwoju miasta."
         ),
         "recommendations": [
             "Proponuj i wdrażaj nietypowe rozwiązania w mieście.",
@@ -692,7 +692,7 @@ archetype_extended = {
         "description": (
             "Archetyp Odkrywcy charakteryzuje się ciekawością, poszukiwaniem nowych możliwości i pragnieniem wolności. "
             "Odkrywcy pragną przełamywać granice i eksplorować nieznane terytoria. Politycy o tym archetypie często prezentują się jako wizjonerzy, którzy mogą poprowadzić społeczeństwo ku nowym horyzontom i możliwościom. "
-            "Odkrywca poszukuje nowych rozwiązań, jest otwarty na zmiany i śledzi światowe trendy, które wdraża w Lublinie. "
+            "Odkrywca poszukuje nowych rozwiązań, jest otwarty na zmiany i śledzi światowe trendy, które wdraża w polityce lokalnej czy krajowej. "
             "Wybiera nowatorskie, nieoczywiste drogi dla rozwoju miasta i jego mieszkańców."
         ),
         "storyline": (
@@ -736,7 +736,7 @@ archetype_extended = {
         "questions": [
             "Jak zachęcasz do odkrywania nowości w mieście?",
             "Jakie projekty wdrażasz, które nie były jeszcze realizowane w innych miastach?",
-            "Jak budujesz wizerunek Lublina jako miejsca wolnego od barier?"
+            "Jak budujesz wizerunek miasta jako miejsca wolnego od barier?"
         ]
     },
     "Czarodziej": {
@@ -745,7 +745,7 @@ archetype_extended = {
         "description": (
             "Czarodziej w polityce to wizjoner i transformator – wytycza nowy kierunek i inspiruje do zmian niemożliwych na pierwszy rzut oka. "
             "Czarodziej obiecuje głęboką przemianę społeczeństwa i nadaje wydarzeniom niemal magiczny sens. "
-            "Dzięki jego inicjatywom Lublin przechodzi metamorfozy, w których niemożliwe staje się możliwe."
+            "Dzięki jego inicjatywom miasto przechodzi metamorfozy, w których niemożliwe staje się możliwe."
         ),
         "storyline": (
             "Opowieść Czarodzieja to zmiana wykraczająca poza rutynę, wyobraźnia, inspiracja, a także odwaga w stawianiu pytań i szukaniu odpowiedzi poza schematami."
@@ -771,7 +771,7 @@ archetype_extended = {
             "Barack Obama", "Václav Klaus", "Nelson Mandela", "Martin Luther King"
         ],
         "example_brands": [
-            "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla", "Nowoczesny Lublin"
+            "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla", "Nowoczesne Miasto"
         ],
         "color_palette": [
             "#8F00FF", "#181C3A", "#E0BBE4", "#7C46C5"
@@ -854,7 +854,7 @@ archetype_extended = {
             "Kandydat–Niewinny buduje zaufanie szczerością i skutecznie apeluje o współpracę dla wspólnego dobra."
         ),
         "storyline": (
-            "Opowieść Niewinnego buduje napięcie wokół pozytywnych emocji, odwołuje się do marzeń o lepszym Lublinie i wiary we wspólny sukces."
+            "Opowieść Niewinnego buduje napięcie wokół pozytywnych emocji, odwołuje się do marzeń o lepszym mieście i wiary we wspólny sukces."
         ),
         "recommendations": [
             "Komunikuj optymizm, wiarę w ludzi i dobre intencje.",
@@ -909,7 +909,7 @@ archetype_extended = {
             "Potrafi ściągnąć uwagę i zjednoczyć mieszkańców wokół śmiałych idei. "
         ),
         "storyline": (
-            "Narracja Buntownika podkreśla walkę z niesprawiedliwością i stagnacją, wytykanie błędów władzy i radykalne pomysły na rozwój Lublina."
+            "Narracja Buntownika podkreśla walkę z niesprawiedliwością i stagnacją, wytykanie błędów władzy i radykalne pomysły na rozwój miasta."
         ),
         "recommendations": [
             "Akcentuj odwagę do mówienia „nie” starym rozwiązaniom.",
@@ -980,12 +980,12 @@ def mask_for(idx, color):
 def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None):
     base = load_base_arche_img().copy()
 
-    # Najpierw uzupełniający (żeby nakryło go potem żółte/czerwone jeśli overlap)
+    # Najpierw poboczny (żeby nakryło go potem żółte/czerwone jeśli overlap)
     if idx_supplement is not None and idx_supplement not in [idx_main, idx_aux] and idx_supplement < 12:
         mask_supplement = mask_for(idx_supplement, (64,185,0,140))  # zielony półtransparentny
         base.alpha_composite(mask_supplement)
 
-    # Potem pomocniczy
+    # Potem wspierający
     if idx_aux is not None and idx_aux != idx_main and idx_aux < 12:
         mask_aux = mask_for(idx_aux, (255,210,47,140))  # żółty
         base.alpha_composite(mask_aux)
@@ -1155,7 +1155,7 @@ def build_word_context(
 
     context = {
         "TYTUL": "Raport Archetypów",
-        "IMIE_NAZWISKO": "Krzysztofa Hetmana",
+        "IMIE_NAZWISKO": "Marcina Gołka",
         "AUTOR": "Piotr Stec",
         "DATA": datetime.now().strftime("%Y-%m-%d"),
         "WSTEP": zapobiegaj_wdowie(
@@ -1165,8 +1165,8 @@ def build_word_context(
             "Analiza archetypów pozwala lepiej zrozumieć sposób odbioru polityka przez otoczenie, a co się z tym wiąże także motywacje i aspiracje. "
             "Wyniki badań archetypowych stanowią istotny fundament do tworzenia skutecznej narracji wyborczej, strategii wizerunkowej i komunikacji z wyborcami.\n\n"
             "W modelu przez nas opracowanym wykorzystano klasyfikację Mark and Pearson, obejmującą 12 uniwersalnych typów osobowościowych. "
-            "Raport przedstawia wyniki i profil archetypowy dla Krzysztofa Hetmana w oparciu o dane z przeprowadzonego badania. "
-            "Badanie to pozwoliło zidentyfikować archetyp główny oraz archetyp wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie w walce o urząd Prezydenta Miasta Lublin.\n\n"
+            "Raport przedstawia wyniki i profil archetypowy dla Marcina Gołka w oparciu o dane z przeprowadzonego badania. "
+            "Badanie to pozwoliło zidentyfikować archetyp główny i wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie w walce o urząd Prezydenta Poznania. Zaprezentowano także trzeci w kolejności ważności - archetyp poboczny.\n\n"
             "Dzięki analizie archetypów można precyzyjnie dopasować komunikację do oczekiwań wyborców, podkreślić atuty, a także przewidzieć skuteczność strategii politycznej w dynamicznym środowisku publicznym. "
         ),
         "TABELA_LICZEBNOSCI": archetype_table.to_dict('records') if archetype_table is not None else [],
@@ -1193,7 +1193,7 @@ def build_word_context(
         "ARCHETYPE_MAIN_KEYWORDS": main.get("keyword_messaging") or [],
         "ARCHETYPE_MAIN_SLOGANS": main.get("watchword") or [],
         "ARCHETYPE_MAIN_QUESTIONS": main.get("questions") or [],
-        # --- ARCHETYP POMOCNICZY ---
+        # --- ARCHETYP WSPIERAJĄCY ---
         "ARCHETYPE_AUX_NAME": second.get("name") or "",
         "ARCHETYPE_AUX_TAGLINE": second.get("tagline") or "",
         "ARCHETYPE_AUX_DESC": second.get("description") or "",
@@ -1210,7 +1210,7 @@ def build_word_context(
         "ARCHETYPE_AUX_KEYWORDS": second.get("keyword_messaging") or [],
         "ARCHETYPE_AUX_SLOGANS": second.get("watchword") or [],
         "ARCHETYPE_AUX_QUESTIONS": second.get("questions") or [],
-        # --- ARCHETYP UZUPEŁNIAJĄCY ---
+        # --- ARCHETYP POBOCZNY ---
         "ARCHETYPE_SUPPLEMENT_NAME": supplement.get("name") or "",
         "ARCHETYPE_SUPPLEMENT_TAGLINE": supplement.get("tagline") or "",
         "ARCHETYPE_SUPPLEMENT_DESC": supplement.get("description") or "",
@@ -1375,7 +1375,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
 
     symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
     symbol_emoji = {
-        "Korona": "👑", "Herb Lublina": "🛡️", "Peleryna": "🦸", "Serce": "❤️", "Uśmiech": "😊", "Dłonie": "🤝",
+        "Korona": "👑", "Herb miasta": "🛡️", "Peleryna": "🦸", "Serce": "❤️", "Uśmiech": "😊", "Dłonie": "🤝",
         "Księga": "📖", "Mapa": "🗺️", "Gwiazda": "⭐", "Gołąb": "🕊️", "Piorun": "⚡", "Rubika": "🧩", "Dom": "🏡"
     }
     icon = symbol_emoji.get(symbol, "🔹")
@@ -1517,7 +1517,7 @@ with header_col1:
     st.markdown("""
     <div style="font-size:2.3em; font-weight:bold; background:#1a93e3; color:#fff; 
         padding:14px 32px 10px 24px; border-radius:2px; width:fit-content; display:inline-block;">
-        Archetypy Krzysztofa Hetmana – panel administratora
+        Archetypy Marcina Gołka – panel administratora
     </div>
     """, unsafe_allow_html=True)
 with header_col2:
@@ -1566,16 +1566,16 @@ if "answers" in data.columns and not data.empty:
             "Opis": main.get("description", ""),
             "Storyline": main.get("storyline", ""),
             "Rekomendacje": "\n".join(main.get("recommendations", [])),
-            "Archetyp pomocniczy": second_type if second_type != main_type else "",
-            "Cechy pomocniczy": archetype_features.get(second_type, "") if second_type != main_type else "",
-            "Opis pomocniczy": second.get("description", "") if second_type != main_type else "",
-            "Storyline pomocniczy": second.get("storyline", "") if second_type != main_type else "",
-            "Rekomendacje pomocniczy": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
-            "Archetyp uzupełniający": supplement_type if supplement_type not in [main_type, second_type] else "",
-            "Cechy uzupełniający": archetype_features.get(supplement_type, "") if supplement_type not in [main_type, second_type] else "",
-            "Opis uzupełniający": supplement.get("description", "") if supplement_type not in [main_type, second_type] else "",
-            "Storyline uzupełniający": supplement.get("storyline", "") if supplement_type not in [main_type, second_type] else "",
-            "Rekomendacje uzupełniający": "\n".join(supplement.get("recommendations", [])) if supplement_type not in [main_type, second_type] else "",
+            "Archetyp wspierający": second_type if second_type != main_type else "",
+            "Cechy wspierający": archetype_features.get(second_type, "") if second_type != main_type else "",
+            "Opis wspierający": second.get("description", "") if second_type != main_type else "",
+            "Storyline wspierający": second.get("storyline", "") if second_type != main_type else "",
+            "Rekomendacje wspierający": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
+            "Archetyp poboczny": supplement_type if supplement_type not in [main_type, second_type] else "",
+            "Cechy poboczny": archetype_features.get(supplement_type, "") if supplement_type not in [main_type, second_type] else "",
+            "Opis poboczny": supplement.get("description", "") if supplement_type not in [main_type, second_type] else "",
+            "Storyline poboczny": supplement.get("storyline", "") if supplement_type not in [main_type, second_type] else "",
+            "Rekomendacje poboczny": "\n".join(supplement.get("recommendations", [])) if supplement_type not in [main_type, second_type] else "",
         })
 
     results_df = pd.DataFrame(results)
@@ -1584,12 +1584,12 @@ if "answers" in data.columns and not data.empty:
 
         results_df = results_df.sort_values("Czas ankiety", ascending=True)
 
-        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów Krzysztofa Hetmana</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów Marcina Gołka</div>', unsafe_allow_html=True)
 
         archetype_names = ARCHE_NAMES_ORDER
 
         counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
-        counts_aux = results_df['Archetyp pomocniczy'].value_counts().reindex(archetype_names, fill_value=0)
+        counts_aux = results_df['Archetyp wspierający'].value_counts().reindex(archetype_names, fill_value=0)
 
         mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
 
@@ -1601,7 +1601,7 @@ if "answers" in data.columns and not data.empty:
         col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
 
         with col1:
-            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, pomocniczych i uzupełniających</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, wspierających i pobocznych</div>', unsafe_allow_html=True)
             archetype_emoji = {
                 "Władca": "👑", "Bohater": "🦸", "Mędrzec": "📖", "Opiekun": "🤝", "Kochanek": "❤️",
                 "Błazen": "🤪", "Twórca": "🧩", "Odkrywca": "🗺️", "Czarodziej": "⭐", "Towarzysz": "🏡",
@@ -1611,8 +1611,8 @@ if "answers" in data.columns and not data.empty:
             archetype_table = pd.DataFrame({
                 "Archetyp": [f"{archetype_emoji.get(n, n)} {n}" for n in archetype_names],
                 "Główny archetyp": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
-                "Pomocniczy archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names],
-                "Uzupełniający archetyp": [zero_to_dash(results_df['Archetyp uzupełniający'].value_counts().reindex(archetype_names, fill_value=0).get(k, 0)) for k in archetype_names]
+                "wspierający archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names],
+                "Poboczny archetyp": [zero_to_dash(results_df['Archetyp poboczny'].value_counts().reindex(archetype_names, fill_value=0).get(k, 0)) for k in archetype_names]
             })
             archetype_table_html = archetype_table.to_html(escape=False, index=False)
             archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
@@ -1629,11 +1629,11 @@ if "answers" in data.columns and not data.empty:
                     '<th style="text-align:center">Główny archetyp</th>',
                     '<th style="text-align:center;width:18%;">Główny archetyp</th>'
                 ).replace(
-                    '<th style="text-align:center">Pomocniczy archetyp</th>',
-                    '<th style="text-align:center;width:18%;">Pomocniczy archetyp</th>'
+                    '<th style="text-align:center">Wspierający archetyp</th>',
+                    '<th style="text-align:center;width:18%;">Wspierający archetyp</th>'
                 ).replace(
-                    '<th style="text-align:center">Uzupełniający archetyp</th>',
-                    '<th style="text-align:center;width:18%;">Uzupełniający archetyp</th>'
+                    '<th style="text-align:center">Poboczny archetyp</th>',
+                    '<th style="text-align:center;width:18%;">Poboczny archetyp</th>'
                 )
                 html = re.sub(
                     r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
@@ -1679,7 +1679,7 @@ if "answers" in data.columns and not data.empty:
                 else:
                     highlight_r.append(None)
                     highlight_marker_color.append("rgba(0,0,0,0)")
-            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px; text-align:center;">Profil archetypów Krzysztofa Hetmana</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px; text-align:center;">Profil archetypów Marcina Gołka</div>', unsafe_allow_html=True)
             fig = go.Figure(
                 data=[
                     go.Scatterpolar(
@@ -1695,7 +1695,7 @@ if "answers" in data.columns and not data.empty:
                         theta=archetype_names,
                         mode='markers',
                         marker=dict(size=18, color=highlight_marker_color, opacity=0.95, line=dict(color="black", width=2)),
-                        name='Archetyp główny/pomocniczy/uzupełniający',
+                        name='Archetyp główny/wspierający/poboczny',
                         showlegend=False,
                     )
                 ],
@@ -1722,11 +1722,11 @@ if "answers" in data.columns and not data.empty:
               </span>
               <span style="display:flex;align-items:center;margin-right:34px;">
                 <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                <span style="font-size:0.85em;">Archetyp pomocniczy</span>
+                <span style="font-size:0.85em;">Archetyp wspierający</span>
               </span>
               <span style="display:flex;align-items:center;">
                 <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                <span style="font-size:0.85em;">Archetyp uzupełniający</span>
+                <span style="font-size:0.85em;">Archetyp poboczny</span>
               </span>
             </div>
             """, unsafe_allow_html=True)
@@ -1740,7 +1740,7 @@ if "answers" in data.columns and not data.empty:
                 )
                 st.image(
                     kola_img,
-                    caption="Podświetlenie: główny – czerwony, pomocniczy – żółty, uzupełniający – zielony",
+                    caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
                     width=700
                 )
 
@@ -1748,26 +1748,26 @@ if "answers" in data.columns and not data.empty:
         <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
         """, unsafe_allow_html=True)
 
-        st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny Krzysztofa Hetmana</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny Marcina Gołka</div>', unsafe_allow_html=True)
         render_archetype_card(archetype_extended.get(main_type, {}), main=True)
 
         if second_type and second_type != main_type:
             st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
             st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
-            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp pomocniczy Krzysztofa Hetmana</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp wspierający Marcina Gołka</div>", unsafe_allow_html=True)
             render_archetype_card(archetype_extended.get(second_type, {}), main=False)
 
         if supplement_type and supplement_type not in [main_type, second_type]:
             st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
             st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
-            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp uzupełniający Krzysztofa Hetmana</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny Marcina Gołka</div>", unsafe_allow_html=True)
             render_archetype_card(archetype_extended.get(supplement_type, {}), main=False)
 
         st.markdown("""
         <div style='height:44px;'></div>
         <hr style="height:1px; border:none; background:#e5e5e5; margin-bottom:26px;" />
         <div style="font-size:1.2em; font-weight:600; margin-bottom:23px;">
-            Pobierz raporty archetypu Krzysztofa Hetmana
+            Pobierz raporty archetypu Marcina Gołka
         </div>
         """, unsafe_allow_html=True)
 
@@ -1842,8 +1842,8 @@ if "answers" in data.columns and not data.empty:
         try:
             col_to_exclude = [
                 "Czas ankiety", "Archetyp", "Główny archetyp", "Cechy kluczowe", "Opis", "Storyline",
-                "Rekomendacje", "Archetyp pomocniczy", "Cechy pomocniczy", "Opis pomocniczy",
-                "Storyline pomocniczy", "Rekomendacje pomocniczy"
+                "Rekomendacje", "Archetyp wspierający", "Cechy wspierający", "Opis wspierający",
+                "Storyline wspierający", "Rekomendacje wspierający"
             ]
             means = final_df.drop(columns=col_to_exclude, errors="ignore").mean(numeric_only=True)
             summary_row = {col: round(means[col], 2) if col in means else "-" for col in final_df.columns}
