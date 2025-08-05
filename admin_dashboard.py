@@ -1609,10 +1609,10 @@ if "answers" in data.columns and not data.empty:
             }
             def zero_to_dash(val): return "-" if val == 0 else str(val)
             archetype_table = pd.DataFrame({
-                "Archetyp": [f"{archetype_emoji.get(n, n)} {n}" for n in archetype_names],
-                "Główny archetyp": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
-                "wspierający archetyp": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names],
-                "Poboczny archetyp": [zero_to_dash(results_df['Archetyp poboczny'].value_counts().reindex(archetype_names, fill_value=0).get(k, 0)) for k in archetype_names]
+                "archetyp": [f"{archetype_emoji.get(n, n)} {n}" for n in archetype_names],
+                "główny": [zero_to_dash(counts_main.get(k, 0)) for k in archetype_names],
+                "wpierający": [zero_to_dash(counts_aux.get(k, 0)) for k in archetype_names],
+                "poboczny": [zero_to_dash(results_df['Archetyp poboczny'].value_counts().reindex(archetype_names, fill_value=0).get(k, 0)) for k in archetype_names]
             })
             archetype_table_html = archetype_table.to_html(escape=False, index=False)
             archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
