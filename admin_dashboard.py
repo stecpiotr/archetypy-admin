@@ -448,7 +448,7 @@ archetype_extended = {
             "Mędrzec nie działa pod wpływem impulsu; każda decyzja jest przemyślana i poparta faktami oraz wsłuchaniem się w potrzeby miasta."
         ),
         "recommendations": [
-            "Wskazuj kompetencje, doświadczenie i eksperckość w zarządzaniu maistem.",
+            "Wskazuj kompetencje, doświadczenie i eksperckość w zarządzaniu miastem.",
             "Komunikuj zrozumiale zawiłości miejskich inwestycji i decyzji.",
             "Stosuj wykresy, dane, analizy i argumenty – przemawiaj do rozumu obywateli.",
             "Zachowaj spokojny, opanowany ton.",
@@ -1001,7 +1001,7 @@ def mask_for(idx, color):
 def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None):
     base = load_base_arche_img().copy()
 
-    # Najpierw poboczny (żeby nakryło go potem żółte/czerwone jeśli overlap)
+    # Najpierw poboczny (żeby nakryło go potem żółte/czerwone, jeśli overlap)
     if idx_supplement is not None and idx_supplement not in [idx_main, idx_aux] and idx_supplement < 12:
         mask_supplement = mask_for(idx_supplement, (64,185,0,140))  # zielony półtransparentny
         base.alpha_composite(mask_supplement)
@@ -1192,7 +1192,7 @@ def build_word_context(
         ),
         "TABELA_LICZEBNOSCI": archetype_table.to_dict('records') if archetype_table is not None else [],
         "RADAR_IMG": radar_image if radar_image is not None else "",
-        # --- NOWOŚĆ: liczebność osob ---
+        # --- NOWOŚĆ: liczebność osób ---
         "LICZEBNOSC_OSOB": (
             f"W badaniu udział wzięło {num_ankiet} {'osób' if (num_ankiet is None or num_ankiet != 1) else 'osoba'}."
             if num_ankiet is not None else ""
@@ -1399,7 +1399,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
         if name == 'opiekun':
             tagline_color = '#145A32'  # CIEMNOZIELONY tylko dla Opiekuna
         elif not is_light(bg_color):
-            tagline_color = "#222222"  # mocny kontrast jeżeli tło ciemne
+            tagline_color = "#222222"  # mocny kontrast, jeżeli tło ciemne
         else:
             tagline_color = border_color
 
@@ -1454,7 +1454,6 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
 
     # symbol musi być stringiem!
     symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
-    # tu wywołujesz  . mapowanie
     icon = symbol_emoji.get(normalize_symbol(symbol), "🔹")
 
     width_card = "70vw"
