@@ -119,6 +119,7 @@ person_wikipedia_links = {
     "Wołodymyr Zełenski": "https://pl.wikipedia.org/wiki/Wo%C5%82odymyr_Ze%C5%82enski",
     "Władysław Kosiniak-Kamysz": "https://pl.wikipedia.org/wiki/W%C5%82adys%C5%82aw_Kosiniak-Kamysz",
     "Xi Jinping": "https://pl.wikipedia.org/wiki/Xi_Jinping",
+    "Deng Xiaoping": "https://en.wikipedia.org/wiki/Deng_Xiaoping",
 }
 
 from docx.oxml import OxmlElement
@@ -280,6 +281,26 @@ archetypes = {
     "Buntownik": [45, 46, 47, 48],
 }
 
+# ---- MAPA EMOJI I FUNKCJE (DAJ JE TU, ZAWSZE PRZED CAŁĄ LOGIKĄ) ----
+archetype_emoji = {
+    "Władca": "👑", "Bohater": "🦸", "Mędrzec": "📖", "Opiekun": "🤝", "Kochanek": "❤️",
+    "Błazen": "🤪", "Twórca": "🧩", "Odkrywca": "🗺️", "Czarodziej": "⭐", "Towarzysz": "🏡",
+    "Niewinny": "🕊️", "Buntownik": "🔥"
+}
+def normalize(name):
+    if not isinstance(name, str):
+        return name
+    return name.split("/")[0].split(",")[0].strip().title()
+
+def get_emoji(name):
+    """
+    Zwraca emoji dla archetypu, nawet jeśli w nazwie pojawiają się ukośniki lub dodatki.
+    """
+    return archetype_emoji.get(normalize(name), "🔹")
+
+def zero_to_dash(val):
+    return "-" if val == 0 else str(val)
+
 archetype_features = {
     "Władca": "Potrzeba kontroli, organizacji, zarządzanie, wprowadzanie ładu.",
     "Bohater": "Odwaga, walka z przeciwnościami, mobilizacja do działania.",
@@ -343,7 +364,7 @@ archetype_extended = {
             "#000000", "#FFD700", "#282C34", "#800020", "#8C564B"
         ],
         "visual_elements": [
-            "Korona", "Herb Miasta", "Sygnet", "Monogram", "Geometryczna, masywna typografia", "Symetria"
+            "korona", "herb Miasta", "sygnet", "monogram", "geometryczna, masywna typografia", "symetria"
         ],
         "keyword_messaging": [
             "Lider miasta", "Siła samorządu", "Stabilność", "Doskonałość działań", "Elita miasta", "Bezpieczeństwo"
@@ -399,7 +420,7 @@ archetype_extended = {
             "#E10600", "#2E3141", "#FFFFFF", "#D62728"
         ],
         "visual_elements": [
-            "Peleryna", "Tarcza", "Aura odwagi", "Podniesiona dłoń", "Gwiazda"
+            "peleryna", "tarcza", "aura odwagi", "podniesiona dłoń", "gwiazda"
         ],
         "keyword_messaging": [
             "Siła", "Zwycięstwo", "Poświęcenie", "Mobilizacja"
@@ -454,7 +475,7 @@ archetype_extended = {
             "#4682B4", "#B0C4DE", "#6C7A89", "#1F77B4"
         ],
         "visual_elements": [
-            "Okulary", "Księga", "Wykres", "Lupa", "Symbole nauki"
+            "okulary", "księga", "wykres", "lupa", "symbole nauki"
         ],
         "keyword_messaging": [
             "Wiedza", "Argument", "Racjonalność", "Rozwój miasta"
@@ -510,7 +531,7 @@ archetype_extended = {
             "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD"
         ],
         "visual_elements": [
-            "Dłonie", "Serce", "Koło wspólnoty", "Symbol opieki"
+            "dłonie", "serce", "koło wspólnoty", "symbol opieki"
         ],
         "keyword_messaging": [
             "Bezpieczeństwo mieszkańców", "Troska", "Wspólnota"
@@ -566,7 +587,7 @@ archetype_extended = {
             "#FA709A", "#FEE140", "#FFD6E0", "#FA709A"
         ],
         "visual_elements": [
-            "Serce", "Uśmiech", "Gest bliskości"
+            "serce", "uśmiech", "gest bliskości"
         ],
         "keyword_messaging": [
             "Relacje", "Bliskość", "Społeczność"
@@ -619,7 +640,7 @@ archetype_extended = {
             "#FFB300", "#FF8300", "#FFD93D", "#F2A93B"
         ],
         "visual_elements": [
-            "Uśmiech", "Czapka błazna", "Kolorowe akcenty"
+            "uśmiech", "czapka błazna", "kolorowe akcenty"
         ],
         "keyword_messaging": [
             "Dystans", "Entuzjazm", "Radość"
@@ -672,7 +693,7 @@ archetype_extended = {
             "#7C53C3", "#3BE8B0", "#87CEEB", "#17BECF"
         ],
         "visual_elements": [
-            "Kostka Rubika", "Żarówka", "Kolorowe fale"
+            "kostka Rubika", "żarówka", "kolorowe fale"
         ],
         "keyword_messaging": [
             "Innowacja", "Twórczość", "Wizja rozwoju"
@@ -725,7 +746,7 @@ archetype_extended = {
             "#43C6DB", "#A0E8AF", "#F9D371", "#E377C2"
         ],
         "visual_elements": [
-            "Mapa", "Kompas", "Droga", "Lupa"
+            "mapa", "kompas", "droga", "lupa"
         ],
         "keyword_messaging": [
             "Odkrywanie", "Nowe horyzonty", "Zmiana"
@@ -777,7 +798,7 @@ archetype_extended = {
             "#8F00FF", "#181C3A", "#E0BBE4", "#7C46C5"
         ],
         "visual_elements": [
-            "Gwiazda", "Iskra", "Łuk magiczny"
+            "gwiazda", "iskra", "łuk magiczny"
         ],
         "keyword_messaging": [
             "Zmiana", "Inspiracja", "Możliwość"
@@ -831,7 +852,7 @@ archetype_extended = {
             "#F9F9F9", "#6CA0DC", "#A3C1AD", "#2CA02C"
         ],
         "visual_elements": [
-            "Dom", "Krąg ludzi", "Prosta ikona dłoni"
+            "dom", "krąg ludzi", "prosta ikona dłoni"
         ],
         "keyword_messaging": [
             "Bliskość", "Razem", "Prostota"
@@ -883,7 +904,7 @@ archetype_extended = {
             "#FFF6C3", "#AAC9CE", "#FFF200", "#9BD6F4"
         ],
         "visual_elements": [
-            "Gołąb", "Słońce", "Dziecko"
+            "gołąb", "słońce", "dziecko"
         ],
         "keyword_messaging": [
             "Nadzieja", "Optymizm", "Wspólnie"
@@ -938,7 +959,7 @@ archetype_extended = {
             "#000000", "#FF0000", "#FF6F61", "#FF7F0E"
         ],
         "visual_elements": [
-            "Piorun", "Megafon", "Odwrócona korona"
+            "piorun", "megafon", "odwrócona korona"
         ],
         "keyword_messaging": [
             "Zmiana", "Rewolucja", "Nowe reguły"
@@ -1395,12 +1416,46 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
     if (archetype_data.get('name', '').strip().lower() == 'niewinny') and not main:
         tagline = "Niesie nadzieję, inspiruje do współpracy, buduje zaufanie szczerością i apeluje o wspólne dobro, otwarcie komunikuje pozytywne wartości."
 
-    symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
+    def normalize_symbol(name):
+        return str(name).strip().title() if isinstance(name, str) else name
+
     symbol_emoji = {
-        "Korona": "👑", "Herb miasta": "🛡️", "Peleryna": "🦸", "Serce": "❤️", "Uśmiech": "😊", "Dłonie": "🤝",
-        "Księga": "📖", "Mapa": "🗺️", "Gwiazda": "⭐", "Gołąb": "🕊️", "Piorun": "⚡", "Rubika": "🧩", "Dom": "🏡"
+        "Korona": "👑",
+        "Herb Miasta": "🛡️",
+        "Peleryna": "🦸",
+        "Serce": "❤️",
+        "Uśmiech": "🤪",
+        "Dłonie": "🤝",
+        "Księga": "📖",
+        "Mapa": "🗺️",
+        "Gwiazda": "⭐",
+        "Gołąb": "🕊️",
+        "Piorun": "🔥",
+        "Kostka Rubika": "🧩",
+        "Dom": "🏡",
+        "Czapka błazna": "🎩",
+        "Krąg ludzi": "🫂",
+        "Żarówka": "💡",
+        "Kolorowe fale": "🌊",
+        "Koło wspólnoty": "⭕",
+        "Sygnet": "💍",
+        "Monogram": "🔠",
+        "Iskra": "✨",
+        "Podniesiona dłoń": "✋",
+        "Tarcza": "🛡️",
+        "Aura odwagi": "🦁",
+        "Okulary": "📖",
+        "Lupa": "🔍",
+        "Droga": "🛣️",
+        "Prosta ikona dłoni": "🫱",
+        "Dziecko": "🧒",
+        "Słońce": "☀️"
     }
-    icon = symbol_emoji.get(symbol, "🔹")
+
+    # symbol musi być stringiem!
+    symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
+    # tu wywołujesz  . mapowanie
+    icon = symbol_emoji.get(normalize_symbol(symbol), "🔹")
 
     width_card = "70vw"
     text_color = "#222"
@@ -1624,24 +1679,6 @@ if "answers" in data.columns and not data.empty:
 
         with col1:
             st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, wspierających i pobocznych</div>', unsafe_allow_html=True)
-            archetype_emoji = {
-                "Władca": "👑", "Bohater": "🦸", "Mędrzec": "📖", "Opiekun": "🤝", "Kochanek": "❤️",
-                "Błazen": "🤪", "Twórca": "🧩", "Odkrywca": "🗺️", "Czarodziej": "⭐", "Towarzysz": "🏡",
-                "Niewinny": "🕊️", "Buntownik": "🔥"
-            }
-
-            def normalize(name):
-                return name.strip().title()
-
-            def get_emoji(name):
-                return archetype_emoji.get(normalize(name), "🔹")
-
-            def zero_to_dash(val):
-                return "-" if val == 0 else str(val)
-
-            # Normalizujemy archetype_names – NAJWAŻNIEJSZE!
-            archetype_names = [normalize(n) for n in archetype_names]
-
             archetype_table = pd.DataFrame({
                 "Archetyp": [f"{get_emoji(n)} {n}" for n in archetype_names],
                 "Główny archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in archetype_names],
