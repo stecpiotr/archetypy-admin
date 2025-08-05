@@ -1008,7 +1008,7 @@ def load():
             port=st.secrets.get("db_port", 5432),
             sslmode="require"
         )
-        df = pd.read_sql("SELECT * FROM aarchetypy_responses", con=conn)
+        df = pd.read_sql("SELECT * FROM archetypy_responses", con=conn)
         conn.close()
         if "created_at" in df.columns:
             df["created_at"] = pd.to_datetime(df["created_at"])
