@@ -1361,7 +1361,18 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
         border_color = archetype_data.get('color_palette', ['#E99836'])[0]
         bg_color = archetype_data.get('color_palette', ['#FFF', '#FAFAFA'])[1] if len(
             archetype_data.get('color_palette', [])) > 1 else "#FFF8F0"
-        tagline_color = border_color
+
+        # Dobierz tagline color zgodnie z jasnością tła:
+        def is_light(color):
+            # 'color' jako hex string #RRGGBB
+            color = color.lstrip('#')
+            r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+            return (r * 299 + g * 587 + b * 114) / 1000 > 180
+
+        if not is_light(bg_color.replace('#', '').upper() if bg_color else "FFF"):  # jeśli tło ciemne
+            tagline_color = "#222222"  # lub np. #173F5F, mocny kontrast
+        else:
+            tagline_color = border_color
         box_shadow = f"0 4px 14px 0 {border_color}44"
     else:
         border_color = archetype_data.get('color_palette', ['#FFD22F'])[0]
