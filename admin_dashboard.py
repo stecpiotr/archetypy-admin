@@ -203,7 +203,7 @@ def zapobiegaj_wdowie(text):
 
 import cairosvg
 
-st.set_page_config(page_title="Archetypy Marcina Gołka – panel administratora", layout="wide")
+st.set_page_config(page_title="Archetypy – panel administratora", layout="wide")
 
 COLOR_NAME_MAP = {
         "#000000": "czerń",
@@ -386,7 +386,7 @@ archetype_extended = {
         "description": (
             "Bohater w polityce to archetyp waleczności, determinacji i odwagi w podejmowaniu trudnych decyzji dla społeczności. "
             "Bohaterowie są gotowi stawić czoła wyzwaniom, pokonywać przeszkody i walczyć o lepszą przyszłość dla wszystkich. Ich celem jest udowodnienie swojej wartości poprzez odważne działania i inspirowanie innych do przekraczania własnych granic. Politycy o tym archetypie często podkreślają swoją gotowość do podejmowania trudnych decyzji i stawiania czoła przeciwnościom w imię dobra wspólnego. "
-            "Kandydat Bohater mobilizuje mieszkańców do działania, bierze odpowiedzialność w najtrudniejszych momentach i broni interesów miasta nawet pod presją."
+            "Bohater mobilizuje mieszkańców do działania, bierze odpowiedzialność w najtrudniejszych momentach i broni interesów miasta nawet pod presją."
         ),
         "storyline": (
             "Opowieść Bohatera to historia przezwyciężania kryzysów i stawania po stronie obywateli. "
@@ -441,7 +441,7 @@ archetype_extended = {
         "description": (
             "Mędrzec w polityce opiera komunikację na wiedzy, argumentacji i logicznym rozumowaniu oraz analitycznym podejściu. "
             "Mędrcy poszukują prawdy i wiedzy, wierząc, że informacja i zrozumienie są kluczem do rozwiązywania problemów. Politycy o tym archetypie często prezentują się jako eksperci, którzy podejmują decyzje w oparciu o fakty i analizy, a nie emocje czy ideologię. "
-            "Kandydat Mędrzec wykorzystuje rozsądne analizy, doświadczenie oraz ekspercką wiedzę, by podejmować najlepsze decyzje dla całej społeczności."
+            "Mędrzec wykorzystuje rozsądne analizy, doświadczenie oraz ekspercką wiedzę, by podejmować najlepsze decyzje dla całej społeczności."
         ),
         "storyline": (
             "Opowieść Mędrca to budowanie zaufania kompetencjami, przejrzystym uzasadnieniem propozycji i edukacją mieszkańców. "
@@ -497,7 +497,7 @@ archetype_extended = {
             "Opiekun w polityce to archetyp zaangażowania, wspierania i budowania poczucia wspólnoty. "
             "Archetyp Opiekuna reprezentuje troskę, empatię i chęć pomocy innym. "
             "Opiekunowie pragną chronić obywateli i zapewniać im bezpieczeństwo oraz wsparcie. Politycy o tym archetypie często skupiają się na polityce społecznej, ochronie zdrowia, edukacji i innych usługach publicznych, które poprawiają jakość życia obywateli. "
-            "Kandydat Opiekun dba o najsłabszych, promuje działania prospołeczne, wdraża programy pomocowe i społecznie odpowiedzialne."
+            "Opiekun dba o najsłabszych, promuje działania prospołeczne, wdraża programy pomocowe i społecznie odpowiedzialne."
         ),
         "storyline": (
             "Narracja Opiekuna podkreśla działania integrujące, troskę o seniorów, rodziny, niepełnosprawnych i osoby wykluczone. "
@@ -607,7 +607,7 @@ archetype_extended = {
         "description": (
             "Błazen w polityce wnosi lekkość, dystans i rozładowanie napięć. "
             "Używa humoru i autoironii, by rozbrajać napięcia oraz tworzyć wrażenie bliskości z wyborcami."
-            "Kandydat-Błazen potrafi rozbawić, rozproszyć atmosferę, ale nigdy nie traci dystansu do siebie i powagi spraw publicznych."
+            "Błazen potrafi rozbawić, rozproszyć atmosferę, ale nigdy nie traci dystansu do siebie i powagi spraw publicznych."
         ),
         "storyline": (
             "Narracja Błazna to umiejętność śmiania się z problemów i codziennych wyzwań miasta, ale też dawania mieszkańcom nadziei oraz pozytywnej energii."
@@ -872,7 +872,7 @@ archetype_extended = {
         "description": (
             "Niewinny w polityce otwarcie komunikuje pozytywne wartości, niesie nadzieję i podkreśla wiarę w zmiany na lepsze. "
             "Głosi prostą, pozytywną wizję dobra wspólnego i nadziei. "
-            "Kandydat–Niewinny buduje zaufanie szczerością i skutecznie apeluje o współpracę dla wspólnego dobra."
+            "Niewinny buduje zaufanie szczerością i skutecznie apeluje o współpracę dla wspólnego dobra."
         ),
         "storyline": (
             "Opowieść Niewinnego buduje napięcie wokół pozytywnych emocji, odwołuje się do marzeń o lepszym mieście i wiary we wspólny sukces."
@@ -926,7 +926,7 @@ archetype_extended = {
             "Archetyp Buntownika charakteryzuje się odwagą w kwestionowaniu status quo i dążeniem do fundamentalnych zmian. "
             "Buntownicy sprzeciwiają się istniejącym strukturom władzy i konwencjom, proponując radykalne rozwiązania."
             "Politycy o tym archetypie często prezentują się jako outsiderzy, którzy chcą zburzyć skorumpowany system i wprowadzić nowy porządek."
-            "Kandydat Buntownik odważnie kwestionuje zastane układy, nawołuje do zmiany i walczy o nowe, lepsze reguły gry w mieście. "
+            "Buntownik odważnie kwestionuje zastane układy, nawołuje do zmiany i walczy o nowe, lepsze reguły gry w mieście. "
             "Potrafi ściągnąć uwagę i zjednoczyć mieszkańców wokół śmiałych idei. "
         ),
         "storyline": (
@@ -1019,7 +1019,7 @@ def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None):
     return base
 
 @st.cache_data(ttl=30)
-def load():
+def load(study_id=None):
     try:
         conn = psycopg2.connect(
             host=st.secrets["db_host"],
@@ -1029,13 +1029,18 @@ def load():
             port=st.secrets.get("db_port", 5432),
             sslmode="require"
         )
-        df = pd.read_sql("SELECT * FROM archetypy_responses", con=conn)
+
+        base_sql = "SELECT created_at, answers FROM public.responses"
+        if study_id:
+            df = pd.read_sql(base_sql + " WHERE study_id = %s ORDER BY created_at",
+                             con=conn, params=(study_id,))
+        else:
+            df = pd.read_sql(base_sql + " ORDER BY created_at", con=conn)
+
         conn.close()
-        if "created_at" in df.columns:
-            df["created_at"] = pd.to_datetime(df["created_at"])
 
         def parse_answers(x):
-            if isinstance(x, list):
+            if isinstance(x, (list, dict)):
                 return x
             try:
                 import json
@@ -1052,7 +1057,32 @@ def load():
 
     except Exception as e:
         st.warning(f"Błąd podczas ładowania danych: {e}")
-        return pd.DataFrame()
+
+
+
+@st.cache_data(ttl=30)
+def fetch_studies_list():
+    conn = psycopg2.connect(
+        host=st.secrets["db_host"],
+        database=st.secrets["db_name"],
+        user=st.secrets["db_user"],
+        password=st.secrets["db_pass"],
+        port=st.secrets.get("db_port", 5432),
+        sslmode="require"
+    )
+    df = pd.read_sql(
+        """
+        SELECT id, first_name_nom, first_name_gen,
+               last_name_nom,  last_name_gen,
+               city_nom, slug
+        FROM public.studies
+        WHERE COALESCE(is_active, true)
+        ORDER BY created_at DESC
+        """,
+        con=conn
+    )
+    conn.close()
+    return df
 
 def archetype_scores(answers):
     if not isinstance(answers, list) or len(answers) < 48:
@@ -1176,7 +1206,7 @@ def build_word_context(
 
     context = {
         "TYTUL": "Raport Archetypów",
-        "IMIE_NAZWISKO": "Marcina Gołka",
+        "IMIE_NAZWISKO": personGen,
         "AUTOR": "Piotr Stec",
         "DATA": datetime.now().strftime("%Y-%m-%d"),
         "WSTEP": zapobiegaj_wdowie(
@@ -1585,7 +1615,25 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
 
 # ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
 
-data = load()
+# ── WYBÓR BADANIA / OSOBY ──────────────────────────────────────────────
+studies_df = fetch_studies_list()
+if studies_df.empty:
+    st.warning("Brak badań w bazie.")
+    st.stop()
+
+labels = [
+    f"{row.first_name_nom} {row.last_name_nom} ({row.city_nom}) – /{row.slug}"
+    for _, row in studies_df.iterrows()
+]
+sel = st.selectbox("Wybierz osobę/JST", options=labels)
+sel_row = studies_df.iloc[labels.index(sel)]
+
+personNom = f"{sel_row.first_name_nom} {sel_row.last_name_nom}"
+personGen = f"{sel_row.first_name_gen} {sel_row.last_name_gen}"
+study_id = sel_row.id
+
+
+data = load(study_id)
 num_ankiet = len(data) if not data.empty else 0
 
 header_col1, header_col2 = st.columns([0.77, 0.23])
