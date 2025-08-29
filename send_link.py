@@ -7,7 +7,7 @@ import base64
 from datetime import datetime, timezone, timedelta
 import time  # ⬅️ do auto-odświeżania (sleep + rerun)
 
-import body
+'import body'
 import pandas as pd
 import streamlit as st
 import re
