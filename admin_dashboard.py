@@ -634,7 +634,7 @@ archetype_extended = {
             "Boris Johnson", "Silvio Berlusconi", "Janusz Palikot",
         ],
         "example_brands": [
-            "Old Spice", "M&M's", "Fanta", "Łomża", "kabarety"
+            "Old Spice", "M&Ms", "Fanta", "Łomża", "kabarety"
         ],
         "color_palette": [
             "#FFB300", "#FF8300", "#FFD93D", "#F2A93B"
@@ -976,15 +976,16 @@ archetype_extended = {
 }
 # --- KONIEC archetype_extended ---
 
-ARCHE_IMG_URL = "https://justynakopec.pl/wp-content/uploads/2024/08/Archetypy-marki-Justyna-Kopec.png"
+from pathlib import Path
+from PIL import Image
+
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
 
 @st.cache_data
 def load_base_arche_img():
-    resp = requests.get(ARCHE_IMG_URL, stream=True, timeout=30)
-    resp.raise_for_status()
-    img = Image.open(io.BytesIO(resp.content)).convert("RGBA")
-    return img
+    p = Path(__file__).with_name("assets").joinpath("archetype_wheel.png")
+    return Image.open(p).convert("RGBA")
+
 
 def mask_for(idx, color):
     base = load_base_arche_img()
@@ -1130,7 +1131,7 @@ from docx.shared import Mm
 from io import BytesIO
 import os
 
-TEMPLATE_PATH = "ap48_raport_template.docx"
+'TEMPLATE_PATH = "ap48_raport_template.docx"'
 
 def build_word_context(
     main_type, second_type, supplement_type, features, main, second, supplement,

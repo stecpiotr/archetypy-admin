@@ -76,6 +76,18 @@ def decline_first_m(name: str) -> Dict[str, str]:
             "voc": "Michale",
         }
 
+    # NOWE: imiona zakończone na „-ko” (np. Gniewko, Janko)
+    if low.endswith("ko"):
+        base = n[:-1]  # ucinamy tylko „o”: Gniewk-
+        return {
+            "gen": _title(base + "a"),     # Gniewka
+            "dat": _title(base + "owi"),   # Gniewkowi
+            "acc": _title(base + "a"),     # Gniewka
+            "ins": _title(base + "iem"),   # Gniewkiem
+            "loc": _title(base + "u"),     # Gniewku
+            "voc": _title(base + "u"),     # Gniewku
+        }
+
     # Ogólna reguła dla większości męskich imion kończących się spółgłoską
     # (Marcin, Emil, Krzysztof, Jakub, Adam, Rafał, itp.)
     root = n
@@ -162,6 +174,30 @@ def decline_surname_m(sur: str) -> Dict[str, str]:
             "ins": base[:-1] + "im",       # Wiśniewskim
             "loc": base[:-1] + "im",       # Wiśniewskim
             "voc": base,                   # Wołacz jak mianownik
+        }
+
+    # NOWE: przymiotnikowe na „-i” (np. Drugi → drugiego/drugiemu/drugim)
+    if re.search(r"[bcćdfghjklłmnńprsśtwzźż]i$", low):
+        stem = s[:-1]
+        return {
+            "gen": _title(stem + "iego"),
+            "dat": _title(stem + "iemu"),
+            "acc": _title(stem + "iego"),
+            "ins": _title(stem + "im"),
+            "loc": _title(stem + "im"),
+            "voc": s,
+        }
+
+    # NOWE: przymiotnikowe na „-y” (np. Młody/Nowy → młodego/nowemu/młodym)
+    if re.search(r"[bcćdfghjklłmnńprsśtwzźż]y$", low):
+        stem = s[:-1]
+        return {
+            "gen": _title(stem + "ego"),
+            "dat": _title(stem + "emu"),
+            "acc": _title(stem + "ego"),
+            "ins": _title(stem + "ym"),
+            "loc": _title(stem + "ym"),
+            "voc": s,
         }
 
     # 2) -ek → Gołek → Gołka / Gołkowi / Gołka / Gołkiem / Gołku / Gołku

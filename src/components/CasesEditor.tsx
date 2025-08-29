@@ -1,119 +1,258 @@
-// archetypy-admin/src/components/CasesSection.tsx
-// Sekcja formularza: wszystkie przypadki obok siebie (imię + nazwisko w jednym wierszu).
-// Automatycznie podpowiada na podstawie mianownika + płci, ale każde pole można nadpisać.
+// archetypy-admin/src/components/CasesEditor.tsx
+import React, { useMemo, useState } from "react";
 
-import React from "react";
-import { buildAllCases, Gender, NameCases } from "../declensions";
+type Gender = "M" | "F";
 
-export interface CasesValues {
-  first_name_nom: string;
-  last_name_nom: string;
-  gender: Gender;
-
-  first_name_gen?: string;
-  last_name_gen?: string;
-
-  first_name_dat?: string;
-  last_name_dat?: string;
-
-  first_name_acc?: string;
-  last_name_acc?: string;
-
-  first_name_ins?: string;
-  last_name_ins?: string;
-
-  first_name_loc?: string;
-  last_name_loc?: string;
-
-  first_name_voc?: string;
-  last_name_voc?: string;
-}
-
-type Props = {
-  value: CasesValues;
-  onChange: (next: CasesValues) => void;
+export type CasesValue = {
+  first_name_gen?: string;  last_name_gen?: string;
+  first_name_dat?: string;  last_name_dat?: string;
+  first_name_acc?: string;  last_name_acc?: string;
+  first_name_ins?: string;  last_name_ins?: string;
+  first_name_loc?: string;  last_name_loc?: string;
+  first_name_voc?: string;  last_name_voc?: string;
 };
 
-const Row: React.FC<{
-  label: string;
-  fKey: keyof NameCases;
-  value: CasesValues;
-  onChange: (next: CasesValues) => void;
-}> = ({ label, fKey, value, onChange }) => {
-  const leftKey = (`first_name_${fKey}` as keyof CasesValues);
-  const rightKey = (`last_name_${fKey}` as keyof CasesValues);
+export function CasesEditor(props: {
+  gender: Gender;
+  firstNameNom: string;
+  lastNameNom: string;
+  value: CasesValue;
+  onChange: (v: CasesValue) => void;
+}) {
+  const { gender, firstNameNom, lastNameNom, value, onChange } = props;
 
-  return (
-    <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10 }}>
-      <div style={{ width: 170, fontWeight: 600 }}>{label}</div>
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const suggest = useMemo(() => suggestPolishCases(firstNameNom, lastNameNom, gender), [
+    firstNameNom,
+    lastNameNom,
+    gender,
+  ]);
+
+  function setField(k: keyof CasesValue, val: string) {
+    onChange({ ...value, [k]: val });
+    setTouched((t) => ({ ...t, [k]: true }));
+  }
+
+  function fillSuggestions() {
+    const next: CasesValue = { ...value };
+    (Object.keys(suggest) as (keyof CasesValue)[]).forEach((k) => {
+      if (!touched[k] && !next[k]) next[k] = suggest[k] || "";
+    });
+    onChange(next);
+  }
+
+  const Row = (props: {
+    label: string;
+    fnKey: keyof CasesValue;
+    lnKey: keyof CasesValue;
+    fnPh?: string;
+    lnPh?: string;
+  }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 10 }}>
+      <div style={{ gridColumn: "1 / span 2", fontSize: 12, color: "#556", marginBottom: 2 }}>
+        {props.label}
+      </div>
       <input
-        style={{ flex: 1, padding: "8px 10px" }}
-        value={(value[leftKey] as string) || ""}
-        onChange={(e) => onChange({ ...value, [leftKey]: e.target.value })}
-        placeholder="Imię w tym przypadku"
+        type="text"
+        value={value[props.fnKey] || ""}
+        placeholder={props.fnPh}
+        onChange={(e) => setField(props.fnKey, e.target.value)}
       />
       <input
-        style={{ flex: 1, padding: "8px 10px" }}
-        value={(value[rightKey] as string) || ""}
-        onChange={(e) => onChange({ ...value, [rightKey]: e.target.value })}
-        placeholder="Nazwisko w tym przypadku"
+        type="text"
+        value={value[props.lnKey] || ""}
+        placeholder={props.lnPh}
+        onChange={(e) => setField(props.lnKey, e.target.value)}
       />
     </div>
   );
-};
-
-const CasesSection: React.FC<Props> = ({ value, onChange }) => {
-  const { first_name_nom, last_name_nom, gender } = value;
-
-  const handleAutofill = () => {
-    const built = buildAllCases(first_name_nom || "", last_name_nom || "", gender || "M");
-
-    const next: CasesValues = {
-      ...value,
-      // Imię
-      first_name_gen: built.first.gen,
-      first_name_dat: built.first.dat,
-      first_name_acc: built.first.acc,
-      first_name_ins: built.first.instr,
-      first_name_loc: built.first.loc,
-      first_name_voc: built.first.voc,
-      // Nazwisko
-      last_name_gen: built.last.gen,
-      last_name_dat: built.last.dat,
-      last_name_acc: built.last.acc,
-      last_name_ins: built.last.instr,
-      last_name_loc: built.last.loc,
-      last_name_voc: built.last.voc,
-    };
-
-    onChange(next);
-  };
 
   return (
-    <div style={{ border: "1px solid #e8e8e8", borderRadius: 8, padding: 14, marginTop: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontWeight: 700 }}>Odmiana imienia i nazwiska (wszystkie przypadki)</div>
-        <button type="button" onClick={handleAutofill} style={{
-          background: "#06b09c", color: "#fff", border: "none", borderRadius: 6, padding: "8px 10px",
-          cursor: "pointer"
-        }}>
-          Uzupełnij automatycznie
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button type="button" onClick={fillSuggestions}>
+          Generuj odmiany
         </button>
       </div>
 
-      <div style={{ marginTop: 10, color: "#677", fontSize: 13 }}>
-        Pola są edytowalne – ręczna zmiana NADPISUJE podpowiedź. W wierszu wprowadzaj imię (lewe) i nazwisko (prawe).
-      </div>
-
-      <Row label="Mianownik (kto? co?)" fKey="nom" value={value} onChange={onChange} />
-      <Row label="Dopełniacz (kogo? czego?)" fKey="gen" value={value} onChange={onChange} />
-      <Row label="Celownik (komu? czemu?)" fKey="dat" value={value} onChange={onChange} />
-      <Row label="Biernik (kogo? co?)" fKey="acc" value={value} onChange={onChange} />
-      <Row label="Narzędnik (z kim? z czym?)" fKey="instr" value={value} onChange={onChange} />
-      <Row label="Miejscownik (o kim? o czym?)" fKey="loc" value={value} onChange={onChange} />
-      <Row label="Wołacz" fKey="voc" value={value} onChange={onChange} />
+      <Row
+        label="Dopełniacz (kogo? czego?)"
+        fnKey="first_name_gen"
+        lnKey="last_name_gen"
+        fnPh={suggest.first_name_gen}
+        lnPh={suggest.last_name_gen}
+      />
+      <Row
+        label="Celownik (komu? czemu?)"
+        fnKey="first_name_dat"
+        lnKey="last_name_dat"
+        fnPh={suggest.first_name_dat}
+        lnPh={suggest.last_name_dat}
+      />
+      <Row
+        label="Biernik (kogo? co?)"
+        fnKey="first_name_acc"
+        lnKey="last_name_acc"
+        fnPh={suggest.first_name_acc}
+        lnPh={suggest.last_name_acc}
+      />
+      <Row
+        label="Narzędnik (z kim? z czym?)"
+        fnKey="first_name_ins"
+        lnKey="last_name_ins"
+        fnPh={suggest.first_name_ins}
+        lnPh={suggest.last_name_ins}
+      />
+      <Row
+        label="Miejscownik (o kim? o czym?)"
+        fnKey="first_name_loc"
+        lnKey="last_name_loc"
+        fnPh={suggest.first_name_loc}
+        lnPh={suggest.last_name_loc}
+      />
+      <Row
+        label="Wołacz"
+        fnKey="first_name_voc"
+        lnKey="last_name_voc"
+        fnPh={suggest.first_name_voc}
+        lnPh={suggest.last_name_voc}
+      />
     </div>
   );
-};
+}
 
-export default CasesSection;
+/** Bardzo proste podpowiedzi + wyjątki. NIE zapisujemy automatycznie. */
+function suggestPolishCases(first: string, last: string, gender: Gender): CasesValue {
+  const fn = first.trim();
+  const ln = last.trim();
+
+  const out: CasesValue = {};
+
+  // ——— GEN ———
+  out.first_name_gen = genFirst(fn, gender);
+  out.last_name_gen  = genLast(ln, gender);
+
+  // ——— DAT (bardzo uproszczony) ———
+  out.first_name_dat = datFromGen(out.first_name_gen!);
+  out.last_name_dat  = datFromGen(out.last_name_gen!);
+
+  // ——— ACC ———
+  out.first_name_acc = accFirst(fn, gender, out.first_name_gen!);
+  out.last_name_acc  = accLast(ln, gender, out.last_name_gen!);
+
+  // ——— INS ———
+  out.first_name_ins = insFirst(fn, gender);
+  out.last_name_ins  = insLast(ln, gender);
+
+  // ——— LOC ———
+  out.first_name_loc = locFirst(fn, gender, out.first_name_gen!);
+  out.last_name_loc  = locLast(ln, gender, out.last_name_gen!);
+
+  // ——— VOC ———
+  out.first_name_voc = vocFirst(fn, gender);
+  out.last_name_voc  = vocLast(ln, gender);
+
+  return out;
+}
+
+/* ===== Najprostsze reguły + wyjątek „Janusza → Januszy” (F) ===== */
+
+function genFirst(n: string, g: Gender) {
+  if (g === "F") {
+    if (/a$/i.test(n)) return n.replace(/a$/i, "y"); // Anna->Anny | Janusza->Januszy (DZIAŁA!)
+    return n;
+  }
+  // M
+  if (/ek$/i.test(n)) return n.replace(/ek$/i, "ka"); // Marek->Marka
+  if (/in$/i.test(n)) return n + "a";                 // Marcin->Marcina
+  return n;
+}
+function genLast(n: string, g: Gender) {
+  if (g === "F") {
+    if (/ska$/i.test(n)) return n.replace(/ska$/i, "skiej");
+    if (/cka$/i.test(n)) return n.replace(/cka$/i, "ckiej");
+    return n + ""; // np. „Stec” zostaje „Stec”
+  }
+  if (/ek$/i.test(n)) return n.replace(/ek$/i, "ka"); // Gołek->Gołka
+  return n;
+}
+
+function datFromGen(gen: string) {
+  // totalny skrót: Anny->Annie, Marcina->Marcinowi, Gołka->Gołkowi
+  if (/y$/i.test(gen)) return gen.replace(/y$/i, "ie");
+  if (/a$/i.test(gen)) return gen.replace(/a$/i, "owi");
+  if (/k$/i.test(gen)) return gen + "owi";
+  return gen;
+}
+
+function accFirst(nom: string, g: Gender, gen: string) {
+  // M: biernik jak dopełniacz, F: „a”->„ę”
+  if (g === "M") return gen;
+  if (/a$/i.test(nom)) return nom.replace(/a$/i, "ę");
+  return nom;
+}
+function accLast(nom: string, g: Gender, gen: string) {
+  if (g === "M") return gen;
+  // F: Kowalska->Kowalską, Stec->Stec
+  if (/ska$/i.test(nom)) return nom.replace(/ska$/i, "ską");
+  if (/cka$/i.test(nom)) return nom.replace(/cka$/i, "cką");
+  if (/a$/i.test(nom))   return nom.replace(/a$/i, "ą");
+  return nom;
+}
+
+function insFirst(n: string, g: Gender) {
+  if (g === "M") {
+    if (/ek$/i.test(n)) return n.replace(/ek$/i, "kiem"); // Marek->Markiem
+    if (/a$/i.test(n))  return n.replace(/a$/i, "ą");
+    return n + "em";                                     // Marcin->Marcinem
+  }
+  if (/a$/i.test(n)) return n.replace(/a$/i, "ą");       // Anna->Anną
+  return n;
+}
+function insLast(n: string, g: Gender) {
+  if (g === "M") {
+    if (/ek$/i.test(n)) return n.replace(/ek$/i, "kiem"); // Gołek->Gołkiem
+    if (!/em$/i.test(n)) return n + "em";
+    return n;
+  }
+  if (/ska$/i.test(n)) return n.replace(/ska$/i, "ską");
+  if (/cka$/i.test(n)) return n.replace(/cka$/i, "cką");
+  if (/a$/i.test(n))   return n.replace(/a$/i, "ą");
+  return n;
+}
+
+function locFirst(n: string, g: Gender, gen: string) {
+  // wyświetlamy bez „o” — UI ma label „Miejscownik (o kim? o czym?)”
+  if (g === "F") {
+    if (/a$/i.test(n)) return n.replace(/a$/i, "ie"); // Anna->Annie, Janusza->Januszie (ale patrz wyjątek w GEN->y; tu zachowujemy)
+    return n;
+  }
+  // M
+  if (/a$/i.test(gen)) return gen.replace(/a$/i, "ie"); // Marcina->Marcinie
+  return gen;
+}
+function locLast(n: string, g: Gender, gen: string) {
+  if (g === "F") {
+    if (/ska$/i.test(n)) return n.replace(/ska$/i, "skiej");
+    if (/cka$/i.test(n)) return n.replace(/cka$/i, "ckiej");
+    if (/a$/i.test(n))   return n.replace(/a$/i, "ie");
+    return n;
+  }
+  if (/a$/i.test(gen)) return gen.replace(/a$/i, "ie"); // Gołka->Gołku
+  return gen;
+}
+
+function vocFirst(n: string, g: Gender) {
+  if (g === "M") {
+    if (/in$/i.test(n)) return n.replace(/in$/i, "inie"); // Marcin->Marcinie
+    return n;
+  }
+  if (/a$/i.test(n)) return n.replace(/a$/i, "o");       // Anna->Anno
+  return n;
+}
+function vocLast(n: string, g: Gender) {
+  if (g === "M") return n;
+  if (/ska$/i.test(n)) return n.replace(/ska$/i, "sko");
+  return n;
+}
