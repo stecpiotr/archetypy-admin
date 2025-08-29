@@ -527,47 +527,84 @@ def render(back_btn: Callable[[], None]) -> None:
     # ── Statusy w tej samej sekcji ────────────────────────────────────────────
     st.markdown('<hr class="hr-thin status-top-tight">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="form-label-strong" style="font-size:18px;margin-bottom:12px;">Statusy SMS</div>',
+        '<div class="form-label-strong" style="font-size:18px;margin-bottom:16px;">Statusy SMS</div>',
         unsafe_allow_html=True
     )
 
-    col1, col2 = st.columns([1, 5])
-    with col1:
+    # 🔄 Ręczne i automatyczne odświeżanie (bez JS, bez experimental_set_query_params)
+    c1, c2 = st.columns([1, 5])
+    with c1:
         if st.button("⟳ Odśwież statusy", key="refresh_sms"):
             st.rerun()
-    with col2:
+
+    with c2:
         auto_refresh = st.checkbox("Auto-odśwież co 15 sekund", value=False, key="auto_refresh_sms")
+        if auto_refresh:
+            # prosty licznik w session_state, żadnego przeładowania strony
+            last = st.session_state.get("sms_last_refresh_ts", 0.0)
+            now = time.time()
+            st.caption("Auto-odświeżanie aktywne (co 15 s)")
+            if now - last >= 15:
+                st.session_state["sms_last_refresh_ts"] = now
+                st.rerun()
 
-    # prosty meta refresh — nie blokuje streamlitu i działa na Cloud
-    if auto_refresh:
-        st.markdown("<meta http-equiv='refresh' content='15'>", unsafe_allow_html=True)
-        st.caption("Auto-odświeżanie aktywne (co 15 s)")
+    # 🔧 poprawiona kolejność ikon (failed > completed > started > clicked > delivered > sent > queued)
+    def _status_icon_fixed(row: Dict) -> str:
+        status = (row.get("status") or "").lower()
+        if status == "failed":
+            return "✖"
+        if row.get("completed_at"):
+            return "✅"
+        if row.get("started_at"):
+            return "🏁"
+        if row.get("clicked_at"):
+            return "🔗"
+        if status == "delivered":
+            return "📬"  # pojawi się tylko gdy provider zwróci „delivered”
+        if status == "sent":
+            return "📤"
+        if status == "queued":
+            return "⏳"
+        return "•"
 
+    # pobranie danych
     df_logs = _logs_dataframe(sb, study_id=study["id"])
+    # podmień kolumnę z ikoną na nową logikę (jeśli istnieje)
+    if not df_logs.empty and "Aktualny status" in df_logs.columns:
+        # odczytaj surowe rekordy jeszcze raz aby mieć oryginalne pola status/started/clicked etc.
+        raw_rows = list_sms_for_study(sb, study["id"]) or []
+        icons = []
+        for r in raw_rows:
+            icons.append(_status_icon_fixed(r))
+        # dopasuj długości (na wszelki wypadek)
+        if len(icons) == len(df_logs):
+            df_logs["Aktualny status"] = icons
 
+    # tabela z szerokościami kolumn (small/medium/large to jedyne dostępne)
+    from streamlit import column_config as cc
     st.dataframe(
         df_logs,
         use_container_width=True,
         hide_index=True,
         column_config={
-            "Data": st.column_config.TextColumn(width="medium"),
-            "Telefon": st.column_config.TextColumn(width="small"),
-            "Status": st.column_config.TextColumn(width="small"),
-            "Wysłano": st.column_config.TextColumn(width="small"),
-            "Kliknięto": st.column_config.TextColumn(width="medium"),
-            "Rozpoczęto": st.column_config.TextColumn(width="medium"),
-            "Zakończono": st.column_config.TextColumn(width="medium"),
-            "Błąd": st.column_config.TextColumn(width="small"),
-        },
+            "Data": cc.Column(width="large"),
+            "Telefon": cc.Column(width="small"),
+            "Aktualny status": cc.Column(width="small"),
+            "Wysłano": cc.Column(width="small"),
+            "Kliknięto": cc.Column(width="large"),
+            "Rozpoczęto": cc.Column(width="large"),
+            "Zakończono": cc.Column(width="large"),
+            "Błąd": cc.Column(width="small"),
+        }
     )
 
-    # Legenda z większym odstępem POD nagłówkiem „Legenda statusów:”
+    # Legenda (większy odstęp po tytule)
     st.markdown("""
-    <div style="font-size:14px; line-height:1.6; margin-top:16px;">
-      <div style="font-weight:700; font-size:14.5px;">Legenda statusów:</div>
-      <div style="height:8px;"></div>
+    <div style="margin-top:18px"></div>
+    <div style="font-size:14px; line-height:1.6;">
+      <b>Legenda statusów:</b><br>
       📤 – SMS wysłany<br>
-      📬 – SMS doręczony<br>
+      📬 – SMS doręczony (jeśli provider zwróci potwierdzenie)<br>
       🔗 – Odbiorca kliknął w link<br>
       🏁 – Ankieta rozpoczęta<br>
       ✅ – Ankieta zakończona<br>
@@ -575,6 +612,5 @@ def render(back_btn: Callable[[], None]) -> None:
       ⏳ – Oczekuje w kolejce<br>
       • – Inny / nieznany status
     </div>
+    <div style="margin-bottom:60px"></div>
     """, unsafe_allow_html=True)
-
-    st.markdown('<div class="status-bottom-gap"></div>', unsafe_allow_html=True)
