@@ -1,4 +1,4 @@
-# db_sms.py — operacje na tabeli public.sms_messages (Supabase)
+# db_sms.py — operacje na tabeli/widoku SMS (Supabase)
 
 from __future__ import annotations
 from typing import Dict, List
@@ -36,9 +36,6 @@ def create_sms_record(sb: Client, study_id: str, phone: str, text: str, token: s
       Dzięki temu warstwa wyżej (send_link.py) może wygenerować NOWY token,
       PODMIENIĆ go w treści SMS i powtórzyć próbę — zachowujemy spójność
       między treścią wysłanego SMS a rekordem w bazie.
-
-    Kolumny w tabeli: id, study_id, phone, body, token, provider_message_id,
-                      status, clicked_at, started_at, completed_at, created_at
     """
     try:
         ins = (
@@ -56,7 +53,6 @@ def create_sms_record(sb: Client, study_id: str, phone: str, text: str, token: s
         )
     except Exception as e:
         if _is_unique_violation(e):
-            # sygnalizujemy do wyższej warstwy: wygeneruj inny token i spróbuj ponownie
             raise DuplicateTokenError("Token already exists") from e
         raise
 
@@ -89,13 +85,15 @@ def mark_sms_sent(sb: Client, sms_id: str, provider_message_id: str) -> None:
 
 def list_sms_for_study(sb: Client, study_id: str) -> List[Dict]:
     """
-    Zwraca listę rekordów SMS dla danego badania (najnowsze na górze).
+    Zwraca listę rekordów SMS dla danego badania (najnowsze na górze),
+    z widoku wzbogaconego o statusy/znaczniki czasu: sms_messages_with_status_v.
+    Uwaga: widok ma kolumnę created_at_pl (formatowany string) — po niej sortujemy.
     """
     res = (
-        sb.table("sms_messages")
+        sb.table("sms_messages_with_status_v")
         .select("*")
         .eq("study_id", study_id)
-        .order("created_at", desc=True)
+        .order("created_at_pl", desc=True)  # ⬅️ ważne: w widoku nie ma created_at
         .execute()
     )
     return res.data or []

@@ -7,7 +7,6 @@ import base64
 from datetime import datetime, timezone, timedelta
 import time  # ⬅️ do auto-odświeżania (sleep + rerun)
 
-'import body'
 import pandas as pd
 import streamlit as st
 import re
@@ -126,13 +125,17 @@ def _build_link(base_url: str, slug: str, token: str) -> str:
     return f"{base}/{s}?t={token}" if s else f"{base}/?t={token}"
 
 
-def _logs_dataframe(sb, study_id: str) -> pd.DataFrame:
+def _logs_dataframe(sb, study_id: str, cache_bust: Optional[int] = None) -> pd.DataFrame:
+    """
+    Buduje ramkę pod tabelę statusów.
+    cache_bust jest tu tylko po to, by podpis funkcji pasował do wywołań; nie używamy go.
+    """
     rows = list_sms_for_study(sb, study_id) or []
     out: List[Dict[str, str]] = []
     for r in rows:
         out.append(
             {
-                "Data": _fmt_dt(r.get("created_at")),
+                "Data": _fmt_dt(r.get("created_at") or r.get("created_at_pl")),
                 "Telefon": r.get("phone", ""),
                 "Status": _status_icon(r),
                 "Wysłano": "✓" if (r.get("status") or "").lower() in ("sent", "delivered") else "",
@@ -531,24 +534,27 @@ def render(back_btn: Callable[[], None]) -> None:
         unsafe_allow_html=True
     )
 
-    # 🔄 Ręczne i automatyczne odświeżanie (bez JS, bez experimental_set_query_params)
-    c1, c2 = st.columns([1, 5])
-    with c1:
+    # 🔄 Ręczne odświeżanie
+    col1, col2 = st.columns([1, 5])
+    with col1:
         if st.button("⟳ Odśwież statusy", key="refresh_sms"):
+            st.session_state["_sms_tick"] = st.session_state.get("_sms_tick", 0) + 1
             st.rerun()
-
-    with c2:
+    with col2:
         auto_refresh = st.checkbox("Auto-odśwież co 15 sekund", value=False, key="auto_refresh_sms")
-        if auto_refresh:
-            # prosty licznik w session_state, żadnego przeładowania strony
-            last = st.session_state.get("sms_last_refresh_ts", 0.0)
-            now = time.time()
-            st.caption("Auto-odświeżanie aktywne (co 15 s)")
-            if now - last >= 15:
-                st.session_state["sms_last_refresh_ts"] = now
-                st.rerun()
 
-    # 🔧 poprawiona kolejność ikon (failed > completed > started > clicked > delivered > sent > queued)
+    # --- pobranie danych (bez cache_bust; widok sam jest „świeży”) ---
+    df_logs = _logs_dataframe(sb, study_id=study["id"])
+
+    # stały zestaw kolumn + nazwy
+    from streamlit import column_config as cc
+    wanted_cols = ["Data","Telefon","Status","Wysłano","Kliknięto","Rozpoczęto","Zakończono","Błąd"]
+    for c in wanted_cols:
+        if c not in df_logs.columns:
+            df_logs[c] = ""
+    df_logs = df_logs[wanted_cols]
+
+    # poprawiona kolejność ikon: failed > completed > started > clicked > delivered > sent > queued
     def _status_icon_fixed(row: Dict) -> str:
         status = (row.get("status") or "").lower()
         if status == "failed":
@@ -560,45 +566,51 @@ def render(back_btn: Callable[[], None]) -> None:
         if row.get("clicked_at"):
             return "🔗"
         if status == "delivered":
-            return "📬"  # pojawi się tylko gdy provider zwróci „delivered”
+            return "📬"
         if status == "sent":
             return "📤"
         if status == "queued":
             return "⏳"
         return "•"
 
-    # pobranie danych
-    df_logs = _logs_dataframe(sb, study_id=study["id"])
-    # podmień kolumnę z ikoną na nową logikę (jeśli istnieje)
-    if not df_logs.empty and "Aktualny status" in df_logs.columns:
-        # odczytaj surowe rekordy jeszcze raz aby mieć oryginalne pola status/started/clicked etc.
-        raw_rows = list_sms_for_study(sb, study["id"]) or []
-        icons = []
-        for r in raw_rows:
-            icons.append(_status_icon_fixed(r))
-        # dopasuj długości (na wszelki wypadek)
-        if len(icons) == len(df_logs):
-            df_logs["Aktualny status"] = icons
+    # podmień kolumnę ikon wg surowych rekordów
+    raw_rows = list_sms_for_study(sb, study["id"]) or []
+    icons = [_status_icon_fixed(r) for r in raw_rows]
+    if len(icons) == len(df_logs):
+        df_logs["Status"] = icons
 
-    # tabela z szerokościami kolumn (small/medium/large to jedyne dostępne)
-    from streamlit import column_config as cc
+    # === WĄSKA, WYŚRODKOWANA TABELA ===
+    st.markdown(
+        """
+        <style>
+          .narrow-table {
+            max-width: 920px;   /* ← tu ustaw docelową szerokość tabeli */
+            margin: 0 auto;     /* wyśrodkowanie */
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="narrow-table">', unsafe_allow_html=True)
+
     st.dataframe(
         df_logs,
-        use_container_width=True,
-        hide_index=True,
+        hide_index=True,  # NIE używamy use_container_width, wtedy nie rozciąga się na 100%
         column_config={
-            "Data": cc.Column(width="large"),
+            "Data": cc.Column(width="medium"),
             "Telefon": cc.Column(width="small"),
-            "Aktualny status": cc.Column(width="small"),
+            "Status": cc.Column(width="small"),
             "Wysłano": cc.Column(width="small"),
-            "Kliknięto": cc.Column(width="large"),
-            "Rozpoczęto": cc.Column(width="large"),
-            "Zakończono": cc.Column(width="large"),
+            "Kliknięto": cc.Column(width="medium"),
+            "Rozpoczęto": cc.Column(width="medium"),
+            "Zakończono": cc.Column(width="medium"),
             "Błąd": cc.Column(width="small"),
         }
     )
 
-    # Legenda (większy odstęp po tytule)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Legenda + odstępy
     st.markdown("""
     <div style="margin-top:18px"></div>
     <div style="font-size:14px; line-height:1.6;">
@@ -614,3 +626,26 @@ def render(back_btn: Callable[[], None]) -> None:
     </div>
     <div style="margin-bottom:60px"></div>
     """, unsafe_allow_html=True)
+
+    # --- AUTO-REFRESH NA KOŃCU, po wyrenderowaniu tabeli ---
+    # stabilny zegar (niezależny od zmian czasu systemowego)
+    st.session_state.setdefault("_sms_last_refresh_mono", time.monotonic())
+    st.session_state.setdefault("_sms_auto_started", False)
+
+    if auto_refresh:
+        st.caption("Auto-odświeżanie aktywne (co 15 s)")
+        if not st.session_state["_sms_auto_started"]:
+            # pierwsze włączenie: uzbrój timer na teraz
+            st.session_state["_sms_auto_started"] = True
+            st.session_state["_sms_last_refresh_mono"] = time.monotonic()
+        else:
+            last = st.session_state["_sms_last_refresh_mono"]
+            now = time.monotonic()
+            if now - last >= 15:
+                st.session_state["_sms_last_refresh_mono"] = now
+                st.session_state["_sms_tick"] = st.session_state.get("_sms_tick", 0) + 1
+                st.rerun()
+    else:
+        # wyłączone — wyczyść stan „uzbrojenia”
+        st.session_state["_sms_auto_started"] = False
+

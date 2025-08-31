@@ -48,12 +48,12 @@ def render_sms_logs(studies: List[Dict]) -> None:
             {
                 "Data": _fmt(r.get("created_at")),
                 "Telefon": r.get("phone", ""),
-                "Aktualny status": icon,
+                "Status": icon,
                 "Kliknięto": _fmt(r.get("clicked_at")),
                 "Rozpoczęto": _fmt(r.get("started_at")),
                 "Zakończono": _fmt(r.get("completed_at")),
             }
         )
 
-    df = pd.DataFrame(data, columns=["Data", "Telefon", "Aktualny status", "Kliknięto", "Rozpoczęto", "Zakończono"])
+    df = pd.DataFrame(data, columns=["Data", "Telefon", "Status", "Kliknięto", "Rozpoczęto", "Zakończono"])
     st.dataframe(df, use_container_width=True, hide_index=True)
