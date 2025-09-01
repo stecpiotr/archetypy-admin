@@ -1075,9 +1075,11 @@ def fetch_studies_list():
     )
     df = pd.read_sql(
         """
-        SELECT id, first_name_nom, first_name_gen,
-               last_name_nom,  last_name_gen,
-               city_nom, slug
+        SELECT
+            id,
+            first_name_nom, first_name_gen, first_name_dat, first_name_acc, first_name_ins, first_name_loc, first_name_voc,
+            last_name_nom,  last_name_gen,  last_name_dat,  last_name_acc,  last_name_ins,  last_name_loc,  last_name_voc,
+            city_nom, slug
         FROM public.studies
         WHERE COALESCE(is_active, true)
         ORDER BY created_at DESC
@@ -1138,81 +1140,71 @@ import os
 def build_word_context(
     main_type, second_type, supplement_type, features, main, second, supplement,
     mean_scores=None, radar_image=None, archetype_table=None, num_ankiet=None,
-    personGen: str = "", personNom: str = ""
+    person: dict | None = None
 ):
+    """
+    person = {
+        "NOM": "Imię Nazwisko",
+        "GEN": "Imienia Nazwiska",
+        "DAT": "Imieniowi Nazwiskowi",
+        "ACC": "Imię Nazwisko",
+        "INS": "Imieniem Nazwiskiem",
+        "LOC": "o Imieniu Nazwisku",
+        "VOC": "Imieniu Nazwisku!",
+        "CITY_NOM": "Kraków"   # (opcjonalnie)
+    }
+    """
     COLOR_NAME_MAP = {
-        "#000000": "Czerń",
-        "#FFD700": "Złoto",
-        "#282C34": "Granat (antracyt)",
-        "#800020": "Burgund",
-        "#E10600": "Czerwień",
-        "#2E3141": "Grafitowy granat",
-        "#FFFFFF": "Biel",
-        "#4682B4": "Stalowy błękit",
-        "#B0C4DE": "Jasny niebieskoszary",
-        "#6C7A89": "Popielaty szary",
-        "#B4D6B4": "Miętowa zieleń",
-        "#A7C7E7": "Pastelowy błękit",
-        "#FFD580": "Pastelowy żółty / beżowy",
-        "#FA709A": "Róż malinowy",
-        "#FEE140": "Jasny żółty",
-        "#FFD6E0": "Bardzo jasny róż",
-        "#FFB300": "Mocna żółć",
-        "#FF8300": "Pomarańcz",
-        "#FFD93D": "Pastelowa żółć",
-        "#7C53C3": "Fiolet",
-        "#3BE8B0": "Miętowy cyjan",
-        "#87CEEB": "Błękit (Sky Blue)",
-        "#43C6DB": "Turkusowy błękit",
-        "#A0E8AF": "Seledyn",
-        "#F9D371": "Złocisty żółty",
-        "#8F00FF": "Fiolet (intensywny)",
-        "#181C3A": "Granat bardzo ciemny",
-        "#E0BBE4": "Pastelowy fiolet",
-        "#F9F9F9": "Biel bardzo jasna",
-        "#6CA0DC": "Pastelowy błękit",
-        "#A3C1AD": "Pastelowa zieleń",
-        "#FFF6C3": "Jasny kremowy",
-        "#AAC9CE": "Pastelowy niebieskoszary",
-        "#FFF200": "Żółty (cytrynowy)",
-        "#FF0000": "Czerwień intensywna",
-        "#FF6F61": "Łososiowy róż",
-        "#8C564B": "Ciemy brąz",
-        "#D62728": "Czerwień karmazynowa",
-        "#1F77B4": "Chabrowy",
-        "#9467BD": "Fiolet śliwkowy",
-        "#F2A93B": "Miodowy żółty",
-        "#17BECF": "Niebieski morski",
-        "#E377C2": "Pastelowy róż fioletowy",
-        "#7C46C5": "Fiolet szafirowy",
-        "#2CA02C": "Zieleń trawiasta",
-        "#9BD6F4": "Pastelowy błękit jasny",
-        "#FF7F0E": "Jaskrawy pomarańcz",
-        # Dodaj kolejne w razie potrzeby
+        "#000000": "Czerń", "#FFD700": "Złoto", "#282C34": "Granat (antracyt)",
+        "#800020": "Burgund", "#E10600": "Czerwień", "#2E3141": "Grafitowy granat",
+        "#FFFFFF": "Biel", "#4682B4": "Stalowy błękit", "#B0C4DE": "Jasny niebieskoszary",
+        "#6C7A89": "Popielaty szary", "#B4D6B4": "Miętowa zieleń", "#A7C7E7": "Pastelowy błękit",
+        "#FFD580": "Pastelowy żółty / beżowy", "#FA709A": "Róż malinowy", "#FEE140": "Jasny żółty",
+        "#FFD6E0": "Bardzo jasny róż", "#FFB300": "Mocna żółć", "#FF8300": "Pomarańcz",
+        "#FFD93D": "Pastelowa żółć", "#7C53C3": "Fiolet", "#3BE8B0": "Miętowy cyjan",
+        "#87CEEB": "Błękit (Sky Blue)", "#43C6DB": "Turkusowy błękit", "#A0E8AF": "Seledyn",
+        "#F9D371": "Złocisty żółty", "#8F00FF": "Fiolet (intensywny)", "#181C3A": "Granat bardzo ciemny",
+        "#E0BBE4": "Pastelowy fiolet", "#F9F9F9": "Biel bardzo jasna", "#6CA0DC": "Pastelowy błękit",
+        "#A3C1AD": "Pastelowa zieleń", "#FFF6C3": "Jasny kremowy", "#AAC9CE": "Pastelowy niebieskoszary",
+        "#FFF200": "Żółty (cytrynowy)", "#FF0000": "Czerwień intensywna", "#FF6F61": "Łososiowy róż",
+        "#8C564B": "Ciemy brąz", "#D62728": "Czerwień karmazynowa", "#1F77B4": "Chabrowy",
+        "#9467BD": "Fiolet śliwkowy", "#F2A93B": "Miodowy żółty", "#17BECF": "Niebieski morski",
+        "#E377C2": "Pastelowy róż fioletowy", "#7C46C5": "Fiolet szafirowy", "#2CA02C": "Zieleń trawiasta",
+        "#9BD6F4": "Pastelowy błękit jasny", "#FF7F0E": "Jaskrawy pomarańcz",
     }
 
-    def person_links_html(person_list):
-        if not person_list:
-            return ""
-        return ', '.join(person_link(name) for name in person_list)
+    person = person or {}
+    def p(key, fallback=""):
+        return (person.get(key) or fallback).strip()
 
     def person_links_plain(person_list):
-        return person_list  # czysta lista nazwisk, bez HTML
+        return person_list or []
 
     def kolor_label_list(palette):
         if not isinstance(palette, list):
             return ""
         out = []
         for code in palette:
-            name = COLOR_NAME_MAP.get(code.upper(), code).lower()  # ← tu dopisek .lower()
+            name = COLOR_NAME_MAP.get(code.upper(), code)
             out.append(f"{name} ({code})")
         return ', '.join(out)
 
     context = {
+        # ——— Meta
         "TYTUL": "Raport Archetypów",
-        "IMIE_NAZWISKO": personGen,
+        "IMIE_NAZWISKO": p("GEN") or p("NOM"),   # zgodność wsteczna
+        "IMIE_NAZWISKO_NOM": p("NOM"),
+        "IMIE_NAZWISKO_GEN": p("GEN"),
+        "IMIE_NAZWISKO_DAT": p("DAT"),
+        "IMIE_NAZWISKO_ACC": p("ACC"),
+        "IMIE_NAZWISKO_INST": p("INS"),
+        "IMIE_NAZWISKO_LOC": p("LOC"),
+        "IMIE_NAZWISKO_VOC": p("VOC"),
+        "CITY_NOM": p("CITY_NOM"),
         "AUTOR": "Piotr Stec",
         "DATA": datetime.now().strftime("%Y-%m-%d"),
+
+        # ——— Wstęp
         "WSTEP": zapobiegaj_wdowie(
             "Archetypy to uniwersalne wzorce osobowości, które od wieków pomagają ludziom rozumieć świat i budować autentyczną tożsamość. "
             "Współczesna psychologia i marketing potwierdzają, że trafnie zdefiniowany archetyp jest potężnym narzędziem komunikacji, pozwalającym budować rozpoznawalność, zaufanie i emocjonalny kontakt. Czas wykorzystać to także w polityce! "
@@ -1220,18 +1212,21 @@ def build_word_context(
             "Analiza archetypów pozwala lepiej zrozumieć sposób odbioru polityka przez otoczenie, a co się z tym wiąże także motywacje i aspiracje. "
             "Wyniki badań archetypowych stanowią istotny fundament do tworzenia skutecznej narracji wyborczej, strategii wizerunkowej i komunikacji z wyborcami.\n\n"
             "W modelu przez nas opracowanym wykorzystano klasyfikację Mark and Pearson, obejmującą 12 uniwersalnych typów osobowościowych. "
-            f"Raport przedstawia wyniki i profil archetypowy dla {personGen} w oparciu o dane z przeprowadzonego badania. "
-            "Badanie pozwoliło zidentyfikować archetyp główny i wspierający oraz trzeci – poboczny.\n\n"
-            "Dzięki analizie archetypów można precyzyjnie dopasować komunikację, podkreślić atuty i planować skuteczną strategię wizerunkową."
+            f"Raport przedstawia wyniki i profil archetypowy dla {p('GEN') or '—'} w oparciu o dane z przeprowadzonego badania. "
+            "Badanie to pozwoliło zidentyfikować archetyp główny i wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie. "
+            "Zaprezentowano także trzeci w kolejności ważności — archetyp poboczny.\n\n"
+            "Dzięki analizie archetypów można precyzyjnie dopasować komunikację do oczekiwań wyborców, podkreślić atuty, a także przewidzieć skuteczność strategii politycznej w dynamicznym środowisku publicznym. "
         ),
+
+        # ——— Tabela + radar + liczebność
         "TABELA_LICZEBNOSCI": archetype_table.to_dict('records') if archetype_table is not None else [],
         "RADAR_IMG": radar_image if radar_image is not None else "",
-        # --- NOWOŚĆ: liczebność osób ---
         "LICZEBNOSC_OSOB": (
             f"W badaniu udział wzięło {num_ankiet} {'osób' if (num_ankiet is None or num_ankiet != 1) else 'osoba'}."
             if num_ankiet is not None else ""
         ),
-        # --- GŁÓWNY ARCHETYP ---
+
+        # ——— Główny / wspierający / poboczny (bez zmian merytorycznych)
         "ARCHETYPE_MAIN_NAME": main.get("name") or "",
         "ARCHETYPE_MAIN_TAGLINE": main.get("tagline") or "",
         "ARCHETYPE_MAIN_DESC": main.get("description") or "",
@@ -1248,7 +1243,7 @@ def build_word_context(
         "ARCHETYPE_MAIN_KEYWORDS": main.get("keyword_messaging") or [],
         "ARCHETYPE_MAIN_SLOGANS": main.get("watchword") or [],
         "ARCHETYPE_MAIN_QUESTIONS": main.get("questions") or [],
-        # --- ARCHETYP WSPIERAJĄCY ---
+
         "ARCHETYPE_AUX_NAME": second.get("name") or "",
         "ARCHETYPE_AUX_TAGLINE": second.get("tagline") or "",
         "ARCHETYPE_AUX_DESC": second.get("description") or "",
@@ -1265,7 +1260,7 @@ def build_word_context(
         "ARCHETYPE_AUX_KEYWORDS": second.get("keyword_messaging") or [],
         "ARCHETYPE_AUX_SLOGANS": second.get("watchword") or [],
         "ARCHETYPE_AUX_QUESTIONS": second.get("questions") or [],
-        # --- ARCHETYP POBOCZNY ---
+
         "ARCHETYPE_SUPPLEMENT_NAME": supplement.get("name") or "",
         "ARCHETYPE_SUPPLEMENT_TAGLINE": supplement.get("tagline") or "",
         "ARCHETYPE_SUPPLEMENT_DESC": supplement.get("description") or "",
@@ -1283,7 +1278,6 @@ def build_word_context(
         "ARCHETYPE_SUPPLEMENT_SLOGANS": supplement.get("watchword") or [],
         "ARCHETYPE_SUPPLEMENT_QUESTIONS": supplement.get("questions") or [],
     }
-
     return context
 
 def export_word_docxtpl(
@@ -1299,29 +1293,27 @@ def export_word_docxtpl(
     archetype_table=None,
     num_ankiet=None,
     panel_img_path=None,
-    personGen: str = "",
-    personNom: str = ""
+    person: dict | None = None
 ):
-
     doc = DocxTemplate(TEMPLATE_PATH)
 
     # Radar image
     if radar_img_path and os.path.exists(radar_img_path):
-        radar_image = InlineImage(doc, radar_img_path, width=Mm(150))
+        radar_image = InlineImage(doc, radar_img_path, width=Mm(140))
     else:
         radar_image = ""
 
     # Panel image
     panel_image = InlineImage(doc, panel_img_path, width=Mm(140)) if panel_img_path and os.path.exists(panel_img_path) else ""
 
-    # UWAGA: przekazujemy wszystkie 3 archetypy oraz osobę
+    # ——— najważniejsze: przekaż person →
     context = build_word_context(
         main_type, second_type, supplement_type, features, main, second, supplement,
         mean_scores, radar_image, archetype_table, num_ankiet,
-        personGen=personGen, personNom=personNom
+        person=person
     )
 
-    # Najważniejsze! Przekaż doc do build_brands_for_word!
+    # Logotypy do Worda
     context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
     context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
     context["ARCHETYPE_SUPPLEMENT_BRANDS_IMG"] = build_brands_for_word(doc, supplement.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
@@ -1330,7 +1322,7 @@ def export_word_docxtpl(
 
     doc.render(context)
 
-    # --- TU WSTAW PĘTLĘ PODMIENIAJĄCĄ NAZWISKA NA LINKI ---
+    # (opcja) hiperłącza do osób – jak było
     for para in doc.paragraphs:
         for name, url in person_wikipedia_links.items():
             if name in para.text:
@@ -1341,7 +1333,6 @@ def export_word_docxtpl(
     doc.save(buf)
     buf.seek(0)
     return buf
-
 
 def word_to_pdf(docx_bytes_io):
     import sys
@@ -1626,9 +1617,35 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
     # personalizacja z przekazanego rekordu
     personNom = f"{study.get('first_name_nom') or study.get('first_name','')} {study.get('last_name_nom') or study.get('last_name','')}".strip()
     personGen = f"{study.get('first_name_gen') or (study.get('first_name_nom') or study.get('first_name',''))} {study.get('last_name_gen') or (study.get('last_name_nom') or study.get('last_name',''))}".strip()
+
+    # ⬇️ NOWE – wszystkie pozostałe przypadki
+    def _join(a, b):
+        return f"{(a or '').strip()} {(b or '').strip()}".strip()
+
+    personDat  = _join(study.get("first_name_dat"),  study.get("last_name_dat"))
+    personAcc  = _join(study.get("first_name_acc"),  study.get("last_name_acc"))
+    personInst = _join(study.get("first_name_ins"),  study.get("last_name_ins"))
+    personLoc  = _join(study.get("first_name_loc"),  study.get("last_name_loc"))
+    personVoc  = _join(study.get("first_name_voc"),  study.get("last_name_voc"))
+
     study_id = study["id"]
 
     data = load(study_id)
+
+    # ❗️ZBIERAMY WSZYSTKIE PRZYPADKI DO SŁOWNIKA DLA WORDA
+    person = {
+        "NOM": personNom,
+        "GEN": personGen,
+        "DAT": personDat,
+        "ACC": personAcc,
+        "INS": personInst,
+        "LOC": personLoc,
+        "VOC": personVoc,
+        "CITY_NOM": (study.get("city_nom") or "").strip(),
+    }
+
+    # ... tu dalej Twój kod (generowanie wykresów, budowanie contextu itd.)
+
     num_ankiet = len(data) if not data.empty else 0
 
     header_col1, header_col2 = st.columns([0.77, 0.23])
@@ -1923,8 +1940,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 archetype_table=archetype_table,
                 num_ankiet=num_ankiet,
                 panel_img_path=panel_img_path,
-                personGen=personGen,
-                personNom=personNom,
+                person=person,
             )
             pdf_buf = word_to_pdf(docx_buf)
 
