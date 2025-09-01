@@ -323,7 +323,7 @@ def home_view() -> None:
 
     # 🔽 linia oddzielająca kafle od statystyk
     st.markdown(
-        "<hr style='border:0; border-top:1px solid #E6E9EE; margin:40px 0;'>",
+        "<hr style='border:0; border-top:1px solid #E6E9EE; margin:30px 0;'>",
         unsafe_allow_html=True)
 
     # panel statystyk
@@ -506,15 +506,15 @@ def stats_panel() -> None:
         card = st.container(border=True)
         with card:
             # pionowe paddingi wewnątrz ramki
-            st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
 
             # (opcjonalnie) minimalny „gutter” lewo/prawo dla treści
-            gL, body, gR = st.columns([1, 20, 1], gap="small")
+            gL, body, gR = st.columns([1, 30, 1], gap="small")
             with body:
                 # tytuł
                 st.markdown(
                     "<div style='font-weight:700; font-size:25px; "
-                    "margin:25px 0 60px 0; padding-bottom:8px; "
+                    "margin:5px 0 45px 0; padding-bottom:8px; "
                     "border-bottom:1px solid #E6E9EE;'>Statystyki</div>",
                     unsafe_allow_html=True
                 )
@@ -556,7 +556,7 @@ def results_view() -> None:
 
     if "wide_report" not in st.session_state: st.session_state["wide_report"] = True
     wide = st.toggle("Szeroki raport", key="wide_report")
-    st.markdown(f"<style>.block-container{{max-width:{'90vw' if wide else '1160px'} !important}}</style>", unsafe_allow_html=True)
+    st.markdown(f"<style>.block-container{{max-width:{'97vw' if wide else '1160px'} !important}}</style>", unsafe_allow_html=True)
 
     try:
         import admin_dashboard as AD

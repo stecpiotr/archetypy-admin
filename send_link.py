@@ -68,22 +68,20 @@ def _strip_pl_diacritics(text: str) -> str:
 
 
 def _fmt_dt(val: Optional[str]) -> str:
-    """ISO → 'YYYY-MM-DD HH:MM:SS' (próba konwersji; puste gdy None)."""
+    """Na wejściu ISO; jeśli ma strefę – konwersja do Europe/Warsaw,
+    jeśli jest 'naive' (bez strefy) – traktuj jako już lokalny i tylko sformatuj."""
     if not val:
         return ""
     try:
-        ts = pd.to_datetime(val, utc=True, errors="coerce")
+        ts = pd.to_datetime(val, errors="coerce", utc=False)
         if pd.isna(ts):
             return ""
-        return ts.tz_convert("Europe/Warsaw").strftime("%Y-%m-%d %H:%M:%S")
+        # tylko gdy jest strefowy (tz-aware), konwertuj do PL
+        if getattr(ts, "tz", None) is not None:
+            ts = ts.tz_convert("Europe/Warsaw")
+        return ts.strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
-        try:
-            ts = pd.to_datetime(val, errors="coerce")
-            if pd.isna(ts):
-                return ""
-            return ts.strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            return str(val)
+        return str(val)
 
 
 def _status_icon(row: Dict) -> str:
@@ -534,27 +532,31 @@ def render(back_btn: Callable[[], None]) -> None:
         unsafe_allow_html=True
     )
 
-    # 🔄 Ręczne odświeżanie
+    # 🔄 Ręczne + auto odświeżanie
     col1, col2 = st.columns([1, 5])
     with col1:
         if st.button("⟳ Odśwież statusy", key="refresh_sms"):
             st.session_state["_sms_tick"] = st.session_state.get("_sms_tick", 0) + 1
             st.rerun()
     with col2:
-        auto_refresh = st.checkbox("Auto-odśwież co 15 sekund", value=False, key="auto_refresh_sms")
+        auto_refresh = st.checkbox(
+            "Auto-odśwież co 15 sekund",
+            value=st.session_state.get("auto_refresh_sms", False),
+            key="auto_refresh_sms",
+        )
 
     # --- pobranie danych (bez cache_bust; widok sam jest „świeży”) ---
     df_logs = _logs_dataframe(sb, study_id=study["id"])
 
     # stały zestaw kolumn + nazwy
     from streamlit import column_config as cc
-    wanted_cols = ["Data","Telefon","Status","Wysłano","Kliknięto","Rozpoczęto","Zakończono","Błąd"]
+    wanted_cols = ["Data", "Telefon", "Status", "Wysłano", "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
     for c in wanted_cols:
         if c not in df_logs.columns:
             df_logs[c] = ""
     df_logs = df_logs[wanted_cols]
 
-    # poprawiona kolejność ikon: failed > completed > started > clicked > delivered > sent > queued
+    # poprawiona kolejność ikon
     def _status_icon_fixed(row: Dict) -> str:
         status = (row.get("status") or "").lower()
         if status == "failed":
@@ -573,7 +575,6 @@ def render(back_btn: Callable[[], None]) -> None:
             return "⏳"
         return "•"
 
-    # podmień kolumnę ikon wg surowych rekordów
     raw_rows = list_sms_for_study(sb, study["id"]) or []
     icons = [_status_icon_fixed(r) for r in raw_rows]
     if len(icons) == len(df_logs):
@@ -584,8 +585,8 @@ def render(back_btn: Callable[[], None]) -> None:
         """
         <style>
           .narrow-table {
-            max-width: 920px;   /* ← tu ustaw docelową szerokość tabeli */
-            margin: 0 auto;     /* wyśrodkowanie */
+            max-width: 920px;
+            margin: 0 auto;
           }
         </style>
         """,
@@ -595,7 +596,7 @@ def render(back_btn: Callable[[], None]) -> None:
 
     st.dataframe(
         df_logs,
-        hide_index=True,  # NIE używamy use_container_width, wtedy nie rozciąga się na 100%
+        hide_index=True,  # nie używamy use_container_width
         column_config={
             "Data": cc.Column(width="medium"),
             "Telefon": cc.Column(width="small"),
@@ -605,9 +606,8 @@ def render(back_btn: Callable[[], None]) -> None:
             "Rozpoczęto": cc.Column(width="medium"),
             "Zakończono": cc.Column(width="medium"),
             "Błąd": cc.Column(width="small"),
-        }
+        },
     )
-
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Legenda + odstępy
@@ -627,25 +627,9 @@ def render(back_btn: Callable[[], None]) -> None:
     <div style="margin-bottom:60px"></div>
     """, unsafe_allow_html=True)
 
-    # --- AUTO-REFRESH NA KOŃCU, po wyrenderowaniu tabeli ---
-    # stabilny zegar (niezależny od zmian czasu systemowego)
-    st.session_state.setdefault("_sms_last_refresh_mono", time.monotonic())
-    st.session_state.setdefault("_sms_auto_started", False)
-
+    # --- AUTO-REFRESH NA KOŃCU: realny impuls (sleep → rerun) ---
     if auto_refresh:
         st.caption("Auto-odświeżanie aktywne (co 15 s)")
-        if not st.session_state["_sms_auto_started"]:
-            # pierwsze włączenie: uzbrój timer na teraz
-            st.session_state["_sms_auto_started"] = True
-            st.session_state["_sms_last_refresh_mono"] = time.monotonic()
-        else:
-            last = st.session_state["_sms_last_refresh_mono"]
-            now = time.monotonic()
-            if now - last >= 15:
-                st.session_state["_sms_last_refresh_mono"] = now
-                st.session_state["_sms_tick"] = st.session_state.get("_sms_tick", 0) + 1
-                st.rerun()
-    else:
-        # wyłączone — wyczyść stan „uzbrojenia”
-        st.session_state["_sms_auto_started"] = False
-
+        time.sleep(15)
+        st.session_state["_sms_tick"] = st.session_state.get("_sms_tick", 0) + 1
+        st.rerun()

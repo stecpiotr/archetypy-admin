@@ -1,3 +1,5 @@
+# admin_dashboard.py - raporty archetypów
+
 import pandas as pd
 import streamlit as st
 import psycopg2
@@ -203,7 +205,7 @@ def zapobiegaj_wdowie(text):
 
 import cairosvg
 
-st.set_page_config(page_title="Archetypy – panel administratora", layout="wide")
+# (page_config usunięty – ustawiany w app.py)
 
 COLOR_NAME_MAP = {
         "#000000": "czerń",
@@ -1135,7 +1137,8 @@ import os
 
 def build_word_context(
     main_type, second_type, supplement_type, features, main, second, supplement,
-    mean_scores=None, radar_image=None, archetype_table=None, num_ankiet=None
+    mean_scores=None, radar_image=None, archetype_table=None, num_ankiet=None,
+    personGen: str = "", personNom: str = ""
 ):
     COLOR_NAME_MAP = {
         "#000000": "Czerń",
@@ -1201,7 +1204,7 @@ def build_word_context(
             return ""
         out = []
         for code in palette:
-            name = COLOR_NAME_MAP.get(code.upper(), code)
+            name = COLOR_NAME_MAP.get(code.upper(), code).lower()  # ← tu dopisek .lower()
             out.append(f"{name} ({code})")
         return ', '.join(out)
 
@@ -1217,9 +1220,9 @@ def build_word_context(
             "Analiza archetypów pozwala lepiej zrozumieć sposób odbioru polityka przez otoczenie, a co się z tym wiąże także motywacje i aspiracje. "
             "Wyniki badań archetypowych stanowią istotny fundament do tworzenia skutecznej narracji wyborczej, strategii wizerunkowej i komunikacji z wyborcami.\n\n"
             "W modelu przez nas opracowanym wykorzystano klasyfikację Mark and Pearson, obejmującą 12 uniwersalnych typów osobowościowych. "
-            "Raport przedstawia wyniki i profil archetypowy dla Marcina Gołka w oparciu o dane z przeprowadzonego badania. "
-            "Badanie to pozwoliło zidentyfikować archetyp główny i wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie w walce o urząd Prezydenta Poznania. Zaprezentowano także trzeci w kolejności ważności - archetyp poboczny.\n\n"
-            "Dzięki analizie archetypów można precyzyjnie dopasować komunikację do oczekiwań wyborców, podkreślić atuty, a także przewidzieć skuteczność strategii politycznej w dynamicznym środowisku publicznym. "
+            f"Raport przedstawia wyniki i profil archetypowy dla {personGen} w oparciu o dane z przeprowadzonego badania. "
+            "Badanie pozwoliło zidentyfikować archetyp główny i wspierający oraz trzeci – poboczny.\n\n"
+            "Dzięki analizie archetypów można precyzyjnie dopasować komunikację, podkreślić atuty i planować skuteczną strategię wizerunkową."
         ),
         "TABELA_LICZEBNOSCI": archetype_table.to_dict('records') if archetype_table is not None else [],
         "RADAR_IMG": radar_image if radar_image is not None else "",
@@ -1295,7 +1298,9 @@ def export_word_docxtpl(
     radar_img_path=None,
     archetype_table=None,
     num_ankiet=None,
-    panel_img_path=None
+    panel_img_path=None,
+    personGen: str = "",
+    personNom: str = ""
 ):
 
     doc = DocxTemplate(TEMPLATE_PATH)
@@ -1309,10 +1314,11 @@ def export_word_docxtpl(
     # Panel image
     panel_image = InlineImage(doc, panel_img_path, width=Mm(140)) if panel_img_path and os.path.exists(panel_img_path) else ""
 
-    # UWAGA: przekazujemy wszystkie 3 archetypy
+    # UWAGA: przekazujemy wszystkie 3 archetypy oraz osobę
     context = build_word_context(
         main_type, second_type, supplement_type, features, main, second, supplement,
-        mean_scores, radar_image, archetype_table, num_ankiet
+        mean_scores, radar_image, archetype_table, num_ankiet,
+        personGen=personGen, personNom=personNom
     )
 
     # Najważniejsze! Przekaż doc do build_brands_for_word!
@@ -1616,374 +1622,376 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
 
 # ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
 
-# ── WYBÓR BADANIA / OSOBY ──────────────────────────────────────────────
-studies_df = fetch_studies_list()
-if studies_df.empty:
-    st.warning("Brak badań w bazie.")
-    st.stop()
+def show_report(sb, study: dict, wide: bool = True) -> None:
+    # personalizacja z przekazanego rekordu
+    personNom = f"{study.get('first_name_nom') or study.get('first_name','')} {study.get('last_name_nom') or study.get('last_name','')}".strip()
+    personGen = f"{study.get('first_name_gen') or (study.get('first_name_nom') or study.get('first_name',''))} {study.get('last_name_gen') or (study.get('last_name_nom') or study.get('last_name',''))}".strip()
+    study_id = study["id"]
 
-labels = [
-    f"{row.first_name_nom} {row.last_name_nom} ({row.city_nom}) – /{row.slug}"
-    for _, row in studies_df.iterrows()
-]
-sel = st.selectbox("Wybierz osobę/JST", options=labels)
-sel_row = studies_df.iloc[labels.index(sel)]
+    data = load(study_id)
+    num_ankiet = len(data) if not data.empty else 0
 
-personNom = f"{sel_row.first_name_nom} {sel_row.last_name_nom}"
-personGen = f"{sel_row.first_name_gen} {sel_row.last_name_gen}"
-study_id = sel_row.id
+    header_col1, header_col2 = st.columns([0.77, 0.23])
+    with header_col1:
+        st.markdown(
+            f"""
+            <div style="font-size:2.3em; font-weight:bold; background:#1a93e3; color:#fff; 
+                padding:14px 32px 10px 24px; border-radius:2px; width:fit-content; display:inline-block;">
+                Archetypy {personGen} – panel administratora
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with header_col2:
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;justify-content:flex-end;height:100%;"><div style="font-size:1.23em;text-align:right;background:#f3f3fa;padding:12px 29px 8px 29px; border-radius:17px; border:2px solid #d1d9ed;color:#195299;font-weight:600;box-shadow:0 2px 10px 0 #b5c9e399;">
+            <span style="font-size:1.8em;font-weight:bold;">{num_ankiet}</span><br/>uczestników badania
+        </div></div>
+        """, unsafe_allow_html=True)
 
-
-data = load(study_id)
-num_ankiet = len(data) if not data.empty else 0
-
-header_col1, header_col2 = st.columns([0.77, 0.23])
-with header_col1:
     st.markdown("""
-    <div style="font-size:2.3em; font-weight:bold; background:#1a93e3; color:#fff; 
-        padding:14px 32px 10px 24px; border-radius:2px; width:fit-content; display:inline-block;">
-        Archetypy Marcina Gołka – panel administratora
-    </div>
-    """, unsafe_allow_html=True)
-with header_col2:
-    st.markdown(f"""
-    <div style="display:flex;align-items:center;justify-content:flex-end;height:100%;"><div style="font-size:1.23em;text-align:right;background:#f3f3fa;padding:12px 29px 8px 29px; border-radius:17px; border:2px solid #d1d9ed;color:#195299;font-weight:600;box-shadow:0 2px 10px 0 #b5c9e399;">
-        <span style="font-size:1.8em;font-weight:bold;">{num_ankiet}</span><br/>uczestników badania
-    </div></div>
+    <hr style="height:1.3px;background:#eaeaec; margin-top:1.8em; margin-bottom:3.8em; border:none;" />
     """, unsafe_allow_html=True)
 
-st.markdown("""
-<hr style="height:1.3px;background:#eaeaec; margin-top:1.8em; margin-bottom:3.8em; border:none;" />
-""", unsafe_allow_html=True)
+    # --- Analiza respondentów i agregacja ---
 
-# --- Analiza respondentów i agregacja ---
+    if "answers" in data.columns and not data.empty:
 
-if "answers" in data.columns and not data.empty:
+        results = []
 
-    results = []
+        for idx, row in data.iterrows():
 
-    for idx, row in data.iterrows():
+            if not isinstance(row.get("answers", None), list):
+                continue
 
-        if not isinstance(row.get("answers", None), list):
-            continue
+            arcsums = archetype_scores(row["answers"])
+            arcper = {k: archetype_percent(v) for k, v in arcsums.items()}
 
-        arcsums = archetype_scores(row["answers"])
-        arcper = {k: archetype_percent(v) for k, v in arcsums.items()}
+            main_type, second_type, supplement_type = pick_top_3_archetypes(arcsums, ARCHE_NAMES_ORDER)
+            main = archetype_extended.get(main_type, {})
+            second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
+            supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
 
-        main_type, second_type, supplement_type = pick_top_3_archetypes(arcsums, ARCHE_NAMES_ORDER)
-        main = archetype_extended.get(main_type, {})
-        second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
-        supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
+            czas_ankiety = ""
+            if pd.notna(row.get("created_at", None)):
+                try:
+                    czas_ankiety = row["created_at"].astimezone(pytz.timezone('Europe/Warsaw')).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    czas_ankiety = row["created_at"].strftime('%Y-%m-%d %H:%M:%S')
 
-        czas_ankiety = ""
-        if pd.notna(row.get("created_at", None)):
-            try:
-                czas_ankiety = row["created_at"].astimezone(pytz.timezone('Europe/Warsaw')).strftime('%Y-%m-%d %H:%M:%S')
-            except Exception:
-                czas_ankiety = row["created_at"].strftime('%Y-%m-%d %H:%M:%S')
-
-        results.append({
-            "Czas ankiety": czas_ankiety,
-            **arcsums,
-            **{f"{k}_%": v for k, v in arcper.items()},
-            "Główny archetyp": main_type,
-            "Cechy kluczowe": archetype_features.get(main_type, ""),
-            "Opis": main.get("description", ""),
-            "Storyline": main.get("storyline", ""),
-            "Rekomendacje": "\n".join(main.get("recommendations", [])),
-            "Archetyp wspierający": second_type if second_type != main_type else "",
-            "Cechy wspierający": archetype_features.get(second_type, "") if second_type != main_type else "",
-            "Opis wspierający": second.get("description", "") if second_type != main_type else "",
-            "Storyline wspierający": second.get("storyline", "") if second_type != main_type else "",
-            "Rekomendacje wspierający": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
-            "Archetyp poboczny": supplement_type if supplement_type not in [main_type, second_type] else "",
-            "Cechy poboczny": archetype_features.get(supplement_type, "") if supplement_type not in [main_type, second_type] else "",
-            "Opis poboczny": supplement.get("description", "") if supplement_type not in [main_type, second_type] else "",
-            "Storyline poboczny": supplement.get("storyline", "") if supplement_type not in [main_type, second_type] else "",
-            "Rekomendacje poboczny": "\n".join(supplement.get("recommendations", [])) if supplement_type not in [main_type, second_type] else "",
-        })
-
-    results_df = pd.DataFrame(results)
-
-    if not results_df.empty and "Czas ankiety" in results_df.columns:
-
-        results_df = results_df.sort_values("Czas ankiety", ascending=True)
-
-        st.markdown('<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów Marcina Gołka</div>', unsafe_allow_html=True)
-
-        archetype_names = ARCHE_NAMES_ORDER
-
-        counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
-        counts_aux = results_df['Archetyp wspierający'].value_counts().reindex(archetype_names, fill_value=0)
-
-        mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
-
-        main_type, second_type, supplement_type = pick_top_3_archetypes(mean_archetype_scores, archetype_names)
-        main = archetype_extended.get(main_type, {})
-        second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
-        supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
-
-        col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
-
-        with col1:
-            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, wspierających i pobocznych</div>', unsafe_allow_html=True)
-            archetype_table = pd.DataFrame({
-                "Archetyp": [f"{get_emoji(n)} {n}" for n in archetype_names],
-                "Główny archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in archetype_names],
-                "Wspierający archetyp": [zero_to_dash(counts_aux.get(normalize(k), 0)) for k in archetype_names],
-                "Poboczny archetyp": [
-                    zero_to_dash(
-                        results_df['Archetyp poboczny'].map(normalize)
-                        .value_counts().reindex(archetype_names, fill_value=0).get(normalize(k), 0)
-                    ) for k in archetype_names
-                ]
+            results.append({
+                "Czas ankiety": czas_ankiety,
+                **arcsums,
+                **{f"{k}_%": v for k, v in arcper.items()},
+                "Główny archetyp": main_type,
+                "Cechy kluczowe": archetype_features.get(main_type, ""),
+                "Opis": main.get("description", ""),
+                "Storyline": main.get("storyline", ""),
+                "Rekomendacje": "\n".join(main.get("recommendations", [])),
+                "Archetyp wspierający": second_type if second_type != main_type else "",
+                "Cechy wspierający": archetype_features.get(second_type, "") if second_type != main_type else "",
+                "Opis wspierający": second.get("description", "") if second_type != main_type else "",
+                "Storyline wspierający": second.get("storyline", "") if second_type != main_type else "",
+                "Rekomendacje wspierający": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
+                "Archetyp poboczny": supplement_type if supplement_type not in [main_type, second_type] else "",
+                "Cechy poboczny": archetype_features.get(supplement_type, "") if supplement_type not in [main_type, second_type] else "",
+                "Opis poboczny": supplement.get("description", "") if supplement_type not in [main_type, second_type] else "",
+                "Storyline poboczny": supplement.get("storyline", "") if supplement_type not in [main_type, second_type] else "",
+                "Rekomendacje poboczny": "\n".join(supplement.get("recommendations", [])) if supplement_type not in [main_type, second_type] else "",
             })
-            archetype_table_html = archetype_table.to_html(escape=False, index=False)
-            archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
-            archetype_table_html = archetype_table_html.replace('<td>', '<td style="text-align:center">')
-            def align_first_column_to_left_with_width(html):
-                html = re.sub(
-                    r'(<tr[^>]*>)(\s*<td style="text-align:center">)',
-                    lambda m: m.group(1) + m.group(2).replace('text-align:center', 'text-align:left;width:24%;'), html
-                )
-                html = html.replace(
-                    '<th style="text-align:center">Archetyp</th>',
-                    '<th style="text-align:center;width:24%;">Archetyp</th>'
-                ).replace(
-                    '<th style="text-align:center">Główny archetyp</th>',
-                    '<th style="text-align:center;width:18%;">Główny archetyp</th>'
-                ).replace(
-                    '<th style="text-align:center">Wspierający archetyp</th>',
-                    '<th style="text-align:center;width:18%;">Wspierający archetyp</th>'
-                ).replace(
-                    '<th style="text-align:center">Poboczny archetyp</th>',
-                    '<th style="text-align:center;width:18%;">Poboczny archetyp</th>'
-                )
-                html = re.sub(
-                    r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
-                    r'(\s*<td style="text-align:center">)',
-                    r'<tr>\1<td style="text-align:center;width:18%">', html
-                )
-                html = re.sub(
-                    r'(<td style="text-align:center;width:18%">.*?</td>)'
-                    r'(\s*<td style="text-align:center">)',
-                    r'\1<td style="text-align:center;width:18%">', html
-                )
-                return html
-            archetype_table_html = align_first_column_to_left_with_width(archetype_table_html)
-            archetype_table_html = archetype_table_html.replace(
-                '<table ',
-                '<table style="margin-left:0px;margin-right:0px;width:99%;" '
-            )
-            st.markdown(archetype_table_html, unsafe_allow_html=True)
 
-        with col2:
-            theta_labels = []
-            for n in archetype_names:
-                if n == main_type:
-                    theta_labels.append(f"<b><span style='color:red;'>{n}</span></b>")
-                elif n == second_type:
-                    theta_labels.append(f"<b><span style='color:#FFD22F;'>{n}</span></b>")
-                elif n == supplement_type:
-                    theta_labels.append(f"<b><span style='color:#40b900;'>{n}</span></b>")
-                else:
-                    theta_labels.append(f"<span style='color:#656565;'>{n}</span>")
-            highlight_r = []
-            highlight_marker_color = []
-            for i, name in enumerate(archetype_names):
-                if name == main_type:
-                    highlight_r.append(mean_archetype_scores[name])
-                    highlight_marker_color.append("red")
-                elif name == second_type:
-                    highlight_r.append(mean_archetype_scores[name])
-                    highlight_marker_color.append("#FFD22F")
-                elif name == supplement_type:
-                    highlight_r.append(mean_archetype_scores[name])
-                    highlight_marker_color.append("#40b900")
-                else:
-                    highlight_r.append(None)
-                    highlight_marker_color.append("rgba(0,0,0,0)")
-            st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px; text-align:center;">Profil archetypów Marcina Gołka</div>', unsafe_allow_html=True)
-            fig = go.Figure(
-                data=[
-                    go.Scatterpolar(
-                        r=list(mean_archetype_scores.values()) + [list(mean_archetype_scores.values())[0]],
-                        theta=archetype_names + [archetype_names[0]],
-                        fill='toself',
-                        name='Średnia wszystkich',
-                        line=dict(color="royalblue", width=3),
-                        marker=dict(size=6)
-                    ),
-                    go.Scatterpolar(
-                        r=highlight_r,
-                        theta=archetype_names,
-                        mode='markers',
-                        marker=dict(size=18, color=highlight_marker_color, opacity=0.95, line=dict(color="black", width=2)),
-                        name='Archetyp główny/wspierający/poboczny',
-                        showlegend=False,
+        results_df = pd.DataFrame(results)
+
+        if not results_df.empty and "Czas ankiety" in results_df.columns:
+
+            results_df = results_df.sort_values("Czas ankiety", ascending=True)
+
+            st.markdown(f'<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów {personGen}</div>', unsafe_allow_html=True)
+
+            archetype_names = ARCHE_NAMES_ORDER
+
+            counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
+            counts_aux = results_df['Archetyp wspierający'].value_counts().reindex(archetype_names, fill_value=0)
+
+            mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
+
+            main_type, second_type, supplement_type = pick_top_3_archetypes(mean_archetype_scores, archetype_names)
+            main = archetype_extended.get(main_type, {})
+            second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
+            supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
+
+            col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
+
+            with col1:
+                st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, wspierających i pobocznych</div>', unsafe_allow_html=True)
+                archetype_table = pd.DataFrame({
+                    "Archetyp": [f"{get_emoji(n)} {n}" for n in archetype_names],
+                    "Główny archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in archetype_names],
+                    "Wspierający archetyp": [zero_to_dash(counts_aux.get(normalize(k), 0)) for k in archetype_names],
+                    "Poboczny archetyp": [
+                        zero_to_dash(
+                            results_df['Archetyp poboczny'].map(normalize)
+                            .value_counts().reindex(archetype_names, fill_value=0).get(normalize(k), 0)
+                        ) for k in archetype_names
+                    ]
+                })
+                archetype_table_html = archetype_table.to_html(escape=False, index=False)
+                archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
+                archetype_table_html = archetype_table_html.replace('<td>', '<td style="text-align:center">')
+                def align_first_column_to_left_with_width(html):
+                    html = re.sub(
+                        r'(<tr[^>]*>)(\s*<td style="text-align:center")',
+                        lambda m: m.group(1) + m.group(2).replace('text-align:center', 'text-align:left;width:24%;"'), html
                     )
-                ],
-                layout=go.Layout(
-                    polar=dict(
-                        radialaxis=dict(visible=True, range=[0, 20]),
-                        angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels)
-                    ),
-                    width=550, height=550,
-                    margin=dict(l=20, r=20, t=32, b=32),
-                    showlegend=False
+                    html = html.replace(
+                        '<th style="text-align:center">Archetyp</th>',
+                        '<th style="text-align:center;width:24%;">Archetyp</th>'
+                    ).replace(
+                        '<th style="text-align:center">Główny archetyp</th>',
+                        '<th style="text-align:center;width:18%;">Główny archetyp</th>'
+                    ).replace(
+                        '<th style="text-align:center">Wspierający archetyp</th>',
+                        '<th style="text-align:center;width:18%;">Wspierający archetyp</th>'
+                    ).replace(
+                        '<th style="text-align:center">Poboczny archetyp</th>',
+                        '<th style="text-align:center;width:18%;">Poboczny archetyp</th>'
+                    )
+                    html = re.sub(
+                        r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
+                        r'(\s*<td style="text-align:center">)',
+                        r'<tr>\1<td style="text-align:center;width:18%">', html
+                    )
+                    html = re.sub(
+                        r'(<td style="text-align:center;width:18%">.*?</td>)'
+                        r'(\s*<td style="text-align:center">)',
+                        r'\1<td style="text-align:center;width:18%">', html
+                    )
+                    return html
+                archetype_table_html = align_first_column_to_left_with_width(archetype_table_html)
+                archetype_table_html = archetype_table_html.replace(
+                    '<table ',
+                    '<table style="margin-left:0px;margin-right:0px;width:99%;" '
                 )
-            )
-            fig.write_image("radar.png", scale=4)
-            st.plotly_chart(fig, use_container_width=True)
+                st.markdown(archetype_table_html, unsafe_allow_html=True)
 
-        # ... (tabela w col1, radar w col2, diagram w col3)
+            with col2:
+                theta_labels = []
+                for n in archetype_names:
+                    if n == main_type:
+                        theta_labels.append(f"<b><span style='color:red;'>{n}</span></b>")
+                    elif n == second_type:
+                        theta_labels.append(f"<b><span style='color:#FFD22F;'>{n}</span></b>")
+                    elif n == supplement_type:
+                        theta_labels.append(f"<b><span style='color:#40b900;'>{n}</span></b>")
+                    else:
+                        theta_labels.append(f"<span style='color:#656565;'>{n}</span>")
+                highlight_r = []
+                highlight_marker_color = []
+                for i, name in enumerate(archetype_names):
+                    if name == main_type:
+                        highlight_r.append(mean_archetype_scores[name])
+                        highlight_marker_color.append("red")
+                    elif name == second_type:
+                        highlight_r.append(mean_archetype_scores[name])
+                        highlight_marker_color.append("#FFD22F")
+                    elif name == supplement_type:
+                        highlight_r.append(mean_archetype_scores[name])
+                        highlight_marker_color.append("#40b900")
+                    else:
+                        highlight_r.append(None)
+                        highlight_marker_color.append("rgba(0,0,0,0)")
+                st.markdown(f'<div style="font-size:1.3em;font-weight:600;margin-bottom:13px; text-align:center;">Profil archetypów {personGen}</div>', unsafe_allow_html=True)
+                fig = go.Figure(
+                    data=[
+                        go.Scatterpolar(
+                            r=list(mean_archetype_scores.values()) + [list(mean_archetype_scores.values())[0]],
+                            theta=archetype_names + [archetype_names[0]],
+                            fill='toself',
+                            name='Średnia wszystkich',
+                            line=dict(color="royalblue", width=3),
+                            marker=dict(size=6)
+                        ),
+                        go.Scatterpolar(
+                            r=highlight_r,
+                            theta=archetype_names,
+                            mode='markers',
+                            marker=dict(size=18, color=highlight_marker_color, opacity=0.95, line=dict(color="black", width=2)),
+                            name='Archetyp główny/wspierający/poboczny',
+                            showlegend=False,
+                        )
+                    ],
+                    layout=go.Layout(
+                        polar=dict(
+                            radialaxis=dict(visible=True, range=[0, 20]),
+                            angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels)
+                        ),
+                        width=550, height=550,
+                        margin=dict(l=20, r=20, t=32, b=32),
+                        showlegend=False
+                    )
+                )
+                # PRZEZROCZYSTE TŁO RADARU
+                fig.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    polar=dict(
+                        bgcolor="rgba(0,0,0,0)",
+                        radialaxis=dict(visible=True, range=[0, 20]),
+                        angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels),
+                    ),
+                    showlegend=False,
+                    width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
+                )
+                fig.write_image("radar.png", scale=4)
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.markdown("""
+                <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+                  <span style="display:flex;align-items:center;margin-right:34px;">
+                    <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                    <span style="font-size:0.85em;">Archetyp główny</span>
+                  </span>
+                  <span style="display:flex;align-items:center;margin-right:34px;">
+                    <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                    <span style="font-size:0.85em;">Archetyp wspierający</span>
+                  </span>
+                  <span style="display:flex;align-items:center;">
+                    <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                    <span style="font-size:0.85em;">Archetyp poboczny</span>
+                  </span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                if main_type is not None:
+                    kola_img = compose_archetype_highlight(
+                        archetype_name_to_img_idx(main_type),
+                        archetype_name_to_img_idx(second_type) if second_type != main_type else None,
+                        archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
+                    )
+                    st.image(
+                        kola_img,
+                        caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
+                        width=700
+                    )
 
             st.markdown("""
-            <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
-              <span style="display:flex;align-items:center;margin-right:34px;">
-                <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                <span style="font-size:0.85em;">Archetyp główny</span>
-              </span>
-              <span style="display:flex;align-items:center;margin-right:34px;">
-                <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                <span style="font-size:0.85em;">Archetyp wspierający</span>
-              </span>
-              <span style="display:flex;align-items:center;">
-                <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                <span style="font-size:0.85em;">Archetyp poboczny</span>
-              </span>
+            <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
+            """, unsafe_allow_html=True)
+
+            st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny {personGen}</div>', unsafe_allow_html=True)
+            render_archetype_card(archetype_extended.get(main_type, {}), main=True)
+
+            if second_type and second_type != main_type:
+                st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
+                st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp wspierający {personGen}</div>", unsafe_allow_html=True)
+                render_archetype_card(archetype_extended.get(second_type, {}), main=False)
+
+            if supplement_type and supplement_type not in [main_type, second_type]:
+                st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
+                st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny {personGen}</div>", unsafe_allow_html=True)
+                render_archetype_card(archetype_extended.get(supplement_type, {}), main=False)
+
+            st.markdown(f"""
+            <div style='height:44px;'></div>
+            <hr style="height:1px; border:none; background:#e5e5e5; margin-bottom:26px;" />
+            <div style="font-size:1.2em; font-weight:600; margin-bottom:23px;">
+                Pobierz raporty archetypu {personGen}
             </div>
             """, unsafe_allow_html=True)
 
-        with col3:
-            if main_type is not None:
-                kola_img = compose_archetype_highlight(
-                    archetype_name_to_img_idx(main_type),
-                    archetype_name_to_img_idx(second_type) if second_type != main_type else None,
-                    archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
-                )
-                st.image(
-                    kola_img,
-                    caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
-                    width=700
-                )
+            # GENEROWANIE OBRAZU PANELU DYNAMICZNIE
+            idx_main = archetype_name_to_img_idx(main_type)
+            idx_aux = archetype_name_to_img_idx(second_type) if second_type != main_type else None
+            idx_supplement = archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
 
-        st.markdown("""
-        <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
-        """, unsafe_allow_html=True)
+            panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supplement)
+            panel_img_path = f"panel_{(main_type or '').lower()}_{(second_type or '') and second_type.lower()}_{(supplement_type or '') and supplement_type.lower()}.png"
+            panel_img.save(panel_img_path)
 
-        st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny Marcina Gołka</div>', unsafe_allow_html=True)
-        render_archetype_card(archetype_extended.get(main_type, {}), main=True)
+            # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
+            docx_buf = export_word_docxtpl(
+                main_type,  # str
+                second_type,  # str
+                supplement_type,  # str
+                archetype_features,  # dict
+                main,  # dict
+                second,  # dict
+                supplement,  # dict
+                radar_img_path="radar.png",
+                archetype_table=archetype_table,
+                num_ankiet=num_ankiet,
+                panel_img_path=panel_img_path,
+                personGen=personGen,
+                personNom=personNom,
+            )
+            pdf_buf = word_to_pdf(docx_buf)
 
-        if second_type and second_type != main_type:
-            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
-            st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
-            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp wspierający Marcina Gołka</div>", unsafe_allow_html=True)
-            render_archetype_card(archetype_extended.get(second_type, {}), main=False)
+            word_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#185abd'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>W</text></svg>"
+            pdf_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#d32f2f'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>PDF</text></svg>"
 
-        if supplement_type and supplement_type not in [main_type, second_type]:
-            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
-            st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
-            st.markdown("<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny Marcina Gołka</div>", unsafe_allow_html=True)
-            render_archetype_card(archetype_extended.get(supplement_type, {}), main=False)
+            st.markdown(
+                f"""
+                <div style="display:flex;flex-direction:column;align-items:flex-start;">
+                    <div style="margin-bottom:11px;">
+                        {word_icon}
+                        <span style="vertical-align:middle;">
+                            <b>Eksport do Word (.docx)</b>
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
+            st.download_button(
+                "Pobierz raport (Word)",
+                data=docx_buf,
+                file_name="ap48_raport.docx",
+                key="word_button"
+            )
 
-        st.markdown("""
-        <div style='height:44px;'></div>
-        <hr style="height:1px; border:none; background:#e5e5e5; margin-bottom:26px;" />
-        <div style="font-size:1.2em; font-weight:600; margin-bottom:23px;">
-            Pobierz raporty archetypu Marcina Gołka
-        </div>
-        """, unsafe_allow_html=True)
+            st.markdown(
+                f"""
+                    <div style="margin-top:21px; margin-bottom:11px;">
+                        {pdf_icon}
+                        <span style="vertical-align:middle;">
+                            <b>Eksport do PDF (.pdf)</b>
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
 
-        # GENEROWANIE OBRAZU PANELU DYNAMICZNIE
-        idx_main = archetype_name_to_img_idx(main_type)
-        idx_aux = archetype_name_to_img_idx(second_type) if second_type != main_type else None
-        idx_supplement = archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
+            st.download_button(
+                "Pobierz raport (PDF)",
+                data=pdf_buf,
+                file_name="ap48_raport.pdf",
+                key="pdf_button"
+            )
 
-        panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supplement)
-        panel_img_path = f"panel_{main_type.lower()}_{second_type.lower() if second_type else ''}_{supplement_type.lower() if supplement_type else ''}.png"
-        panel_img.save(panel_img_path)
-
-        # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
-        docx_buf = export_word_docxtpl(
-            main_type,  # str
-            second_type,  # str
-            supplement_type,  # str
-            archetype_features,  # dict
-            main,  # dict
-            second,  # dict
-            supplement,  # dict
-            radar_img_path="radar.png",
-            archetype_table=archetype_table,
-            num_ankiet=num_ankiet,
-            panel_img_path=panel_img_path
-        )
-        pdf_buf = word_to_pdf(docx_buf)
-
-        word_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#185abd'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>W</text></svg>"
-        pdf_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#d32f2f'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>PDF</text></svg>"
-
-        st.markdown(
-            f"""
-            <div style="display:flex;flex-direction:column;align-items:flex-start;">
-                <div style="margin-bottom:11px;">
-                    {word_icon}
-                    <span style="vertical-align:middle;">
-                        <b>Eksport do Word (.docx)</b>
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-        st.download_button(
-            "Pobierz raport (Word)",
-            data=docx_buf,
-            file_name="ap48_raport.docx",
-            key="word_button"
-        )
-
-        st.markdown(
-            f"""
-                <div style="margin-top:21px; margin-bottom:11px;">
-                    {pdf_icon}
-                    <span style="vertical-align:middle;">
-                        <b>Eksport do PDF (.pdf)</b>
-                    </span>
-                </div>
+            st.markdown("""
+            <hr style="height:1px; border:none; background:#eee; margin-top:38px; margin-bottom:24px;" />
             """, unsafe_allow_html=True)
 
-        st.download_button(
-            "Pobierz raport (PDF)",
-            data=pdf_buf,
-            file_name="ap48_raport.pdf",
-            key="pdf_button"
-        )
-
-        st.markdown("""
-        <hr style="height:1px; border:none; background:#eee; margin-top:38px; margin-bottom:24px;" />
-        """, unsafe_allow_html=True)
-
-        st.markdown('<div style="font-size:1.13em;font-weight:600;margin-bottom:13px;">Tabela odpowiedzi respondentów (pełne wyniki)</div>', unsafe_allow_html=True)
-        final_df = results_df.copy()
-        try:
-            col_to_exclude = [
-                "Czas ankiety", "Archetyp", "Główny archetyp", "Cechy kluczowe", "Opis", "Storyline",
-                "Rekomendacje", "Archetyp wspierający", "Cechy wspierający", "Opis wspierający",
-                "Storyline wspierający", "Rekomendacje wspierający"
-            ]
-            means = final_df.drop(columns=col_to_exclude, errors="ignore").mean(numeric_only=True)
-            summary_row = {col: round(means[col], 2) if col in means else "-" for col in final_df.columns}
-            summary_row["Czas ankiety"] = "ŚREDNIA"
-            final_df = pd.concat([final_df, pd.DataFrame([summary_row])], ignore_index=True)
-        except Exception as e:
-            pass
-        st.dataframe(final_df, hide_index=True)
-        st.download_button("Pobierz wyniki archetypów (CSV)", final_df.to_csv(index=False), "ap48_archetypy.csv")
-        buffer = io.BytesIO()
-        final_df.to_excel(buffer, index=False)
-        st.download_button(
-            label="Pobierz wyniki archetypów (XLSX)",
-            data=buffer.getvalue(),
-            file_name="ap48_archetypy.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-else:
-    st.info("Brak danych 'answers' – nie wykryto odpowiedzi w bazie danych.")
+            st.markdown('<div style="font-size:1.13em;font-weight:600;margin-bottom:13px;">Tabela odpowiedzi respondentów (pełne wyniki)</div>', unsafe_allow_html=True)
+            final_df = results_df.copy()
+            try:
+                col_to_exclude = [
+                    "Czas ankiety", "Archetyp", "Główny archetyp", "Cechy kluczowe", "Opis", "Storyline",
+                    "Rekomendacje", "Archetyp wspierający", "Cechy wspierający", "Opis wspierający",
+                    "Storyline wspierający", "Rekomendacje wspierający"
+                ]
+                means = final_df.drop(columns=col_to_exclude, errors="ignore").mean(numeric_only=True)
+                summary_row = {col: round(means[col], 2) if col in means else "-" for col in final_df.columns}
+                summary_row["Czas ankiety"] = "ŚREDNIA"
+                final_df = pd.concat([final_df, pd.DataFrame([summary_row])], ignore_index=True)
+            except Exception as e:
+                pass
+            st.dataframe(final_df, hide_index=True)
+            st.download_button("Pobierz wyniki archetypów (CSV)", final_df.to_csv(index=False), "ap48_archetypy.csv")
+            buffer = io.BytesIO()
+            final_df.to_excel(buffer, index=False)
+            st.download_button(
+                label="Pobierz wyniki archetypów (XLSX)",
+                data=buffer.getvalue(),
+                file_name="ap48_archetypy.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    else:
+        st.info("Brak danych 'answers' – nie wykryto odpowiedzi w bazie danych.")
