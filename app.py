@@ -29,8 +29,116 @@ except Exception:
 
 from utils import make_token
 from send_link import render as render_send_link
+from streamlit.components.v1 import html as html_component
 
 st.set_page_config(page_title="Archetypy – panel", layout="wide")
+
+# globalna kotwica na samym szczycie aplikacji
+st.markdown('<a id="__top__"></a>', unsafe_allow_html=True)
+
+ENABLE_TITLEBAR = False  # ukryj teraz pasek breadcrumbs; ustaw True gdy zechcesz pokazać
+
+def inject_scroll_to_top() -> None:
+    st.markdown(
+        """
+        <style>
+          #toTopWrapper{
+            position: fixed;
+            z-index: 2147483647;
+            top: 70px;           /* Twoje położenie */
+            left: 15px;
+            width: 0; height: 0;
+            pointer-events: none;
+          }
+          #toTopBtn{
+            pointer-events: auto;
+            width: 40px; height: 40px;
+            border-radius: 999px;
+            display: inline-flex; align-items:center; justify-content:center;
+            border: 1px solid #D7DEE8;
+            background:#FFFFFF;
+            box-shadow: 0 1px 2px rgba(0,0,0,.05);
+            cursor: pointer;
+            transition: transform .08s ease, background .15s ease, border-color .15s ease;
+            text-decoration: none; color: inherit;
+          }
+          #toTopBtn:hover{ background:#F3F6FA; border-color:#CBD5E1; }
+          #toTopBtn:active{ transform: translateY(1px) scale(0.98); }
+          #toTopBtn svg{ width:18px; height:18px; opacity:.9; }
+        </style>
+
+        <div id="toTopWrapper" aria-hidden="true">
+          <!-- KLUCZ: to jest <a> z href do kotwicy; zadziała nawet bez JS -->
+          <a id="toTopBtn" href="#__top__" aria-label="Do góry" title="Do góry">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="18 15 12 9 6 15"></polyline>
+            </svg>
+          </a>
+        </div>
+
+        <script>
+        (function(){
+          const doc = window.document;
+
+          // usuń duplikaty wrappera i przenieś do <body>
+          const olds = Array.from(doc.querySelectorAll('#toTopWrapper'));
+          if (olds.length > 1) olds.slice(0, -1).forEach(n => n.remove());
+          const wrap = doc.getElementById('toTopWrapper');
+          if (wrap && wrap.parentElement !== doc.body) doc.body.appendChild(wrap);
+
+          const btn = doc.getElementById('toTopBtn');
+          if (!btn || btn.dataset.bound) return;
+          btn.dataset.bound = '1';
+
+          // gdy JS jest dostępny – smooth scroll + dobijanie
+          function scrollAllTop(){
+            const targets = new Set([
+              window,
+              doc, doc.documentElement, doc.body, doc.scrollingElement,
+              doc.querySelector('section.main'),
+              doc.querySelector('[data-testid="stAppViewContainer"]'),
+              doc.querySelector('.block-container')?.parentElement
+            ].filter(Boolean));
+
+            // dorzuć wszystkie realnie przewijalne
+            doc.querySelectorAll('*').forEach(el=>{
+              try{
+                const s = getComputedStyle(el);
+                const can = /(auto|scroll)/.test(s.overflow + s.overflowY + s.overflowX);
+                if (can && el.scrollHeight > el.clientHeight + 1) targets.add(el);
+              }catch(e){}
+            });
+
+            targets.forEach(el=>{
+              try{
+                if (typeof el.scrollTo === 'function') el.scrollTo({top:0, behavior:'smooth'});
+                else if (typeof el.scrollTop === 'number') el.scrollTop = 0;
+              }catch(e){}
+            });
+
+            // dociśnij w kilku klatkach
+            let i=0;
+            const nudge=()=> {
+              i++;
+              targets.forEach(el=>{
+                try{ (el===window)? window.scrollTo(0,0) : (el.scrollTop=0); }catch(e){}
+              });
+              if(i<8) requestAnimationFrame(nudge);
+            };
+            requestAnimationFrame(nudge);
+          }
+
+          // nadpisujemy domyślne przewinięcie #hash tylko po to, by dodać smooth
+          btn.addEventListener('click', function(e){
+            // pozwól działać hash-jumpowi, ale dodatkowo uruchom „smooth + nudge”
+            setTimeout(scrollAllTop, 0);
+          }, {passive:true});
+        })();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ───────────────────────── styles (bez zmian poza danger button) ────────────────────────
 st.markdown(
@@ -67,12 +175,135 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 #danger-del-anchor + div button:hover{
   background:#DC2626 !important; border-color:#DC2626 !important;
 }
+/* cienka szara linia, używana przed "Udostępnij raport" */
+.soft-hr{
+  border:0;
+  border-top:1px solid var(--line);
+  margin:28px 0 10px 0;
+}
+
+/* nagłówki sekcji — warianty z dedykowanymi marginesami/czcionką */
+.section-title.choose-title{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color:#195299;
+  margin-top: 18px;
+  margin-bottom: 10px;
+}
+.section-title.share-title{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color:#1F2937;
+  margin-top: 8px;
+  margin-bottom: 14px;
+}
+
+/* niebieskie stylowanie selectboxa — tylko w obrębie kontenera #blue-select-scope */
+#blue-select-scope .stSelectbox>div>div{
+  border:2px solid var(--brand) !important;
+  border-radius:10px !important;
+  background:#F8FBFF !important;
+}
+#blue-select-scope .stSelectbox label{
+  display:none !important; /* chowamy label, dajemy własny nagłówek */
+}
+
+/* przyciski nawigacyjne (Opisy archetypów / Raport / Tabela / Udostępnij) */
+.quick-nav{
+  display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 14px 0;
+}
+.quick-nav button{
+  cursor:pointer;
+  border:1px solid var(--line-2);
+  background:#FFFFFF;
+  border-radius:10px;
+  padding:8px 12px;
+  font-weight:600;
+}
+.quick-nav button:hover{ background:#F3F6FA; border-color:#CBD5E1; }
+/* ───── wyniki/raport: szybka nawigacja i drobne poprawki ───── */
+.soft-hr{border:0;border-top:1px solid var(--line);margin:28px 0 18px 0;}
+.section-label{font-weight:700;font-size:16px;margin:18px 0 8px 0;color:#1F2937;}
+.quicknav{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin:4px 0 8px;}
+.quicknav b.sep{opacity:.6;margin:0 6px;}
+.quicknav a{
+  display:inline-block;padding:6px 10px;border:1px solid var(--line-2);
+  border-radius:10px;text-decoration:none;color:#1F2937;font-weight:600;font-size:13px;
+  background:#fff;
+}
+.quicknav a:hover{border-color:#CBD5E1;background:#F3F6FA}
+
+/* “Wybierz osobę/JST” – niebieska obwódka jak w “Wyślij link…” */
+.stSelectbox div[data-baseweb="select"]>div{
+  border:1px solid var(--brand) !important;
+  box-shadow:0 0 0 1px var(--brand) inset !important;
+  border-radius:10px !important;
+}
+
+/* ── results: lokalne marginesy dla etykiety i selectboxa ── */
+#results-choose .section-label{
+  /* TYPOGRAFIA */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  font-weight: 630;      /* zmień jeśli chcesz cieńszą: 600/500 */
+  font-size: 19px;       /* rozmiar etykiety */
+  line-height: 1.25;
+  color: #1F2937;
+
+  /* ODSTĘPY: góra | prawo | dół | lewo */
+  margin: 6px 0 12px 0;  /* ← edytuj tutaj */
+}
+#results-choose .stSelectbox{
+  margin-bottom: 10px;   /* przerwa pod selectem – edytuj */
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
+# ← TU, już po zamknięciu st.markdown, wywołaj strzałkę:
+inject_scroll_to_top()
+
 sb = get_supabase()
+
+def render_titlebar(crumbs: List[str]) -> None:
+    """
+    Pasek breadcrumbs – renderuj tylko, gdy ENABLE_TITLEBAR = True.
+    (Strzałka '↑' jest wstrzykiwana globalnie przez inject_scroll_to_top().)
+    """
+    if not ENABLE_TITLEBAR:
+        return
+
+    crumbs_html = ' <span class="sep">›</span> '.join(
+        [f'<span class="crumb">{c}</span>' for c in crumbs]
+    )
+    page_title = " / ".join(crumbs)
+
+    st.markdown(
+        f"""
+        <style>
+          #titlebar {{
+            position: sticky; top: 0; z-index: 9998;
+            background: #FAFAFA;  /* tło jak strona */
+            border-bottom:1px solid var(--line);
+            padding: 10px 12px; margin: -8px 0 10px 0;
+            display:flex; align-items:center; gap:10px;
+          }}
+          #titlebar .sep   {{ opacity:.55; margin: 0 6px; }}
+          #titlebar .crumb {{ font-size:13px; color:#64748B; }}
+          #titlebar .crumb:last-child {{ color:#0F172A; font-weight:700; }}
+        </style>
+        <div id="titlebar">
+          <div class="crumbs">{crumbs_html}</div>
+        </div>
+        <script>
+          try {{ document.title = "Archetypy – {page_title}"; }} catch(e) {{}}
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 def goto(view: str) -> None:
     st.session_state["view"] = view
@@ -307,6 +538,7 @@ def login_view() -> None:
 def home_view() -> None:
     require_auth()
     header("Archetypy – panel administratora")
+    render_titlebar(["Panel", "Start"])
 
     # kafle
     st.markdown('<div class="tiles">', unsafe_allow_html=True)
@@ -323,7 +555,7 @@ def home_view() -> None:
 
     # 🔽 linia oddzielająca kafle od statystyk
     st.markdown(
-        "<hr style='border:0; border-top:1px solid #E6E9EE; margin:30px 0;'>",
+        "<hr style='border:0; border-top:1px solid #E6E9EE; margin:20px 0;'>",
         unsafe_allow_html=True)
 
     # panel statystyk
@@ -332,6 +564,7 @@ def home_view() -> None:
 def add_view() -> None:
     require_auth()
     header("➕ Dodaj badanie archetypu")
+    render_titlebar(["Panel", "Dodaj badanie"])
     back_button()
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
 
@@ -362,8 +595,10 @@ def add_view() -> None:
 def edit_view() -> None:
     require_auth()
     header("✏️ Edytuj dane badania")
+
     back_button()
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    render_titlebar(["Panel", "Edytuj badanie"])
 
     studies = fetch_studies(sb)
     if not studies:
@@ -499,22 +734,22 @@ def stats_panel() -> None:
     # Tu sterujesz SZEROKOŚCIĄ całej ramki:
     # [1, 6, 1] ≈ 75% szerokości kontenera strony
     # np. [1, 5, 1] węższa, [1, 8, 1] szersza
-    L, C, R = st.columns([1, 28, 1], gap="large")
+    L, C, R = st.columns([1, 45, 1], gap="small")
     # ⬅️➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➤➡️
 
     with C:
         card = st.container(border=True)
         with card:
             # pionowe paddingi wewnątrz ramki
-            st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 
             # (opcjonalnie) minimalny „gutter” lewo/prawo dla treści
-            gL, body, gR = st.columns([1, 30, 1], gap="small")
+            gL, body, gR = st.columns([1, 20, 1], gap="small")
             with body:
                 # tytuł
                 st.markdown(
                     "<div style='font-weight:700; font-size:25px; "
-                    "margin:5px 0 45px 0; padding-bottom:8px; "
+                    "margin:5px 0 40px 0; padding-bottom:8px; "
                     "border-bottom:1px solid #E6E9EE;'>Statystyki</div>",
                     unsafe_allow_html=True
                 )
@@ -543,20 +778,70 @@ def stats_panel() -> None:
 def results_view() -> None:
     require_auth()
     header("📊 Sprawdź wyniki badania archetypu")
+    render_titlebar(["Panel", "Wyniki"])
     back_button()
-    st.markdown('<hr class="hr-thin">', unsafe_allow_html=True)
+
+    # ⬇️ Ukryj siatkę kafli z home_view na czas renderu wyników (eliminuje migotanie)
+    st.markdown("<style>.tiles{display:none!important}</style>", unsafe_allow_html=True)
 
     studies = fetch_studies(sb)
     if not studies:
         st.info("Brak rekordów w bazie."); return
 
-    options = { f"{s.get('first_name_nom') or s['first_name']} {s.get('last_name_nom') or s['last_name']} ({s['city']}) – /{s['slug']}": s for s in studies }
-    choice = st.selectbox("Wybierz osobę/JST", options=list(options.keys()))
-    study = options[choice]
+    # ── GÓRNY RZĄD: 1) przełącznik szerokości + 2) szybka nawigacja
+    if "wide_report" not in st.session_state:
+        st.session_state["wide_report"] = True
 
-    if "wide_report" not in st.session_state: st.session_state["wide_report"] = True
-    wide = st.toggle("Szeroki raport", key="wide_report")
-    st.markdown(f"<style>.block-container{{max-width:{'97vw' if wide else '1160px'} !important}}</style>", unsafe_allow_html=True)
+    topL, topR = st.columns([0.42, 0.58])
+    with topL:
+        # ⬅️ JEDEN toggle z unikalnym key
+        wide = st.toggle("🔎 Szeroki raport", key="wide_report")
+        st.markdown(
+            f"<style>.block-container{{max-width:{'97vw' if wide else '1160px'} !important}}</style>",
+            unsafe_allow_html=True
+        )
+    with topR:
+        st.markdown("""
+        <div class="quicknav">
+          <b class="sep">|</b>
+          <a href="#opisy">Opisy archetypów</a>
+          <a href="#raport">Raport</a>
+          <a href="#tabela">Tabela</a>
+          <a href="#udostepnij">Udostępnij</a>
+        </div>
+        <script>
+          const root = window.document;
+          root.querySelectorAll('.quicknav a').forEach(a=>{
+            a.addEventListener('click', (e)=>{
+              e.preventDefault();
+              const id = a.getAttribute('href');
+              const el = root.querySelector(id);
+              if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+            });
+          });
+        </script>
+        """, unsafe_allow_html=True)
+
+    # lokalny wrapper, żeby CSS działał tylko tutaj
+    st.markdown('<div id="results-choose"><div class="section-label">Wybierz osobę:</div>', unsafe_allow_html=True)
+
+    options = {
+        f"{s.get('last_name_nom') or s['last_name']} {s.get('first_name_nom') or s['first_name']} ({s['city']}) – /{s['slug']}"
+        : s for s in studies
+    }
+    choice = st.selectbox("", options=list(options.keys()), label_visibility="collapsed")
+    study = options[choice]
+    render_titlebar([
+        "Panel", "Wyniki",
+        f"{(study.get('last_name_nom') or study['last_name'])} "
+        f"{(study.get('first_name_nom') or study['first_name'])} "
+        f"({study.get('city', '')})"
+    ])
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ⬇️ PRZENIESIONA LINIA — TERAZ POD SELECTEM
+    st.markdown('<hr class="hr-thin">', unsafe_allow_html=True)
 
     try:
         import admin_dashboard as AD
@@ -569,7 +854,24 @@ def results_view() -> None:
     except Exception as e:
         st.error(f"Nie udało się wczytać raportu: {e}"); st.json(study)
 
-    st.markdown('<div class="section-title">Udostępnij raport</div>', unsafe_allow_html=True)
+    # Sprzątanie: jeżeli jakiś komponent dodał swój #titlebar niżej – usuń go
+    st.markdown("""
+    <script>
+      (function(){
+        const bars = Array.from(document.querySelectorAll('#titlebar'));
+        // zostaw tylko pierwszy (ten u góry)
+        if (bars.length > 1) {
+          bars.slice(1).forEach(el => el.remove());
+        }
+      })();
+    </script>
+    """, unsafe_allow_html=True)
+
+
+    # szara linia + kotwica + nagłówek
+    st.markdown("<hr class='soft-hr' /><div id='udostepnij'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="section-title share-title">Udostępnij raport</div>', unsafe_allow_html=True)
+
     with st.form("share_form"):
         method = st.radio("Metoda", ["E-mail","SMS"], horizontal=True, index=0)
         recipients_raw = st.text_area("Adresaci", placeholder="Oddziel przecinkami: np. jan@firma.pl, ola@urzad.gov.pl (lub numery telefonów dla SMS)")
@@ -596,7 +898,10 @@ def results_view() -> None:
                 for L in saved_links: st.code(L)
 
 def send_link_view() -> None:
-    require_auth(); header("✉️ Wyślij link do ankiety"); render_send_link(back_button)
+    require_auth()
+    header("✉️ Wyślij link do ankiety")
+    render_titlebar(["Panel", "Wyślij link do ankiety"])
+    render_send_link(back_button)
 
 # ───────────────────────── routing ─────────────────────────
 if "view" not in st.session_state: st.session_state["view"] = "login"

@@ -188,73 +188,148 @@ def build_brands_for_word(doc, brand_list, logos_dir, height_mm=20):
     return out
 
 
-def zapobiegaj_wdowie(text):
-    # Twarda spacja przed ostatnim wyrazem każdego akapitu
-    # Obsługuje \n\n jako koniec akapitu
-    paras = text.split('\n')
-    out = []
-    for para in paras:
-        para = para.rstrip()
-        # Jeśli za krótko, pomiń
-        if len(para.split(' ')) < 2:
-            out.append(para)
-            continue
-        before_last, last = para.rsplit(' ', 1)
-        out.append(f"{before_last}\u00A0{last}")
-    return '\n'.join(out)
+from pathlib import Path
+import base64
+
+# --- IKONY ARCHETYPÓW (SVG) ---
+ARCHETYPE_ICON_DIR = Path(__file__).with_name("assets") / "person_icons"
+
+_PL_MAP = str.maketrans({
+    "ą":"a","ć":"c","ę":"e","ł":"l","ń":"n","ó":"o","ś":"s","ź":"z","ż":"z",
+    "Ą":"a","Ć":"c","Ę":"e","Ł":"l","Ń":"n","Ó":"o","Ś":"s","Ź":"z","Ż":"z",
+    "’":"", "'":""
+})
+
+def _slug_pl(s: str) -> str:
+    s = (s or "").strip().lower().translate(_PL_MAP)
+    # normalizacje nazw używanych w danych
+    s = s.replace(" / ", " ").replace("/", " ").replace(",", " ")
+    s = " ".join(s.split())
+    return s.replace(" ", "-")
+
+# Gdyby Twoje pliki miały inne nazwy niż slug (opcjonalnie dopisz mapę wyjątków)
+ARCHETYPE_FILENAME_MAP = {
+    # "kochanelubwielbiciel": "kochanek.svg"  # przykład, jeśli trzeba
+}
+
+def arche_icon_img_html(archetype_name: str, height_px: int = 90) -> str:
+    import base64, glob, os
+    slug = _slug_pl(archetype_name)
+
+    # Szukaj plików: slug.svg, slug_*.svg, slug.png, slug_*.png
+    patterns = [
+        ARCHETYPE_ICON_DIR / f"{slug}.svg",
+        ARCHETYPE_ICON_DIR / f"{slug}_*.svg",
+        ARCHETYPE_ICON_DIR / f"{slug}.png",
+        ARCHETYPE_ICON_DIR / f"{slug}_*.png",
+    ]
+
+    path = None
+    for pat in patterns:
+        # glob dla wzorców z gwiazdką
+        matches = glob.glob(str(pat))
+        if matches:
+            path = Path(matches[0])
+            break
+        if pat.exists():
+            path = pat
+            break
+
+    if path and path.exists():
+        data = path.read_bytes()
+        ext = path.suffix.lower()
+        mime = "image/svg+xml" if ext == ".svg" else "image/png"
+        b64 = base64.b64encode(data).decode("ascii")
+        return (
+            f"<img src='data:{mime};base64,{b64}' alt='{archetype_name}' "
+            f"style='height:{height_px}px; width:auto; display:block;'/>"
+        )
+
+    # Fallback
+    return f"<div style='font-size:{int(height_px*0.9)}px;line-height:1'>🔹</div>"
+
+
 
 import cairosvg
 
 # (page_config usunięty – ustawiany w app.py)
 
 COLOR_NAME_MAP = {
-        "#000000": "czerń",
-        "#FFD700": "złoto",
-        "#282C34": "granat /antracyt/",
-        "#800020": "burgund",
-        "#E10600": "czerwień",
-        "#2E3141": "grafitowy granat",
-        "#FFFFFF": "biel",
-        "#4682B4": "stalowy błękit",
-        "#B0C4DE": "jasny niebieskoszary",
-        "#6C7A89": "popielaty szary",
-        "#B4D6B4": "miętowa zieleń",
-        "#A7C7E7": "pastelowy błękit",
-        "#FFD580": "pastelowy żółty / beżowy",
-        "#FA709A": "róż malinowy",
-        "#FEE140": "jasny żółty",
-        "#FFD6E0": "bardzo jasny róż",
-        "#FFB300": "mocna żółć",
-        "#FF8300": "pomarańcz",
-        "#FFD93D": "pastelowa żółć",
-        "#7C53C3": "fiolet",
-        "#3BE8B0": "miętowy cyjan",
-        "#87CEEB": "błękit /sky blue/",
-        "#43C6DB": "turkusowy błękit",
-        "#A0E8AF": "seledyn",
-        "#F9D371": "złocisty żółty",
-        "#8F00FF": "fiolet intensywny",
-        "#181C3A": "granat bardzo ciemny",
-        "#E0BBE4": "pastelowy fiolet",
-        "#F9F9F9": "biel bardzo jasna",
-        "#6CA0DC": "pastelowy błękit",
-        "#A3C1AD": "pastelowa zieleń",
-        "#FFF6C3": "jasny kremowy",
-        "#AAC9CE": "pastelowy niebieskoszary",
-        "#FFF200": "żółty (cytrynowy)",
-        "#FF0000": "czerwień intensywna",
-        "#FF6F61": "łososiowy róż",
-        "#8C564B": "ciemny brąz",
-        "#D62728": "czerwień karmazynowa",
-        "#1F77B4": "chabrowy",
-        "#9467BD": "fiolet śliwkowy",
-        "#F2A93B": "miodowy żółty",
-        "#17BECF": "niebieski morski",
-        "#E377C2": "pastelowy róż fioletowy",
-        "#7C46C5": "fiolet szafirowy",
-        "#2CA02C": "zieleń trawiasta",
-        "#9BD6F4": "pastelowy błękit jasny",
-        "#FF7F0E": "jaskrawy pomarańcz"
+    "#000000": "czerń",
+    "#FFD700": "złoto",
+    "#282C34": "granat (antracyt)",
+    "#800020": "burgund",
+    "#E10600": "czerwień",
+    "#2E3141": "grafitowy granat",
+    "#FFFFFF": "biel",
+    "#4682B4": "stalowy błękit",
+    "#B0C4DE": "jasny niebieskoszary",
+    "#6C7A89": "popielaty szary",
+    "#B4D6B4": "miętowa zieleń",
+    "#A7C7E7": "pastelowy błękit",
+    "#FFD580": "pastelowy żółty / beżowy",
+    "#FA709A": "róż malinowy",
+    "#FEE140": "jasny żółty",
+    "#FFD6E0": "bardzo jasny róż",
+    "#FFB300": "mocna żółć",
+    "#FF8300": "pomarańcz",
+    "#FFD93D": "pastelowa żółć",
+    "#7C53C3": "fiolet",
+    "#3BE8B0": "miętowy cyjan",
+    "#87CEEB": "błękit (sky blue)",
+    "#43C6DB": "turkusowy błękit",
+    "#A0E8AF": "seledyn",
+    "#F9D371": "złocisty żółty",
+    "#8F00FF": "fiolet intensywny",
+    "#181C3A": "granat bardzo ciemny",
+    "#E0BBE4": "pastelowy fiolet",
+    "#F9F9F9": "biel bardzo jasna",
+    "#6CA0DC": "błękit średni",
+    "#A3C1AD": "pastelowa zieleń",
+    "#FFF6C3": "jasny kremowy",
+    "#AAC9CE": "pastelowy niebieskoszary",
+    "#FFF200": "żółty (cytrynowy)",
+    "#FF0000": "czerwień intensywna",
+    "#FF6F61": "łososiowy róż",
+    "#8C564B": "ciemny brąz",
+    "#D62728": "czerwień karmazynowa",
+    "#1F77B4": "chabrowy",
+    "#9467BD": "fiolet śliwkowy",
+    "#F2A93B": "miodowy żółty",
+    "#17BECF": "niebieski morski",
+    "#E377C2": "pastelowy róż fioletowy",
+    "#7C46C5": "fiolet szafirowy",
+    "#2CA02C": "zieleń trawiasta",
+    "#9BD6F4": "pastelowy błękit jasny",
+    "#FF7F0E": "jaskrawy pomarańcz",
+    "#D5C6AF": "beż jasny",
+    "#906C46": "brąz średni",
+    "#696812": "oliwkowy ciemny",
+    "#212809": "oliwkowy głęboki",
+    "#B6019A": "fuksja",
+    "#E10209": "czerwony żywy",
+    "#1B1715": "brąz bardzo ciemny",
+    "#F9ED06": "żółty intensywny",
+    "#588A4F": "zielony średni",
+    "#7AA571": "zielony jasny",
+    "#AB3941": "czerwony wiśniowy",
+    "#61681C": "oliwkowy",
+    "#0070B5": "niebieski",
+    "#8681E8": "fiolet jasny",
+    "#FE89BE": "róż jasny",
+    "#FD4431": "pomarańczowy żywy",
+    "#5B6979": "grafitowy",
+    "#A1B1C2": "szary jasny",
+    "#0192D3": "turkus",
+    "#2C7D78": "turkus ciemny",
+    "#86725D": "brąz jasny",
+    "#F4F1ED": "biały ciepły",
+    "#BBBDA0": "khaki jasne",
+    "#2D4900": "oliwkowy bardzo ciemny",
+    "#0E0D13": "grafit bardzo ciemny",
+    "#2B2D41": "granat ciemny",
+    "#C2BCC1": "szary bardzo jasny",
+    "#CC3E2F": "czerwony ceglasty",
 }
 
 ARCHE_NAMES_ORDER = [
@@ -419,7 +494,7 @@ archetype_extended = {
             "Nike", "Duracell", "FedEx", "Ferrari", "Polska Husaria", "Patriotyczny samorząd"
         ],
         "color_palette": [
-            "#E10600", "#2E3141", "#FFFFFF", "#D62728"
+            "#E10600", "#2E3141", "#FFFFFF", "#D62728", "#0E0D13", "#2B2D41", "#C2BCC1", "#CC3E2F",
         ],
         "visual_elements": [
             "peleryna", "tarcza", "aura odwagi", "podniesiona dłoń", "gwiazda"
@@ -474,7 +549,7 @@ archetype_extended = {
             "BBC", "Google", "MIT", "CNN", "Audi", "think tanki"
         ],
         "color_palette": [
-            "#4682B4", "#B0C4DE", "#6C7A89", "#1F77B4"
+            "#4682B4", "#B0C4DE", "#6C7A89", "#1F77B4", "#86725D", "#F4F1ED", "#BBBDA0", "#2D4900",
         ],
         "visual_elements": [
             "okulary", "księga", "wykres", "lupa", "symbole nauki"
@@ -530,7 +605,7 @@ archetype_extended = {
             "UNICEF", "Nivea", "Caritas", "WOŚP", "Pampers", "Volvo", "hospicja"
         ],
         "color_palette": [
-            "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD"
+            "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD", "#5B6979", "#A1B1C2", "#0192D3", "#2C7D78",
         ],
         "visual_elements": [
             "dłonie", "serce", "koło wspólnoty", "symbol opieki"
@@ -639,7 +714,7 @@ archetype_extended = {
             "Old Spice", "M&Ms", "Fanta", "Łomża", "kabarety"
         ],
         "color_palette": [
-            "#FFB300", "#FF8300", "#FFD93D", "#F2A93B"
+            "#FFB300", "#FF8300", "#FFD93D", "#F2A93B", "#588A4F", "#7AA571", "#AB3941", "#61681C",
         ],
         "visual_elements": [
             "uśmiech", "czapka błazna", "kolorowe akcenty"
@@ -692,7 +767,7 @@ archetype_extended = {
             "Apple", "Lego", "Adobe", "Toyota", "startupy"
         ],
         "color_palette": [
-            "#7C53C3", "#3BE8B0", "#87CEEB", "#17BECF"
+            "#7C53C3", "#3BE8B0", "#87CEEB", "#17BECF", "#B6019A", "#E10209", "#1B1715", "#F9ED06",
         ],
         "visual_elements": [
             "kostka Rubika", "żarówka", "kolorowe fale"
@@ -745,7 +820,7 @@ archetype_extended = {
             "NASA", "Jeep", "Red Bull", "National Geographic", "The North Face", "Amazon", "Nomadzi"
         ],
         "color_palette": [
-            "#43C6DB", "#A0E8AF", "#F9D371", "#E377C2"
+            "#43C6DB", "#A0E8AF", "#F9D371", "#E377C2", "#D5C6AF", "#906C46", "#696812", "#212809",
         ],
         "visual_elements": [
             "mapa", "kompas", "droga", "lupa"
@@ -797,7 +872,7 @@ archetype_extended = {
             "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla", "Nowoczesne Miasto"
         ],
         "color_palette": [
-            "#8F00FF", "#181C3A", "#E0BBE4", "#7C46C5"
+            "#8F00FF", "#181C3A", "#E0BBE4", "#7C46C5", "#0070B5", "#8681E8", "#FE89BE", "#FD4431",
         ],
         "visual_elements": [
             "gwiazda", "iskra", "łuk magiczny"
@@ -980,6 +1055,51 @@ archetype_extended = {
 
 from pathlib import Path
 from PIL import Image
+
+# —— GLOBALNY STYL DLA NAGŁÓWKÓW, HR, PRZYCISKÓW I SELECTBOXA ——
+st.markdown("""
+<style>
+/* delikatna, szara linia */
+.soft-hr{
+  height:1px; border:none; background:#e5e7eb; margin:28px 0 26px 0;
+}
+
+/* tytuły sekcji (np. „Udostępnij raport”, „Wybierz osobę/JST”) */
+.section-title{
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  font-weight: 650;               /* grubość */
+  font-size: 1.20em;              /* czcionka */
+  margin: 14px 0 12px 0;           /* marginesy: góra/dół */
+  line-height: 1.15;
+  color:#182433;
+}
+.section-title--blue{ color:#1a93e3; }
+
+/* przyciski skoków (linki wyglądające jak przyciski) */
+.jump-btns{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px 0; }
+.jump-btn{
+  display:inline-block; padding:8px 14px; border-radius:10px; text-decoration:none;
+  border:1px solid #1a93e3; color:#1a93e3; font-weight:600; font-size:0.95em;
+  background:#f0f8ff;
+}
+.jump-btn:hover{ background:#e6f3ff; }
+
+/* lepsze przewijanie do kotwic */
+:target{ scroll-margin-top: 90px; }
+
+/* niebieskie stylowanie selectboxa (jak „Wyślij link do ankiety”) */
+div[data-testid="stSelectbox"] > div{
+  border:1.5px solid #1a93e3 !important;
+  border-radius:10px !important;
+  box-shadow: 0 0 0 1px #1a93e333 inset;
+}
+div[data-testid="stSelectbox"] label{
+  color:#1a93e3 !important;
+  font-weight:700 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
 
@@ -1205,7 +1325,7 @@ def build_word_context(
         "DATA": datetime.now().strftime("%Y-%m-%d"),
 
         # ——— Wstęp
-        "WSTEP": zapobiegaj_wdowie(
+        "WSTEP": (
             "Archetypy to uniwersalne wzorce osobowości, które od wieków pomagają ludziom rozumieć świat i budować autentyczną tożsamość. "
             "Współczesna psychologia i marketing potwierdzają, że trafnie zdefiniowany archetyp jest potężnym narzędziem komunikacji, pozwalającym budować rozpoznawalność, zaufanie i emocjonalny kontakt. Czas wykorzystać to także w polityce! "
             "\n\nW polityce archetyp pomaga wyeksponować najważniejsze cechy lidera, porządkuje przekaz, wzmacnia spójność strategii oraz wyraźnie różnicuje kandydata na tle konkurencji. "
@@ -1215,8 +1335,7 @@ def build_word_context(
             f"Raport przedstawia wyniki i profil archetypowy dla {p('GEN') or '—'} w oparciu o dane z przeprowadzonego badania. "
             "Badanie to pozwoliło zidentyfikować archetyp główny i wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie. "
             "Zaprezentowano także trzeci w kolejności ważności — archetyp poboczny.\n\n"
-            "Dzięki analizie archetypów można precyzyjnie dopasować komunikację do oczekiwań wyborców, podkreślić atuty, a także przewidzieć skuteczność strategii politycznej w dynamicznym środowisku publicznym. "
-        ),
+            "Dzięki analizie archetypów można precyzyjnie dopasować komunikację do oczekiwań wyborców, podkreślić atuty, a także przewidzieć skuteczność strategii politycznej w dynamicznym środowisku publicznym. "),
 
         # ——— Tabela + radar + liczebność
         "TABELA_LICZEBNOSCI": archetype_table.to_dict('records') if archetype_table is not None else [],
@@ -1371,6 +1490,38 @@ def is_color_dark(color_hex):
     lum = 0.2126*r + 0.7152*g + 0.0722*b
     return lum < 110
 
+def palette_boxes_html(palette, color_name_map=COLOR_NAME_MAP):
+    if not isinstance(palette, list) or not palette:
+        return ""
+
+    def label_for(code):
+        name = color_name_map.get(str(code).upper(), str(code))
+        return f"{name} ({code})"
+
+    boxes = []
+
+    for hexcode in palette:
+            txt = "#111111" if not is_color_dark(hexcode) else "#FFFFFF"
+            shadow = ""  # ← zero cienia pod tekstem
+            boxes.append(
+                f"<div class='ap-box' style='background:{hexcode};'>"
+                f"<span style='color:{txt};'>{label_for(hexcode)}</span>"
+                f"</div>"
+            )
+    return (
+                "<style>"
+                ".ap-palette{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px 0;}"
+                ".ap-palette .ap-box{width:110px;height:65px;border-radius:8px;"
+                "display:flex;align-items:center;justify-content:center;"
+                "text-align:center;padding:6px;border:1px solid rgba(0,0,0,.08);"
+                "box-shadow:none;}"  # ← usunięty cień
+                ".ap-palette .ap-box span{font-weight:700;font-size:12.5px;line-height:1.25}"
+                "@media (max-width:700px){ .ap-palette .ap-box{width:120px;height:76px} }"
+                "</style>"
+                "<div class='ap-palette'>" + "".join(boxes) + "</div>"
+        )
+
+
 import base64
 
 def build_brand_icons_html(brand_names, logos_dir):
@@ -1447,42 +1598,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
     def normalize_symbol(name):
         return str(name).strip().title() if isinstance(name, str) else name
 
-    symbol_emoji = {
-        "Korona": "👑",
-        "Herb Miasta": "🛡️",
-        "Peleryna": "🦸",
-        "Serce": "❤️",
-        "Uśmiech": "🤪",
-        "Dłonie": "🤝",
-        "Księga": "📖",
-        "Mapa": "🗺️",
-        "Gwiazda": "⭐",
-        "Gołąb": "🕊️",
-        "Piorun": "🔥",
-        "Kostka Rubika": "🧩",
-        "Dom": "🏡",
-        "Czapka błazna": "🎩",
-        "Krąg ludzi": "🫂",
-        "Żarówka": "💡",
-        "Kolorowe fale": "🌊",
-        "Koło wspólnoty": "⭕",
-        "Sygnet": "💍",
-        "Monogram": "🔠",
-        "Iskra": "✨",
-        "Podniesiona dłoń": "✋",
-        "Tarcza": "🛡️",
-        "Aura odwagi": "🦁",
-        "Okulary": "📖",
-        "Lupa": "🔍",
-        "Droga": "🛣️",
-        "Prosta ikona dłoni": "🫱",
-        "Dziecko": "🧒",
-        "Słońce": "☀️"
-    }
-
-    # symbol musi być stringiem!
-    symbol = archetype_data.get('visual_elements', [''])[0] if archetype_data.get('visual_elements') else ""
-    icon = symbol_emoji.get(normalize_symbol(symbol), "🔹")
+    icon_html = arche_icon_img_html(archetype_data.get('name', ''), height_px=56)
 
     width_card = "70vw"
     text_color = "#222"
@@ -1490,19 +1606,9 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
         text_color = "#fff"
         tagline_color = "#FFD22F" if archetype_data.get('name', '').lower() == "bohater" else "#fffbea"
 
-    color_palette = archetype_data.get('color_palette', [])
-    color_names = [COLOR_NAME_MAP.get(c.upper(), c).lower() for c in color_palette] if color_palette else []
-    color_icons_html = ""
-    if color_palette and isinstance(color_palette, list):
-        color_icons_html = ''.join(
-            f'<span style="display:inline-block;width:23px;height:23px;border-radius:50%;background:{c};margin-right:6px;border:2px solid #222;vertical-align:middle;"></span>'
-            for c in color_palette
-        )
-    color_desc_html = ""
-    if color_palette and isinstance(color_palette, list) and color_names:
-        color_items = [f"{n} ({h})" for n, h in zip(color_names, color_palette)]
-        color_desc_html = f'<div style="color:{text_color};font-size:0.98em;margin-top:3px;margin-bottom:7px;">' + ', '.join(
-            color_items) + '</div>'
+    # --- paleta kolorów: kwadraty z nazwą w środku ---
+    color_palette = archetype_data.get('color_palette') or []
+    color_boxes_html = palette_boxes_html(color_palette) if color_palette else ""
 
     questions = archetype_data.get('questions', [])
     questions_html = ""
@@ -1564,7 +1670,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
             margin-bottom: 32px;
             color: {text_color};
             display: flex; align-items: flex-start;">
-            <div style="font-size:2.6em; margin-right:23px; margin-top:1px; flex-shrink:0;">{icon}</div>
+            <div style="margin-right:23px; margin-top:1px; flex-shrink:0;">{arche_icon_img_html(archetype_data.get('name', '?'), height_px=110)}</div>
             <div>
                 <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
                     {archetype_data.get('name', '?')}
@@ -1603,8 +1709,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
                 {build_brand_icons_html(archetype_data.get('example_brands', []), logos_dir)}
                 {watchword_html}
                 {"<div style='margin-top:32px;font-weight:600;'>Kolory:</div>" if color_palette else ""}
-                {"<div style='margin-bottom:2px; margin-top:7px;'>" + color_icons_html + "</div>" if color_icons_html else ""}
-                {color_desc_html}
+                {color_boxes_html}
                 {"<div style='margin-top:22px;font-weight:600;'>Pytania archetypowe:</div>" if questions else ""}
                 {questions_html}
             </div>
@@ -1894,7 +1999,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
             """, unsafe_allow_html=True)
-
+            st.markdown("<div id='opisy'></div>", unsafe_allow_html=True)
             st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny {personGen}</div>', unsafe_allow_html=True)
             render_archetype_card(archetype_extended.get(main_type, {}), main=True)
 
@@ -1909,6 +2014,8 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny {personGen}</div>", unsafe_allow_html=True)
                 render_archetype_card(archetype_extended.get(supplement_type, {}), main=False)
+
+            st.markdown("<div id='raport'></div>", unsafe_allow_html=True)
 
             st.markdown(f"""
             <div style='height:44px;'></div>
@@ -1984,6 +2091,8 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:38px; margin-bottom:24px;" />
             """, unsafe_allow_html=True)
+
+            st.markdown("<div id='tabela'></div>", unsafe_allow_html=True)
 
             st.markdown('<div style="font-size:1.13em;font-weight:600;margin-bottom:13px;">Tabela odpowiedzi respondentów (pełne wyniki)</div>', unsafe_allow_html=True)
             final_df = results_df.copy()
