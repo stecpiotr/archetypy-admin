@@ -605,7 +605,7 @@ archetype_extended = {
             "UNICEF", "Nivea", "Caritas", "WOŚP", "Pampers", "Volvo", "hospicja"
         ],
         "color_palette": [
-            "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD", "#5B6979", "#A1B1C2", "#0192D3", "#2C7D78",
+            "#0192D3", "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD", "#5B6979", "#A1B1C2", "#2C7D78",
         ],
         "visual_elements": [
             "dłonie", "serce", "koło wspólnoty", "symbol opieki"
@@ -624,7 +624,7 @@ archetype_extended = {
         ]
     },
     "Kochanek": {
-        "name": "Kochanek / Wielbiciel",
+        "name": "Kochanek",
         "tagline": "Bliskość. Relacje. Pasja.",
         "description": (
             "Kochanek w polityce buduje pozytywne relacje z mieszkańcami, jest otwarty, komunikatywny i wzbudza zaufanie. "
@@ -714,7 +714,7 @@ archetype_extended = {
             "Old Spice", "M&Ms", "Fanta", "Łomża", "kabarety"
         ],
         "color_palette": [
-            "#FFB300", "#FF8300", "#FFD93D", "#F2A93B", "#588A4F", "#7AA571", "#AB3941", "#61681C",
+            "#FF8300", "#FFB300", "#FFD93D", "#F2A93B", "#588A4F", "#7AA571", "#AB3941", "#61681C",
         ],
         "visual_elements": [
             "uśmiech", "czapka błazna", "kolorowe akcenty"
@@ -820,7 +820,7 @@ archetype_extended = {
             "NASA", "Jeep", "Red Bull", "National Geographic", "The North Face", "Amazon", "Nomadzi"
         ],
         "color_palette": [
-            "#43C6DB", "#A0E8AF", "#F9D371", "#E377C2", "#D5C6AF", "#906C46", "#696812", "#212809",
+            "#212809", "#A0E8AF", "#F9D371", "#E377C2", "#D5C6AF", "#906C46", "#43C6DB", "#696812",
         ],
         "visual_elements": [
             "mapa", "kompas", "droga", "lupa"
@@ -890,7 +890,7 @@ archetype_extended = {
         ]
     },
     "Towarzysz": {
-        "name": "Towarzysz / Zwykły Człowiek",
+        "name": "Towarzysz",
         "tagline": "Wspólnota. Prostota. Bliskość.",
         "description": (
             "Towarzysz w polityce stoi blisko ludzi, jest autentyczny, stawia na prostotę, tworzenie bezpiecznej wspólnoty społecznej oraz zrozumienie codziennych problemów obywateli. "
@@ -926,7 +926,7 @@ archetype_extended = {
             "Ikea", "Skoda", "Żabka", "Ford", "VW"
         ],
         "color_palette": [
-            "#F9F9F9", "#6CA0DC", "#A3C1AD", "#2CA02C"
+            "#A3C1AD", "#F9F9F9", "#6CA0DC", "#2CA02C"
         ],
         "visual_elements": [
             "dom", "krąg ludzi", "prosta ikona dłoni"
@@ -978,7 +978,7 @@ archetype_extended = {
             "Dove", "Milka", "Kinder", "Polska Akcja Humanitarna"
         ],
         "color_palette": [
-            "#FFF6C3", "#AAC9CE", "#FFF200", "#9BD6F4"
+            "#9BD6F4", "#FFF6C3", "#AAC9CE", "#FFF200",
         ],
         "visual_elements": [
             "gołąb", "słońce", "dziecko"
@@ -1670,7 +1670,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
             margin-bottom: 32px;
             color: {text_color};
             display: flex; align-items: flex-start;">
-            <div style="margin-right:23px; margin-top:1px; flex-shrink:0;">{arche_icon_img_html(archetype_data.get('name', '?'), height_px=110)}</div>
+            <div style="margin-right:23px; margin-top:1px; flex-shrink:0;">{arche_icon_img_html(archetype_data.get('name', '?'), height_px=130)}</div>
             <div>
                 <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
                     {archetype_data.get('name', '?')}
