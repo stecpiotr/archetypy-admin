@@ -714,7 +714,7 @@ archetype_extended = {
             "Old Spice", "M&Ms", "Fanta", "Łomża", "kabarety"
         ],
         "color_palette": [
-            "#FF8300", "#FFB300", "#FFD93D", "#F2A93B", "#588A4F", "#7AA571", "#AB3941", "#61681C",
+            "#AB3941", "#F2A93B", "#FFB300", "#FFD93D", "#588A4F", "#7AA571", "#61681C", "#FF8300",
         ],
         "visual_elements": [
             "uśmiech", "czapka błazna", "kolorowe akcenty"
@@ -872,7 +872,7 @@ archetype_extended = {
             "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla", "Nowoczesne Miasto"
         ],
         "color_palette": [
-            "#8F00FF", "#181C3A", "#E0BBE4", "#7C46C5", "#0070B5", "#8681E8", "#FE89BE", "#FD4431",
+            "#181C3A", "#E0BBE4", "#8F00FF", "#7C46C5", "#0070B5", "#8681E8", "#FE89BE", "#FD4431",
         ],
         "visual_elements": [
             "gwiazda", "iskra", "łuk magiczny"
@@ -1033,7 +1033,7 @@ archetype_extended = {
             "Harley Davidson", "Jack Daniel's", "Greenpeace", "Virgin", "Bitcoin"
         ],
         "color_palette": [
-            "#000000", "#FF0000", "#FF6F61", "#FF7F0E"
+            "#FF0000", "#FF6F61", "#000000", "#FF7F0E"
         ],
         "visual_elements": [
             "piorun", "megafon", "odwrócona korona"
