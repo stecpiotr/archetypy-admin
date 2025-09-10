@@ -5,6 +5,7 @@ import streamlit as st
 import psycopg2
 import ast
 import plotly.graph_objects as go
+'import study'
 from fpdf import FPDF
 import unicodedata
 import requests
@@ -212,42 +213,44 @@ ARCHETYPE_FILENAME_MAP = {
     # "kochanelubwielbiciel": "kochanek.svg"  # przykład, jeśli trzeba
 }
 
-def arche_icon_img_html(archetype_name: str, height_px: int = 90) -> str:
+def arche_icon_img_html(archetype_name: str, height_px: int = 90, gender_code: str = "M") -> str:
+    """
+    Szuka w assets/person_icons pliku o nazwie:
+      <slug>_<gender>.svg|png   (np. blazen_M.png, wladca_K.svg)
+    a gdy go nie znajdzie – próbuje też <slug>.svg|png jako fallback.
+    """
     import base64, glob, os
-    slug = _slug_pl(archetype_name)
+    # archetype_name może już być w formie żeńskiej – cofnij do męskiej bazy:
+    base_masc = base_masc_from_any(archetype_name)
+    slug = ARCHETYPE_BASE_SLUGS.get(base_masc, _slug_pl(base_masc))
+    g = (gender_code or "M").upper()
 
-    # Szukaj plików: slug.svg, slug_*.svg, slug.png, slug_*.png
     patterns = [
-        ARCHETYPE_ICON_DIR / f"{slug}.svg",
-        ARCHETYPE_ICON_DIR / f"{slug}_*.svg",
+        ARCHETYPE_ICON_DIR / f"{slug}_{g}.svg",
+        ARCHETYPE_ICON_DIR / f"{slug}_{g}.png",
+        ARCHETYPE_ICON_DIR / f"{slug}.svg",   # fallback wspólny
         ARCHETYPE_ICON_DIR / f"{slug}.png",
-        ARCHETYPE_ICON_DIR / f"{slug}_*.png",
     ]
 
     path = None
     for pat in patterns:
-        # glob dla wzorców z gwiazdką
         matches = glob.glob(str(pat))
         if matches:
-            path = Path(matches[0])
-            break
-        if pat.exists():
-            path = pat
-            break
+            path = Path(matches[0]); break
+        if Path(pat).exists():
+            path = Path(pat); break
 
     if path and path.exists():
         data = path.read_bytes()
-        ext = path.suffix.lower()
-        mime = "image/svg+xml" if ext == ".svg" else "image/png"
+        mime = "image/svg+xml" if path.suffix.lower() == ".svg" else "image/png"
         b64 = base64.b64encode(data).decode("ascii")
         return (
             f"<img src='data:{mime};base64,{b64}' alt='{archetype_name}' "
             f"style='height:{height_px}px; width:auto; display:block;'/>"
         )
 
-    # Fallback
+    # Fallback (gdy nic nie ma)
     return f"<div style='font-size:{int(height_px*0.9)}px;line-height:1'>🔹</div>"
-
 
 
 import cairosvg
@@ -392,6 +395,67 @@ archetype_features = {
     "Niewinny": "Optymizm, ufność, unikanie konfliktów, pozytywne nastawienie.",
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
 }
+
+# --- PŁEĆ I ODWZOROWANIA NAZW/PLIKÓW ---
+
+# Feminatywy, zgodnie z Twoją listą
+GENDER_FEMININE_MAP = {
+    "Władca": "Władczyni",
+    "Bohater": "Bohaterka",
+    "Mędrzec": "Mędrczyni",
+    "Opiekun": "Opiekunka",
+    "Kochanek": "Kochanka",
+    "Błazen": "Komiczka",
+    "Twórca": "Twórczyni",
+    "Odkrywca": "Odkrywczyni",
+    "Czarodziej": "Czarodziejka",
+    "Towarzysz": "Towarzyszka",
+    "Niewinny": "Niewinna",
+    "Buntownik": "Buntowniczka",
+}
+
+# odwrotna mapa (z żeńskich na męskie), przydaje się, gdy wejściowo dostaniemy już żeńską formę
+GENDER_MASC_FROM_FEM = {v: k for k, v in GENDER_FEMININE_MAP.items()}
+
+# “bazowe” nazwy plików w assets/person_icons (bez sufiksu _M/_K i rozszerzenia)
+# ← podajemy tu męskie formy jako klucz
+ARCHETYPE_BASE_SLUGS = {
+    "Władca": "wladca",
+    "Bohater": "bohater",
+    "Mędrzec": "medrzec",
+    "Opiekun": "opiekun",
+    "Kochanek": "kochanek",
+    "Błazen": "blazen",
+    "Twórca": "tworca",
+    "Odkrywca": "odkrywca",
+    "Czarodziej": "czarodziej",
+    "Towarzysz": "towarzysz",
+    "Niewinny": "niewinny",
+    "Buntownik": "buntownik",
+}
+
+def normalize_gender(value) -> str:
+    """
+    Z dowolnej wartości („M”, „K”, „mężczyzna”, „kobieta”, True/False, itp.)
+    zwraca kod 'M' albo 'K'. Domyślnie 'M'.
+    """
+    v = (str(value or "")).strip().lower()
+    if v in ("k", "kobieta", "female", "f", "kob"):
+        return "K"
+    return "M"
+
+def display_name_for_gender(base_masc_name: str, gender_code: str) -> str:
+    """Zwraca nazwę do pokazania na ekranie zależnie od płci."""
+    if gender_code == "K":
+        return GENDER_FEMININE_MAP.get(base_masc_name, base_masc_name)
+    return base_masc_name
+
+def base_masc_from_any(name: str) -> str:
+    """Jeśli dostaliśmy już żeńską formę – cofamy do męskiej; w innym wypadku zwracamy jak było."""
+    if name in GENDER_MASC_FROM_FEM:
+        return GENDER_MASC_FROM_FEM[name]
+    return name
+
 
 # <<<--- TUTAJ WKLEJ własne archetype_extended = {...}
 archetype_extended = {
@@ -1255,8 +1319,6 @@ from docx.shared import Mm
 from io import BytesIO
 import os
 
-'TEMPLATE_PATH = "ap48_raport_template.docx"'
-
 def build_word_context(
     main_type, second_type, supplement_type, features, main, second, supplement,
     mean_scores=None, radar_image=None, archetype_table=None, num_ankiet=None,
@@ -1546,7 +1608,7 @@ def person_links_html(person_list):
     return ', '.join(person_link(name) for name in person_list)
 
 
-def render_archetype_card(archetype_data, main=True, supplement=False):
+def render_archetype_card(archetype_data, main=True, supplement=False, gender_code="M"):
     if not archetype_data:
         st.warning("Brak danych o archetypie.")
         return
@@ -1670,7 +1732,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
             margin-bottom: 32px;
             color: {text_color};
             display: flex; align-items: flex-start;">
-            <div style="margin-right:23px; margin-top:1px; flex-shrink:0;">{arche_icon_img_html(archetype_data.get('name', '?'), height_px=130)}</div>
+            <div style="margin-right:23px; margin-top:1px; flex-shrink:0;">{arche_icon_img_html(archetype_data.get('name', '?'), height_px=130, gender_code=gender_code)}</div>
             <div>
                 <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
                     {archetype_data.get('name', '?')}
@@ -1719,6 +1781,28 @@ def render_archetype_card(archetype_data, main=True, supplement=False):
 # ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
 
 def show_report(sb, study: dict, wide: bool = True) -> None:
+    # --- NOWE: płeć + mapowanie nazw do żeńskich ---
+    gender_raw = (study.get("gender") or study.get("sex") or study.get("plec") or "").strip().lower()
+    IS_FEMALE = gender_raw in {"k", "kobieta", "female", "f"}
+
+    FEM_NAME_MAP = {
+        "Władca": "Władczyni",
+        "Bohater": "Bohaterka",
+        "Mędrzec": "Mędrczyni",
+        "Opiekun": "Opiekunka",
+        "Kochanek": "Kochanka",
+        "Błazen": "Komiczka",
+        "Twórca": "Twórczyni",
+        "Odkrywca": "Odkrywczyni",
+        "Czarodziej": "Czarodziejka",
+        "Towarzysz": "Towarzyszka",
+        "Niewinny": "Niewinna",
+        "Buntownik": "Buntowniczka",
+    }
+
+    def disp_name(name: str) -> str:
+        return FEM_NAME_MAP.get(name, name) if IS_FEMALE else name
+
     # personalizacja z przekazanego rekordu
     personNom = f"{study.get('first_name_nom') or study.get('first_name','')} {study.get('last_name_nom') or study.get('last_name','')}".strip()
     personGen = f"{study.get('first_name_gen') or (study.get('first_name_nom') or study.get('first_name',''))} {study.get('last_name_gen') or (study.get('last_name_nom') or study.get('last_name',''))}".strip()
@@ -1734,7 +1818,6 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
     personVoc  = _join(study.get("first_name_voc"),  study.get("last_name_voc"))
 
     study_id = study["id"]
-
     data = load(study_id)
 
     # ❗️ZBIERAMY WSZYSTKIE PRZYPADKI DO SŁOWNIKA DLA WORDA
@@ -1794,6 +1877,18 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
             supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
 
+            # wersje do wyświetlania – podmień 'name' na żeńskie, jeśli IS_FEMALE
+            main_disp = dict(main)
+            main_disp["name"] = disp_name(main.get("name", main_type or ""))
+
+            second_disp = dict(second)
+            if second:
+                second_disp["name"] = disp_name(second.get("name", second_type or ""))
+
+            supplement_disp = dict(supplement)
+            if supplement:
+                supplement_disp["name"] = disp_name(supplement.get("name", supplement_type or ""))
+
             czas_ankiety = ""
             if pd.notna(row.get("created_at", None)):
                 try:
@@ -1847,7 +1942,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             with col1:
                 st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, wspierających i pobocznych</div>', unsafe_allow_html=True)
                 archetype_table = pd.DataFrame({
-                    "Archetyp": [f"{get_emoji(n)} {n}" for n in archetype_names],
+                    "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in archetype_names],
                     "Główny archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in archetype_names],
                     "Wspierający archetyp": [zero_to_dash(counts_aux.get(normalize(k), 0)) for k in archetype_names],
                     "Poboczny archetyp": [
@@ -1899,14 +1994,15 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             with col2:
                 theta_labels = []
                 for n in archetype_names:
+                    label = disp_name(n)
                     if n == main_type:
-                        theta_labels.append(f"<b><span style='color:red;'>{n}</span></b>")
+                        theta_labels.append(f"<b><span style='color:red;'>{label}</span></b>")
                     elif n == second_type:
-                        theta_labels.append(f"<b><span style='color:#FFD22F;'>{n}</span></b>")
+                        theta_labels.append(f"<b><span style='color:#FFD22F;'>{label}</span></b>")
                     elif n == supplement_type:
-                        theta_labels.append(f"<b><span style='color:#40b900;'>{n}</span></b>")
+                        theta_labels.append(f"<b><span style='color:#40b900;'>{label}</span></b>")
                     else:
-                        theta_labels.append(f"<span style='color:#656565;'>{n}</span>")
+                        theta_labels.append(f"<span style='color:#656565;'>{label}</span>")
                 highlight_r = []
                 highlight_marker_color = []
                 for i, name in enumerate(archetype_names):
@@ -2001,19 +2097,19 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             """, unsafe_allow_html=True)
             st.markdown("<div id='opisy'></div>", unsafe_allow_html=True)
             st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny {personGen}</div>', unsafe_allow_html=True)
-            render_archetype_card(archetype_extended.get(main_type, {}), main=True)
+            render_archetype_card(main_disp, main=True, gender_code=("K" if IS_FEMALE else "M"))
 
             if second_type and second_type != main_type:
                 st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp wspierający {personGen}</div>", unsafe_allow_html=True)
-                render_archetype_card(archetype_extended.get(second_type, {}), main=False)
+                render_archetype_card(second_disp, main=False, gender_code=("K" if IS_FEMALE else "M"))
 
             if supplement_type and supplement_type not in [main_type, second_type]:
                 st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny {personGen}</div>", unsafe_allow_html=True)
-                render_archetype_card(archetype_extended.get(supplement_type, {}), main=False)
+                render_archetype_card(supplement_disp, main=False, gender_code=("K" if IS_FEMALE else "M"))
 
             st.markdown("<div id='raport'></div>", unsafe_allow_html=True)
 
@@ -2040,9 +2136,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 second_type,  # str
                 supplement_type,  # str
                 archetype_features,  # dict
-                main,  # dict
-                second,  # dict
-                supplement,  # dict
+                main_disp,  # dict
+                second_disp,  # dict
+                supplement_disp,  # dict
                 radar_img_path="radar.png",
                 archetype_table=archetype_table,
                 num_ankiet=num_ankiet,

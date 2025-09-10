@@ -797,7 +797,7 @@ def results_view() -> None:
         # ⬅️ JEDEN toggle z unikalnym key
         wide = st.toggle("🔎 Szeroki raport", key="wide_report")
         st.markdown(
-            f"<style>.block-container{{max-width:{'97vw' if wide else '1160px'} !important}}</style>",
+            f"<style>.block-container{{max-width:{'100vw' if wide else '1160px'} !important}}</style>",
             unsafe_allow_html=True
         )
     with topR:
