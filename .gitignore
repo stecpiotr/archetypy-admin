@@ -11,3 +11,4 @@ ext.py
 >>>>>>> 38db51a4c620c47b5cb61250da144dac7b6c7760
 .idea/
 .env
+.backup/

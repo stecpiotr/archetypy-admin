@@ -66,6 +66,119 @@ from docx.shared import Mm
 import subprocess
 from io import BytesIO
 
+# === PDF (FPDF2) z osadzonymi fontami TTF ===
+from fpdf import FPDF
+from pathlib import Path
+
+FONT_DIR = Path(__file__).with_name("assets") / "fonts"
+
+def build_pdf_with_ttf(sample_title: str = "Raport AP48", sample_body: str = "Przykładowy akapit z polskimi znakami: ąęćłńóśźż – oraz nazwą fontu Arial Nova Cond.") -> bytes:
+    """
+    Generuje prosty PDF z osadzonymi fontami TTF (Arial Nova Cond + Light + Roboto Condensed).
+    Zwraca bajty PDF gotowe do st.download_button (Streamlit).
+    """
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.add_page()
+
+    # Rejestracja fontów TTF (zostaną osadzone w PDF)
+    # Upewnij się, że pliki istnieją: assets/fonts/ArialNovaCond.ttf itd.
+    an_cond      = FONT_DIR / "ArialNovaCond.ttf"
+    an_cond_lt   = FONT_DIR / "ArialNovaCondLight.ttf"
+    rob_cond     = FONT_DIR / "RobotoCondensed-Regular.ttf"
+    rob_cond_lt  = FONT_DIR / "RobotoCondensed-Light.ttf"
+
+    # Dodaj tylko te, które faktycznie masz
+    if an_cond.exists():
+        pdf.add_font("ArialNovaCond", "", str(an_cond), uni=True)
+    if an_cond_lt.exists():
+        pdf.add_font("ArialNovaCond", "L", str(an_cond_lt), uni=True)
+    if rob_cond.exists():
+        pdf.add_font("RobotoCondensed", "", str(rob_cond), uni=True)
+    if rob_cond_lt.exists():
+        pdf.add_font("RobotoCondensed", "L", str(rob_cond_lt), uni=True)
+
+    # Nagłówek
+    try:
+        pdf.set_font("ArialNovaCond", size=24)
+    except:
+        pdf.set_font("Helvetica", size=24)  # fallback
+    pdf.cell(0, 12, sample_title, new_x="LMARGIN", new_y="NEXT")
+
+    # Podtytuł
+    try:
+        pdf.set_font("ArialNovaCond", "L", 14)
+    except:
+        pdf.set_font("Helvetica", "", 14)
+    pdf.cell(0, 8, "Czcionka osadzona w PDF (TTF)", new_x="LMARGIN", new_y="NEXT")
+
+    pdf.ln(3)
+
+    # Treść akapitu
+    try:
+        pdf.set_font("RobotoCondensed", "", 12)
+    except:
+        pdf.set_font("Helvetica", "", 12)
+    pdf.multi_cell(0, 6.5, sample_body)
+
+    # Zwróć bajty PDF
+    return bytes(pdf.output(dest="S").encode("latin1"))
+
+# === PDF (ReportLab) z osadzonymi fontami TTF ===
+from io import BytesIO
+from pathlib import Path
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+FONT_DIR = Path(__file__).with_name("assets") / "fonts"
+
+def build_pdf_reportlab(sample_title: str = "Raport AP48", sample_body: str = "Przykładowy akapit ąęćłńóśźż.") -> bytes:
+    buf = BytesIO()
+
+    # Rejestracja TTF → osadzanie w PDF
+    def _reg(name, file):
+        p = FONT_DIR / file
+        if p.exists():
+            pdfmetrics.registerFont(TTFont(name, str(p)))
+
+    _reg("ArialNovaCond", "ArialNovaCond.ttf")
+    _reg("ArialNovaCondLight", "ArialNovaCondLight.ttf")
+    _reg("RobotoCondensed", "RobotoCondensed-Regular.ttf")
+    _reg("RobotoCondensedLight", "RobotoCondensed-Light.ttf")
+
+    c = canvas.Canvas(buf, pagesize=A4)
+    W, H = A4
+
+    # Nagłówek
+    try:
+        c.setFont("ArialNovaCond", 24)
+    except:
+        c.setFont("Helvetica-Bold", 24)
+    c.drawString(40, H - 60, sample_title)
+
+    # Podtytuł
+    try:
+        c.setFont("ArialNovaCondLight", 13)
+    except:
+        c.setFont("Helvetica", 13)
+    c.drawString(40, H - 85, "Czcionki TTF osadzone w dokumencie PDF")
+
+    # Treść
+    try:
+        c.setFont("RobotoCondensed", 11.5)
+    except:
+        c.setFont("Helvetica", 11.5)
+    textobj = c.beginText(40, H - 120)
+    for line in sample_body.splitlines():
+        textobj.textLine(line)
+    c.drawText(textobj)
+
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
 person_wikipedia_links = {
     "Aleksandra Dulkiewicz": "https://pl.wikipedia.org/wiki/Aleksandra_Dulkiewicz",
     "Aleksiej Nawalny": "https://pl.wikipedia.org/wiki/Aleksiej_Nawalny",
@@ -170,6 +283,94 @@ def svg_to_png_bytes(svg_path, width_mm=None, height_mm=None):
 
     png_bytes = cairosvg.svg2png(bytestring=svg_bytes, **arg_dict)
     return png_bytes
+
+# --- Ikony archetypów do Word (InlineImage) ---
+def _icon_file_for(archetype_name: str, gender_code: str = "M"):
+    """
+    Zwraca ścieżkę do pliku ikony w assets/person_icons:
+      <slug>_<M/K>.svg|png lub fallback <slug>.svg|png
+    """
+    import glob
+    base_masc = base_masc_from_any(archetype_name)
+    slug = ARCHETYPE_BASE_SLUGS.get(base_masc, _slug_pl(base_masc))
+    g = (gender_code or "M").upper()
+    candidates = [
+        ARCHETYPE_ICON_DIR / f"{slug}_{g}.svg",
+        ARCHETYPE_ICON_DIR / f"{slug}_{g}.png",
+        ARCHETYPE_ICON_DIR / f"{slug}.svg",
+        ARCHETYPE_ICON_DIR / f"{slug}.png",
+    ]
+    for c in candidates:
+        if Path(c).exists():
+            return Path(c)
+        m = glob.glob(str(c))
+        if m:
+            return Path(m[0])
+    return None
+
+def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
+    """
+    Zwraca InlineImage do docxtpl dla danego archetypu.
+    Obsługuje SVG (konwersja do PNG) i PNG.
+    """
+    path = _icon_file_for(archetype_name, gender_code)
+    if not path:
+        return ""
+    if path.suffix.lower() == ".svg":
+        png_bytes = svg_to_png_bytes(str(path), height_mm=height_mm)
+        return InlineImage(doc, BytesIO(png_bytes), height=Mm(height_mm))
+    else:
+        return InlineImage(doc, str(path), height=Mm(height_mm))
+
+
+# --- Generowanie grafiki z paletą kolorów do Word ---
+def _luma(hexcode: str) -> float:
+    h = hexcode.lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c*2 for c in h)
+    r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
+    return 0.2126*r + 0.7152*g + 0.0722*b
+
+def make_palette_png(palette: list[str], box_w=260, box_h=160, pad=20, gap=18, font_pt=28):
+    """
+    Tworzy jeden rząd kafelków kolorów z podpisami 'nazwa (#HEX)'.
+    Zwraca BytesIO (PNG).
+    """
+    if not palette:
+        return None
+    from PIL import ImageFont
+    # spróbuj systemowych DejaVu (bezpieczny fallback)
+    try:
+        font_b = ImageFont.truetype("DejaVuSans-Bold.ttf", font_pt)
+    except Exception:
+        font_b = None
+
+    n = len(palette)
+    W = pad*2 + n*box_w + (n-1)*gap
+    H = pad*2 + box_h
+    img = Image.new("RGBA", (W, H), (255, 255, 255, 0))
+    drw = ImageDraw.Draw(img)
+
+    x = pad
+    for hexcode in palette:
+        drw.rounded_rectangle([x, pad, x+box_w, pad+box_h], radius=22, fill=hexcode)
+        label = f"{COLOR_NAME_MAP.get(hexcode.upper(), hexcode)}\n({hexcode.upper()})"
+        # kolor napisu – biały dla bardzo ciemnych kafli
+        tcol = (255, 255, 255) if _luma(hexcode) < 110 else (17, 17, 17)
+        tw, th = drw.multiline_textbbox((0, 0), label, font=font_b or None, align="center")[2:]
+        drw.multiline_text((x + box_w/2 - tw/2, pad + box_h/2 - th/2),
+                           label, fill=tcol, font=font_b or None, align="center")
+        x += box_w + gap
+
+    out = BytesIO()
+    img.save(out, "PNG")
+    out.seek(0)
+    return out
+
+def palette_inline_for_word(doc, palette: list[str]):
+    png = make_palette_png(palette)
+    return InlineImage(doc, png, width=Mm(170)) if png else ""
+
 
 def build_brands_for_word(doc, brand_list, logos_dir, height_mm=20):
     out = []
@@ -395,6 +596,98 @@ archetype_features = {
     "Niewinny": "Optymizm, ufność, unikanie konfliktów, pozytywne nastawienie.",
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
 }
+
+# --- KOLORY HEURYSTYCZNE (mapa pytań + opis meta) ---
+COLOR_QUESTION_MAP = {
+    "Niebieski": [9,10,11,12,37,38,39,40,41,42,43,44],
+    "Zielony":   [13,14,15,16,17,18,19,20,21,22,23,24],
+    "Żółty":     [25,26,27,28,33,34,35,36,29,30,31,32],
+    "Czerwony":  [1,2,3,4,5,6,7,8,45,46,47,48],
+}
+
+COLOR_META = {
+    "Niebieski": {
+        "emoji":"🔵",
+        "title":"Niebieski – analityczny, proceduralny, precyzyjny",
+        "orient":"Orientacja na: fakty, dane, logikę i procedury",
+        "arche":"Archetypy: Mędrzec, Towarzysz, Niewinny",
+        "desc":
+            "Ceni fakty, logikę i stabilne procedury. "
+            "Działa najlepiej, gdy ma jasno określone zasady, harmonogram i dostęp do danych. "
+            "Nie lubi chaosu, nagłych zmian i improwizacji – woli działać według planu. "
+            "Może sprawiać wrażenie zdystansowanego i nadmiernie ostrożnego, ale wnosi do zespołu rzetelność, "
+            "sumienność i dbałość o szczegóły. Niebieski to myślenie.\n\n"
+            "👉 W polityce to typ eksperta – skrupulatny analityk, który zamiast haseł pokazuje liczby i tabele. "
+            "Budzi zaufanie dzięki przygotowaniu merytorycznemu i pragmatycznym rozwiązaniom. "
+            "Może być odbierany jako mało charyzmatyczny, ale daje wyborcom poczucie przewidywalności i bezpieczeństwa instytucjonalnego."
+    },
+    "Zielony": {
+        "emoji":"🟢",
+        "title":"Zielony – empatyczny, harmonijny, wspierający",
+        "orient":"Orientacja na: relacje, troskę, zaufanie, wspólnotę",
+        "arche":"Archetypy: Opiekun, Kochanek, Błazen",
+        "desc":
+            "Kierują się wartościami, relacjami i potrzebą budowania poczucia bezpieczeństwa. "
+            "Są empatyczni, uważni na innych i dążą do zgody. "
+            "Nie lubią gwałtownych zmian i konfrontacji, czasem brakuje im asertywności, "
+            "ale potrafią tworzyć atmosferę zaufania i współpracy. "
+            "Wnoszą do zespołu stabilność, lojalność i umiejętność łagodzenia napięć. "
+            "Zieloni to uczucia.\n\n"
+            "👉 W polityce to typ mediator-społecznik, który stawia na dialog, kompromis i dobro wspólne. "
+            "Potrafi przekonać elektorat stylem „opiekuńczego lidera”, akcentując wartości społeczne, "
+            "wspólnotowe i solidarnościowe. "
+            "Może unikać ostrych sporów, ale umiejętnie buduje mosty i zdobywa poparcie przez bliskość "
+            "i troskę o codzienne sprawy ludzi."
+    },
+    "Żółty": {
+        "emoji":"🟡",
+        "title":"Żółci – kreatywni, pełni energii i spontaniczni",
+        "orient":"Orientacja na: wizję, innowację, możliwości, odkrywanie",
+        "arche":"Archetypy: Twórca, Czarodziej, Odkrywca",
+        "desc":
+            "Osoba wizjonerska i entuzjastyczna – pełna pomysłów, które inspirują innych. "
+            "Najlepiej czuje się w środowisku swobodnym, otwartym na eksperymenty i innowacje. "
+            "Nie przepada za rutyną, schematami i nadmierną kontrolą. "
+            "Jego mocną stroną jest umiejętność rozbudzania energii zespołu, improwizacja i znajdowanie "
+            "nowych możliwości tam, gdzie inni widzą bariery. "
+            "Żółty to intuicja.\n\n"
+            "👉 W polityce to typ showmana i wizjonera, który potrafi porwać tłumy hasłami zmiany i nowego otwarcia. "
+            "Umie przekuć abstrakcyjne idee w obrazowe narracje, które przemawiają do emocji. "
+            "Bywa odbierany jako idealista lub ryzykant, ale świetnie nadaje dynamikę kampanii i kreuje „nową nadzieję” "
+            "dla wyborców."
+    },
+    "Czerwony": {
+        "emoji":"🔴",
+        "title":"Czerwony – decyzyjny, nastawiony na wynik, dominujący",
+        "orient":"Orientacja na: działanie, sprawczość, szybkie decyzje",
+        "arche":"Archetypy: Władca, Bohater, Buntownik",
+        "desc":
+               "Ma naturalne zdolności przywódcze i skłonność do szybkiego podejmowania decyzji. "
+               "Jest niezależny, ambitny i skoncentrowany na rezultatach. "
+               "Może być niecierpliwy, zbyt stanowczy i mało elastyczny, ale dzięki determinacji potrafi przeprowadzić "
+               "projekt do końca mimo przeszkód. "
+               "To osoba, która nadaje kierunek i mobilizuje innych do działania. "
+               "Czerwony to doświadczenie.\n\n"
+               "👉 W polityce to typ lidera-wojownika, który buduje swoją pozycję na sile, determinacji i zdolności "
+               "„dowiezienia” obietnic. "
+               "Sprawdza się w kampaniach, gdzie liczy się mocne przywództwo i szybkie decyzje. "
+               "Może odstraszać swoją twardością, ale równocześnie daje poczucie, że „trzyma ster” i potrafi poprowadzić "
+               "kraj czy miasto przez kryzysy."
+    },
+}
+
+def color_scores_from_answers(answers: list[int]) -> dict[str, int]:
+    if not isinstance(answers, list) or len(answers) < 48:
+        return {c: 0 for c in COLOR_QUESTION_MAP}
+    out = {}
+    for color, idxs in COLOR_QUESTION_MAP.items():
+        out[color] = sum(answers[i-1] for i in idxs)  # pytania są 1-indexed
+    return out
+
+def color_percents_from_scores(scores: dict[str,int]) -> dict[str, float]:
+    total = sum(scores.values()) or 1
+    return {c: round(v/total*100, 1) for c, v in scores.items()}
+
 
 # --- PŁEĆ I ODWZOROWANIA NAZW/PLIKÓW ---
 
@@ -933,7 +1226,7 @@ archetype_extended = {
             "Barack Obama", "Václav Klaus", "Nelson Mandela", "Martin Luther King"
         ],
         "example_brands": [
-            "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla", "Nowoczesne Miasto"
+            "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla",
         ],
         "color_palette": [
             "#181C3A", "#E0BBE4", "#8F00FF", "#7C46C5", "#0070B5", "#8681E8", "#FE89BE", "#FD4431",
@@ -1163,6 +1456,31 @@ div[data-testid="stSelectbox"] label{
 }
 </style>
 """, unsafe_allow_html=True)
+
+# (opcjonalnie) osadzenie własnych fontów w widoku Streamlit
+import base64, pathlib
+def _font_face_css(font_path, family_name, weight="normal", style="normal"):
+    try:
+        data = pathlib.Path(font_path).read_bytes()
+        b64 = base64.b64encode(data).decode("ascii")
+        return f"""
+        @font-face {{
+            font-family: '{family_name}';
+            src: url(data:font/ttf;base64,{b64}) format('truetype');
+            font-weight: {weight};
+            font-style: {style};
+            font-display: swap;
+        }}
+        """
+    except Exception:
+        return ""
+css_ff = ""
+css_ff += _font_face_css("fonts/ArialNovaCond.ttf", "Arial Nova Cond", "600")
+css_ff += _font_face_css("fonts/ArialNovaCondLight.ttf", "Arial Nova Cond", "300")
+css_ff += _font_face_css("fonts/RobotoCondensed-Regular.ttf", "Roboto Condensed", "400")
+css_ff += _font_face_css("fonts/RobotoCondensed-Light.ttf", "Roboto Condensed", "300")
+if css_ff:
+    st.markdown(f"<style>{css_ff} body{{font-family:'Roboto','Segoe UI','Arial',sans-serif;}}</style>", unsafe_allow_html=True)
 
 
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
@@ -1474,7 +1792,8 @@ def export_word_docxtpl(
     archetype_table=None,
     num_ankiet=None,
     panel_img_path=None,
-    person: dict | None = None
+    person: dict | None = None,
+    gender_code: str = "M",
 ):
     doc = DocxTemplate(TEMPLATE_PATH)
 
@@ -1487,12 +1806,31 @@ def export_word_docxtpl(
     # Panel image
     panel_image = InlineImage(doc, panel_img_path, width=Mm(140)) if panel_img_path and os.path.exists(panel_img_path) else ""
 
+    # Ikony archetypów do Word (główny/wspierający/poboczny)
+    ARCHETYPE_MAIN_ICON = arche_icon_inline_for_word(doc, main_type, gender_code, height_mm=18) if main_type else ""
+    ARCHETYPE_AUX_ICON = arche_icon_inline_for_word(doc, second_type, gender_code, height_mm=18) if second_type else ""
+    ARCHETYPE_SUPP_ICON = arche_icon_inline_for_word(doc, supplement_type, gender_code, height_mm=18) if supplement_type else ""
+
+    # Grafiki palet kolorów
+    ARCHETYPE_MAIN_PALETTE_IMG = palette_inline_for_word(doc, main.get("color_palette", []))
+    ARCHETYPE_AUX_PALETTE_IMG = palette_inline_for_word(doc, second.get("color_palette", []))
+    ARCHETYPE_SUPP_PALETTE_IMG = palette_inline_for_word(doc, supplement.get("color_palette", []))
+
     # ——— najważniejsze: przekaż person →
     context = build_word_context(
         main_type, second_type, supplement_type, features, main, second, supplement,
         mean_scores, radar_image, archetype_table, num_ankiet,
         person=person
     )
+
+    # Wstrzyknięcie ikon i palet do szablonu DOCX
+    context["ARCHETYPE_MAIN_ICON"] = ARCHETYPE_MAIN_ICON
+    context["ARCHETYPE_AUX_ICON"] = ARCHETYPE_AUX_ICON
+    context["ARCHETYPE_SUPP_ICON"] = ARCHETYPE_SUPP_ICON
+
+    context["ARCHETYPE_MAIN_PALETTE_IMG"] = ARCHETYPE_MAIN_PALETTE_IMG
+    context["ARCHETYPE_AUX_PALETTE_IMG"] = ARCHETYPE_AUX_PALETTE_IMG
+    context["ARCHETYPE_SUPP_PALETTE_IMG"] = ARCHETYPE_SUPP_PALETTE_IMG
 
     # Logotypy do Worda
     context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
@@ -1532,7 +1870,13 @@ def word_to_pdf(docx_bytes_io):
         else:
             import subprocess
             result = subprocess.run([
-                "soffice", "--headless", "--convert-to", "pdf", "--outdir", tmpdir, docx_path
+                "soffice",
+                "--headless",
+                "--convert-to",
+                # wymuś profil eksportu + embed czcionek:
+                "pdf:writer_pdf_Export:EmbedStandardFonts=true;EmbedOpenTypeFonts=true;UseTaggedPDF=true",
+                "--outdir", tmpdir,
+                docx_path
             ], capture_output=True)
             if result.returncode != 0 or not os.path.isfile(pdf_path):
                 raise RuntimeError("LibreOffice PDF error: " + result.stderr.decode())
@@ -1872,6 +2216,10 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             arcsums = archetype_scores(row["answers"])
             arcper = {k: archetype_percent(v) for k, v in arcsums.items()}
 
+            # --- kolory heurystyczne dla tej odpowiedzi ---
+            col_scores = color_scores_from_answers(row["answers"])
+            col_perc = color_percents_from_scores(col_scores)
+
             main_type, second_type, supplement_type = pick_top_3_archetypes(arcsums, ARCHE_NAMES_ORDER)
             main = archetype_extended.get(main_type, {})
             second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
@@ -1915,6 +2263,8 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 "Opis poboczny": supplement.get("description", "") if supplement_type not in [main_type, second_type] else "",
                 "Storyline poboczny": supplement.get("storyline", "") if supplement_type not in [main_type, second_type] else "",
                 "Rekomendacje poboczny": "\n".join(supplement.get("recommendations", [])) if supplement_type not in [main_type, second_type] else "",
+                **{f"Kolor_{k}": v for k, v in col_scores.items()},
+                **{f"Kolor_{k}_%": v for k, v in col_perc.items()},
             })
 
         results_df = pd.DataFrame(results)
@@ -2092,6 +2442,47 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                         width=700
                     )
 
+            # === Heurystyczna analiza kolorów (donut + opis) ===
+            try:
+                color_order = ["Niebieski","Zielony","Żółty","Czerwony"]
+                if all(f"Kolor_{c}_%" in results_df.columns for c in color_order):
+                    mean_colors = {c: float(results_df[f"Kolor_{c}_%"].mean()) for c in color_order}
+                else:
+                    # fallback: policz ze średniej odpowiedzi jeśli kolumny nie istnieją
+                    first_ans = next((r for _, r in data.iterrows() if isinstance(r.get("answers"), list)), None)
+                    if first_ans is not None:
+                        cs = color_scores_from_answers(first_ans["answers"])
+                        mean_colors = color_percents_from_scores(cs)
+                    else:
+                        mean_colors = {c: 0.0 for c in color_order}
+
+                figc = go.Figure(
+                    data=[go.Pie(
+                        labels=list(mean_colors.keys()),
+                        values=list(mean_colors.values()),
+                        hole=0.55,
+                        textinfo="label+percent",
+                        hovertemplate="%{label}: %{value:.1f}%<extra></extra>"
+                    )],
+                    layout=go.Layout(margin=dict(l=10, r=10, t=10, b=10))
+                )
+                figc.update_traces(sort=False)
+                st.markdown("<div style='font-size:1.35em;font-weight:600;margin:6px 0 10px 0;'>Profil kolorów (heurystyka)</div>", unsafe_allow_html=True)
+                st.plotly_chart(figc, use_container_width=True)
+
+                dom_color = max(mean_colors.items(), key=lambda kv: kv[1])[0] if mean_colors else "Niebieski"
+                meta = COLOR_META[dom_color]
+                st.markdown(f"""
+                <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin:8px 0 26px 0;background:#fafafa;">
+                  <div style="font-weight:700;margin-bottom:6px;">{meta["emoji"]} {meta["title"]}</div>
+                  <div>• {meta["orient"]}</div>
+                  <div>• {meta["arche"]}</div>
+                  <div style="margin-top:8px;line-height:1.45">{meta["desc"]}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            except Exception:
+                st.info("Brak danych do analizy kolorów.")
+
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
             """, unsafe_allow_html=True)
@@ -2132,19 +2523,21 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
             docx_buf = export_word_docxtpl(
-                main_type,  # str
-                second_type,  # str
-                supplement_type,  # str
-                archetype_features,  # dict
-                main_disp,  # dict
-                second_disp,  # dict
-                supplement_disp,  # dict
+                main_type,
+                second_type,
+                supplement_type,
+                archetype_features,
+                main_disp,
+                second_disp,
+                supplement_disp,
                 radar_img_path="radar.png",
                 archetype_table=archetype_table,
                 num_ankiet=num_ankiet,
                 panel_img_path=panel_img_path,
                 person=person,
+                gender_code=("K" if IS_FEMALE else "M"),
             )
+
             pdf_buf = word_to_pdf(docx_buf)
 
             word_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#185abd'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>W</text></svg>"
