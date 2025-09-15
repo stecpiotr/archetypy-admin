@@ -12,7 +12,8 @@ markdown
 pytz
 plotly>=5.0.0
 kaleido>=0.2.1
-
+reportlab
+streamlit-charts
 
 pydantic==2.11.7
 pydantic-core==2.33.2
