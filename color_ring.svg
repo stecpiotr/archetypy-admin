@@ -1,0 +1,24 @@
+
+    <svg width="600" height="600" viewBox="0 0 600 600" style="display:block;">
+      
+      <defs>
+        <filter id="g_c343332d" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#29ABE2" flood-opacity="0.35"/>
+        </filter>
+      </defs>
+    
+      <g transform="rotate(-90 300.0 300.0)">
+        <circle cx="300.0" cy="300.0" r="276.0" fill="none"
+                stroke="#F1F3F5" stroke-width="48" stroke-linecap="round"/>
+        <circle cx="300.0" cy="300.0" r="276.0" fill="none"
+                stroke="#29ABE2" stroke-width="48" stroke-linecap="round"
+                stroke-dasharray="539.323494027067 1194.8356507544988" filter="url(#g_c343332d)"/>
+      </g>
+      <g>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+              style="font-family: 'Segoe UI', system-ui, -apple-system, Arial; font-size:168px; font-weight:800; fill:#333;">
+          31%
+        </text>
+      </g>
+    </svg>
+    

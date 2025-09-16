@@ -20,6 +20,7 @@ from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
 import shutil
+import streamlit.components.v1 as components
 import sys
 if sys.platform.startswith("linux"):
     import subprocess
@@ -597,84 +598,311 @@ archetype_features = {
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
 }
 
-# --- KOLORY HEURYSTYCZNE (mapa pytań + opis meta) ---
+# --- KOLORY: mapowanie pytań (1..48) do 4 kolorów i kalkulator % ---
 COLOR_QUESTION_MAP = {
     "Niebieski": [9,10,11,12,37,38,39,40,41,42,43,44],
     "Zielony":   [13,14,15,16,17,18,19,20,21,22,23,24],
     "Żółty":     [25,26,27,28,33,34,35,36,29,30,31,32],
     "Czerwony":  [1,2,3,4,5,6,7,8,45,46,47,48],
 }
+COLOR_HEX = {  # kolory pierścieni
+    "Czerwony":  "#E53935",
+    "Zielony":   "#7ED321",
+    "Żółty":     "#FFC107",
+    "Niebieski": "#29ABE2",
+}
 
-COLOR_META = {
+# === 4 bąbelki w linii: średnica ~ udział % w całości, pierścień ~ % względem zwycięzcy ===
+def _bubble_svg(value_pct: float, winner_pct: float, color: str,
+                diameter_px: int, track="#EEF2F6", text_color="#111") -> str:
+    import math
+    value_pct  = max(0.0, float(value_pct or 0.0))
+    winner_pct = max(0.0001, float(winner_pct or 0.0001))
+    ring_pct   = max(0.0, min(100.0, 100.0 * value_pct / winner_pct))  # % względem zwycięzcy
+
+    size   = int(diameter_px)
+    stroke = max(10, int(size * 0.14))
+    r      = (size - stroke) / 2
+    c      = 2 * math.pi * r
+    dash   = c * (ring_pct / 100.0)
+    gap    = c - dash
+
+    return f"""
+    <svg width="{size}" height="{size}" viewBox="0 0 {size} {size}"
+         style="display:block; shape-rendering:geometricPrecision;">
+      <g transform="rotate(-90 {size/2} {size/2})">
+        <circle cx="{size/2}" cy="{size/2}" r="{r}" fill="none"
+                stroke="{track}" stroke-width="{stroke}" stroke-linecap="round"/>
+        <circle cx="{size/2}" cy="{size/2}" r="{r}" fill="none"
+                stroke="{color}" stroke-width="{stroke}" stroke-linecap="round"
+                stroke-dasharray="{dash} {gap}"/>
+      </g>
+      <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+            style="font-family:'Segoe UI',system-ui,-apple-system,Arial;
+                   font-size:{int(size*0.30)}px; font-weight:800; fill:{text_color};">
+        {int(round(value_pct))}%
+      </text>
+    </svg>
+    """
+
+def color_bubbles_html(pcts: dict[str, float],
+                       min_d: int = 110, max_d: int = 240,
+                       map_mode: str = "diameter") -> str:
+    items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
+    if not items:
+        return "<div></div>"
+    winner_val = max(0.0001, items[0][1])
+
+    def dia(val):
+        frac = max(0.0, min(1.0, (val or 0.0) / 100.0))
+        if map_mode == "area":
+            frac = frac ** 0.5
+        return int(min_d + frac * (max_d - min_d))
+
+    blocks = []
+    for name, val in items:
+        d = dia(val)
+        svg = _bubble_svg(val, winner_val, COLOR_HEX[name], d)
+        blocks.append(f"""
+          <div class="ap-bubble-wrap">
+            <div class="ap-bubble" style="width:{d}px;height:{d}px;">{svg}</div>
+            <div class="ap-chip">
+              <span class="ap-dot" style="background:{COLOR_HEX[name]}"></span>{name}
+            </div>
+          </div>
+        """)
+
+    return f"""
+    <style>
+      .ap-bubbles-row{{display:flex;justify-content:center;align-items:flex-end;gap:26px;background:transparent;}}
+      .ap-bubble-wrap{{display:flex;flex-direction:column;align-items:center;gap:10px;}}
+      /* delikatny, neutralny cień tylko CSS – brak kolorowych smug */
+      .ap-bubble{{filter: drop-shadow(0 6px 12px rgba(0,0,0,.12)); border-radius:50%;}}
+      .ap-chip{{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;
+               border:1px solid #eceff3;border-radius:999px;
+               font:600 13px/1.1 'Segoe UI',system-ui;background:#fff;}}
+      .ap-dot{{width:10px;height:10px;border-radius:50%;display:inline-block}}
+    </style>
+    <div class="ap-bubbles-row">{''.join(blocks)}</div>
+    """
+
+def _sum_color_points_for_answers(answers: list[int]) -> dict[str,int]:
+    """Suma punktów na podstawie jednej odpowiedzi (48 pytań)."""
+    out = {k: 0 for k in COLOR_QUESTION_MAP}
+    if not isinstance(answers, list) or len(answers) < 48:
+        return out
+    for color, qs in COLOR_QUESTION_MAP.items():
+        out[color] += sum(answers[i-1] for i in qs)
+    return out
+
+def calc_color_percentages_from_df(df: pd.DataFrame) -> dict[str, float]:
+    """Agreguje po wszystkich rekordach df['answers'] → % udziału kolorów (suma = 100)."""
+    totals = {k: 0 for k in COLOR_QUESTION_MAP}
+    if "answers" not in df.columns or df.empty:
+        return {k: 0.0 for k in COLOR_QUESTION_MAP}
+    for _, row in df.iterrows():
+        ans = row.get("answers")
+        sums = _sum_color_points_for_answers(ans)
+        for k, v in sums.items():
+            totals[k] += v
+    grand = sum(totals.values()) or 1
+    return {k: round(v / grand * 100, 1) for k, v in totals.items()}
+
+# --- Pierścień w SVG (transparentne tło + delikatna poświata) ---
+def _ring_svg(percent: float, color: str, size: int = 180, stroke: int = 16,
+              track="#F1F3F5", text_color="#333") -> str:
+    import math, uuid
+    pct = max(0.0, min(100.0, float(percent)))
+    r = (size - stroke) / 2
+    c = 2 * math.pi * r
+    dash = c * pct / 100.0
+    gap = c - dash
+
+    uid = "g_" + uuid.uuid4().hex[:8]  # 👈 unikalny id filtra
+
+    filter_def = f"""
+      <defs>
+        <filter id="{uid}" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="{color}" flood-opacity="0.35"/>
+        </filter>
+      </defs>
+    """
+    return f"""
+    <svg width="{size}" height="{size}" viewBox="0 0 {size} {size}" style="display:block;">
+      {filter_def}
+      <g transform="rotate(-90 {size/2} {size/2})">
+        <circle cx="{size/2}" cy="{size/2}" r="{r}" fill="none"
+                stroke="{track}" stroke-width="{stroke}" stroke-linecap="round"/>
+        <circle cx="{size/2}" cy="{size/2}" r="{r}" fill="none"
+                stroke="{color}" stroke-width="{stroke}" stroke-linecap="round"
+                stroke-dasharray="{dash} {gap}" filter="url(#{uid})"/>
+      </g>
+      <g>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+              style="font-family: 'Segoe UI', system-ui, -apple-system, Arial; font-size:{int(size*0.28)}px; font-weight:800; fill:{text_color};">
+          {int(round(pct))}%
+        </text>
+      </g>
+    </svg>
+    """
+
+
+def color_gauges_html(pcts: dict[str, float]) -> str:
+    """Układ jak na screenie: 1 duży + 3 małe po prawej; full transparent."""
+    # sort – pierwszy to największy (duży)
+    items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
+    big = items[0]
+    small = items[1:]
+
+    def chip(name, hex_):
+        return (f"<span style='display:inline-flex;align-items:center;"
+                f"gap:8px;padding:6px 10px;border:1px solid #e8e8ee;border-radius:999px;"
+                f"font:600 13px/1.1 \"Segoe UI\",system-ui; background:rgba(255,255,255,.65)'>"
+                f"<span style='width:10px;height:10px;border-radius:50%;background:{hex_};display:inline-block'></span>{name}</span>")
+
+    big_svg = _ring_svg(big[1], COLOR_HEX[big[0]], size=220, stroke=20)
+    small_svgs = "".join(
+        f"<div style='display:flex;align-items:center;gap:12px'>"
+        f"<div style='width:120px'>{_ring_svg(v, COLOR_HEX[k], size=120, stroke=14)}</div>"
+        f"{chip(k, COLOR_HEX[k])}"
+        f"</div>"
+        for k, v in small
+    )
+
+    return f"""
+    <div style="display:flex; gap:32px; align-items:center; background:transparent;">
+      <div style="width:240px">{big_svg}</div>
+      <div style="display:flex; flex-direction:column; gap:18px;">{small_svgs}</div>
+    </div>
+    """
+
+# --- OPISY HEURYSTYCZNE 4 KOLORÓW (treści z Twojej specyfikacji) ---
+COLOR_EMOJI = {"Czerwony":"🔴","Zielony":"🟢","Żółty":"🟡","Niebieski":"🔵"}
+
+COLOR_LONG = {
     "Niebieski": {
-        "emoji":"🔵",
-        "title":"Niebieski – analityczny, proceduralny, precyzyjny",
-        "orient":"Orientacja na: fakty, dane, logikę i procedury",
-        "arche":"Archetypy: Mędrzec, Towarzysz, Niewinny",
-        "desc":
-            "Ceni fakty, logikę i stabilne procedury. "
-            "Działa najlepiej, gdy ma jasno określone zasady, harmonogram i dostęp do danych. "
-            "Nie lubi chaosu, nagłych zmian i improwizacji – woli działać według planu. "
-            "Może sprawiać wrażenie zdystansowanego i nadmiernie ostrożnego, ale wnosi do zespołu rzetelność, "
-            "sumienność i dbałość o szczegóły. Niebieski to myślenie.\n\n"
-            "👉 W polityce to typ eksperta – skrupulatny analityk, który zamiast haseł pokazuje liczby i tabele. "
-            "Budzi zaufanie dzięki przygotowaniu merytorycznemu i pragmatycznym rozwiązaniom. "
-            "Może być odbierany jako mało charyzmatyczny, ale daje wyborcom poczucie przewidywalności i bezpieczeństwa instytucjonalnego."
+        "title": "Niebieski – analityczny, proceduralny, precyzyjny",
+        "orient": "fakty, dane, logikę i procedury",
+        "body": (
+            "Ceni fakty, logikę i stabilne procedury. Działa najlepiej, gdy ma jasno określone zasady, "
+            "harmonogram i dostęp do danych. Nie lubi chaosu, nagłych zmian i improwizacji – woli działać "
+            "według planu. Może sprawiać wrażenie zdystansowanego i nadmiernie ostrożnego, ale wnosi do "
+            "zespołu rzetelność, sumienność i dbałość o szczegóły. Niebieski to myślenie."
+        ),
+        "politics": (
+            "W polityce to typ eksperta – skrupulatny analityk, który zamiast haseł pokazuje liczby i tabele. "
+            "Budzi zaufanie dzięki przygotowaniu merytorycznemu i pragmatycznym rozwiązaniom. Może być odbierany "
+            "jako mało charyzmatyczny, ale daje wyborcom poczucie przewidywalności i bezpieczeństwa instytucjonalnego."
+        ),
+        "hex": COLOR_HEX["Niebieski"]
     },
     "Zielony": {
-        "emoji":"🟢",
-        "title":"Zielony – empatyczny, harmonijny, wspierający",
-        "orient":"Orientacja na: relacje, troskę, zaufanie, wspólnotę",
-        "arche":"Archetypy: Opiekun, Kochanek, Błazen",
-        "desc":
-            "Kierują się wartościami, relacjami i potrzebą budowania poczucia bezpieczeństwa. "
-            "Są empatyczni, uważni na innych i dążą do zgody. "
-            "Nie lubią gwałtownych zmian i konfrontacji, czasem brakuje im asertywności, "
-            "ale potrafią tworzyć atmosferę zaufania i współpracy. "
-            "Wnoszą do zespołu stabilność, lojalność i umiejętność łagodzenia napięć. "
-            "Zieloni to uczucia.\n\n"
-            "👉 W polityce to typ mediator-społecznik, który stawia na dialog, kompromis i dobro wspólne. "
-            "Potrafi przekonać elektorat stylem „opiekuńczego lidera”, akcentując wartości społeczne, "
-            "wspólnotowe i solidarnościowe. "
-            "Może unikać ostrych sporów, ale umiejętnie buduje mosty i zdobywa poparcie przez bliskość "
-            "i troskę o codzienne sprawy ludzi."
+        "title": "Zielony – empatyczny, harmonijny, wspierający",
+        "orient": "relacje, troskę, zaufanie, wspólnotę",
+        "body": (
+            "Kierują się wartościami, relacjami i potrzebą budowania poczucia bezpieczeństwa. Są empatyczni, "
+            "uważni na innych i dążą do zgody. Nie lubią gwałtownych zmian i konfrontacji, czasem brakuje im "
+            "asertywności, ale potrafią tworzyć atmosferę zaufania i współpracy. Wnoszą do zespołu stabilność, "
+            "lojalność i umiejętność łagodzenia napięć. Zieloni to uczucia."
+        ),
+        "politics": (
+            "W polityce to typ mediator-społecznik, który stawia na dialog, kompromis i dobro wspólne. Potrafi "
+            "przekonać elektorat stylem „opiekuńczego lidera”, akcentując wartości społeczne, wspólnotowe i "
+            "solidarnościowe. Może unikać ostrych sporów, ale umiejętnie buduje mosty i zdobywa poparcie przez "
+            "bliskość i troskę o codzienne sprawy ludzi."
+        ),
+        "hex": COLOR_HEX["Zielony"]
     },
     "Żółty": {
-        "emoji":"🟡",
-        "title":"Żółci – kreatywni, pełni energii i spontaniczni",
-        "orient":"Orientacja na: wizję, innowację, możliwości, odkrywanie",
-        "arche":"Archetypy: Twórca, Czarodziej, Odkrywca",
-        "desc":
-            "Osoba wizjonerska i entuzjastyczna – pełna pomysłów, które inspirują innych. "
-            "Najlepiej czuje się w środowisku swobodnym, otwartym na eksperymenty i innowacje. "
-            "Nie przepada za rutyną, schematami i nadmierną kontrolą. "
-            "Jego mocną stroną jest umiejętność rozbudzania energii zespołu, improwizacja i znajdowanie "
-            "nowych możliwości tam, gdzie inni widzą bariery. "
-            "Żółty to intuicja.\n\n"
-            "👉 W polityce to typ showmana i wizjonera, który potrafi porwać tłumy hasłami zmiany i nowego otwarcia. "
-            "Umie przekuć abstrakcyjne idee w obrazowe narracje, które przemawiają do emocji. "
-            "Bywa odbierany jako idealista lub ryzykant, ale świetnie nadaje dynamikę kampanii i kreuje „nową nadzieję” "
-            "dla wyborców."
+        "title": "Żółty – kreatywny, pełny energii i spontaniczny",
+        "orient": "wizję, innowację, możliwości, odkrywanie nowych dróg",
+        "body": (
+            "Osoba wizjonerska i entuzjastyczna – pełna pomysłów, które inspirują innych. Najlepiej czuje się w "
+            "środowisku swobodnym, otwartym na eksperymenty i innowacje. Nie przepada za rutyną, schematami i "
+            "nadmierną kontrolą. Jego mocną stroną jest umiejętność rozbudzania energii zespołu, improwizacja i "
+            "znajdowanie nowych możliwości tam, gdzie inni widzą bariery. Żółty to intuicja."
+        ),
+        "politics": (
+            "W polityce to typ showmana i wizjonera, który potrafi porwać tłumy hasłami zmiany i nowego otwarcia. "
+            "Umie przekuć abstrakcyjne idee w obrazowe narracje, które przemawiają do emocji. Bywa odbierany jako "
+            "idealista lub ryzykant, ale świetnie nadaje dynamikę kampanii i kreuje „nową nadzieję”."
+        ),
+        "hex": COLOR_HEX["Żółty"]
     },
     "Czerwony": {
-        "emoji":"🔴",
-        "title":"Czerwony – decyzyjny, nastawiony na wynik, dominujący",
-        "orient":"Orientacja na: działanie, sprawczość, szybkie decyzje",
-        "arche":"Archetypy: Władca, Bohater, Buntownik",
-        "desc":
-               "Ma naturalne zdolności przywódcze i skłonność do szybkiego podejmowania decyzji. "
-               "Jest niezależny, ambitny i skoncentrowany na rezultatach. "
-               "Może być niecierpliwy, zbyt stanowczy i mało elastyczny, ale dzięki determinacji potrafi przeprowadzić "
-               "projekt do końca mimo przeszkód. "
-               "To osoba, która nadaje kierunek i mobilizuje innych do działania. "
-               "Czerwony to doświadczenie.\n\n"
-               "👉 W polityce to typ lidera-wojownika, który buduje swoją pozycję na sile, determinacji i zdolności "
-               "„dowiezienia” obietnic. "
-               "Sprawdza się w kampaniach, gdzie liczy się mocne przywództwo i szybkie decyzje. "
-               "Może odstraszać swoją twardością, ale równocześnie daje poczucie, że „trzyma ster” i potrafi poprowadzić "
-               "kraj czy miasto przez kryzysy."
+        "title": "Czerwony – decyzyjny, nastawiony na wynik, dominujący",
+        "orient": "działanie, sprawczość, szybkie decyzje, forsowanie kierunku",
+        "body": (
+            "Ma naturalne zdolności przywódcze i skłonność do szybkiego podejmowania decyzji. Jest niezależny, "
+            "ambitny i skoncentrowany na rezultatach. Może być niecierpliwy, zbyt stanowczy i mało elastyczny, "
+            "ale dzięki determinacji potrafi przeprowadzić projekt do końca mimo przeszkód. To osoba, która nadaje "
+            "kierunek i mobilizuje innych do działania. Czerwony to doświadczenie."
+        ),
+        "politics": (
+            "W polityce to typ lidera-wojownika, który buduje swoją pozycję na sile, determinacji i zdolności "
+            "„dowiezienia” obietnic. Sprawdza się w kampaniach, gdzie liczy się mocne przywództwo i szybkie decyzje. "
+            "Może odstraszać swoją twardością, ale równocześnie daje poczucie, że „trzyma ster”."
+        ),
+        "hex": COLOR_HEX["Czerwony"]
     },
 }
+
+COLOR_META = {
+    name: {
+        "emoji": COLOR_EMOJI[name],
+        "title": COLOR_LONG[name]["title"],
+        "orient": f"Orientacja na: {COLOR_LONG[name]['orient']}",
+        "desc":   COLOR_LONG[name]["body"] + "\n\n" + " 👉 " + COLOR_LONG[name]["politics"],
+    }
+    for name in COLOR_LONG.keys()
+}
+
+def color_explainer_one_html(name: str, pct: float) -> str:
+    """Jeden panel z opisem dominującego koloru."""
+    meta = COLOR_LONG[name]
+    emoji = COLOR_EMOJI[name]
+    return f"""
+    <div style="border:1px solid #ececf3; border-left:6px solid {meta['hex']};
+                border-radius:12px; padding:16px 18px; margin:10px 0 6px 0;
+                background:rgba(255,255,255,.65);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+         <span style="font-size:20px">{emoji}</span>
+         <div style="font:700 16px/1.15 'Segoe UI',system-ui">{meta['title']}</div>
+         <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:#333">{pct:.1f}%</div>
+      </div>
+      <div style="font:600 13.5px/1.35 'Segoe UI',system-ui; color:#444;">
+         • <b>Orientacja na:</b> {meta['orient']}<br/>
+      </div>
+      <div style="margin-top:8px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">{meta['body']}</div>
+      <div style="margin-top:6px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">👉 {meta['politics']}</div>
+    </div>
+    """
+
+def color_explainer_html(pcts: dict[str, float]) -> str:
+    """Render 4 akapity pod wykresem – kolejność wg udziału (%)."""
+    items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
+    blocks = []
+    for name, val in items:
+        meta = COLOR_LONG[name]
+        emoji = COLOR_EMOJI[name]
+        blocks.append(f"""
+        <div style="border:1px solid #ececf3; border-left:6px solid {meta['hex']};
+                    border-radius:12px; padding:16px 18px; margin-bottom:14px;
+                    background:rgba(255,255,255,.65);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+             <span style="font-size:20px">{emoji}</span>
+             <div style="font:700 16px/1.15 'Segoe UI',system-ui">{meta['title']}</div>
+             <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:#333">{val:.1f}%</div>
+          </div>
+          <div style="font:600 13.5px/1.35 'Segoe UI',system-ui; color:#444;">
+             • <b>Orientacja na:</b> {meta['orient']}<br/>
+          </div>
+          <div style="margin-top:8px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">{meta['body']}</div>
+          <div style="margin-top:6px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">👉 {meta['politics']}</div>
+        </div>
+        """)
+    return "<div style='background:transparent'>" + "".join(blocks) + "</div>"
+
 
 def color_scores_from_answers(answers: list[int]) -> dict[str, int]:
     if not isinstance(answers, list) or len(answers) < 48:
@@ -1839,6 +2067,8 @@ def export_word_docxtpl(
 
     context["PANEL_IMG"] = panel_image
 
+    context["COLOR_RING_IMG"] = InlineImage(doc, "color_ring.png", width=Mm(70))
+
     doc.render(context)
 
     # (opcja) hiperłącza do osób – jak było
@@ -1855,33 +2085,62 @@ def export_word_docxtpl(
 
 def word_to_pdf(docx_bytes_io):
     import sys
-    import tempfile, os
+    import tempfile, os, shutil
     from io import BytesIO
-    with tempfile.TemporaryDirectory() as tmpdir:
-        docx_path = os.path.join(tmpdir, "raport.docx")
-        pdf_path = os.path.join(tmpdir, "raport.pdf")
-        with open(docx_path, "wb") as f:
-            f.write(docx_bytes_io.getbuffer())
-        if sys.platform.startswith("win32"):
-            import pythoncom
-            from docx2pdf import convert
-            pythoncom.CoInitialize()     # ← TU!
+    from pathlib import Path
+    if sys.platform.startswith("win32"):
+        # --- WINDOWS: bez zmian, Word + docx2pdf (honoruje osadzone fonty) ---
+        import pythoncom
+        from docx2pdf import convert
+        with tempfile.TemporaryDirectory() as tmpdir:
+            docx_path = os.path.join(tmpdir, "raport.docx")
+            pdf_path = os.path.join(tmpdir, "raport.pdf")
+            with open(docx_path, "wb") as f:
+                f.write(docx_bytes_io.getbuffer())
+            pythoncom.CoInitialize()
             convert(docx_path, pdf_path)
-        else:
-            import subprocess
-            result = subprocess.run([
-                "soffice",
-                "--headless",
-                "--convert-to",
-                # wymuś profil eksportu + embed czcionek:
-                "pdf:writer_pdf_Export:EmbedStandardFonts=true;EmbedOpenTypeFonts=true;UseTaggedPDF=true",
-                "--outdir", tmpdir,
-                docx_path
-            ], capture_output=True)
-            if result.returncode != 0 or not os.path.isfile(pdf_path):
-                raise RuntimeError("LibreOffice PDF error: " + result.stderr.decode())
-        with open(pdf_path, "rb") as f:
-            return BytesIO(f.read())
+            with open(pdf_path, "rb") as f:
+                return BytesIO(f.read())
+    else:
+        # --- LINUX: najpierw do-instaluj fonty do ~/.local/share/fonts, odśwież fontconfig ---
+        with tempfile.TemporaryDirectory() as tmpdir:
+            docx_path = os.path.join(tmpdir, "raport.docx")
+            pdf_path = os.path.join(tmpdir, "raport.pdf")
+            with open(docx_path, "wb") as f:
+                f.write(docx_bytes_io.getbuffer())
+
+            # 1) Skopiuj TTF-y do prywatnego katalogu fontów
+            project_font_dir = Path(__file__).with_name("assets") / "fonts"
+            user_font_dir = Path.home() / ".local" / "share" / "fonts" / "ap48"
+            user_font_dir.mkdir(parents=True, exist_ok=True)
+            if project_font_dir.exists():
+                for src in project_font_dir.glob("*.ttf"):
+                    dst = user_font_dir / src.name
+                    try:
+                        shutil.copyfile(src, dst)
+                    except Exception:
+                        pass
+
+            # 2) Odśwież cache fontów
+            try:
+                import subprocess
+                subprocess.run(["fc-cache", "-f", "-v"], check=False, capture_output=True)
+            except Exception:
+                pass  # jeśli fc-cache niedostępny w środowisku, i tak próbujemy dalej
+
+            # 3) Konwersja LibreOffice
+            try:
+                result = subprocess.run([
+                    "soffice", "--headless", "--convert-to", "pdf",
+                    "--outdir", tmpdir, docx_path
+                ], capture_output=True)
+                if result.returncode != 0 or not os.path.isfile(pdf_path):
+                    raise RuntimeError("LibreOffice PDF error: " + result.stderr.decode(errors="ignore"))
+            except FileNotFoundError:
+                raise RuntimeError("LibreOffice (soffice) nie jest dostępny w systemie.")
+            with open(pdf_path, "rb") as f:
+                return BytesIO(f.read())
+
 
 
 def is_color_dark(color_hex):
@@ -2429,6 +2688,56 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 </div>
                 """, unsafe_allow_html=True)
 
+            # --- Heurystyczna analiza koloru (układ 2-kolumnowy + tytuł) ---
+            color_pcts = calc_color_percentages_from_df(data)  # zostaje, bo używasz tego niżej
+
+            # większy oddech od poprzednich wykresów
+            st.markdown("<div style='height:34px;'></div>", unsafe_allow_html=True)
+
+            left_col, right_col = st.columns([0.58, 0.42], gap="large")
+
+            with left_col:
+                st.markdown("<div class='section-title'>Heurystyczna analiza koloru</div>",
+                            unsafe_allow_html=True)
+                row_html = color_bubbles_html(color_pcts, min_d=130, max_d=240,
+                                              map_mode="diameter")  # albo "area"
+                components.html(row_html, height=360, scrolling=False)
+
+            with right_col:
+                # tu wstawisz drugi wykres – na razie placeholder
+                st.markdown("<div class='section-title'>[Drugi wykres – wstęp]</div>",
+                            unsafe_allow_html=True)
+                st.markdown("<div style='height:320px;border:1px dashed #d9dfeb;border-radius:12px;"
+                            "display:flex;align-items:center;justify-content:center;color:#8091a7;'>"
+                            "Miejsce na kolejny wykres</div>", unsafe_allow_html=True)
+
+            # (opcjonalnie) podpis pod wykresem – opis dominującego koloru
+            COLOR_DESC = {
+                "Niebieski": "analityczny, proceduralny, precyzyjny",
+                "Zielony": "empatyczny, harmonijny, wspierający",
+                "Żółty": "kreatywny, pełen energii i spontaniczny",
+                "Czerwony": "decyzyjny, nastawiony na wynik, dominujący",
+            }
+            # tylko dominujący kolor
+            dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
+
+            # mały podpis nad opisem (opcjonalnie)
+            st.markdown(
+                f"<div style='text-align:center; font:600 15px/1.3 \"Segoe UI\",system-ui; color:#2a2a2a'>"
+                f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
+                unsafe_allow_html=True
+            )
+
+            # sam opis tylko dla dominującego koloru
+            st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
+
+            # zapisz PNG z dużego pierścienia do użycia w Wordzie
+            big_color = max(color_pcts.items(), key=lambda kv: kv[1])[0]
+            big_svg = _ring_svg(color_pcts[big_color], COLOR_HEX[big_color], size=600, stroke=48)
+            with open("color_ring.svg", "w", encoding="utf-8") as f:
+                f.write(big_svg)
+            cairosvg.svg2png(url="color_ring.svg", write_to="color_ring.png")
+
             with col3:
                 if main_type is not None:
                     kola_img = compose_archetype_highlight(
@@ -2441,47 +2750,6 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                         caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
                         width=700
                     )
-
-            # === Heurystyczna analiza kolorów (donut + opis) ===
-            try:
-                color_order = ["Niebieski","Zielony","Żółty","Czerwony"]
-                if all(f"Kolor_{c}_%" in results_df.columns for c in color_order):
-                    mean_colors = {c: float(results_df[f"Kolor_{c}_%"].mean()) for c in color_order}
-                else:
-                    # fallback: policz ze średniej odpowiedzi jeśli kolumny nie istnieją
-                    first_ans = next((r for _, r in data.iterrows() if isinstance(r.get("answers"), list)), None)
-                    if first_ans is not None:
-                        cs = color_scores_from_answers(first_ans["answers"])
-                        mean_colors = color_percents_from_scores(cs)
-                    else:
-                        mean_colors = {c: 0.0 for c in color_order}
-
-                figc = go.Figure(
-                    data=[go.Pie(
-                        labels=list(mean_colors.keys()),
-                        values=list(mean_colors.values()),
-                        hole=0.55,
-                        textinfo="label+percent",
-                        hovertemplate="%{label}: %{value:.1f}%<extra></extra>"
-                    )],
-                    layout=go.Layout(margin=dict(l=10, r=10, t=10, b=10))
-                )
-                figc.update_traces(sort=False)
-                st.markdown("<div style='font-size:1.35em;font-weight:600;margin:6px 0 10px 0;'>Profil kolorów (heurystyka)</div>", unsafe_allow_html=True)
-                st.plotly_chart(figc, use_container_width=True)
-
-                dom_color = max(mean_colors.items(), key=lambda kv: kv[1])[0] if mean_colors else "Niebieski"
-                meta = COLOR_META[dom_color]
-                st.markdown(f"""
-                <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin:8px 0 26px 0;background:#fafafa;">
-                  <div style="font-weight:700;margin-bottom:6px;">{meta["emoji"]} {meta["title"]}</div>
-                  <div>• {meta["orient"]}</div>
-                  <div>• {meta["arche"]}</div>
-                  <div style="margin-top:8px;line-height:1.45">{meta["desc"]}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            except Exception:
-                st.info("Brak danych do analizy kolorów.")
 
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
