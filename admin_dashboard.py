@@ -73,112 +73,6 @@ from pathlib import Path
 
 FONT_DIR = Path(__file__).with_name("assets") / "fonts"
 
-def build_pdf_with_ttf(sample_title: str = "Raport AP48", sample_body: str = "Przykładowy akapit z polskimi znakami: ąęćłńóśźż – oraz nazwą fontu Arial Nova Cond.") -> bytes:
-    """
-    Generuje prosty PDF z osadzonymi fontami TTF (Arial Nova Cond + Light + Roboto Condensed).
-    Zwraca bajty PDF gotowe do st.download_button (Streamlit).
-    """
-    pdf = FPDF(orientation="P", unit="mm", format="A4")
-    pdf.add_page()
-
-    # Rejestracja fontów TTF (zostaną osadzone w PDF)
-    # Upewnij się, że pliki istnieją: assets/fonts/ArialNovaCond.ttf itd.
-    an_cond      = FONT_DIR / "ArialNovaCond.ttf"
-    an_cond_lt   = FONT_DIR / "ArialNovaCondLight.ttf"
-    rob_cond     = FONT_DIR / "RobotoCondensed-Regular.ttf"
-    rob_cond_lt  = FONT_DIR / "RobotoCondensed-Light.ttf"
-
-    # Dodaj tylko te, które faktycznie masz
-    if an_cond.exists():
-        pdf.add_font("ArialNovaCond", "", str(an_cond), uni=True)
-    if an_cond_lt.exists():
-        pdf.add_font("ArialNovaCond", "L", str(an_cond_lt), uni=True)
-    if rob_cond.exists():
-        pdf.add_font("RobotoCondensed", "", str(rob_cond), uni=True)
-    if rob_cond_lt.exists():
-        pdf.add_font("RobotoCondensed", "L", str(rob_cond_lt), uni=True)
-
-    # Nagłówek
-    try:
-        pdf.set_font("ArialNovaCond", size=24)
-    except:
-        pdf.set_font("Helvetica", size=24)  # fallback
-    pdf.cell(0, 12, sample_title, new_x="LMARGIN", new_y="NEXT")
-
-    # Podtytuł
-    try:
-        pdf.set_font("ArialNovaCond", "L", 14)
-    except:
-        pdf.set_font("Helvetica", "", 14)
-    pdf.cell(0, 8, "Czcionka osadzona w PDF (TTF)", new_x="LMARGIN", new_y="NEXT")
-
-    pdf.ln(3)
-
-    # Treść akapitu
-    try:
-        pdf.set_font("RobotoCondensed", "", 12)
-    except:
-        pdf.set_font("Helvetica", "", 12)
-    pdf.multi_cell(0, 6.5, sample_body)
-
-    # Zwróć bajty PDF
-    return bytes(pdf.output(dest="S").encode("latin1"))
-
-# === PDF (ReportLab) z osadzonymi fontami TTF ===
-from io import BytesIO
-from pathlib import Path
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
-FONT_DIR = Path(__file__).with_name("assets") / "fonts"
-
-def build_pdf_reportlab(sample_title: str = "Raport AP48", sample_body: str = "Przykładowy akapit ąęćłńóśźż.") -> bytes:
-    buf = BytesIO()
-
-    # Rejestracja TTF → osadzanie w PDF
-    def _reg(name, file):
-        p = FONT_DIR / file
-        if p.exists():
-            pdfmetrics.registerFont(TTFont(name, str(p)))
-
-    _reg("ArialNovaCond", "ArialNovaCond.ttf")
-    _reg("ArialNovaCondLight", "ArialNovaCondLight.ttf")
-    _reg("RobotoCondensed", "RobotoCondensed-Regular.ttf")
-    _reg("RobotoCondensedLight", "RobotoCondensed-Light.ttf")
-
-    c = canvas.Canvas(buf, pagesize=A4)
-    W, H = A4
-
-    # Nagłówek
-    try:
-        c.setFont("ArialNovaCond", 24)
-    except:
-        c.setFont("Helvetica-Bold", 24)
-    c.drawString(40, H - 60, sample_title)
-
-    # Podtytuł
-    try:
-        c.setFont("ArialNovaCondLight", 13)
-    except:
-        c.setFont("Helvetica", 13)
-    c.drawString(40, H - 85, "Czcionki TTF osadzone w dokumencie PDF")
-
-    # Treść
-    try:
-        c.setFont("RobotoCondensed", 11.5)
-    except:
-        c.setFont("Helvetica", 11.5)
-    textobj = c.beginText(40, H - 120)
-    for line in sample_body.splitlines():
-        textobj.textLine(line)
-    c.drawText(textobj)
-
-    c.showPage()
-    c.save()
-    return buf.getvalue()
-
 
 person_wikipedia_links = {
     "Aleksandra Dulkiewicz": "https://pl.wikipedia.org/wiki/Aleksandra_Dulkiewicz",
@@ -614,7 +508,7 @@ COLOR_HEX = {  # kolory pierścieni
 
 # === 4 bąbelki w linii: średnica ~ udział % w całości, pierścień ~ % względem zwycięzcy ===
 def _bubble_svg(value_pct: float, winner_pct: float, color: str,
-                diameter_px: int, track="#EEF2F6", text_color="#111") -> str:
+                diameter_px: int, track="#FFFFFF", text_color="#111") -> str:
     import math
     value_pct  = max(0.0, float(value_pct or 0.0))
     winner_pct = max(0.0001, float(winner_pct or 0.0001))
@@ -675,16 +569,75 @@ def color_bubbles_html(pcts: dict[str, float],
     return f"""
     <style>
       .ap-bubbles-row{{display:flex;justify-content:center;align-items:flex-end;gap:26px;background:transparent;}}
-      .ap-bubble-wrap{{display:flex;flex-direction:column;align-items:center;gap:10px;}}
+    .ap-bubble-wrap{{display:flex;flex-direction:column;align-items:center;gap:16px;}}
       /* delikatny, neutralny cień tylko CSS – brak kolorowych smug */
       .ap-bubble{{filter: drop-shadow(0 6px 12px rgba(0,0,0,.12)); border-radius:50%;}}
-      .ap-chip{{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;
-               border:1px solid #eceff3;border-radius:999px;
-               font:600 13px/1.1 'Segoe UI',system-ui;background:#fff;}}
+    .ap-chip{{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;
+             border:1px solid #eceff3;border-radius:999px;margin-top:4px;
+             font:600 13px/1.1 'Segoe UI',system-ui;background:#fff;}}
       .ap-dot{{width:10px;height:10px;border-radius:50%;display:inline-block}}
     </style>
     <div class="ap-bubbles-row">{''.join(blocks)}</div>
     """
+
+def color_progress_bars_html(pcts: dict[str, float], order: str = "desc") -> str:
+    """
+    Paski 0–100% z szarym torem i kolorowym wypełnieniem.
+    • % >= 10  → etykieta na końcu WEWNĘTRZNYM kolorowego paska.
+    • % < 10   → etykieta na końcu ZEWNĘTRZNYM kolorowego paska (tuż za nim).
+    order: 'asc' = najmniejszy na górze, 'desc' = największy na górze.
+    """
+    items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=(order == "desc"))
+
+    rows = []
+    for name, val in items:
+        pct = max(0.0, float(val or 0.0))
+        pct_int = int(round(pct))
+        width_css = f"{pct:.3f}%"
+        color = COLOR_HEX[name]
+        inside = pct >= 10.0
+
+        rows.append(f"""
+          <div class="cp-row">
+            <div class="cp-label">
+              <span class="cp-dot" style="background:{color}"></span>
+              <b>{name}</b>
+            </div>
+
+            <div class="cp-track">
+              <div class="cp-fill" style="width:{width_css}; background:{color}">
+                <div class="cp-badge {'in' if inside else 'out'}">{pct_int}%</div>
+              </div>
+            </div>
+          </div>
+        """)
+
+    return f"""
+    <style>
+      :root {{ --ff: "Arial Nova Cond","Roboto Condensed","Segoe UI",system-ui,-apple-system,Arial,sans-serif; }}
+
+      .cp-wrap{{ font-family: var(--ff); }}
+      .cp-row{{display:grid; grid-template-columns:140px 1fr; gap:12px;
+               align-items:center; margin:14px 0;}}
+      .cp-label{{display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px;}}
+      .cp-dot{{width:10px; height:10px; border-radius:50%; display:inline-block;}}
+
+      .cp-track{{position:relative; height:42px; border-radius:999px;
+                 background:#eef2f7; box-shadow: inset 0 0 0 1px #e1e7f0;}}
+      .cp-fill{{position:relative; height:100%; border-radius:999px; overflow:visible;}}
+
+      .cp-badge{{position:absolute; top:50%; transform:translateY(-50%);
+                 font-family: var(--ff); font-weight:800; font-size:14px; color:#111; white-space:nowrap;}}
+      .cp-badge.in{{right:12px;}}                    /* wewnątrz koloru (≥10%) */
+      .cp-badge.out{{left:100%; margin-left:12px;}}  /* tuż za kolorem (<10%) */
+    </style>
+
+    <div class="cp-wrap">
+      {''.join(rows)}
+    </div>
+    """
+
+
 
 def _sum_color_points_for_answers(answers: list[int]) -> dict[str,int]:
     """Suma punktów na podstawie jednej odpowiedzi (48 pytań)."""
@@ -696,21 +649,32 @@ def _sum_color_points_for_answers(answers: list[int]) -> dict[str,int]:
     return out
 
 def calc_color_percentages_from_df(df: pd.DataFrame) -> dict[str, float]:
-    """Agreguje po wszystkich rekordach df['answers'] → % udziału kolorów (suma = 100)."""
+    """Średni % dla każdego koloru przy skali 0–100 per kolor (60 pkt max na kolor i osobę)."""
     totals = {k: 0 for k in COLOR_QUESTION_MAP}
+    n = 0
     if "answers" not in df.columns or df.empty:
         return {k: 0.0 for k in COLOR_QUESTION_MAP}
+
     for _, row in df.iterrows():
         ans = row.get("answers")
         sums = _sum_color_points_for_answers(ans)
-        for k, v in sums.items():
-            totals[k] += v
-    grand = sum(totals.values()) or 1
-    return {k: round(v / grand * 100, 1) for k, v in totals.items()}
+        if sums:
+            for k, v in sums.items():
+                totals[k] += v
+            n += 1
+
+    if n == 0:
+        return {k: 0.0 for k in COLOR_QUESTION_MAP}
+
+    max_per_color = {c: 5 * len(qs) for c, qs in COLOR_QUESTION_MAP.items()}
+    return {
+        c: round(100.0 * totals[c] / (max_per_color[c] * n), 1)
+        for c in COLOR_QUESTION_MAP.keys()
+    }
 
 # --- Pierścień w SVG (transparentne tło + delikatna poświata) ---
 def _ring_svg(percent: float, color: str, size: int = 180, stroke: int = 16,
-              track="#F1F3F5", text_color="#333") -> str:
+              track="#FFFFFF", text_color="#333") -> str:
     import math, uuid
     pct = max(0.0, min(100.0, float(percent)))
     r = (size - stroke) / 2
@@ -720,13 +684,7 @@ def _ring_svg(percent: float, color: str, size: int = 180, stroke: int = 16,
 
     uid = "g_" + uuid.uuid4().hex[:8]  # 👈 unikalny id filtra
 
-    filter_def = f"""
-      <defs>
-        <filter id="{uid}" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="{color}" flood-opacity="0.35"/>
-        </filter>
-      </defs>
-    """
+    filter_def = ""
     return f"""
     <svg width="{size}" height="{size}" viewBox="0 0 {size} {size}" style="display:block;">
       {filter_def}
@@ -734,8 +692,8 @@ def _ring_svg(percent: float, color: str, size: int = 180, stroke: int = 16,
         <circle cx="{size/2}" cy="{size/2}" r="{r}" fill="none"
                 stroke="{track}" stroke-width="{stroke}" stroke-linecap="round"/>
         <circle cx="{size/2}" cy="{size/2}" r="{r}" fill="none"
-                stroke="{color}" stroke-width="{stroke}" stroke-linecap="round"
-                stroke-dasharray="{dash} {gap}" filter="url(#{uid})"/>
+            stroke="{color}" stroke-width="{stroke}" stroke-linecap="round"
+            stroke-dasharray="{dash} {gap}"/>
       </g>
       <g>
         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
@@ -745,6 +703,47 @@ def _ring_svg(percent: float, color: str, size: int = 180, stroke: int = 16,
       </g>
     </svg>
     """
+def build_color_bars(pcts: dict[str, float], orientation: str = "h") -> go.Figure:
+    # sort od największego
+    items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
+    labels = [k for k, _ in items]
+    values = [v for _, v in items]
+    colors = [COLOR_HEX[k] for k in labels]
+
+    if orientation == "h":
+        fig = go.Figure(go.Bar(
+            x=values, y=labels, orientation="h",
+            text=[f"{int(round(v))}%" for v in values],
+            textposition="inside",
+            insidetextanchor="middle",
+            marker=dict(color=colors),
+        ))
+        fig.update_layout(
+            xaxis=dict(range=[0, 100], showgrid=True, zeroline=False),
+            yaxis=dict(tickfont=dict(size=14)),
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=260,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            showlegend=False,
+        )
+    else:
+        fig = go.Figure(go.Bar(
+            x=labels, y=values,
+            text=[f"{int(round(v))}%" for v in values],
+            textposition="outside",
+            marker=dict(color=colors),
+        ))
+        fig.update_layout(
+            yaxis=dict(range=[0, 100], showgrid=True, zeroline=False),
+            xaxis=dict(tickfont=dict(size=14)),
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=320,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            showlegend=False,
+        )
+    return fig
 
 
 def color_gauges_html(pcts: dict[str, float]) -> str:
@@ -862,21 +861,29 @@ def color_explainer_one_html(name: str, pct: float) -> str:
     meta = COLOR_LONG[name]
     emoji = COLOR_EMOJI[name]
     return f"""
-    <div style="border:1px solid #ececf3; border-left:6px solid {meta['hex']};
-                border-radius:12px; padding:16px 18px; margin:10px 0 6px 0;
-                background:rgba(255,255,255,.65);">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-         <span style="font-size:20px">{emoji}</span>
-         <div style="font:700 16px/1.15 'Segoe UI',system-ui">{meta['title']}</div>
-         <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:#333">{pct:.1f}%</div>
+      <div style="border:1px solid #ececf3; border-left:6px solid {meta['hex']};
+                  border-radius:12px; padding:20px 22px; margin:4px 0 6px 0;
+                  background:rgba(255,255,255,.65);">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+          <span style="font-size:20px">{emoji}</span>
+          <div style="font:650 18px/1.2 'Segoe UI',system-ui">{meta['title']}</div>
+          <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:#333">{pct:.1f}%</div>
+        </div>
+
+        <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:#444;">
+          • <b>Orientacja na:</b> {meta['orient']}
+        </div>
+
+        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">
+          {meta['body']}
+        </div>
+
+        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">
+          👉 {meta['politics']}
+        </div>
       </div>
-      <div style="font:600 13.5px/1.35 'Segoe UI',system-ui; color:#444;">
-         • <b>Orientacja na:</b> {meta['orient']}<br/>
-      </div>
-      <div style="margin-top:8px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">{meta['body']}</div>
-      <div style="margin-top:6px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">👉 {meta['politics']}</div>
-    </div>
     """
+
 
 def color_explainer_html(pcts: dict[str, float]) -> str:
     """Render 4 akapity pod wykresem – kolejność wg udziału (%)."""
@@ -889,16 +896,16 @@ def color_explainer_html(pcts: dict[str, float]) -> str:
         <div style="border:1px solid #ececf3; border-left:6px solid {meta['hex']};
                     border-radius:12px; padding:16px 18px; margin-bottom:14px;
                     background:rgba(255,255,255,.65);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
              <span style="font-size:20px">{emoji}</span>
-             <div style="font:700 16px/1.15 'Segoe UI',system-ui">{meta['title']}</div>
+             <div style="font:650 18px/1.2 'Segoe UI',system-ui">{meta['title']}</div>
              <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:#333">{val:.1f}%</div>
           </div>
-          <div style="font:600 13.5px/1.35 'Segoe UI',system-ui; color:#444;">
+           <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:#444;">
              • <b>Orientacja na:</b> {meta['orient']}<br/>
           </div>
-          <div style="margin-top:8px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">{meta['body']}</div>
-          <div style="margin-top:6px; font:400 14px/1.5 'Segoe UI',system-ui; color:#2a2a2a;">👉 {meta['politics']}</div>
+          <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">{meta['body']}</div>
+          <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">👉 {meta['politics']}</div>
         </div>
         """)
     return "<div style='background:transparent'>" + "".join(blocks) + "</div>"
@@ -912,9 +919,14 @@ def color_scores_from_answers(answers: list[int]) -> dict[str, int]:
         out[color] = sum(answers[i-1] for i in idxs)  # pytania są 1-indexed
     return out
 
-def color_percents_from_scores(scores: dict[str,int]) -> dict[str, float]:
-    total = sum(scores.values()) or 1
-    return {c: round(v/total*100, 1) for c, v in scores.items()}
+def color_percents_from_scores(scores: dict[str, int]) -> dict[str, float]:
+    # 12 pytań × 5 pkt = 60; obliczaj z mapy dla odporności
+    max_per_color = {c: 5 * len(qs) for c, qs in COLOR_QUESTION_MAP.items()}
+    out = {}
+    for c in COLOR_QUESTION_MAP.keys():
+        v = max(0, int(scores.get(c, 0)))
+        out[c] = round(100.0 * v / max_per_color[c], 1)
+    return out
 
 
 # --- PŁEĆ I ODWZOROWANIA NAZW/PLIKÓW ---
@@ -1653,11 +1665,14 @@ st.markdown("""
 .section-title{
   font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
   font-weight: 650;               /* grubość */
-  font-size: 1.20em;              /* czcionka */
-  margin: 14px 0 12px 0;           /* marginesy: góra/dół */
+  font-size: 1.28em;              /* czcionka */
+  margin: 15px 0 25px 0;           /* marginesy: góra/dół */
   line-height: 1.15;
   color:#182433;
 }
+.section-title--padTop{ margin-top:34px !important; }
+.mt-28{ margin-top:28px !important; }
+
 .section-title--blue{ color:#1a93e3; }
 
 /* przyciski skoków (linki wyglądające jak przyciski) */
@@ -2549,7 +2564,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
 
             with col1:
-                st.markdown('<div style="font-size:1.3em;font-weight:600;margin-bottom:13px;">Liczebność archetypów głównych, wspierających i pobocznych</div>', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="section-title mt-28">Liczebność archetypów głównych, wspierających i pobocznych</div>',
+                    unsafe_allow_html=True)
                 archetype_table = pd.DataFrame({
                     "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in archetype_names],
                     "Główny archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in archetype_names],
@@ -2627,7 +2644,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     else:
                         highlight_r.append(None)
                         highlight_marker_color.append("rgba(0,0,0,0)")
-                st.markdown(f'<div style="font-size:1.3em;font-weight:600;margin-bottom:13px; text-align:center;">Profil archetypów {personGen}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:1.28em;font-weight:650;margin-bottom:13px; text-align:center;">Profil archetypów {personGen}</div>', unsafe_allow_html=True)
                 fig = go.Figure(
                     data=[
                         go.Scatterpolar(
@@ -2688,48 +2705,39 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 </div>
                 """, unsafe_allow_html=True)
 
-            # --- Heurystyczna analiza koloru (układ 2-kolumnowy + tytuł) ---
-            color_pcts = calc_color_percentages_from_df(data)  # zostaje, bo używasz tego niżej
+            # --- Heurystyczna analiza koloru (bąbelki OUT; słupki po LEWEJ; prawa pusta) ---
+            color_pcts = calc_color_percentages_from_df(data)
 
-            # większy oddech od poprzednich wykresów
             st.markdown("<div style='height:34px;'></div>", unsafe_allow_html=True)
-
             left_col, right_col = st.columns([0.58, 0.42], gap="large")
 
             with left_col:
-                st.markdown("<div class='section-title'>Heurystyczna analiza koloru</div>",
-                            unsafe_allow_html=True)
-                row_html = color_bubbles_html(color_pcts, min_d=130, max_d=240,
-                                              map_mode="diameter")  # albo "area"
-                components.html(row_html, height=360, scrolling=False)
+                # tylko słupki
+                st.markdown(
+                    "<div class='section-title section-title--padTop'>Udział kolorów – wykres słupkowy</div>",
+                    unsafe_allow_html=True
+                )
+                components.html(
+                    color_progress_bars_html(color_pcts, order="desc"),
+                    height=360,
+                    scrolling=False
+                )
 
-            with right_col:
-                # tu wstawisz drugi wykres – na razie placeholder
-                st.markdown("<div class='section-title'>[Drugi wykres – wstęp]</div>",
-                            unsafe_allow_html=True)
-                st.markdown("<div style='height:320px;border:1px dashed #d9dfeb;border-radius:12px;"
-                            "display:flex;align-items:center;justify-content:center;color:#8091a7;'>"
-                            "Miejsce na kolejny wykres</div>", unsafe_allow_html=True)
+                # opisy ZOSTAJĄ — dominujący kolor + opis
+                dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
+                st.markdown(
+                    f"<div style='text-align:center; font:700 20px/1.25 \"Segoe UI\",system-ui; color:#222; margin: 6px 0 -10px;'>"
+                    f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
 
-            # (opcjonalnie) podpis pod wykresem – opis dominującego koloru
-            COLOR_DESC = {
-                "Niebieski": "analityczny, proceduralny, precyzyjny",
-                "Zielony": "empatyczny, harmonijny, wspierający",
-                "Żółty": "kreatywny, pełen energii i spontaniczny",
-                "Czerwony": "decyzyjny, nastawiony na wynik, dominujący",
-            }
+            # prawa kolumna — NA RAZIE PUSTA (rezerwacja miejsca na inny wykres)
+            # with right_col:
+            #     st.markdown("&nbsp;", unsafe_allow_html=True)
+
             # tylko dominujący kolor
             dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
-
-            # mały podpis nad opisem (opcjonalnie)
-            st.markdown(
-                f"<div style='text-align:center; font:600 15px/1.3 \"Segoe UI\",system-ui; color:#2a2a2a'>"
-                f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
-                unsafe_allow_html=True
-            )
-
-            # sam opis tylko dla dominującego koloru
-            st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
 
             # zapisz PNG z dużego pierścienia do użycia w Wordzie
             big_color = max(color_pcts.items(), key=lambda kv: kv[1])[0]
