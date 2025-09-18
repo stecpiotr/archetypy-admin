@@ -5,7 +5,6 @@ import streamlit as st
 import psycopg2
 import ast
 import plotly.graph_objects as go
-'import study'
 from fpdf import FPDF
 import unicodedata
 import requests
@@ -66,13 +65,6 @@ from docx.shared import Mm
 
 import subprocess
 from io import BytesIO
-
-# === PDF (FPDF2) z osadzonymi fontami TTF ===
-from fpdf import FPDF
-from pathlib import Path
-
-FONT_DIR = Path(__file__).with_name("assets") / "fonts"
-
 
 person_wikipedia_links = {
     "Aleksandra Dulkiewicz": "https://pl.wikipedia.org/wiki/Aleksandra_Dulkiewicz",
@@ -226,45 +218,160 @@ def _luma(hexcode: str) -> float:
     r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
     return 0.2126*r + 0.7152*g + 0.0722*b
 
-def make_palette_png(palette: list[str], box_w=260, box_h=160, pad=20, gap=18, font_pt=28):
-    """
-    Tworzy jeden rząd kafelków kolorów z podpisami 'nazwa (#HEX)'.
-    Zwraca BytesIO (PNG).
-    """
-    if not palette:
-        return None
-    from PIL import ImageFont
-    # spróbuj systemowych DejaVu (bezpieczny fallback)
-    try:
-        font_b = ImageFont.truetype("DejaVuSans-Bold.ttf", font_pt)
-    except Exception:
-        font_b = None
+# --- stałe do rysowania palety dla Worda ---
+PALETTE_W_MM       = 160   # docelowa szerokość w Wordzie
+PALETTE_CELL_H_MM  = 22    # wysokość kafelka
+PALETTE_MAX_COLS   = 6     # max kafelków w wierszu
+PALETTE_PAD_MM     = 4
+PALETTE_GAP_MM     = 3
+PALETTE_CORNER_MM  = 3.5
+PALETTE_DPI        = 300   # wysoka rozdzielczość
 
-    n = len(palette)
-    W = pad*2 + n*box_w + (n-1)*gap
-    H = pad*2 + box_h
+def _mm_to_px(mm, dpi=PALETTE_DPI):
+    return int(round(mm * dpi / 25.4))
+
+# --- stałe / utils ---
+PALETTE_W_MM       = 160
+PALETTE_TILE_MM    = 28      # bok kwadratu (mm) – JEDNAKOWY
+PALETTE_PAD_MM     = 6
+PALETTE_GAP_MM     = 6
+PALETTE_CORNER_MM  = 4
+PALETTE_DPI        = 300
+
+def _mm_to_px(mm, dpi=PALETTE_DPI): return int(round(mm * dpi / 25.4))
+def _pt_to_px(pt, dpi=PALETTE_DPI): return int(round(pt * dpi / 72.0))
+
+def make_palette_png_fixed(
+    palette: list[str],
+    target_width_mm: float = PALETTE_W_MM,
+    tile_mm: float = PALETTE_TILE_MM,
+    pad_mm: float = PALETTE_PAD_MM,
+    gap_mm: float = PALETTE_GAP_MM,
+    corner_mm: float = PALETTE_CORNER_MM,
+    dpi: int = PALETTE_DPI,
+    name_pt: int = 18,          # STAŁY rozmiar nazwy
+    hex_pt: int  = 15           # STAŁY rozmiar kodu
+):
+    """
+    Jednolite, kwadratowe kafelki i stałe rozmiary czcionek.
+    """
+    if not palette: return None
+
+    import math, textwrap
+    from PIL import Image, ImageDraw, ImageFont
+    import os
+
+    # wymiary
+    W   = _mm_to_px(target_width_mm, dpi)
+    pad = _mm_to_px(pad_mm, dpi)
+    gap = _mm_to_px(gap_mm, dpi)
+    S   = _mm_to_px(tile_mm, dpi)            # bok kwadratu
+    rad = _mm_to_px(corner_mm, dpi)
+
+    # ile kolumn się mieści przy stałym S
+    cols = max(1, (W - 2*pad + gap) // (S + gap))
+    rows = math.ceil(len(palette) / cols)
+    H    = 2*pad + rows * S + (rows - 1) * gap
+
     img = Image.new("RGBA", (W, H), (255, 255, 255, 0))
     drw = ImageDraw.Draw(img)
 
-    x = pad
-    for hexcode in palette:
-        drw.rounded_rectangle([x, pad, x+box_w, pad+box_h], radius=22, fill=hexcode)
-        label = f"{COLOR_NAME_MAP.get(hexcode.upper(), hexcode)}\n({hexcode.upper()})"
-        # kolor napisu – biały dla bardzo ciemnych kafli
-        tcol = (255, 255, 255) if _luma(hexcode) < 110 else (17, 17, 17)
-        tw, th = drw.multiline_textbbox((0, 0), label, font=font_b or None, align="center")[2:]
-        drw.multiline_text((x + box_w/2 - tw/2, pad + box_h/2 - th/2),
-                           label, fill=tcol, font=font_b or None, align="center")
-        x += box_w + gap
+    # fonty – STAŁE rozmiary
+    def load_ttf(name, size_px):
+        try:
+            return ImageFont.truetype(name, size_px)
+        except Exception:
+            return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size_px)
 
-    out = BytesIO()
-    img.save(out, "PNG")
-    out.seek(0)
+    f_name = load_ttf("DejaVuSans-Bold.ttf", _pt_to_px(name_pt, dpi))
+    f_hex  = load_ttf("DejaVuSans.ttf",      _pt_to_px(hex_pt, dpi))
+
+    in_pad = _mm_to_px(3, dpi)  # wewnętrzne marginesy
+    def luma(hexcode: str) -> float:
+        h = hexcode.lstrip('#');
+        if len(h)==3: h=''.join(c*2 for c in h)
+        r,g,b = (int(h[i:i+2],16) for i in (0,2,4))
+        return 0.2126*r + 0.7152*g + 0.0722*b
+
+    def wrap_two_lines(text, font, max_w_px):
+        # łamie na max 2 linie, bez zmiany rozmiaru fontu
+        words = text.replace(" / ", " / ").split()
+        line1, line2 = "", ""
+        for w in words:
+            trial = (line1 + " " + w).strip()
+            if drw.textlength(trial, font=font) <= max_w_px:
+                line1 = trial
+            else:
+                if not line1:
+                    # bardzo długie słowo – przytnij z „…”
+                    while drw.textlength(w + "…", font=font) > max_w_px and len(w) > 1:
+                        w = w[:-1]
+                    line1 = w + "…"
+                    break
+                else:
+                    break
+        rest = " ".join(words[len(line1.split()):]).strip()
+        if rest:
+            # do drugiej linii ile wejdzie, resztę utnij „…”
+            cut = rest
+            while drw.textlength(cut, font=font) > max_w_px and len(cut) > 1:
+                cut = cut[:-1]
+            if cut != rest:
+                cut = cut[:-1] + "…"
+            line2 = cut
+        return [line1] + ([line2] if line2 else [])
+
+    # rysowanie
+    for i, hexcode in enumerate(palette):
+        r, c = divmod(i, cols)
+
+        # wyśrodkuj wiersz, jeśli ostatni ma mniej kolumn
+        cols_in_row = cols if (i // cols) < (rows - 1) else max(1, len(palette) - (rows - 1)*cols)
+        row_w = cols_in_row * S + (cols_in_row - 1) * gap
+        row_x0 = pad + (W - 2*pad - row_w) // 2   # centrowanie rzędu
+
+        x0 = row_x0 + c * (S + gap)
+        y0 = pad + r * (S + gap)
+
+        drw.rounded_rectangle([x0, y0, x0 + S, y0 + S], radius=rad, fill=hexcode)
+
+        txt_col = (255,255,255,255) if luma(hexcode) < 110 else (17,17,17,255)
+
+        name = COLOR_NAME_MAP.get(str(hexcode).upper(), str(hexcode).upper())
+        hex_txt = f"({str(hexcode).upper()})"
+
+        max_w = S - 2*in_pad
+        name_lines = wrap_two_lines(name, f_name, max_w)
+
+        # wysokości
+        nb_h = sum(drw.textbbox((0,0), line, font=f_name)[3] - drw.textbbox((0,0), line, font=f_name)[1]
+                   for line in name_lines)
+        hb   = drw.textbbox((0,0), hex_txt, font=f_hex)
+        h_h  = hb[3] - hb[1]
+        total_h = nb_h + _mm_to_px(1.6, dpi) + h_h
+
+        # pionowe wyśrodkowanie bloku tekstu
+        ty = y0 + (S - total_h)//2
+
+        # nazwa (1–2 linie)
+        for line in name_lines:
+            bb = drw.textbbox((0,0), line, font=f_name)
+            tw = bb[2] - bb[0]
+            drw.text((x0 + (S - tw)//2, ty), line, fill=txt_col, font=f_name)
+            ty += (bb[3] - bb[1])
+        ty += _mm_to_px(1.6, dpi)  # odstęp
+
+        # hex
+        bb = drw.textbbox((0,0), hex_txt, font=f_hex)
+        tw = bb[2] - bb[0]
+        drw.text((x0 + (S - tw)//2, ty), hex_txt, fill=txt_col, font=f_hex)
+
+    out = BytesIO(); img.save(out, "PNG"); out.seek(0)
     return out
 
-def palette_inline_for_word(doc, palette: list[str]):
-    png = make_palette_png(palette)
-    return InlineImage(doc, png, width=Mm(170)) if png else ""
+def palette_inline_for_word(doc, palette: list[str], width_mm: float = PALETTE_W_MM):
+    png = make_palette_png_fixed(palette, target_width_mm=width_mm)
+    return InlineImage(doc, png, width=Mm(width_mm)) if png else ""
 
 
 def build_brands_for_word(doc, brand_list, logos_dir, height_mm=20):
@@ -580,13 +687,18 @@ def color_bubbles_html(pcts: dict[str, float],
     <div class="ap-bubbles-row">{''.join(blocks)}</div>
     """
 
-def color_progress_bars_html(pcts: dict[str, float], order: str = "desc") -> str:
-    """
-    Paski 0–100% z szarym torem i kolorowym wypełnieniem.
-    • % >= 10  → etykieta na końcu WEWNĘTRZNYM kolorowego paska.
-    • % < 10   → etykieta na końcu ZEWNĘTRZNYM kolorowego paska (tuż za nim).
-    order: 'asc' = najmniejszy na górze, 'desc' = największy na górze.
-    """
+def color_progress_bars_html(
+    pcts: dict[str, float],
+    order: str = "desc",
+    label_font: str = "'Roboto','Segoe UI',system-ui,Arial,sans-serif",
+    label_size_px: int = 16,                   # rozmiar „Zielony/Żółty…”
+    label_color: str = "#31333F",               # kolor etykiet
+    row_vmargin_px: int = 17,                  # mniejsze odstępy między wierszami
+    track_height_px: int = 40,                 # niższe „pigułki”
+    track_color: str = "#eef2f7",
+    value_font: str = "'Roboto','Segoe UI',system-ui,Arial,sans-serif",
+    value_size_px: int = 15,
+):
     items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=(order == "desc"))
 
     rows = []
@@ -596,14 +708,12 @@ def color_progress_bars_html(pcts: dict[str, float], order: str = "desc") -> str
         width_css = f"{pct:.3f}%"
         color = COLOR_HEX[name]
         inside = pct >= 10.0
-
         rows.append(f"""
           <div class="cp-row">
             <div class="cp-label">
               <span class="cp-dot" style="background:{color}"></span>
-              <b>{name}</b>
+              <b class="cp-label-text">{name}</b>
             </div>
-
             <div class="cp-track">
               <div class="cp-fill" style="width:{width_css}; background:{color}">
                 <div class="cp-badge {'in' if inside else 'out'}">{pct_int}%</div>
@@ -614,29 +724,34 @@ def color_progress_bars_html(pcts: dict[str, float], order: str = "desc") -> str
 
     return f"""
     <style>
-      :root {{ --ff: "Arial Nova Cond","Roboto Condensed","Segoe UI",system-ui,-apple-system,Arial,sans-serif; }}
-
-      .cp-wrap{{ font-family: var(--ff); }}
-      .cp-row{{display:grid; grid-template-columns:140px 1fr; gap:12px;
-               align-items:center; margin:14px 0;}}
-      .cp-label{{display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px;}}
+      .cp-row{{
+        display:grid; grid-template-columns:110px 1fr; gap:6px;
+        align-items:center; margin:{row_vmargin_px}px 0;
+      }}
+      .cp-label{{display:flex; align-items:center; gap:10px;}}
+      .cp-label-text{{
+        font-family:{label_font};
+        font-size:{label_size_px}px;
+        color:{label_color};
+        font-weight:530;
+        letter-spacing:.0px;
+      }}
       .cp-dot{{width:10px; height:10px; border-radius:50%; display:inline-block;}}
-
-      .cp-track{{position:relative; height:42px; border-radius:999px;
-                 background:#eef2f7; box-shadow: inset 0 0 0 1px #e1e7f0;}}
+      .cp-track{{
+        position:relative; height:{track_height_px}px; border-radius:999px;
+        background:{track_color}; box-shadow: inset 0 0 0 1px #e1e7f0;
+      }}
       .cp-fill{{position:relative; height:100%; border-radius:999px; overflow:visible;}}
-
-      .cp-badge{{position:absolute; top:50%; transform:translateY(-50%);
-                 font-family: var(--ff); font-weight:800; font-size:14px; color:#111; white-space:nowrap;}}
-      .cp-badge.in{{right:12px;}}                    /* wewnątrz koloru (≥10%) */
-      .cp-badge.out{{left:100%; margin-left:12px;}}  /* tuż za kolorem (<10%) */
+      .cp-badge{{
+        position:absolute; top:50%; transform:translateY(-50%);
+        font-family:{value_font}; font-size:{value_size_px}px;
+        font-weight:700; color:#111; white-space:nowrap;
+      }}
+      .cp-badge.in{{ right:12px; }}
+      .cp-badge.out{{ left:100%; margin-left:12px; }}
     </style>
-
-    <div class="cp-wrap">
-      {''.join(rows)}
-    </div>
+    <div class="cp-wrap">{''.join(rows)}</div>
     """
-
 
 
 def _sum_color_points_for_answers(answers: list[int]) -> dict[str,int]:
@@ -703,47 +818,146 @@ def _ring_svg(percent: float, color: str, size: int = 180, stroke: int = 16,
       </g>
     </svg>
     """
-def build_color_bars(pcts: dict[str, float], orientation: str = "h") -> go.Figure:
-    # sort od największego
-    items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
-    labels = [k for k, _ in items]
-    values = [v for _, v in items]
-    colors = [COLOR_HEX[k] for k in labels]
 
-    if orientation == "h":
-        fig = go.Figure(go.Bar(
-            x=values, y=labels, orientation="h",
-            text=[f"{int(round(v))}%" for v in values],
-            textposition="inside",
-            insidetextanchor="middle",
-            marker=dict(color=colors),
-        ))
-        fig.update_layout(
-            xaxis=dict(range=[0, 100], showgrid=True, zeroline=False),
-            yaxis=dict(tickfont=dict(size=14)),
-            margin=dict(l=10, r=10, t=10, b=10),
-            height=260,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            showlegend=False,
-        )
-    else:
-        fig = go.Figure(go.Bar(
-            x=labels, y=values,
-            text=[f"{int(round(v))}%" for v in values],
-            textposition="outside",
-            marker=dict(color=colors),
-        ))
-        fig.update_layout(
-            yaxis=dict(range=[0, 100], showgrid=True, zeroline=False),
-            xaxis=dict(tickfont=dict(size=14)),
-            margin=dict(l=10, r=10, t=10, b=10),
-            height=320,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            showlegend=False,
-        )
-    return fig
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
+
+def _try_font(paths, size):
+    for p in paths:
+        try:
+            return ImageFont.truetype(p, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+def make_color_progress_png_for_word(
+    pcts: dict[str, float],
+    out_path: str = "color_progress.png",
+    # rozmiary/odstępy
+    width_px: int = 1600,
+    pad: int = 36,
+    bar_h: int = 68,
+    bar_gap: int = 30,
+    # etykieta (kropka + tekst) i odstęp do paska
+    dot_radius: int = 10,
+    label_gap_px: int = 35,      # <<< odstęp między etykietą a paskiem
+    # typografia
+    label_font_size: int = 35,   # <<< mniejsze niż było
+    pct_font_size: int = 30,     # <<< mniejsze niż było
+    pct_margin: int = 14         # margines liczb od krawędzi wypełnienia
+):
+    rows = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
+    n = len(rows)
+    H = pad + pad + n * bar_h + (n - 1) * bar_gap
+    W = width_px
+
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    drw = ImageDraw.Draw(img)
+
+    track = (238, 242, 247, 255)
+    label_col = (33, 35, 47, 255)
+    val_col = (17, 17, 17, 255)
+
+    bold_paths = [
+        "assets/fonts/ArialNovaCond.ttf",
+    ]
+    reg_paths = [
+        "assets/fonts/RobotoCondensed-Regular.ttf",
+    ]
+    f_label = _try_font(reg_paths, label_font_size)
+    f_pct = _try_font(bold_paths, pct_font_size)
+    _ = _try_font(reg_paths, 30)  # fallback (nieużywany, ale niech zostanie)
+
+    def _luma(hexcode: str) -> float:
+        h = hexcode.lstrip('#')
+        if len(h) == 3:
+            h = ''.join(c*2 for c in h)
+        r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
+        return 0.2126*r + 0.7152*g + 0.0722*b
+
+    # policz maks. szerokość etykiety (tekst) → jednorodny, MAŁY gap do paska
+    max_label_text_w = 0
+    for name, _ in rows:
+        bbox = drw.textbbox((0, 0), name, font=f_label)
+        max_label_text_w = max(max_label_text_w, bbox[2]-bbox[0])
+
+    dot_w   = 2*dot_radius
+    dot_pad = 10                  # odstęp między kropką a tekstem
+    label_block_w = 6 + dot_w + dot_pad + max_label_text_w
+    x0_base = pad + label_block_w + label_gap_px  # start paska
+    bar_w   = W - x0_base - pad
+    radius  = bar_h // 2
+
+    y = pad
+    for name, val in rows:
+        # etykieta
+        ly = y + bar_h // 2
+        c_hex = COLOR_HEX[name]
+        # kropka
+        drw.ellipse([pad + 6, ly - dot_radius, pad + 6 + dot_w, ly + dot_radius], fill=c_hex)
+        # tekst wycentrowany pionowo do kropki – lekko pogrubiony (stroke), z fallbackiem
+        tb = drw.textbbox((0, 0), name, font=f_label)
+        th = tb[3] - tb[1]
+        x_text = pad + 6 + dot_w + dot_pad
+        y_text = ly - th // 2
+        try:
+            drw.text(
+                (x_text, y_text),
+                name,
+                fill=label_col,
+                font=f_label,
+                stroke_width=1,  # zwiększ na 2, jeśli chcesz mocniej
+                stroke_fill=label_col
+            )
+        except TypeError:
+            # fallback dla starszego Pillow bez stroke_*: pseudo-bold przez zdublowanie
+            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                drw.text((x_text + dx, y_text + dy), name, fill=label_col, font=f_label)
+
+        # tor
+        x0 = x0_base
+        x1 = x0 + bar_w
+        y0 = y
+        y1 = y + bar_h
+        drw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=track)
+
+        # wypełnienie
+        fill_w = int(bar_w * max(0.0, min(100.0, float(val))) / 100.0)
+        if fill_w > 0:
+            drw.rounded_rectangle([x0, y0, x0 + fill_w, y1], radius=radius, fill=c_hex)
+
+        # --- % na środku wypełnienia (albo przy starcie gdy 0%) ---
+        pct_text = f"{int(round(val))}%"
+
+        # kolor % wewnątrz, zależnie od jasności wypełnienia
+        text_fill_inside = (255, 255, 255, 255) if _luma(c_hex) < 110 else (17, 17, 17, 255)
+
+        cy = y0 + bar_h / 2
+
+        if fill_w > 0:
+            # centrowanie w obrębie wypełnienia
+            try:
+                cx = x0 + fill_w / 2
+                drw.text((cx, cy), pct_text, font=f_pct, fill=text_fill_inside, anchor="mm")
+            except TypeError:
+                # fallback dla starszego Pillow bez anchor
+                pb = drw.textbbox((0, 0), pct_text, font=f_pct)
+                tx = x0 + fill_w / 2 - (pb[2] - pb[0]) / 2
+                ty = cy - (pb[3] - pb[1]) / 2
+                drw.text((tx, ty), pct_text, font=f_pct, fill=text_fill_inside)
+        else:
+            # 0% – pokaż przy początku toru, wyśrodkowane w pionie
+            try:
+                drw.text((x0 + pct_margin, cy), pct_text, font=f_pct, fill=val_col, anchor="lm")
+            except TypeError:
+                pb = drw.textbbox((0, 0), pct_text, font=f_pct)
+                drw.text((x0 + pct_margin, cy - (pb[3] - pb[1]) / 2), pct_text, font=f_pct,
+                         fill=val_col)
+
+        y += bar_h + bar_gap
+
+    img.save(out_path, "PNG")
+    return out_path
 
 
 def color_gauges_html(pcts: dict[str, float]) -> str:
@@ -1661,17 +1875,27 @@ st.markdown("""
   height:1px; border:none; background:#e5e7eb; margin:28px 0 26px 0;
 }
 
+/* jednolity nagłówek sekcji – 1:1 jak „Profil archetypów …” */
+.ap-h2{
+  font-weight:600;
+  font-size:1.26em;
+  line-height:1.00;
+  margin:5px 0 20px 0;
+  color:#2a2a2a;
+}
+.ap-h2.center{ text-align:center; }
+
 /* tytuły sekcji (np. „Udostępnij raport”, „Wybierz osobę/JST”) */
 .section-title{
   font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
-  font-weight: 650;               /* grubość */
-  font-size: 1.28em;              /* czcionka */
+  font-weight: 605;               /* grubość */
+  font-size: 1.25em;              /* czcionka */
   margin: 15px 0 25px 0;           /* marginesy: góra/dół */
   line-height: 1.15;
   color:#182433;
 }
-.section-title--padTop{ margin-top:34px !important; }
-.mt-28{ margin-top:28px !important; }
+.section-title--padTop{ margin-top:0px !important; }
+.mt-28{ margin-top:0px !important; }
 
 .section-title--blue{ color:#1a93e3; }
 
@@ -1765,6 +1989,70 @@ def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None):
         base.alpha_composite(mask_main)
 
     return base
+
+# ---- KOŁO „osi potrzeb” (inny porządek, start o 12:00) ----
+KOLO_NAMES_ORDER = [
+    "Buntownik","Błazen","Kochanek","Opiekun","Towarzysz","Niewinny",
+    "Władca","Mędrzec","Czarodziej","Bohater","Twórca","Odkrywca"
+]
+ANGLE_OFFSET_DEG = -15  # przesunięcie o 2.5 min w lewo (2.5 × 6° = 15°)
+
+@st.cache_data
+def load_axes_wheel_img():
+    base_dir = Path(__file__).with_name("assets")
+    png = base_dir / "archetypy_kolo.png"
+    if png.exists():
+        return Image.open(png).convert("RGBA")
+    svg = base_dir / "archetypy_kolo.svg"
+    if svg.exists():
+        import cairosvg
+        from io import BytesIO
+        buf = BytesIO(cairosvg.svg2png(url=str(svg)))
+        return Image.open(buf).convert("RGBA")
+    raise FileNotFoundError("Brak pliku assets/archetypy_kolo.(png|svg)")
+
+def _mask_pie_ring(base: Image.Image, idx: int, rgba,
+                   r_out_frac=0.46, r_in_frac=0.16):
+    """
+    Maluje półprzezroczysty 30° sektor TYLKO na pierścieniu (donut), nie na całym płótnie.
+    r_out_frac / r_in_frac – promień zewnętrzny/wewnętrzny w ułamku szerokości obrazu
+    (w razie potrzeby możesz lekko podregulować, np. 0.44 / 0.18).
+    """
+    if idx is None:
+        return base
+    w, h = base.size
+    cx, cy = w//2, h//2
+    R = int(min(w, h) * r_out_frac)
+    r = int(min(w, h) * r_in_frac)
+
+    start = -90 + ANGLE_OFFSET_DEG + idx * 30
+    end   = start + 30
+
+    # rysujemy na osobnej warstwie z alfą → potem alpha_composite
+    layer = Image.new("RGBA", (w, h), (0,0,0,0))
+    d = ImageDraw.Draw(layer, "RGBA")
+    d.pieslice([cx-R, cy-R, cx+R, cy+R], start, end, fill=rgba)
+    # wycinamy środek (donut)
+    d.ellipse([cx-r, cy-r, cx+r, cy+r], fill=(0,0,0,0))
+    base.alpha_composite(layer)
+    return base
+
+def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None) -> Image.Image:
+    """Koło z podświetleniem: zielony (poboczny), żółty (wspierający), czerwony (główny)."""
+    img = load_axes_wheel_img().copy()
+
+    def idx(n):
+        try:
+            return KOLO_NAMES_ORDER.index(n)
+        except:
+            return None
+
+    # kolejność: poboczny → wspierający → główny (nakładanie)
+    _mask_pie_ring(img, idx(supp_name), (64,185,0,110))
+    _mask_pie_ring(img, idx(aux_name),  (255,210,47,110))
+    _mask_pie_ring(img, idx(main_name), (255,0,0,110))
+    return img
+
 
 @st.cache_data(ttl=30)
 def load(study_id=None):
@@ -2037,22 +2325,25 @@ def export_word_docxtpl(
     panel_img_path=None,
     person: dict | None = None,
     gender_code: str = "M",
+    axes_wheel_img_path: str | None = None,
+    dom_color: dict | None = None,
+    color_progress_img_path: str | None = None,
 ):
     doc = DocxTemplate(TEMPLATE_PATH)
 
     # Radar image
     if radar_img_path and os.path.exists(radar_img_path):
-        radar_image = InlineImage(doc, radar_img_path, width=Mm(140))
+        radar_image = InlineImage(doc, radar_img_path, width=Mm(120))
     else:
         radar_image = ""
 
     # Panel image
-    panel_image = InlineImage(doc, panel_img_path, width=Mm(140)) if panel_img_path and os.path.exists(panel_img_path) else ""
+    panel_image = InlineImage(doc, panel_img_path, width=Mm(110)) if panel_img_path and os.path.exists(panel_img_path) else ""
 
     # Ikony archetypów do Word (główny/wspierający/poboczny)
-    ARCHETYPE_MAIN_ICON = arche_icon_inline_for_word(doc, main_type, gender_code, height_mm=18) if main_type else ""
-    ARCHETYPE_AUX_ICON = arche_icon_inline_for_word(doc, second_type, gender_code, height_mm=18) if second_type else ""
-    ARCHETYPE_SUPP_ICON = arche_icon_inline_for_word(doc, supplement_type, gender_code, height_mm=18) if supplement_type else ""
+    ARCHETYPE_MAIN_ICON = arche_icon_inline_for_word(doc, main_type, gender_code, height_mm=26) if main_type else ""
+    ARCHETYPE_AUX_ICON = arche_icon_inline_for_word(doc, second_type, gender_code, height_mm=26) if second_type else ""
+    ARCHETYPE_SUPP_ICON = arche_icon_inline_for_word(doc, supplement_type, gender_code, height_mm=26) if supplement_type else ""
 
     # Grafiki palet kolorów
     ARCHETYPE_MAIN_PALETTE_IMG = palette_inline_for_word(doc, main.get("color_palette", []))
@@ -2082,7 +2373,36 @@ def export_word_docxtpl(
 
     context["PANEL_IMG"] = panel_image
 
-    context["COLOR_RING_IMG"] = InlineImage(doc, "color_ring.png", width=Mm(70))
+    # Grafikę pierścienia już masz:
+    context["COLOR_RING_IMG"] = InlineImage(doc, "color_ring.png", width=Mm(110))
+
+    # Tekstowy opis dominującego koloru:
+    if dom_color:
+        context["DOM_COLOR_NAME"] = dom_color["name"]
+        context["DOM_COLOR_EMOJI"] = dom_color["emoji"]
+        context["DOM_COLOR_TITLE"] = dom_color["title"]
+        context["DOM_COLOR_PCT"] = f"{dom_color['pct']:.1f}%"
+        context["DOM_COLOR_ORIENT"] = dom_color["orient"]
+        context["DOM_COLOR_BODY"] = dom_color["body"]
+        context["DOM_COLOR_POLITICS"] = dom_color["politics"]
+    else:
+        # Bezpieczne puste wartości, gdyby kiedyś nie było danych
+        for k in ("DOM_COLOR_NAME", "DOM_COLOR_EMOJI", "DOM_COLOR_TITLE",
+                  "DOM_COLOR_PCT", "DOM_COLOR_ORIENT", "DOM_COLOR_BODY", "DOM_COLOR_POLITICS"):
+            context[k] = ""
+
+    AXES_WHEEL_IMG = (
+        InlineImage(doc, axes_wheel_img_path, width=Mm(120))
+        if (axes_wheel_img_path and os.path.exists(axes_wheel_img_path))
+        else "")
+
+    context["AXES_WHEEL_IMG"] = AXES_WHEEL_IMG
+
+    # Wykres pigułek (PNG na przezroczystym tle)
+    if color_progress_img_path and os.path.exists(color_progress_img_path):
+        context["COLOR_PROGRESS_IMG"] = (
+            InlineImage(doc, color_progress_img_path, width=Mm(160))
+            if color_progress_img_path and os.path.exists(color_progress_img_path) else "")
 
     doc.render(context)
 
@@ -2565,7 +2885,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             with col1:
                 st.markdown(
-                    '<div class="section-title mt-28">Liczebność archetypów głównych, wspierających i pobocznych</div>',
+                    '<div class="ap-h2">Liczebność archetypów głównych, wspierających i pobocznych</div>',
                     unsafe_allow_html=True)
                 archetype_table = pd.DataFrame({
                     "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in archetype_names],
@@ -2644,7 +2964,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     else:
                         highlight_r.append(None)
                         highlight_marker_color.append("rgba(0,0,0,0)")
-                st.markdown(f'<div style="font-size:1.28em;font-weight:650;margin-bottom:13px; text-align:center;">Profil archetypów {personGen}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ap-h2" style="text-align:center">Profil archetypów {personGen}</div>',
+                    unsafe_allow_html=True)
                 fig = go.Figure(
                     data=[
                         go.Scatterpolar(
@@ -2669,7 +2991,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                             radialaxis=dict(visible=True, range=[0, 20]),
                             angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels)
                         ),
-                        width=550, height=550,
+                        width=400, height=400,
                         margin=dict(l=20, r=20, t=32, b=32),
                         showlegend=False
                     )
@@ -2683,7 +3005,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                         angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels),
                     ),
                     showlegend=False,
-                    width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
+                    width=530, height=530, margin=dict(l=20, r=20, t=32, b=32),
                 )
                 fig.write_image("radar.png", scale=4)
                 st.plotly_chart(fig, use_container_width=True)
@@ -2708,36 +3030,77 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             # --- Heurystyczna analiza koloru (bąbelki OUT; słupki po LEWEJ; prawa pusta) ---
             color_pcts = calc_color_percentages_from_df(data)
 
-            st.markdown("<div style='height:34px;'></div>", unsafe_allow_html=True)
-            left_col, right_col = st.columns([0.58, 0.42], gap="large")
+            st.markdown("<div style='height:50px;'></div>", unsafe_allow_html=True)
+            left_col, right_col = st.columns([0.55, 0.45], gap="large")
 
             with left_col:
                 # tylko słupki
-                st.markdown(
-                    "<div class='section-title section-title--padTop'>Udział kolorów – wykres słupkowy</div>",
-                    unsafe_allow_html=True
-                )
-                components.html(
-                    color_progress_bars_html(color_pcts, order="desc"),
-                    height=360,
-                    scrolling=False
-                )
+                st.markdown("<div class='ap-h2'>Heurystyczna analiza koloru psychologicznego</div>",
+                            unsafe_allow_html=True)
+                components.html(color_progress_bars_html(color_pcts, order="desc"),
+                                height=310, scrolling=False)  # niższy iframe
+
+                st.markdown("<style>.cp-row{margin:15px 0 !important}</style>",
+                            unsafe_allow_html=True)  # mniejsze odstępy między wierszami
 
                 # opisy ZOSTAJĄ — dominujący kolor + opis
                 dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
                 st.markdown(
-                    f"<div style='text-align:center; font:700 20px/1.25 \"Segoe UI\",system-ui; color:#222; margin: 6px 0 -10px;'>"
+                    f"<div style='text-align:center; font:680 20px/1.30 \"Roboto\",\"Segoe UI\",\"Arial\",system-ui,sans-serif; color:#222; margin: -15px 0 60px;'>"
                     f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
                     unsafe_allow_html=True
                 )
                 st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
 
-            # prawa kolumna — NA RAZIE PUSTA (rezerwacja miejsca na inny wykres)
-            # with right_col:
-            #     st.markdown("&nbsp;", unsafe_allow_html=True)
+            # prawa kolumna — wykres archetypów
+            with right_col:
+                # spójny nagłówek jak w innych miejscach (bez .center)
+                st.markdown("<div class='ap-h2'>Rozkład archetypów na osiach potrzeb</div>",
+                            unsafe_allow_html=True)
+
+                aux = second_type if second_type != main_type else None
+                supp = supplement_type if supplement_type not in [main_type, second_type] else None
+
+                kolo_axes_img = compose_axes_wheel_highlight(main_type, aux, supp)
+
+                # bez deprecated ostrzeżenia i bez gigantycznego obrazu
+                # w bloku: with right_col:
+                indent, imgcol = st.columns([0.10, 0.90])  # ← 0.10–0.20 = delikatne przesunięcie
+                with imgcol:
+                    st.image(kolo_axes_img, width=650)
 
             # tylko dominujący kolor
             dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
+
+            color_pcts = calc_color_percentages_from_df(data)
+
+            progress_png_path = make_color_progress_png_for_word(
+                color_pcts,
+                width_px=1600,
+                pad=32,
+                bar_h=66,
+                bar_gap=30,          # odstęp między paskami
+                dot_radius=10,
+                label_gap_px=35,  # << mniejszy odstęp etykieta→pasek
+                label_font_size=35,  # << mniejsze fonty
+                pct_font_size=22,
+                pct_margin=10
+            )
+
+            # Dane opisowe dominującego koloru do Worda
+            dom_meta = COLOR_LONG[dom_name]  # masz już COLOR_LONG w pliku
+            dom_color = {
+                "name": dom_name,
+                "pct": dom_pct,
+                "emoji": COLOR_EMOJI[dom_name],
+                "title": dom_meta["title"],
+                "orient": dom_meta["orient"],
+                "body": dom_meta["body"],
+                "politics": dom_meta["politics"],
+                "hex": dom_meta["hex"],
+            }
+
+            # (pierścień już zapisujesz wcześniej jako color_ring.png)
 
             # zapisz PNG z dużego pierścienia do użycia w Wordzie
             big_color = max(color_pcts.items(), key=lambda kv: kv[1])[0]
@@ -2746,7 +3109,14 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 f.write(big_svg)
             cairosvg.svg2png(url="color_ring.svg", write_to="color_ring.png")
 
+            # -- PNG 2: Rozkład archetypów na osiach potrzeb (twoje koło)
+            kolo_axes_img.save("axes_wheel.png")  # <= zapis
+
             with col3:
+                st.markdown(
+                    '<div class="ap-h2">Koło archetypów (pragnienia i wartości)</div>',
+                    unsafe_allow_html=True)
+
                 if main_type is not None:
                     kola_img = compose_archetype_highlight(
                         archetype_name_to_img_idx(main_type),
@@ -2756,7 +3126,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     st.image(
                         kola_img,
                         caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
-                        width=700
+                        width=640
                     )
 
             st.markdown("""
@@ -2812,6 +3182,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 panel_img_path=panel_img_path,
                 person=person,
                 gender_code=("K" if IS_FEMALE else "M"),
+                axes_wheel_img_path="axes_wheel.png",
+                dom_color=dom_color,
+                color_progress_img_path=progress_png_path,
             )
 
             pdf_buf = word_to_pdf(docx_buf)
