@@ -20,6 +20,9 @@ from io import BytesIO
 import tempfile
 import shutil
 import streamlit.components.v1 as components
+import matplotlib.pyplot as plt
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import numpy as np
 import sys
 if sys.platform.startswith("linux"):
     import subprocess
@@ -27,6 +30,7 @@ else:
     from docx2pdf import convert
 
 TEMPLATE_PATH = "ap48_raport_template.docx"
+TEMPLATE_PATH_NOSUPP = "ap48_raport_template_nosupp.docx"  # szablon bez sekcji archetypu pobocznego
 logos_dir = "logos_local"
 
 def get_logo_svg_path(brand_name, logos_dir=None):
@@ -209,6 +213,223 @@ def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M",
     else:
         return InlineImage(doc, str(path), height=Mm(height_mm))
 
+def _load_arche_icon_for_mpl(name: str, size_px: int = 160, tint: str = "#3B82F6", as_array: bool = True):
+    """
+    Wczytuje ikonę archetypu (PNG/SVG), zachowuje proporcje (contain) bez rozciągania,
+    osadza na kwadratowym, przezroczystym płótnie i barwi na `tint`.
+    Zwraca numpy array (domyślnie) albo PIL.Image gdy as_array=False.
+    """
+    from pathlib import Path
+    from io import BytesIO
+    from PIL import Image, ImageOps, ImageColor
+
+    try:
+        import numpy as np  # potrzebne, gdy chcemy array
+    except Exception:
+        np = None
+
+    # --- Twoje utilsy/ścieżki (zostaw jak masz) ---
+    base = base_masc_from_any(name)
+    slug = ARCHETYPE_BASE_SLUGS.get(base, _slug_pl(base))
+    svg = ARCHE_STACKED_ICON_DIR / f"{slug}.svg"
+    png = ARCHE_STACKED_ICON_DIR / f"{slug}.png"
+    # ------------------------------------------------
+
+    # Pillow 10+
+    RESAMPLE = getattr(Image, "Resampling", Image).LANCZOS
+
+    canvas = Image.new("RGBA", (size_px, size_px), (255, 255, 255, 0))
+
+    try:
+        if png.exists():
+            im = Image.open(png).convert("RGBA")
+        elif svg.exists():
+            import cairosvg
+            buf = cairosvg.svg2png(url=str(svg), output_width=size_px * 4, output_height=size_px * 4)
+            im = Image.open(BytesIO(buf)).convert("RGBA")
+        else:
+            return None
+
+        # Bez deformacji: "contain" do kwadratu
+        im = ImageOps.contain(im, (size_px, size_px), RESAMPLE)
+
+        # Tint: bierzemy tylko alpha z ikony i wlewamy jednolity kolor pod maskę
+        color_rgb = ImageColor.getrgb(tint)
+        alpha = im.getchannel("A")
+        colored = Image.new("RGBA", im.size, color_rgb + (0,))
+        colored.putalpha(alpha)
+
+        # Wklejamy na środek kwadratowego, przezroczystego płótna
+        x = (size_px - colored.width) // 2
+        y = (size_px - colored.height) // 2
+        canvas.alpha_composite(colored, (x, y))
+
+        if as_array:
+            if np is None:
+                raise RuntimeError("numpy is required when as_array=True")
+            return np.array(canvas)
+        return canvas
+
+    except Exception:
+        return None
+
+
+def make_stacked_bar_png_for_word(
+    archetype_names: list[str],
+    counts_main: dict[str, int],
+    counts_aux: dict[str, int],
+    counts_supp: dict[str, int],
+    out_path: str = "archetypes_stacked.png",
+):
+    import os
+    import numpy as np
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from matplotlib import ticker
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    from matplotlib import font_manager as fm
+    from PIL import Image, ImageOps  # do „kwadratowania” ikon
+
+    # ===== POKRĘTŁA =====
+    FIG_SCALE  = 0.90
+    FONT_SCALE = 1.25
+    DPI = 300
+
+    # Roboto Condensed
+    FONT_DIR = "assets/fonts"
+    for fname in ("RobotoCondensed-Regular.ttf", "RobotoCondensed-Bold.ttf"):
+        p = os.path.join(FONT_DIR, fname)
+        if os.path.exists(p):
+            fm.fontManager.addfont(p)
+    mpl.rcParams["font.family"] = "Roboto Condensed"
+
+    base_fs = 9 * FONT_SCALE
+    mpl.rcParams.update({
+        "font.size": base_fs,
+        "axes.labelsize": 0.85 * base_fs,
+        "xtick.labelsize": 0.70 * base_fs,
+        "ytick.labelsize": 0.85 * base_fs,
+        "legend.fontsize": 0.80 * base_fs,
+        "pdf.fonttype": 42, "ps.fonttype": 42,
+    })
+
+    # ===== Dane =====
+    names = list(archetype_names)
+    m = np.array([int(counts_main.get(n, 0) or 0) for n in names], dtype=int)
+    a = np.array([int(counts_aux.get(n, 0) or 0)  for n in names], dtype=int)
+    s = np.array([int(counts_supp.get(n, 0) or 0) for n in names], dtype=int)
+    t = m + a + s
+
+    order = np.argsort(-t)
+    names, m, a, s, t = [[arr[i] for i in order] if isinstance(arr, list) else arr[order]
+                         for arr in (names, m, a, s, t)]
+    y = np.arange(len(names))
+
+    # ===== Figura =====
+    fig_w = 8.0 * FIG_SCALE
+    HEIGHT_SCALE = 1.03  # wysokość wykresu
+    fig_h = HEIGHT_SCALE * ((0.55 * FIG_SCALE) * len(names) + 0.9)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=DPI)
+    fig.patch.set_alpha(0)
+    ax.set_facecolor((1,1,1,0))
+    fig.subplots_adjust(left=0.30, right=0.975, top=0.83, bottom=0.05)
+
+    # ===== Osi / kolory =====
+    c_main = COLOR_HEX["Czerwony"]
+    c_aux  = COLOR_HEX["Żółty"]
+    c_supp = COLOR_HEX["Zielony"]
+    axis_col = "#4B5563"
+    grid_col = "#E5E7EB"
+
+    ax.xaxis.set_ticks_position("top")
+    ax.xaxis.set_label_position("top")
+    ax.set_xlabel("Liczba wskazań", fontsize=8.5, color="#8A94A6", labelpad=12)   # większy odstęp
+    ax.xaxis.set_label_coords(0.5, 1.06)                             # wyżej nad osią
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    ax.grid(axis="x", color=grid_col, linewidth=0.7)
+    ax.set_axisbelow(True)
+
+    ax.tick_params(axis="x", colors=axis_col, labelsize=0.70 * base_fs, length=3, pad=2)
+    ax.tick_params(axis="y", colors="#111827", pad=2)
+
+    ax.spines["top"].set_color(axis_col)
+    ax.spines["left"].set_color(axis_col)
+    ax.spines["top"].set_linewidth(1.0)
+    ax.spines["left"].set_linewidth(1.0)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+
+    # ===== Słupki =====
+    bar_h = 0.70
+    ax.barh(y, m, height=bar_h, color=c_main, edgecolor="white", linewidth=0.6, label="Główny")
+    ax.barh(y, a, left=m, height=bar_h, color=c_aux,  edgecolor="white", linewidth=0.6, label="Wspierający")
+    ax.barh(y, s, left=m+a, height=bar_h, color=c_supp, edgecolor="white", linewidth=0.6, label="Poboczny")
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(names, ha="right")
+    for lbl in ax.get_yticklabels():
+        lbl.set_x(-0.012)  # ciut bliżej osi
+
+    # ===== Ikony – mniejsze, dalej w lewo, zawsze kwadrat =====
+    ICON_PX   = int(84 * FIG_SCALE)   # rozdzielczość pola
+    ICON_ZOOM = 0.30 * FIG_SCALE      # faktyczna wielkość na wykresie
+    ICON_X    = -0.17                 # bardziej ujemne = dalej w lewo
+
+    for i, nme in enumerate(names):
+        icon_arr = _load_arche_icon_for_mpl(nme, size_px=ICON_PX)
+        if icon_arr is None:
+            continue
+        im = Image.fromarray(icon_arr)
+        im = ImageOps.pad(im, (ICON_PX, ICON_PX), color=(255, 255, 255, 0), centering=(0.5, 0.5))
+        icon_arr = np.array(im)
+
+        img = OffsetImage(icon_arr, zoom=ICON_ZOOM)  # isotropowe skalowanie (brak spłaszczania)
+        ab = AnnotationBbox(img, (ICON_X, i),
+                            xycoords=("axes fraction", "data"),
+                            box_alignment=(1.0, 0.5),
+                            frameon=False, annotation_clip=False)
+        ax.add_artist(ab)
+
+    # ===== Etykiety wewnątrz =====
+    def annotate_segment(left_arr, vals):
+        for row, val in enumerate(vals):
+            if val <= 0:
+                continue
+            ax.text(left_arr[row] + val/2.0, row, str(int(val)),
+                    color="white", ha="center", va="center",
+                    fontsize=0.65 * base_fs)
+
+    annotate_segment(np.zeros_like(m, float), m)
+    annotate_segment(m, a)
+    annotate_segment(m + a, s)
+
+    # ===== Suma na końcu =====
+    gap = max(0.02 * (t.max() if t.max() > 0 else 1), 0.10)
+    for i in range(len(y)):
+        ax.text(float(t[i]) + gap, i, str(int(t[i])),
+                color="#374151", ha="left", va="center",
+                fontsize=0.80 * base_fs, fontweight="bold")
+
+    # ===== Legenda =====
+    leg = ax.legend(
+        loc="upper center",
+        bbox_to_anchor=(0, -0.03, 1, 0),  # (x, y, width, height) w ułamku osi
+        #mode="expand",  # rozkłada etykiety równomiernie na całą szerokość
+        ncol=3,
+        frameon=False,
+        handlelength=1.5,  # dłuższe próbki
+        handletextpad=0.6,  # odstęp próbka–tekst
+        columnspacing=3.0,  # większy rozstrzał między kolumnami
+        borderaxespad=0.0
+    )
+
+    fig.subplots_adjust(bottom=0.085)  # ciaśniej na dole
+
+    ax.invert_yaxis()
+    fig.savefig(out_path, dpi=DPI, bbox_inches="tight", pad_inches=0.02, transparent=True)
+    plt.close(fig)
+    return out_path
+
 
 # --- Generowanie grafiki z paletą kolorów do Word ---
 def _luma(hexcode: str) -> float:
@@ -218,177 +439,301 @@ def _luma(hexcode: str) -> float:
     r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
     return 0.2126*r + 0.7152*g + 0.0722*b
 
-# --- stałe do rysowania palety dla Worda ---
-PALETTE_W_MM       = 160   # docelowa szerokość w Wordzie
-PALETTE_CELL_H_MM  = 22    # wysokość kafelka
-PALETTE_MAX_COLS   = 6     # max kafelków w wierszu
-PALETTE_PAD_MM     = 4
-PALETTE_GAP_MM     = 3
-PALETTE_CORNER_MM  = 3.5
-PALETTE_DPI        = 300   # wysoka rozdzielczość
 
-def _mm_to_px(mm, dpi=PALETTE_DPI):
-    return int(round(mm * dpi / 25.4))
-
-# --- stałe / utils ---
-PALETTE_W_MM       = 160
-PALETTE_TILE_MM    = 28      # bok kwadratu (mm) – JEDNAKOWY
-PALETTE_PAD_MM     = 6
-PALETTE_GAP_MM     = 6
-PALETTE_CORNER_MM  = 4
-PALETTE_DPI        = 300
-
-def _mm_to_px(mm, dpi=PALETTE_DPI): return int(round(mm * dpi / 25.4))
-def _pt_to_px(pt, dpi=PALETTE_DPI): return int(round(pt * dpi / 72.0))
-
-def make_palette_png_fixed(
+def make_palette_png(
     palette: list[str],
-    target_width_mm: float = PALETTE_W_MM,
-    tile_mm: float = PALETTE_TILE_MM,
-    pad_mm: float = PALETTE_PAD_MM,
-    gap_mm: float = PALETTE_GAP_MM,
-    corner_mm: float = PALETTE_CORNER_MM,
-    dpi: int = PALETTE_DPI,
-    name_pt: int = 18,          # STAŁY rozmiar nazwy
-    hex_pt: int  = 15           # STAŁY rozmiar kodu
+    target_width_mm: float = 160,   # szerokość obrazka pod Worda
+    cols: int = 5,                  # ile kafelków w rzędzie
+    tile_w_mm: float = 36,          # SZEROKOŚĆ kafelka (mm) — ręcznie
+    tile_h_mm: float = 28,          # WYSOKOŚĆ kafelka (mm) — ręcznie
+    pad_mm: float = 6,
+    gap_mm: float = 6,
+    corner_mm: float = 3,           # zaokrąglenia rogów
+    dpi: int = 300,
+    name_font_px: int | None = None,  # ROZMIAR czcionki nazwy (px) — ręcznie
+    hex_font_px:  int | None = None,  # ROZMIAR czcionki (#HEX) (px) — ręcznie
 ):
-    """
-    Jednolite, kwadratowe kafelki i stałe rozmiary czcionek.
-    """
-    if not palette: return None
+    if not palette:
+        return None
 
-    import math, textwrap
     from PIL import Image, ImageDraw, ImageFont
-    import os
+    import math
 
-    # wymiary
-    W   = _mm_to_px(target_width_mm, dpi)
-    pad = _mm_to_px(pad_mm, dpi)
-    gap = _mm_to_px(gap_mm, dpi)
-    S   = _mm_to_px(tile_mm, dpi)            # bok kwadratu
-    rad = _mm_to_px(corner_mm, dpi)
+    def _mm_to_px(mm): return int(round(mm * dpi / 25.4))
 
-    # ile kolumn się mieści przy stałym S
-    cols = max(1, (W - 2*pad + gap) // (S + gap))
-    rows = math.ceil(len(palette) / cols)
-    H    = 2*pad + rows * S + (rows - 1) * gap
+    W      = _mm_to_px(target_width_mm)
+    pad    = _mm_to_px(pad_mm)
+    gap    = _mm_to_px(gap_mm)
+    corner = _mm_to_px(corner_mm)
+
+    cell_w = _mm_to_px(tile_w_mm)
+    cell_h = _mm_to_px(tile_h_mm)
+
+    # policz rzędy na podstawie liczby elementów i kolumn
+    n    = len(palette)
+    rows = math.ceil(n / cols)
+
+    # gdy szerokość 5×kafelek + przerwy przekracza obraz — zmniejsz cell_w proporcjonalnie
+    total_w = 2*pad + cols*cell_w + (cols-1)*gap
+    if total_w > W:
+        scale = (W - 2*pad - (cols-1)*gap) / (cols*cell_w)
+        cell_w = int(cell_w * scale)
+        cell_h = int(cell_h * scale)
+
+    H = 2*pad + rows*cell_h + (rows-1)*gap
 
     img = Image.new("RGBA", (W, H), (255, 255, 255, 0))
     drw = ImageDraw.Draw(img)
 
-    # fonty – STAŁE rozmiary
-    def load_ttf(name, size_px):
-        try:
-            return ImageFont.truetype(name, size_px)
-        except Exception:
-            return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size_px)
+    # FONTY — ręcznie, albo proporcjonalnie do wysokości kafelka
+    def _font(paths, size):
+        for p in paths:
+            try: return ImageFont.truetype(p, size)
+            except: pass
+        return ImageFont.load_default()
 
-    f_name = load_ttf("DejaVuSans-Bold.ttf", _pt_to_px(name_pt, dpi))
-    f_hex  = load_ttf("DejaVuSans.ttf",      _pt_to_px(hex_pt, dpi))
+    # --- STAŁE rozmiary czcionek (bez auto-fit) ---
+    NAME_FONT_PX_DEFAULT = 26  # ← rozmiar NAZWY
+    HEX_FONT_PX_DEFAULT = 18  # ← rozmiar #HEX
 
-    in_pad = _mm_to_px(3, dpi)  # wewnętrzne marginesy
-    def luma(hexcode: str) -> float:
-        h = hexcode.lstrip('#');
-        if len(h)==3: h=''.join(c*2 for c in h)
-        r,g,b = (int(h[i:i+2],16) for i in (0,2,4))
+    NAME_FONT_PX = name_font_px if name_font_px is not None else NAME_FONT_PX_DEFAULT
+    HEX_FONT_PX = hex_font_px if hex_font_px is not None else HEX_FONT_PX_DEFAULT
+
+    # Jeśli chcesz nazwę pogrubioną, zostaw -Bold; jeśli zwykłą, zamień na Regular.
+    name_font = _font(
+        [
+            "assets/fonts/RobotoCondensed-Bold.ttf",
+            "assets/fonts/ArialNovaCond-Bold.ttf",
+            "DejaVuSans-Bold.ttf",
+        ],
+        NAME_FONT_PX,
+    )
+
+    hex_font = _font(
+        [
+            "assets/fonts/RobotoCondensed-Regular.ttf",
+            "assets/fonts/ArialNovaCond.ttf",
+            "DejaVuSans.ttf",
+        ],
+        HEX_FONT_PX,
+    )
+
+    def _luma(hexcode: str) -> float:
+        h = hexcode.lstrip('#')
+        if len(h) == 3: h = ''.join(c*2 for c in h)
+        r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
         return 0.2126*r + 0.7152*g + 0.0722*b
 
-    def wrap_two_lines(text, font, max_w_px):
-        # łamie na max 2 linie, bez zmiany rozmiaru fontu
-        words = text.replace(" / ", " / ").split()
-        line1, line2 = "", ""
+    def ellipsize_two_lines(text: str, max_w: int) -> list[str]:
+        words = text.split()
+        if not words: return [text]
+        lines, cur = [], ""
         for w in words:
-            trial = (line1 + " " + w).strip()
-            if drw.textlength(trial, font=font) <= max_w_px:
-                line1 = trial
+            test = (cur + " " + w).strip()
+            if drw.textlength(test, font=name_font) <= max_w or not cur:
+                cur = test
             else:
-                if not line1:
-                    # bardzo długie słowo – przytnij z „…”
-                    while drw.textlength(w + "…", font=font) > max_w_px and len(w) > 1:
-                        w = w[:-1]
-                    line1 = w + "…"
-                    break
-                else:
-                    break
-        rest = " ".join(words[len(line1.split()):]).strip()
-        if rest:
-            # do drugiej linii ile wejdzie, resztę utnij „…”
-            cut = rest
-            while drw.textlength(cut, font=font) > max_w_px and len(cut) > 1:
-                cut = cut[:-1]
-            if cut != rest:
-                cut = cut[:-1] + "…"
-            line2 = cut
-        return [line1] + ([line2] if line2 else [])
+                lines.append(cur); cur = w
+            if len(lines) == 1 and drw.textlength(cur, font=name_font) > max_w:
+                while drw.textlength(cur + "…", font=name_font) > max_w and len(cur) > 1:
+                    cur = cur[:-1]
+                cur += "…"
+        lines.append(cur)
+        if len(lines) > 2:
+            first, second = lines[0], " ".join(lines[1:])
+            while drw.textlength(second + "…", font=name_font) > max_w and len(second) > 1:
+                second = second[:-1]
+            lines = [first, second + "…"]
+        return lines[:2]
 
-    # rysowanie
     for i, hexcode in enumerate(palette):
         r, c = divmod(i, cols)
+        x0 = pad + c * (cell_w + gap)
+        y0 = pad + r * (cell_h + gap)
+        x1 = x0 + cell_w
+        y1 = y0 + cell_h
 
-        # wyśrodkuj wiersz, jeśli ostatni ma mniej kolumn
-        cols_in_row = cols if (i // cols) < (rows - 1) else max(1, len(palette) - (rows - 1)*cols)
-        row_w = cols_in_row * S + (cols_in_row - 1) * gap
-        row_x0 = pad + (W - 2*pad - row_w) // 2   # centrowanie rzędu
+        drw.rounded_rectangle([x0, y0, x1, y1], radius=corner, fill=hexcode)
 
-        x0 = row_x0 + c * (S + gap)
-        y0 = pad + r * (S + gap)
+        txt_col = (255, 255, 255) if _luma(hexcode) < 110 else (17, 17, 17)
 
-        drw.rounded_rectangle([x0, y0, x0 + S, y0 + S], radius=rad, fill=hexcode)
+        from_name = COLOR_NAME_MAP.get(str(hexcode).upper(), str(hexcode).upper())
+        max_w = cell_w - _mm_to_px(6)
+        lines = ellipsize_two_lines(from_name, max_w)
 
-        txt_col = (255,255,255,255) if luma(hexcode) < 110 else (17,17,17,255)
-
-        name = COLOR_NAME_MAP.get(str(hexcode).upper(), str(hexcode).upper())
+        # oblicz wysokości
+        name_h = sum(drw.textbbox((0,0), ln, font=name_font)[3] - drw.textbbox((0,0), ln, font=name_font)[1] for ln in lines)
+        gap_y  = _mm_to_px(1.2)
         hex_txt = f"({str(hexcode).upper()})"
+        hb  = drw.textbbox((0,0), hex_txt, font=hex_font)
+        hex_h = hb[3]-hb[1]
 
-        max_w = S - 2*in_pad
-        name_lines = wrap_two_lines(name, f_name, max_w)
+        total_h = name_h + gap_y + hex_h
+        base_y  = y0 + (cell_h - total_h)//2
+        cx      = x0 + cell_w//2
 
-        # wysokości
-        nb_h = sum(drw.textbbox((0,0), line, font=f_name)[3] - drw.textbbox((0,0), line, font=f_name)[1]
-                   for line in name_lines)
-        hb   = drw.textbbox((0,0), hex_txt, font=f_hex)
-        h_h  = hb[3] - hb[1]
-        total_h = nb_h + _mm_to_px(1.6, dpi) + h_h
+        # nazwy (wyśrodkowane)
+        cur_y = base_y
+        for ln in lines:
+            nb = drw.textbbox((0,0), ln, font=name_font)
+            nw = nb[2]-nb[0]
+            drw.text((cx - nw/2, cur_y), ln, font=name_font, fill=txt_col)
+            cur_y += nb[3]-nb[1]
 
-        # pionowe wyśrodkowanie bloku tekstu
-        ty = y0 + (S - total_h)//2
+        # hex (wyśrodkowany)
+        drw.text((cx - (hb[2]-hb[0])/2, cur_y + gap_y), hex_txt, font=hex_font, fill=txt_col)
 
-        # nazwa (1–2 linie)
-        for line in name_lines:
-            bb = drw.textbbox((0,0), line, font=f_name)
-            tw = bb[2] - bb[0]
-            drw.text((x0 + (S - tw)//2, ty), line, fill=txt_col, font=f_name)
-            ty += (bb[3] - bb[1])
-        ty += _mm_to_px(1.6, dpi)  # odstęp
-
-        # hex
-        bb = drw.textbbox((0,0), hex_txt, font=f_hex)
-        tw = bb[2] - bb[0]
-        drw.text((x0 + (S - tw)//2, ty), hex_txt, fill=txt_col, font=f_hex)
-
-    out = BytesIO(); img.save(out, "PNG"); out.seek(0)
+    out = BytesIO()
+    img.save(out, "PNG"); out.seek(0)
     return out
 
-def palette_inline_for_word(doc, palette: list[str], width_mm: float = PALETTE_W_MM):
-    png = make_palette_png_fixed(palette, target_width_mm=width_mm)
+
+def palette_inline_for_word(
+    doc, palette: list[str],
+    width_mm: float = 160,
+    cols: int = 4,
+    tile_w_mm: float = 36,
+    tile_h_mm: float = 20,
+    name_font_px: int = 38,
+    hex_font_px: int = 34,
+    gap_mm: float = 5,  # ← odstęp między kaflami
+    pad_mm: float = 3,  # ← zewnętrzny margines obrazka
+):
+    png = make_palette_png(
+        palette,
+        target_width_mm=width_mm,
+        cols=cols,
+        tile_w_mm=tile_w_mm,
+        tile_h_mm=tile_h_mm,
+        name_font_px=name_font_px,
+        hex_font_px=hex_font_px,
+        pad_mm=pad_mm,
+        gap_mm=gap_mm,
+    )
     return InlineImage(doc, png, width=Mm(width_mm)) if png else ""
 
+# === Logo → kafelek PNG o stałym rozmiarze (pod Word) ===
+def _mm_to_px_logo(mm: float, dpi: int = 300) -> int:
+    return int(round(mm * dpi / 25.4))
 
-def build_brands_for_word(doc, brand_list, logos_dir, height_mm=20):
+def _svg_viewbox_ratio(svg_path: str) -> float | None:
+    """Spróbuj odczytać proporcje (szer/wys) ze viewBox lub width/height w pliku SVG."""
+    try:
+        import re
+        with open(svg_path, "r", encoding="utf-8", errors="ignore") as f:
+            s = f.read()
+        m = re.search(r'viewBox\s*=\s*"([\d.\s-]+)"', s)
+        if m:
+            nums = [float(x) for x in m.group(1).split()]
+            if len(nums) == 4 and nums[3] > 0:
+                w, h = nums[2], nums[3]
+                if h > 0:
+                    return w / h
+        mw = re.search(r'width\s*=\s*"([\d.]+)', s)
+        mh = re.search(r'height\s*=\s*"([\d.]+)', s)
+        if mw and mh:
+            w, h = float(mw.group(1)), float(mh.group(1))
+            if h > 0:
+                return w / h
+    except Exception:
+        pass
+    return None
+
+def make_logo_tile_bytes(
+    path: str,
+    slot_w_mm: float = 25.0,     # szerokość kafelka (identyczna dla WSZYSTKICH)
+    slot_h_mm: float = 21.0,     # wysokość kafelka (identyczna dla WSZYSTKICH)
+    pad_mm: float = 10.0,         # wewnętrzny margines
+    dpi: int = 300,
+    bg_rgba=(255, 255, 255, 0)   # tło przezroczyste (PNG z alfą)
+) -> bytes:
+    """
+    Renderuje logo (SVG/PNG) na płótno o stałym rozmiarze.
+    Skalowanie proporcjonalne, centrowanie, padding. Zwraca bytes PNG.
+    """
+    from PIL import Image, ImageOps
+    import os
+    from io import BytesIO
+
+    slot_w_px = _mm_to_px_logo(slot_w_mm, dpi)
+    slot_h_px = _mm_to_px_logo(slot_h_mm, dpi)
+    pad_px    = _mm_to_px_logo(pad_mm, dpi)
+    box_w = max(1, slot_w_px - 2 * pad_px)
+    box_h = max(1, slot_h_px - 2 * pad_px)
+
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".svg":
+        # (opcjonalnie) dopasuj rasteryzację pod aspekt
+        ar = _svg_viewbox_ratio(path) or 1.0
+        # wyjściowy „cel” w pikselach (zmniejszamy aliasing)
+        if ar >= 1.0:
+            out_w = box_w
+            out_h = max(1, int(round(out_w / ar)))
+            if out_h > box_h:
+                out_h = box_h
+                out_w = max(1, int(round(out_h * ar)))
+        else:
+            out_h = box_h
+            out_w = max(1, int(round(out_h * ar)))
+            if out_w > box_w:
+                out_w = box_w
+                out_h = max(1, int(round(out_w / ar)))
+
+        # rasteryzacja SVG → PNG (bez wymiarów – i tak dociśniemy contain)
+        png_bytes = svg_to_png_bytes(path)
+        im = Image.open(BytesIO(png_bytes)).convert("RGBA")
+        im = ImageOps.contain(im, (out_w, out_h))
+    else:
+        im = Image.open(path).convert("RGBA")
+        im = ImageOps.contain(im, (box_w, box_h))
+
+    tile = Image.new("RGBA", (slot_w_px, slot_h_px), bg_rgba)
+    x = (slot_w_px - im.width) // 2
+    y = (slot_h_px - im.height) // 2
+    tile.alpha_composite(im, (x, y))
+
+    out = BytesIO()
+    tile.save(out, "PNG")
+    return out.getvalue()
+
+def build_brands_for_word(
+    doc,
+    brand_list,
+    logos_dir,
+    slot_w_mm: float = 35.0,   # szerokość kafelka w Wordzie
+    slot_h_mm: float = 21.0,   # wysokość kafelka w Wordzie
+    pad_mm: float = 10.0,
+    dpi: int = 300
+):
+    """
+    Zwraca listę {brand, logo}, gdzie 'logo' to InlineImage kafelka
+    o stałym „footprincie” – wszystkie znaki wyglądają spójnie.
+    """
     out = []
+    import os
+    from io import BytesIO
+    from docxtpl import InlineImage
+    from docx.shared import Mm
 
     for brand in brand_list:
         logo_path = get_logo_svg_path(brand, logos_dir)
-
-        if logo_path:
-            # Wygeneruj PNG o wysokości 20 mm, szerokość liczy się automatycznie
-            img_bytes = svg_to_png_bytes(logo_path, height_mm=height_mm)
-            img_stream = BytesIO(img_bytes)
-            img = InlineImage(doc, img_stream, height=Mm(height_mm))
-            out.append({"brand": brand, "logo": img})
+        if logo_path and os.path.exists(logo_path):
+            try:
+                png_bytes = make_logo_tile_bytes(
+                    logo_path,
+                    slot_w_mm=slot_w_mm,
+                    slot_h_mm=slot_h_mm,
+                    pad_mm=pad_mm,
+                    dpi=dpi
+                )
+                img_stream = BytesIO(png_bytes)
+                # USTALAMY *SZEROKOŚĆ* kafelka – wszystkie będą identyczne
+                img = InlineImage(doc, img_stream, width=Mm(slot_w_mm))
+                out.append({"brand": brand, "logo": img})
+            except Exception:
+                out.append({"brand": brand, "logo": ""})
         else:
             out.append({"brand": brand, "logo": ""})
-
     return out
 
 
@@ -397,6 +742,8 @@ import base64
 
 # --- IKONY ARCHETYPÓW (SVG) ---
 ARCHETYPE_ICON_DIR = Path(__file__).with_name("assets") / "person_icons"
+# Ikony do etykiet wykresu skumulowanego (nie mylić z person_icons)
+ARCHE_STACKED_ICON_DIR = Path(__file__).with_name("assets") / "arche_icons"
 
 _PL_MAP = str.maketrans({
     "ą":"a","ć":"c","ę":"e","ł":"l","ń":"n","ó":"o","ś":"s","ź":"z","ż":"z",
@@ -410,6 +757,18 @@ def _slug_pl(s: str) -> str:
     s = s.replace(" / ", " ").replace("/", " ").replace(",", " ")
     s = " ".join(s.split())
     return s.replace(" ", "-")
+
+def build_report_filenames(study: dict) -> tuple[str, str]:
+    """
+    Zwraca ('raport_<nazwisko-imie>.docx', 'raport_<nazwisko-imie>.pdf').
+    Korzysta z *_nom (mianownik), z fallbackiem na first_name / last_name.
+    """
+    last_nom  = (study.get("last_name_nom")  or study.get("last_name")  or "").strip()
+    first_nom = (study.get("first_name_nom") or study.get("first_name") or "").strip()
+    base = (f"{last_nom} {first_nom}").strip() or "raport"
+    slug = _slug_pl(base)  # już masz zdefiniowane wyżej
+    return (f"raport_{slug}.docx", f"raport_{slug}.pdf")
+
 
 # Gdyby Twoje pliki miały inne nazwy niż slug (opcjonalnie dopisz mapę wyjątków)
 ARCHETYPE_FILENAME_MAP = {
@@ -457,6 +816,7 @@ def arche_icon_img_html(archetype_name: str, height_px: int = 90, gender_code: s
 
 
 import cairosvg
+
 
 # (page_config usunięty – ustawiany w app.py)
 
@@ -691,13 +1051,13 @@ def color_progress_bars_html(
     pcts: dict[str, float],
     order: str = "desc",
     label_font: str = "'Roboto','Segoe UI',system-ui,Arial,sans-serif",
-    label_size_px: int = 16,                   # rozmiar „Zielony/Żółty…”
-    label_color: str = "#31333F",               # kolor etykiet
-    row_vmargin_px: int = 17,                  # mniejsze odstępy między wierszami
-    track_height_px: int = 40,                 # niższe „pigułki”
+    label_size_px: int = 15,                  # mniejsze niż było
+    label_color: str = "#31333F",
+    row_vmargin_px: int = 17,
+    track_height_px: int = 40,
     track_color: str = "#eef2f7",
     value_font: str = "'Roboto','Segoe UI',system-ui,Arial,sans-serif",
-    value_size_px: int = 15,
+    value_size_px: int = 17,                  # większe %
 ):
     items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=(order == "desc"))
 
@@ -712,7 +1072,7 @@ def color_progress_bars_html(
           <div class="cp-row">
             <div class="cp-label">
               <span class="cp-dot" style="background:{color}"></span>
-              <b class="cp-label-text">{name}</b>
+              <span class="cp-label-text">{name}</span>
             </div>
             <div class="cp-track">
               <div class="cp-fill" style="width:{width_css}; background:{color}">
@@ -725,7 +1085,7 @@ def color_progress_bars_html(
     return f"""
     <style>
       .cp-row{{
-        display:grid; grid-template-columns:110px 1fr; gap:6px;
+        display:grid; grid-template-columns:110px 1fr; gap:8px;
         align-items:center; margin:{row_vmargin_px}px 0;
       }}
       .cp-label{{display:flex; align-items:center; gap:10px;}}
@@ -733,7 +1093,7 @@ def color_progress_bars_html(
         font-family:{label_font};
         font-size:{label_size_px}px;
         color:{label_color};
-        font-weight:530;
+        font-weight:500;                /* lżej */
         letter-spacing:.0px;
       }}
       .cp-dot{{width:10px; height:10px; border-radius:50%; display:inline-block;}}
@@ -745,9 +1105,10 @@ def color_progress_bars_html(
       .cp-badge{{
         position:absolute; top:50%; transform:translateY(-50%);
         font-family:{value_font}; font-size:{value_size_px}px;
-        font-weight:700; color:#111; white-space:nowrap;
+        font-weight:700;               /* grube % */
+        color:#111; white-space:nowrap;
       }}
-      .cp-badge.in{{ right:12px; }}
+      .cp-badge.in{{ right:12px; }}    /* do wewnętrznej krawędzi */
       .cp-badge.out{{ left:100%; margin-left:12px; }}
     </style>
     <div class="cp-wrap">{''.join(rows)}</div>
@@ -822,29 +1183,21 @@ def _ring_svg(percent: float, color: str, size: int = 180, stroke: int = 16,
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
-def _try_font(paths, size):
-    for p in paths:
-        try:
-            return ImageFont.truetype(p, size)
-        except Exception:
-            continue
-    return ImageFont.load_default()
-
 def make_color_progress_png_for_word(
     pcts: dict[str, float],
     out_path: str = "color_progress.png",
     # rozmiary/odstępy
     width_px: int = 1600,
     pad: int = 36,
-    bar_h: int = 68,
-    bar_gap: int = 30,
+    bar_h: int = 72,            # nieco wyższe pastylki → większe % bez ścisku
+    bar_gap: int = 34,
     # etykieta (kropka + tekst) i odstęp do paska
     dot_radius: int = 10,
-    label_gap_px: int = 35,      # <<< odstęp między etykietą a paskiem
-    # typografia
-    label_font_size: int = 35,   # <<< mniejsze niż było
-    pct_font_size: int = 30,     # <<< mniejsze niż było
-    pct_margin: int = 14         # margines liczb od krawędzi wypełnienia
+    label_gap_px: int = 40,
+    # typografia (etykieta lżejsza, % duże i grube)
+    label_font_size: int = 30,
+    pct_font_size: int | None = None,   # auto: 50% wysokości paska
+    pct_margin: int = 20                # odsunięcie % od krawędzi
 ):
     rows = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
     n = len(rows)
@@ -859,14 +1212,26 @@ def make_color_progress_png_for_word(
     val_col = (17, 17, 17, 255)
 
     bold_paths = [
-        "assets/fonts/ArialNovaCond.ttf",
+        "assets/fonts/RobotoCondensed-Bold.ttf",
+        "assets/fonts/DejaVuSans-Bold.ttf",
+        "assets/fonts/Arial Bold.ttf",
     ]
-    reg_paths = [
+    reg_paths  = [
         "assets/fonts/RobotoCondensed-Regular.ttf",
+        "assets/fonts/DejaVuSans.ttf",
+        "assets/fonts/Arial.ttf",
     ]
-    f_label = _try_font(reg_paths, label_font_size)
-    f_pct = _try_font(bold_paths, pct_font_size)
-    _ = _try_font(reg_paths, 30)  # fallback (nieużywany, ale niech zostanie)
+
+    def _try_font(paths, size):
+        for p in paths:
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:
+                continue
+        return ImageFont.load_default()
+
+    # etykieta – lżejsza
+    f_label = _try_font(reg_paths,  label_font_size)
 
     def _luma(hexcode: str) -> float:
         h = hexcode.lstrip('#')
@@ -875,44 +1240,72 @@ def make_color_progress_png_for_word(
         r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
         return 0.2126*r + 0.7152*g + 0.0722*b
 
-    # policz maks. szerokość etykiety (tekst) → jednorodny, MAŁY gap do paska
+    def draw_bold_text(drw, xy, txt, font, fill, stroke=1):
+        """Proste pogrubienie tekstu przez dorysowanie 4 przesuniętych kopii."""
+        x, y = xy
+        if stroke > 0:
+            for dx, dy in ((-stroke, 0), (stroke, 0), (0, -stroke), (0, stroke)):
+                drw.text((x + dx, y + dy), txt, font=font, fill=fill)
+        drw.text((x, y), txt, font=font, fill=fill)
+
+    # maks. szerokość etykiety → stały odstęp od paska
     max_label_text_w = 0
     for name, _ in rows:
         bbox = drw.textbbox((0, 0), name, font=f_label)
         max_label_text_w = max(max_label_text_w, bbox[2]-bbox[0])
 
     dot_w   = 2*dot_radius
-    dot_pad = 10                  # odstęp między kropką a tekstem
+    dot_pad = 10
     label_block_w = 6 + dot_w + dot_pad + max_label_text_w
-    x0_base = pad + label_block_w + label_gap_px  # start paska
+    x0_base = pad + label_block_w + label_gap_px
     bar_w   = W - x0_base - pad
     radius  = bar_h // 2
 
     y = pad
+
+    # --- KONFIG WARTOŚCI % ---
+    PCT_FONT_PX = 33  # rozmiar czcionki %
+    PCT_BOLD = True  # True = pogrubiona, False = zwykła
+    PCT_RIGHT_PAD = max(10, int(bar_h * 0.35))  # odstęp od prawej krawędzi wypełnienia (px)
+    PCT_VSHIFT = 0  # ręczne przesunięcie w pionie (px, + w dół, - w górę)
+
+    # załaduj font dla % (pogrubiony lub regularny)
+    def _font(paths, size):
+        from PIL import ImageFont
+        for p in paths:
+            try:
+                return ImageFont.truetype(p, size)
+            except:
+                pass
+        return ImageFont.load_default()
+
+    _pct_font_paths_bold = [
+        "assets/fonts/RobotoCondensed-Bold.ttf",
+        "assets/fonts/ArialNovaCond-Bold.ttf",
+        "DejaVuSans-Bold.ttf",
+    ]
+    _pct_font_paths_reg = [
+        "assets/fonts/RobotoCondensed-Regular.ttf",
+        "assets/fonts/ArialNovaCond.ttf",
+        "DejaVuSans.ttf",
+    ]
+    f_pct = _font(_pct_font_paths_bold if PCT_BOLD else _pct_font_paths_reg, PCT_FONT_PX)
+
     for name, val in rows:
-        # etykieta
-        ly = y + bar_h // 2
+        ly = y + bar_h//2
         c_hex = COLOR_HEX[name]
+
         # kropka
-        drw.ellipse([pad + 6, ly - dot_radius, pad + 6 + dot_w, ly + dot_radius], fill=c_hex)
-        # tekst wycentrowany pionowo do kropki – lekko pogrubiony (stroke), z fallbackiem
-        tb = drw.textbbox((0, 0), name, font=f_label)
-        th = tb[3] - tb[1]
-        x_text = pad + 6 + dot_w + dot_pad
-        y_text = ly - th // 2
+        drw.ellipse([pad+6, ly-dot_radius, pad+6+dot_w, ly+dot_radius], fill=c_hex)
+
+        # etykieta – idealnie na środku (anchor) z fallbackiem
+        label_x = pad+6+dot_w+dot_pad
         try:
-            drw.text(
-                (x_text, y_text),
-                name,
-                fill=label_col,
-                font=f_label,
-                stroke_width=1,  # zwiększ na 2, jeśli chcesz mocniej
-                stroke_fill=label_col
-            )
+            drw.text((label_x, ly), name, fill=label_col, font=f_label, anchor="lm")
         except TypeError:
-            # fallback dla starszego Pillow bez stroke_*: pseudo-bold przez zdublowanie
-            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-                drw.text((x_text + dx, y_text + dy), name, fill=label_col, font=f_label)
+            tb = drw.textbbox((0, 0), name, font=f_label)
+            th = tb[3]-tb[1]
+            drw.text((label_x, ly - th/2), name, fill=label_col, font=f_label)
 
         # tor
         x0 = x0_base
@@ -922,42 +1315,231 @@ def make_color_progress_png_for_word(
         drw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=track)
 
         # wypełnienie
-        fill_w = int(bar_w * max(0.0, min(100.0, float(val))) / 100.0)
+        pct_val = max(0.0, min(100.0, float(val)))
+        fill_w = int(bar_w * pct_val / 100.0)
         if fill_w > 0:
-            drw.rounded_rectangle([x0, y0, x0 + fill_w, y1], radius=radius, fill=c_hex)
+            drw.rounded_rectangle([x0, y0, x0+fill_w, y1], radius=radius, fill=c_hex)
 
-        # --- % na środku wypełnienia (albo przy starcie gdy 0%) ---
+        # --- % na prawej wewnętrznej krawędzi wypełnienia, wyśrodkowane pionowo ---
         pct_text = f"{int(round(val))}%"
 
-        # kolor % wewnątrz, zależnie od jasności wypełnienia
+        # kolor napisu w środku; jasność wypełnienia decyduje o bieli/czerni
         text_fill_inside = (255, 255, 255, 255) if _luma(c_hex) < 110 else (17, 17, 17, 255)
 
-        cy = y0 + bar_h / 2
+        cy = y0 + bar_h / 2 + PCT_VSHIFT  # środek pionowy paska + ewentualny v-shift
 
         if fill_w > 0:
-            # centrowanie w obrębie wypełnienia
+            # x przy prawej krawędzi wypełnienia z marginesem do środka (anchor='rm')
+            cx = x0 + fill_w - PCT_RIGHT_PAD
+            # nie pozwól wyjechać w lewo przy małych słupkach
+            cx = max(cx, x0 + PCT_RIGHT_PAD)
+
             try:
-                cx = x0 + fill_w / 2
-                drw.text((cx, cy), pct_text, font=f_pct, fill=text_fill_inside, anchor="mm")
+                # right-middle = „przyklej” do prawej krawędzi wypełnienia, wyśrodkuj w pionie
+                drw.text((cx, cy), pct_text, font=f_pct, fill=text_fill_inside, anchor="rm")
             except TypeError:
                 # fallback dla starszego Pillow bez anchor
                 pb = drw.textbbox((0, 0), pct_text, font=f_pct)
-                tx = x0 + fill_w / 2 - (pb[2] - pb[0]) / 2
+                tx = cx - (pb[2] - pb[0])  # prawa krawędź tekstu w cx
                 ty = cy - (pb[3] - pb[1]) / 2
                 drw.text((tx, ty), pct_text, font=f_pct, fill=text_fill_inside)
         else:
-            # 0% – pokaż przy początku toru, wyśrodkowane w pionie
+            # 0% – przy początku toru, lekko od lewej, wyśrodkowane pionowo
             try:
-                drw.text((x0 + pct_margin, cy), pct_text, font=f_pct, fill=val_col, anchor="lm")
+                drw.text((x0 + PCT_RIGHT_PAD, cy), pct_text, font=f_pct, fill=(17, 17, 17, 255),
+                         anchor="lm")
             except TypeError:
                 pb = drw.textbbox((0, 0), pct_text, font=f_pct)
-                drw.text((x0 + pct_margin, cy - (pb[3] - pb[1]) / 2), pct_text, font=f_pct,
-                         fill=val_col)
+                drw.text((x0 + PCT_RIGHT_PAD, cy - (pb[3] - pb[1]) / 2), pct_text, font=f_pct,
+                         fill=(17, 17, 17, 255))
 
         y += bar_h + bar_gap
 
     img.save(out_path, "PNG")
     return out_path
+
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
+import math
+
+# mapowanie archetyp → kolor „rodziny” (jak w całej appce)
+ARCHETYPE_TO_COLOR_FAMILY = {
+    "Władca":"Czerwony", "Bohater":"Czerwony", "Buntownik":"Czerwony",
+    "Twórca":"Żółty", "Czarodziej":"Żółty", "Odkrywca":"Żółty",
+    "Opiekun":"Zielony", "Kochanek":"Zielony", "Błazen":"Zielony",
+    "Mędrzec":"Niebieski", "Towarzysz":"Niebieski", "Niewinny":"Niebieski",
+}
+
+def make_capsule_columns_png_for_word(
+    means_pct_by_arche: dict[str, float],
+    out_path: str = "arche_capsules.png",
+    width_px: int = 1900,
+    grid_height_px: int = 620,
+    top_title: str | None = None,
+):
+    """
+    Kolumny-kapsuły z osią Y oraz X; % nad kropką; siatka 10%.
+    (Poprawki: wyższe % nad kropkami, niższe nazwy, kapsuły do 100%, oś X=Y.)
+    """
+    if not means_pct_by_arche:
+        return None
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    # render w 2× dla ostrości (geometria bez zmian)
+    S = 2
+
+    # ------- dane -------
+    items = sorted(means_pct_by_arche.items(), key=lambda kv: kv[1], reverse=True)
+
+    # ------- layout (logiczne px) -------
+    pad_x = 84
+    pad_title = 96 if top_title else 40
+    axis_band = 62
+    pad_bottom = 118
+    grid_left  = pad_x + axis_band
+    grid_right = width_px - pad_x
+    n = len(items)
+
+    col_w = max(68, int((grid_right - grid_left) / max(n, 1) * 0.72))
+    gap   = max(30, int((grid_right - grid_left - n * col_w) / max(n - 1, 1))) if n > 1 else 0
+
+    grid_h    = grid_height_px
+    height_px = pad_title + grid_h + pad_bottom
+
+    # przeskalowane płótno
+    W, H = width_px * S, height_px * S
+    img = Image.new("RGBA", (W, H), (255, 255, 255, 0))
+    drw = ImageDraw.Draw(img)
+
+    # ------- fonty -------
+    def _try_font(paths, size):
+        from PIL import ImageFont
+        for p in paths:
+            try: return ImageFont.truetype(p, size)
+            except Exception: pass
+        return ImageFont.load_default()
+
+    f_title = _try_font(["assets/fonts/RobotoCondensed-Bold.ttf","DejaVuSans-Bold.ttf","Arial.ttf"], 42*S)
+    f_name  = _try_font(["assets/fonts/RobotoCondensed-Regular.ttf","DejaVuSans.ttf","Arial.ttf"], 28*S)
+    f_pct   = _try_font(["assets/fonts/RobotoCondensed-Bold.ttf","DejaVuSans-Bold.ttf","Arial.ttf"], 27*S)
+    f_axis  = _try_font(["assets/fonts/RobotoCondensed-Regular.ttf","DejaVuSans.ttf","Arial.ttf"], 21*S)
+    f_pct_big = _try_font(
+        ["assets/fonts/RobotoCondensed-Bold.ttf", "DejaVuSans-Bold.ttf", "Arial.ttf"], (27 + 5) * S)
+
+    # ------- kolory / linie -------
+    label_color = (30, 32, 36, 255)
+    axis_col = (138, 144, 153, 255)      # identyczny dla X i Y
+    tick_col = (200, 205, 213, 255)
+    grid_col = (226, 230, 236, 255)
+    cap_bg = (234, 238, 243, 255)
+    cap_border = (206, 210, 217, 255)
+    AXIS_W = 2 * S
+
+    # ------- tytuł -------
+    if top_title:
+        tb = drw.textbbox((0,0), top_title, font=f_title)
+        drw.text(((W - (tb[2]-tb[0]))/2, 16*S), top_title, font=f_title, fill=label_color)
+
+    # ------- osie -------
+    y_top   = pad_title * S
+    y_bot   = (pad_title + grid_h) * S
+    x_axis_y = y_bot                     # oś X na dnie siatki
+    axis_x   = (grid_left - 32) * S
+
+    # Oś Y
+    drw.line([(axis_x, y_top), (axis_x, x_axis_y)], fill=axis_col, width=AXIS_W)
+    # Oś X (ten sam kolor i grubość co Y)
+    drw.line([(grid_left * S, x_axis_y), (grid_right * S, x_axis_y)], fill=axis_col, width=AXIS_W)
+
+    # Linie poziome co 10% + etykiety
+    for p in range(0, 101, 10):
+        yy = y_bot - int(round(grid_h * S * (p/100.0)))
+        drw.line([(grid_left * S, yy), (grid_right * S, yy)], fill=grid_col, width=1 * S)
+        drw.line([(axis_x - 6 * S, yy), (axis_x, yy)], fill=tick_col, width=1 * S)
+        txt = f"{p}%"
+        tb = drw.textbbox((0,0), txt, font=f_axis)
+        drw.text((axis_x - 10 * S - (tb[2]-tb[0]), yy - (tb[3]-tb[1])//2), txt, font=f_axis, fill=axis_col)
+
+    # ------- kapsuły (teraz DOCHODZĄ do 100%) -------
+    col_w_S = col_w * S
+    gap_S   = gap * S
+    cap_r   = (col_w // 2) * S
+    cap_top = y_top               # góra = dokładnie 100%
+    cap_bot = x_axis_y            # dół = oś X (0%)
+
+    def y_for_pct(p):
+        p = max(0.0, min(100.0, float(p)))
+        return cap_bot - int(round((cap_bot - cap_top) * (p/100.0)))
+
+    # offsety wg Twoich uwag
+    PCT_OFFSET_ABOVE_DOT = 42 * S     # % wyżej nad kropką
+    NAME_OFFSET_BELOW_X  = 18 * S     # nazwy niżej od osi X
+
+    x = grid_left * S
+    for name, val in items:
+        # tło kapsuły – top=100%, bottom=0%
+        cap_left, cap_right = x, x + col_w_S
+        drw.rounded_rectangle([cap_left, cap_top, cap_right, cap_bot],
+                              radius=cap_r, fill=cap_bg, outline=cap_border, width=2 * S)
+
+        fam = ARCHETYPE_TO_COLOR_FAMILY.get(name, "Niebieski")
+        c_hex = COLOR_HEX[fam]
+        c_rgb = tuple(int(c_hex[i:i+2], 16) for i in (1,3,5)) + (255,)
+
+        cx    = (cap_left + cap_right) // 2
+        y_val = y_for_pct(val)
+
+        # linia od 0%
+        drw.line([(cx, cap_bot), (cx, y_val)], fill=c_rgb, width=6 * S)
+
+        # kropka
+        dot_r = max(6 * S, int(col_w * 0.13) * S)
+        drw.ellipse([cx-dot_r, y_val-dot_r, cx+dot_r, y_val+dot_r], fill=c_rgb)
+
+        # % NAD kropką
+        pct_value = float(val)
+        pct_txt = f"{round(pct_value, 1):.1f}%"
+        font_pct = f_pct_big if pct_value >= 70.0 else f_pct  # +2 px dla ≥ 70%
+
+        pb = drw.textbbox((0, 0), pct_txt, font=font_pct)
+        drw.text((cx - (pb[2] - pb[0]) / 2, y_val - dot_r - PCT_OFFSET_ABOVE_DOT),
+                 pct_txt, font=font_pct, fill=c_rgb)
+
+        # ticzki X i nazwa (niżej)
+        drw.line([(cx, cap_bot), (cx, cap_bot + 7 * S)], fill=tick_col, width=1 * S)
+        nb = drw.textbbox((0,0), name, font=f_name)
+        drw.text((cx - (nb[2]-nb[0]) / 2, cap_bot + NAME_OFFSET_BELOW_X),
+                 name, font=f_name, fill=label_color)
+
+        x += col_w_S + gap_S
+
+    img.save(out_path, "PNG", dpi=(300, 300))
+    return out_path
+
+
+
+
+
+def mean_pct_by_archetype_from_df(df: pd.DataFrame) -> dict[str, float]:
+    """
+    Zwraca {archetyp: średni % 0..100} dla całego df.
+    Zakłada, że kolumna 'answers' ma listę 48 wartości 0..5.
+    """
+    if df.empty: return {k: 0.0 for k in archetypes.keys()}
+    totals = {k: 0 for k in archetypes.keys()}
+    n = 0
+    for _, row in df.iterrows():
+        ans = row.get("answers")
+        if not isinstance(ans, list) or len(ans) < 48:
+            continue
+        sc = archetype_scores(ans)  # masz wyżej
+        for k, v in sc.items():
+            totals[k] += v
+        n += 1
+    if n == 0: return {k: 0.0 for k in archetypes.keys()}
+    # 4 pytania na archetyp * 5 pkt = 20 maks → %:
+    return {k: round((totals[k] / (20.0 * n)) * 100.0, 2) for k in archetypes.keys()}
 
 
 def color_gauges_html(pcts: dict[str, float]) -> str:
@@ -996,6 +1578,7 @@ COLOR_LONG = {
     "Niebieski": {
         "title": "Niebieski – analityczny, proceduralny, precyzyjny",
         "orient": "fakty, dane, logikę i procedury",
+        "arche": "Mędrzec, Towarzysz, Niewinny",
         "body": (
             "Ceni fakty, logikę i stabilne procedury. Działa najlepiej, gdy ma jasno określone zasady, "
             "harmonogram i dostęp do danych. Nie lubi chaosu, nagłych zmian i improwizacji – woli działać "
@@ -1012,11 +1595,12 @@ COLOR_LONG = {
     "Zielony": {
         "title": "Zielony – empatyczny, harmonijny, wspierający",
         "orient": "relacje, troskę, zaufanie, wspólnotę",
+        "arche": "Opiekun, Kochanek, Błazen",
         "body": (
-            "Kierują się wartościami, relacjami i potrzebą budowania poczucia bezpieczeństwa. Są empatyczni, "
-            "uważni na innych i dążą do zgody. Nie lubią gwałtownych zmian i konfrontacji, czasem brakuje im "
-            "asertywności, ale potrafią tworzyć atmosferę zaufania i współpracy. Wnoszą do zespołu stabilność, "
-            "lojalność i umiejętność łagodzenia napięć. Zieloni to uczucia."
+            "Kieruje się wartościami, relacjami i potrzebą budowania poczucia bezpieczeństwa. Jest empatyczny, "
+            "uważny na innych i dąży do zgody. Nie lubi gwałtownych zmian i konfrontacji, czasem brakuje mu "
+            "asertywności, ale potrafi tworzyć atmosferę zaufania i współpracy. Wnosi do zespołu stabilność, "
+            "lojalność i umiejętność łagodzenia napięć. Zielony to uczucia."
         ),
         "politics": (
             "W polityce to typ mediator-społecznik, który stawia na dialog, kompromis i dobro wspólne. Potrafi "
@@ -1029,6 +1613,7 @@ COLOR_LONG = {
     "Żółty": {
         "title": "Żółty – kreatywny, pełny energii i spontaniczny",
         "orient": "wizję, innowację, możliwości, odkrywanie nowych dróg",
+        "arche": "Twórca, Czarodziej, Odkrywca",
         "body": (
             "Osoba wizjonerska i entuzjastyczna – pełna pomysłów, które inspirują innych. Najlepiej czuje się w "
             "środowisku swobodnym, otwartym na eksperymenty i innowacje. Nie przepada za rutyną, schematami i "
@@ -1045,6 +1630,7 @@ COLOR_LONG = {
     "Czerwony": {
         "title": "Czerwony – decyzyjny, nastawiony na wynik, dominujący",
         "orient": "działanie, sprawczość, szybkie decyzje, forsowanie kierunku",
+        "arche": "Władca, Bohater, Buntownik",
         "body": (
             "Ma naturalne zdolności przywódcze i skłonność do szybkiego podejmowania decyzji. Jest niezależny, "
             "ambitny i skoncentrowany na rezultatach. Może być niecierpliwy, zbyt stanowczy i mało elastyczny, "
@@ -1065,6 +1651,7 @@ COLOR_META = {
         "emoji": COLOR_EMOJI[name],
         "title": COLOR_LONG[name]["title"],
         "orient": f"Orientacja na: {COLOR_LONG[name]['orient']}",
+        "arche": f"Archetypy: {COLOR_LONG[name]['arche']}",
         "desc":   COLOR_LONG[name]["body"] + "\n\n" + " 👉 " + COLOR_LONG[name]["politics"],
     }
     for name in COLOR_LONG.keys()
@@ -1086,6 +1673,10 @@ def color_explainer_one_html(name: str, pct: float) -> str:
 
         <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:#444;">
           • <b>Orientacja na:</b> {meta['orient']}
+        </div>
+        
+        <div style="font:510 14px/1.40 'Segoe UI',system-ui; color:#444; margin-top:6px;">
+          • <b>Archetypy:</b> {meta['arche']}
         </div>
 
         <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">
@@ -1115,8 +1706,11 @@ def color_explainer_html(pcts: dict[str, float]) -> str:
              <div style="font:650 18px/1.2 'Segoe UI',system-ui">{meta['title']}</div>
              <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:#333">{val:.1f}%</div>
           </div>
-           <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:#444;">
+          <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:#444;">
              • <b>Orientacja na:</b> {meta['orient']}<br/>
+          </div>
+          <div style="font:510 14px/1.40 'Segoe UI',system-ui; color:#444; margin-top:6px;">
+             • <b>Archetypy:</b> {meta['arche']}
           </div>
           <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">{meta['body']}</div>
           <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">👉 {meta['politics']}</div>
@@ -1249,7 +1843,7 @@ archetype_extended = {
             "Rolex", "Mercedes-Benz", "IBM", "Microsoft", "Hugo Boss", "BMW", "Silny samorząd"
         ],
         "color_palette": [
-            "#000000", "#FFD700", "#282C34", "#800020", "#8C564B"
+            "#800020", "#FFD700", "#282C34", "#800020","#000000", "#8C564B"
         ],
         "visual_elements": [
             "korona", "herb Miasta", "sygnet", "monogram", "geometryczna, masywna typografia", "symetria"
@@ -1413,7 +2007,7 @@ archetype_extended = {
             "Jacinda Ardern", "Franklin D. Roosevelt", "Clement Attlee", "Władysław Kosiniak-Kamysz", "Jacek Kuroń"
         ],
         "example_brands": [
-            "UNICEF", "Nivea", "Caritas", "WOŚP", "Pampers", "Volvo", "hospicja"
+            "UNICEF", "Nivea", "Caritas", "WOŚP", "Pampers", "Volvo",
         ],
         "color_palette": [
             "#0192D3", "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD", "#5B6979", "#A1B1C2", "#2C7D78",
@@ -1867,63 +2461,6 @@ archetype_extended = {
 from pathlib import Path
 from PIL import Image
 
-# —— GLOBALNY STYL DLA NAGŁÓWKÓW, HR, PRZYCISKÓW I SELECTBOXA ——
-st.markdown("""
-<style>
-/* delikatna, szara linia */
-.soft-hr{
-  height:1px; border:none; background:#e5e7eb; margin:28px 0 26px 0;
-}
-
-/* jednolity nagłówek sekcji – 1:1 jak „Profil archetypów …” */
-.ap-h2{
-  font-weight:600;
-  font-size:1.26em;
-  line-height:1.00;
-  margin:5px 0 20px 0;
-  color:#2a2a2a;
-}
-.ap-h2.center{ text-align:center; }
-
-/* tytuły sekcji (np. „Udostępnij raport”, „Wybierz osobę/JST”) */
-.section-title{
-  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
-  font-weight: 605;               /* grubość */
-  font-size: 1.25em;              /* czcionka */
-  margin: 15px 0 25px 0;           /* marginesy: góra/dół */
-  line-height: 1.15;
-  color:#182433;
-}
-.section-title--padTop{ margin-top:0px !important; }
-.mt-28{ margin-top:0px !important; }
-
-.section-title--blue{ color:#1a93e3; }
-
-/* przyciski skoków (linki wyglądające jak przyciski) */
-.jump-btns{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px 0; }
-.jump-btn{
-  display:inline-block; padding:8px 14px; border-radius:10px; text-decoration:none;
-  border:1px solid #1a93e3; color:#1a93e3; font-weight:600; font-size:0.95em;
-  background:#f0f8ff;
-}
-.jump-btn:hover{ background:#e6f3ff; }
-
-/* lepsze przewijanie do kotwic */
-:target{ scroll-margin-top: 90px; }
-
-/* niebieskie stylowanie selectboxa (jak „Wyślij link do ankiety”) */
-div[data-testid="stSelectbox"] > div{
-  border:1.5px solid #1a93e3 !important;
-  border-radius:10px !important;
-  box-shadow: 0 0 0 1px #1a93e333 inset;
-}
-div[data-testid="stSelectbox"] label{
-  color:#1a93e3 !important;
-  font-weight:700 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 # (opcjonalnie) osadzenie własnych fontów w widoku Streamlit
 import base64, pathlib
 def _font_face_css(font_path, family_name, weight="normal", style="normal"):
@@ -1946,8 +2483,105 @@ css_ff += _font_face_css("fonts/ArialNovaCond.ttf", "Arial Nova Cond", "600")
 css_ff += _font_face_css("fonts/ArialNovaCondLight.ttf", "Arial Nova Cond", "300")
 css_ff += _font_face_css("fonts/RobotoCondensed-Regular.ttf", "Roboto Condensed", "400")
 css_ff += _font_face_css("fonts/RobotoCondensed-Light.ttf", "Roboto Condensed", "300")
-if css_ff:
-    st.markdown(f"<style>{css_ff} body{{font-family:'Roboto','Segoe UI','Arial',sans-serif;}}</style>", unsafe_allow_html=True)
+
+# >>> BEGIN CSS INJECTOR (wklej po zbudowaniu css_ff) >>>
+import json
+import streamlit.components.v1 as components  # masz już import wyżej, ale zostaw – jest idempotentne
+
+# 1) Złóż jeden łańcuch CSS: @font-face (css_ff) + Twoje reguły globalne
+GLOBAL_CSS = (css_ff or "") + """
+/* delikatna, szara linia */
+.soft-hr{ height:1px; border:none; background:#e5e7eb; margin:28px 0 26px 0; }
+
+/* jednolity nagłówek sekcji */
+.ap-h2{
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 1.23rem;
+  line-height: 1.3;
+  letter-spacing: 0;
+  color:#1f2937;
+  margin: 10px 0 25px 0;
+  white-space: normal;
+  word-break: keep-all;
+}
+.ap-h2.center{ text-align:center; }
+
+/* tytuły sekcji */
+.section-title{
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  font-weight: 605;
+  font-size: 1.25em;
+  margin: 15px 0 25px 0;
+  line-height: 1.15;
+  color:#182433;
+}
+.section-title--padTop{ margin-top:0px !important; }
+.mt-28{ margin-top:0px !important; }
+.section-title--blue{ color:#1a93e3; }
+
+/* przyciski skoków */
+.jump-btns{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px 0; }
+.jump-btn{
+  display:inline-block; padding:8px 14px; border-radius:10px; text-decoration:none;
+  border:1px solid #1a93e3; color:#1a93e3; font-weight:600; font-size:0.95em;
+  background:#f0f8ff;
+}
+.jump-btn:hover{ background:#e6f3ff; }
+:target{ scroll-margin-top: 90px; }
+
+/* selectbox */
+div[data-testid="stSelectbox"] > div{
+  border:1.5px solid #1a93e3 !important;
+  border-radius:10px !important;
+  box-shadow: 0 0 0 1px #1a93e333 inset;
+}
+div[data-testid="stSelectbox"] label{
+  color:#1a93e3 !important;
+  font-weight:700 !important;
+}
+
+/* Streamlitowe nagłówki (w tym st.subheader) */
+.stHeading h1, .stHeading h2, .stHeading h3,
+h1, h2, h3,
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 1.23rem !important;
+  line-height: 1.3 !important;
+  color:#1f2937 !important;
+  margin: 10px 0 25px 0 !important;
+  letter-spacing: 0 !important;
+}
+
+/* domyślna rodzina dla body */
+body { font-family:'Roboto','Segoe UI','Arial',sans-serif; }
+"""
+
+def inject_global_css(css_text: str, style_id: str = "ap-global-css"):
+    # Wstrzykujemy CSS do <head> w nadrzędnym dokumencie (stały id -> idempotentne)
+    components.html(f"""
+    <script>
+    (function() {{
+      const css = {json.dumps(css_text)};
+      const id = "{style_id}";
+      const doc = window.parent.document;
+      let el = doc.getElementById(id);
+      if (!el) {{
+        el = doc.createElement('style');
+        el.id = id;
+        doc.head.appendChild(el);
+      }}
+      if (el.innerHTML !== css) {{
+        el.innerHTML = css;
+      }}
+    }})();
+    </script>
+    """, height=0)
+
+# 2) Wołaj na każdym rerunie – jest szybkie i bezpieczne
+inject_global_css(GLOBAL_CSS)
+# <<< END CSS INJECTOR <<<
 
 
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
@@ -2012,7 +2646,7 @@ def load_axes_wheel_img():
     raise FileNotFoundError("Brak pliku assets/archetypy_kolo.(png|svg)")
 
 def _mask_pie_ring(base: Image.Image, idx: int, rgba,
-                   r_out_frac=0.46, r_in_frac=0.16):
+                   r_out_frac=0.39, r_in_frac=0.10):
     """
     Maluje półprzezroczysty 30° sektor TYLKO na pierścieniu (donut), nie na całym płótnie.
     r_out_frac / r_in_frac – promień zewnętrzny/wewnętrzny w ułamku szerokości obrazu
@@ -2076,16 +2710,18 @@ def load(study_id=None):
         conn.close()
 
         def parse_answers(x):
-            if isinstance(x, (list, dict)):
-                return x
-            try:
-                import json
-                return json.loads(x)
-            except:
-                try:
-                    return ast.literal_eval(x)
-                except:
-                    return None
+            import json
+            if isinstance(x, list):
+                return [int(v) for v in x] if x and isinstance(x[0], (int, str)) else x
+            if isinstance(x, str):
+                for loader in (json.loads, ast.literal_eval):
+                    try:
+                        val = loader(x)
+                        return [int(v) for v in val] if isinstance(val, list) else None
+                    except Exception:
+                        pass
+                return None
+            return None
 
         if "answers" in df.columns:
             df["answers"] = df["answers"].apply(parse_answers)
@@ -2125,10 +2761,9 @@ def fetch_studies_list():
 def archetype_scores(answers):
     if not isinstance(answers, list) or len(answers) < 48:
         return {k: None for k in archetypes}
-    out = {}
-    for name, idxs in archetypes.items():
-        out[name] = sum(answers[i-1] for i in idxs)
-    return out
+    a = [int(v) for v in answers]  # 👈 twarde rzutowanie
+    return {name: sum(a[i-1] for i in idxs) for name, idxs in archetypes.items()}
+
 
 def archetype_percent(scoresum):
     if scoresum is None:
@@ -2148,6 +2783,20 @@ def pick_top_3_archetypes(archetype_means, archetype_order):
     aux_type = sorted_archetypes[1][0] if len(sorted_archetypes) > 1 else None
     supplement_type = sorted_archetypes[2][0] if len(sorted_archetypes) > 2 else None
     return main_type, aux_type, supplement_type
+
+def should_show_supplement(third_name: str | None,
+                           means_pct: dict[str, float],
+                           threshold: float = 70.0) -> bool:
+    """
+    Zwraca True, jeśli trzeci archetyp ma % >= threshold.
+    'means_pct' to słownik {archetyp: % 0..100}.
+    """
+    if not third_name:
+        return False
+    try:
+        return float(means_pct.get(third_name, 0.0)) >= (threshold - 1e-9)
+    except Exception:
+        return False
 
 def add_image(paragraph, img, width):
     # img może być ścieżką lub BytesIO/file-like
@@ -2328,17 +2977,23 @@ def export_word_docxtpl(
     axes_wheel_img_path: str | None = None,
     dom_color: dict | None = None,
     color_progress_img_path: str | None = None,
+    archetype_stacked_img_path: str | None = None,
+    capsule_columns_img_path: str | None = None,
+    show_supplement: bool = True,                       # ⬅️ NOWY ARGUMENT
+    template_path: str | None = None,                   # ⬅️ (opcjonalny override)
 ):
-    doc = DocxTemplate(TEMPLATE_PATH)
+    # Wybór szablonu zależnie od widoczności pobocznego
+    _template = template_path or (TEMPLATE_PATH if show_supplement else TEMPLATE_PATH_NOSUPP)
+    doc = DocxTemplate(_template)
 
     # Radar image
     if radar_img_path and os.path.exists(radar_img_path):
-        radar_image = InlineImage(doc, radar_img_path, width=Mm(120))
+        radar_image = InlineImage(doc, radar_img_path, width=Mm(115))
     else:
         radar_image = ""
 
     # Panel image
-    panel_image = InlineImage(doc, panel_img_path, width=Mm(110)) if panel_img_path and os.path.exists(panel_img_path) else ""
+    panel_image = InlineImage(doc, panel_img_path, width=Mm(105)) if panel_img_path and os.path.exists(panel_img_path) else ""
 
     # Ikony archetypów do Word (główny/wspierający/poboczny)
     ARCHETYPE_MAIN_ICON = arche_icon_inline_for_word(doc, main_type, gender_code, height_mm=26) if main_type else ""
@@ -2366,15 +3021,29 @@ def export_word_docxtpl(
     context["ARCHETYPE_AUX_PALETTE_IMG"] = ARCHETYPE_AUX_PALETTE_IMG
     context["ARCHETYPE_SUPP_PALETTE_IMG"] = ARCHETYPE_SUPP_PALETTE_IMG
 
+    # Jeśli nie pokazujemy pobocznego – wyczyść jego pola (na wszelki wypadek)
+    if not show_supplement:
+        for k in list(context.keys()):
+            if k.startswith("ARCHETYPE_SUPPLEMENT_"):
+                context[k] = "" if not isinstance(context[k], list) else []
+        context["ARCHETYPE_SUPP_ICON"] = ""
+        context["ARCHETYPE_SUPP_PALETTE_IMG"] = ""
+
     # Logotypy do Worda
-    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(doc, main.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
-    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(doc, second.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
-    context["ARCHETYPE_SUPPLEMENT_BRANDS_IMG"] = build_brands_for_word(doc, supplement.get("example_brands", []), logos_dir=logos_dir, height_mm=7)
+    context["ARCHETYPE_MAIN_BRANDS_IMG"] = build_brands_for_word(
+        doc, main.get("example_brands", []), logos_dir=logos_dir, slot_w_mm=30.0, slot_h_mm=20.0,
+        pad_mm=2.0)
+    context["ARCHETYPE_AUX_BRANDS_IMG"] = build_brands_for_word(
+        doc, second.get("example_brands", []), logos_dir=logos_dir, slot_w_mm=30.0, slot_h_mm=20.0,
+        pad_mm=2.0)
+    context["ARCHETYPE_SUPPLEMENT_BRANDS_IMG"] = build_brands_for_word(
+        doc, supplement.get("example_brands", []), logos_dir=logos_dir, slot_w_mm=30.0,
+        slot_h_mm=20.0, pad_mm=2.0)
 
     context["PANEL_IMG"] = panel_image
 
     # Grafikę pierścienia już masz:
-    context["COLOR_RING_IMG"] = InlineImage(doc, "color_ring.png", width=Mm(110))
+    context["COLOR_RING_IMG"] = InlineImage(doc, "color_ring.png", width=Mm(105))
 
     # Tekstowy opis dominującego koloru:
     if dom_color:
@@ -2385,6 +3054,8 @@ def export_word_docxtpl(
         context["DOM_COLOR_ORIENT"] = dom_color["orient"]
         context["DOM_COLOR_BODY"] = dom_color["body"]
         context["DOM_COLOR_POLITICS"] = dom_color["politics"]
+        context["DOM_COLOR_ARCHE"] = dom_color.get("arche") or COLOR_LONG.get(dom_color["name"],
+                                                                              {}).get("arche", "")
     else:
         # Bezpieczne puste wartości, gdyby kiedyś nie było danych
         for k in ("DOM_COLOR_NAME", "DOM_COLOR_EMOJI", "DOM_COLOR_TITLE",
@@ -2392,7 +3063,7 @@ def export_word_docxtpl(
             context[k] = ""
 
     AXES_WHEEL_IMG = (
-        InlineImage(doc, axes_wheel_img_path, width=Mm(120))
+        InlineImage(doc, axes_wheel_img_path, width=Mm(105))
         if (axes_wheel_img_path and os.path.exists(axes_wheel_img_path))
         else "")
 
@@ -2403,6 +3074,17 @@ def export_word_docxtpl(
         context["COLOR_PROGRESS_IMG"] = (
             InlineImage(doc, color_progress_img_path, width=Mm(160))
             if color_progress_img_path and os.path.exists(color_progress_img_path) else "")
+
+    # Skumulowany wykres słupkowy archetypów (główny/ wspierający/ poboczny)
+    context["ARCHETYPE_STACKED_IMG"] = (
+        InlineImage(doc, archetype_stacked_img_path, width=Mm(160))
+        if (archetype_stacked_img_path and os.path.exists(archetype_stacked_img_path))
+        else "")
+
+    context["ARCHETYPE_CAPSULES_IMG"] = (
+        InlineImage(doc, capsule_columns_img_path, width=Mm(170))
+        if (capsule_columns_img_path and os.path.exists(capsule_columns_img_path))
+        else "")
 
     doc.render(context)
 
@@ -2814,22 +3496,23 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             col_scores = color_scores_from_answers(row["answers"])
             col_perc = color_percents_from_scores(col_scores)
 
-            main_type, second_type, supplement_type = pick_top_3_archetypes(arcsums, ARCHE_NAMES_ORDER)
-            main = archetype_extended.get(main_type, {})
-            second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
-            supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
+            # <<< UNIKALNE NAZWY TYLKO DLA TEGO RESPONDENTA >>>
+            main_i, aux_i, supp_i = pick_top_3_archetypes(arcsums, ARCHE_NAMES_ORDER)
 
-            # wersje do wyświetlania – podmień 'name' na żeńskie, jeśli IS_FEMALE
-            main_disp = dict(main)
-            main_disp["name"] = disp_name(main.get("name", main_type or ""))
+            main = archetype_extended.get(main_i, {})
+            second = archetype_extended.get(aux_i, {}) if aux_i != main_i else {}
+            supplement = archetype_extended.get(supp_i, {}) if supp_i not in [main_i, aux_i] else {}
 
+            # wersje do wyświetlania – żeńskie/męskie
+            main_disp = dict(main);
+            main_disp["name"] = disp_name(main.get("name", main_i or ""))
             second_disp = dict(second)
             if second:
-                second_disp["name"] = disp_name(second.get("name", second_type or ""))
+                second_disp["name"] = disp_name(second.get("name", aux_i or ""))
 
             supplement_disp = dict(supplement)
             if supplement:
-                supplement_disp["name"] = disp_name(supplement.get("name", supplement_type or ""))
+                supplement_disp["name"] = disp_name(supplement.get("name", supp_i or ""))
 
             czas_ankiety = ""
             if pd.notna(row.get("created_at", None)):
@@ -2842,21 +3525,21 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 "Czas ankiety": czas_ankiety,
                 **arcsums,
                 **{f"{k}_%": v for k, v in arcper.items()},
-                "Główny archetyp": main_type,
-                "Cechy kluczowe": archetype_features.get(main_type, ""),
+                "Główny archetyp": main_i,
+                "Cechy kluczowe": archetype_features.get(main_i, ""),
                 "Opis": main.get("description", ""),
                 "Storyline": main.get("storyline", ""),
                 "Rekomendacje": "\n".join(main.get("recommendations", [])),
-                "Archetyp wspierający": second_type if second_type != main_type else "",
-                "Cechy wspierający": archetype_features.get(second_type, "") if second_type != main_type else "",
-                "Opis wspierający": second.get("description", "") if second_type != main_type else "",
-                "Storyline wspierający": second.get("storyline", "") if second_type != main_type else "",
-                "Rekomendacje wspierający": "\n".join(second.get("recommendations", [])) if second_type != main_type else "",
-                "Archetyp poboczny": supplement_type if supplement_type not in [main_type, second_type] else "",
-                "Cechy poboczny": archetype_features.get(supplement_type, "") if supplement_type not in [main_type, second_type] else "",
-                "Opis poboczny": supplement.get("description", "") if supplement_type not in [main_type, second_type] else "",
-                "Storyline poboczny": supplement.get("storyline", "") if supplement_type not in [main_type, second_type] else "",
-                "Rekomendacje poboczny": "\n".join(supplement.get("recommendations", [])) if supplement_type not in [main_type, second_type] else "",
+                "Archetyp wspierający": aux_i if aux_i != main_i else "",
+                "Cechy wspierający": archetype_features.get(aux_i, "") if aux_i != main_i else "",
+                "Opis wspierający": second.get("description", "") if aux_i != main_i else "",
+                "Storyline wspierający": second.get("storyline", "") if aux_i != main_i else "",
+                "Rekomendacje wspierający": "\n".join(second.get("recommendations", [])) if aux_i != main_i else "",
+                "Archetyp poboczny": supp_i if supp_i not in [main_i, aux_i] else "",
+                "Cechy poboczny": archetype_features.get(supp_i, "") if supp_i not in [main_i, aux_i] else "",
+                "Opis poboczny": supplement.get("description", "") if supp_i not in [main_i, aux_i] else "",
+                "Storyline poboczny": supplement.get("storyline", "") if supp_i not in [main_i, aux_i] else "",
+                "Rekomendacje poboczny": "\n".join(supplement.get("recommendations", [])) if supp_i not in [main_i, aux_i] else "",
                 **{f"Kolor_{k}": v for k, v in col_scores.items()},
                 **{f"Kolor_{k}_%": v for k, v in col_perc.items()},
             })
@@ -2869,108 +3552,179 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             st.markdown(f'<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów {personGen}</div>', unsafe_allow_html=True)
 
+            # --- ⬇️ RANKING I WYKRES NA BAZIE ŚREDNIEJ (0–20), NIE LICZEBNOŚCI! ---
             archetype_names = ARCHE_NAMES_ORDER
 
-            counts_main = results_df['Główny archetyp'].value_counts().reindex(archetype_names, fill_value=0)
-            counts_aux = results_df['Archetyp wspierający'].value_counts().reindex(archetype_names, fill_value=0)
+            # 1) średnia suma punktów dla każdego archetypu (0–20)
+            mean_archetype_scores = {
+                k: float(results_df[k].mean()) if k in results_df.columns else 0.0
+                for k in archetype_names
+            }
 
-            mean_archetype_scores = {k: results_df[k].mean() if k in results_df.columns else 0 for k in archetype_names}
+            # <<< NAZWY „AVG” – tylko dla ŚREDNICH >>>
+            main_avg, aux_avg, supp_avg = pick_top_3_archetypes(mean_archetype_scores,
+                                                                archetype_names)
 
-            main_type, second_type, supplement_type = pick_top_3_archetypes(mean_archetype_scores, archetype_names)
-            main = archetype_extended.get(main_type, {})
-            second = archetype_extended.get(second_type, {}) if second_type != main_type else {}
-            supplement = archetype_extended.get(supplement_type, {}) if supplement_type not in [main_type, second_type] else {}
+            # ——— PRÓG 70% dla archetypu pobocznego (liczony na średnich % z całego df)
+            means_pct_for_threshold = mean_pct_by_archetype_from_df(data)  # {archetyp: %}
+            SHOW_SUPP = should_show_supplement(supp_avg, means_pct_for_threshold, threshold=70.0)
+            if not SHOW_SUPP:
+                # wyłącz poboczny globalnie (radar, koła, karty)
+                supp_avg = None
 
-            col1, col2, col3 = st.columns([0.23, 0.40, 0.42], gap="small")
+
+            # Progi widoczności pobocznego: używamy % (0..100) ze średnich
+            means_pct_for_threshold = mean_pct_by_archetype_from_df(data)  # {archetyp: %}
+            SHOW_SUPP = should_show_supplement(supp_avg, means_pct_for_threshold, threshold=70.0)
+            if not SHOW_SUPP:
+                # „Wyłącz” poboczny globalnie – dalszy kod dostanie None i nic nie namaluje
+                supp_avg = None
+
+            # >>> KARTY I OPISY: przygotuj dane archetypów na podstawie ŚREDNICH <<<
+            main_data = archetype_extended.get(main_avg, {})
+            second_data = archetype_extended.get(aux_avg,
+                                                 {}) if aux_avg and aux_avg != main_avg else {}
+            supp_data = archetype_extended.get(supp_avg, {}) if supp_avg and supp_avg not in [
+                main_avg, aux_avg] else {}
+
+            # wersje z żeńskimi nazwami, jeśli trzeba
+            main_disp = dict(main_data);
+            main_disp["name"] = disp_name(main_avg or "")
+            second_disp = dict(second_data)
+            if second_data:
+                second_disp["name"] = disp_name(aux_avg or "")
+            supp_disp = dict(supp_data)
+            if supp_data:
+                supp_disp["name"] = disp_name(supp_avg or "")
+
+            col1, col2, col3 = st.columns([0.26, 0.36, 0.38], gap="small")
+
+            # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
+            counts_main = (
+                results_df['Główny archetyp'].map(normalize)
+                .value_counts().reindex(archetype_names, fill_value=0)
+            )
+
+            counts_aux = (
+                results_df['Archetyp wspierający'].map(normalize)
+                .value_counts().reindex(archetype_names, fill_value=0)
+            )
+
+            counts_supp = (
+                results_df['Archetyp poboczny']
+                .map(normalize)
+                .value_counts()
+                .reindex(archetype_names, fill_value=0)
+            )
+
+            # wykres skumulowany (PNG) dla Worda/PDF
+            stacked_png_path = make_stacked_bar_png_for_word(
+                archetype_names=ARCHE_NAMES_ORDER,  # lub Twoja lista 'archetype_names'
+                counts_main=counts_main,
+                counts_aux=counts_aux,
+                counts_supp=counts_supp,
+                out_path="archetypes_stacked.png",
+            )
 
             with col1:
                 st.markdown(
                     '<div class="ap-h2">Liczebność archetypów głównych, wspierających i pobocznych</div>',
-                    unsafe_allow_html=True)
+                    unsafe_allow_html=True
+                )
+
                 archetype_table = pd.DataFrame({
                     "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in archetype_names],
-                    "Główny archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in archetype_names],
-                    "Wspierający archetyp": [zero_to_dash(counts_aux.get(normalize(k), 0)) for k in archetype_names],
-                    "Poboczny archetyp": [
-                        zero_to_dash(
-                            results_df['Archetyp poboczny'].map(normalize)
-                            .value_counts().reindex(archetype_names, fill_value=0).get(normalize(k), 0)
-                        ) for k in archetype_names
-                    ]
+                    "Główny<br/>archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in
+                                            archetype_names],
+                    "Wspierający<br/>archetyp": [zero_to_dash(counts_aux.get(normalize(k), 0)) for k
+                                                 in archetype_names],
+                    "Poboczny<br/>archetyp": [zero_to_dash(counts_supp.get(normalize(k), 0)) for k
+                                              in archetype_names],
                 })
-                archetype_table_html = archetype_table.to_html(escape=False, index=False)
-                archetype_table_html = archetype_table_html.replace('<th>', '<th style="text-align:center">')
-                archetype_table_html = archetype_table_html.replace('<td>', '<td style="text-align:center">')
-                def align_first_column_to_left_with_width(html):
-                    html = re.sub(
-                        r'(<tr[^>]*>)(\s*<td style="text-align:center")',
-                        lambda m: m.group(1) + m.group(2).replace('text-align:center', 'text-align:left;width:24%;"'), html
-                    )
-                    html = html.replace(
-                        '<th style="text-align:center">Archetyp</th>',
-                        '<th style="text-align:center;width:24%;">Archetyp</th>'
-                    ).replace(
-                        '<th style="text-align:center">Główny archetyp</th>',
-                        '<th style="text-align:center;width:18%;">Główny archetyp</th>'
-                    ).replace(
-                        '<th style="text-align:center">Wspierający archetyp</th>',
-                        '<th style="text-align:center;width:18%;">Wspierający archetyp</th>'
-                    ).replace(
-                        '<th style="text-align:center">Poboczny archetyp</th>',
-                        '<th style="text-align:center;width:18%;">Poboczny archetyp</th>'
-                    )
-                    html = re.sub(
-                        r'<tr>(\s*<td style="[^"]*left;?[^"]*">.*?</td>)'
-                        r'(\s*<td style="text-align:center">)',
-                        r'<tr>\1<td style="text-align:center;width:18%">', html
-                    )
-                    html = re.sub(
-                        r'(<td style="text-align:center;width:18%">.*?</td>)'
-                        r'(\s*<td style="text-align:center">)',
-                        r'\1<td style="text-align:center;width:18%">', html
-                    )
-                    return html
-                archetype_table_html = align_first_column_to_left_with_width(archetype_table_html)
-                archetype_table_html = archetype_table_html.replace(
-                    '<table ',
-                    '<table style="margin-left:0px;margin-right:0px;width:99%;" '
+
+                # HTML tabeli – BEZ indeksu, pozwól na <br/> w nagłówkach
+                html_table = archetype_table.to_html(index=False, escape=False, border=0)
+                # podmień klasę (różne wersje pandas różnie piszą border=…)
+                html_table = (
+                    html_table
+                    .replace('class="dataframe"', 'class="ap-table"')
+                    .replace('border="1"', 'border="0"')
                 )
-                st.markdown(archetype_table_html, unsafe_allow_html=True)
+
+                # CSS do tabeli (bez iframa, bez scrolla)
+                st.markdown("""
+                <style>
+                  .ap-table{
+                    table-layout: fixed;
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+                    font-size: 16px;
+                  }
+                  .ap-table th, .ap-table td{
+                    padding: 11px 11px;
+                    border-bottom: 1px solid #eaeaea;
+                    text-align: center;
+                    vertical-align: middle;
+                    white-space: nowrap;
+                    line-height: 1.15;
+                  }
+                  .ap-table th:nth-child(1), .ap-table td:nth-child(1){
+                    text-align: left !important;
+                    width: 37%;
+                  }
+                  .ap-table th:nth-child(2), .ap-table td:nth-child(2),
+                  .ap-table th:nth-child(3), .ap-table td:nth-child(3),
+                  .ap-table th:nth-child(4), .ap-table td:nth-child(4){
+                    width: 21%;
+                  }
+                </style>
+                """, unsafe_allow_html=True)
+
+                # 🔴 WAŻNE: tylko st.markdown + unsafe_allow_html=True (NIE st.write!)
+                st.markdown(html_table, unsafe_allow_html=True)
 
             with col2:
                 theta_labels = []
                 for n in archetype_names:
                     label = disp_name(n)
-                    if n == main_type:
+                    if n == main_avg:
                         theta_labels.append(f"<b><span style='color:red;'>{label}</span></b>")
-                    elif n == second_type:
+                    elif n == aux_avg:
                         theta_labels.append(f"<b><span style='color:#FFD22F;'>{label}</span></b>")
-                    elif n == supplement_type:
+                    elif n == supp_avg:
                         theta_labels.append(f"<b><span style='color:#40b900;'>{label}</span></b>")
                     else:
                         theta_labels.append(f"<span style='color:#656565;'>{label}</span>")
+
+                # markery TOP-3 z mean_archetype_scores
                 highlight_r = []
                 highlight_marker_color = []
-                for i, name in enumerate(archetype_names):
-                    if name == main_type:
-                        highlight_r.append(mean_archetype_scores[name])
+                for name in archetype_names:
+                    if name == main_avg:
+                        highlight_r.append(mean_archetype_scores.get(name, 0.0))
                         highlight_marker_color.append("red")
-                    elif name == second_type:
-                        highlight_r.append(mean_archetype_scores[name])
+                    elif name == aux_avg:
+                        highlight_r.append(mean_archetype_scores.get(name, 0.0))
                         highlight_marker_color.append("#FFD22F")
-                    elif name == supplement_type:
-                        highlight_r.append(mean_archetype_scores[name])
+                    elif name == supp_avg:
+                        highlight_r.append(mean_archetype_scores.get(name, 0.0))
                         highlight_marker_color.append("#40b900")
                     else:
                         highlight_r.append(None)
                         highlight_marker_color.append("rgba(0,0,0,0)")
+
+                # ŚREDNIE (0–20) w KOLEJNOŚCI archetype_names
+                mean_vals_ordered = [mean_archetype_scores.get(n, 0.0) for n in archetype_names]
+
                 st.markdown(
                     f'<div class="ap-h2" style="text-align:center">Profil archetypów {personGen}</div>',
                     unsafe_allow_html=True)
+
                 fig = go.Figure(
                     data=[
                         go.Scatterpolar(
-                            r=list(mean_archetype_scores.values()) + [list(mean_archetype_scores.values())[0]],
+                            r=mean_vals_ordered + [mean_vals_ordered[0]],
                             theta=archetype_names + [archetype_names[0]],
                             fill='toself',
                             name='Średnia wszystkich',
@@ -2981,7 +3735,8 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                             r=highlight_r,
                             theta=archetype_names,
                             mode='markers',
-                            marker=dict(size=18, color=highlight_marker_color, opacity=0.95, line=dict(color="black", width=2)),
+                            marker=dict(size=18, color=highlight_marker_color, opacity=0.95,
+                                        line=dict(color="black", width=2)),
                             name='Archetyp główny/wspierający/poboczny',
                             showlegend=False,
                         )
@@ -2989,26 +3744,29 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     layout=go.Layout(
                         polar=dict(
                             radialaxis=dict(visible=True, range=[0, 20]),
-                            angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels)
+                            angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names,
+                                             ticktext=theta_labels)
                         ),
                         width=400, height=400,
                         margin=dict(l=20, r=20, t=32, b=32),
                         showlegend=False
                     )
                 )
-                # PRZEZROCZYSTE TŁO RADARU
+
+                # PRZEZROCZYSTE TŁO RADARU — bez zmian
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     polar=dict(
                         bgcolor="rgba(0,0,0,0)",
                         radialaxis=dict(visible=True, range=[0, 20]),
-                        angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names, ticktext=theta_labels),
+                        angularaxis=dict(tickfont=dict(size=17), tickvals=archetype_names,
+                                         ticktext=theta_labels),
                     ),
                     showlegend=False,
-                    width=530, height=530, margin=dict(l=20, r=20, t=32, b=32),
+                    width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
                 )
                 fig.write_image("radar.png", scale=4)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key=f"radar-{study_id}")
 
                 st.markdown("""
                 <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
@@ -3027,6 +3785,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 </div>
                 """, unsafe_allow_html=True)
 
+
             # --- Heurystyczna analiza koloru (bąbelki OUT; słupki po LEWEJ; prawa pusta) ---
             color_pcts = calc_color_percentages_from_df(data)
 
@@ -3038,7 +3797,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 st.markdown("<div class='ap-h2'>Heurystyczna analiza koloru psychologicznego</div>",
                             unsafe_allow_html=True)
                 components.html(color_progress_bars_html(color_pcts, order="desc"),
-                                height=310, scrolling=False)  # niższy iframe
+                                height=280, scrolling=False)  # niższy iframe
 
                 st.markdown("<style>.cp-row{margin:15px 0 !important}</style>",
                             unsafe_allow_html=True)  # mniejsze odstępy między wierszami
@@ -3055,13 +3814,14 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             # prawa kolumna — wykres archetypów
             with right_col:
                 # spójny nagłówek jak w innych miejscach (bez .center)
-                st.markdown("<div class='ap-h2'>Rozkład archetypów na osiach potrzeb</div>",
-                            unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ap-h2" style="text-align:center">Rozkład archetypów na osiach potrzeb</div>',
+                    unsafe_allow_html=True)
 
-                aux = second_type if second_type != main_type else None
-                supp = supplement_type if supplement_type not in [main_type, second_type] else None
+                aux = aux_avg if aux_avg != main_avg else None
+                supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
 
-                kolo_axes_img = compose_axes_wheel_highlight(main_type, aux, supp)
+                kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
 
                 # bez deprecated ostrzeżenia i bez gigantycznego obrazu
                 # w bloku: with right_col:
@@ -3078,13 +3838,13 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 color_pcts,
                 width_px=1600,
                 pad=32,
-                bar_h=66,
+                bar_h=66,          # wyższe pastylki
                 bar_gap=30,          # odstęp między paskami
                 dot_radius=10,
                 label_gap_px=35,  # << mniejszy odstęp etykieta→pasek
-                label_font_size=35,  # << mniejsze fonty
-                pct_font_size=22,
-                pct_margin=10
+                label_font_size=36,  # << mniejsze fonty
+                pct_font_size=32,  # większe %
+                pct_margin=14
             )
 
             # Dane opisowe dominującego koloru do Worda
@@ -3112,17 +3872,24 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             # -- PNG 2: Rozkład archetypów na osiach potrzeb (twoje koło)
             kolo_axes_img.save("axes_wheel.png")  # <= zapis
 
+            # --- ŚREDNIE % archetypów → kapsułki do Worda ---
+            means_pct = mean_pct_by_archetype_from_df(data)  # {archetyp: % z dwoma miejscami}
+            capsules_path = make_capsule_columns_png_for_word(
+                means_pct,
+                out_path="arche_capsules.png",
+                top_title=None  # albo np. "Średnie wyniki archetypów"
+            )
+
             with col3:
                 st.markdown(
-                    '<div class="ap-h2">Koło archetypów (pragnienia i wartości)</div>',
+                    f'<div class="ap-h2">Koło archetypów (pragnienia i wartości)</div>',
                     unsafe_allow_html=True)
 
-                if main_type is not None:
+                if main_avg is not None:
                     kola_img = compose_archetype_highlight(
-                        archetype_name_to_img_idx(main_type),
-                        archetype_name_to_img_idx(second_type) if second_type != main_type else None,
-                        archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
-                    )
+                        archetype_name_to_img_idx(main_avg),
+                        archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None,
+                        archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None)
                     st.image(
                         kola_img,
                         caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
@@ -3136,17 +3903,17 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny {personGen}</div>', unsafe_allow_html=True)
             render_archetype_card(main_disp, main=True, gender_code=("K" if IS_FEMALE else "M"))
 
-            if second_type and second_type != main_type:
+            if aux_avg and aux_avg != main_avg:
                 st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp wspierający {personGen}</div>", unsafe_allow_html=True)
                 render_archetype_card(second_disp, main=False, gender_code=("K" if IS_FEMALE else "M"))
 
-            if supplement_type and supplement_type not in [main_type, second_type]:
+            if supp_avg and supp_avg not in [main_avg, aux_avg]:
                 st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny {personGen}</div>", unsafe_allow_html=True)
-                render_archetype_card(supplement_disp, main=False, gender_code=("K" if IS_FEMALE else "M"))
+                render_archetype_card(supp_disp, main=False, gender_code=("K" if IS_FEMALE else "M"))
 
             st.markdown("<div id='raport'></div>", unsafe_allow_html=True)
 
@@ -3159,23 +3926,22 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             """, unsafe_allow_html=True)
 
             # GENEROWANIE OBRAZU PANELU DYNAMICZNIE
-            idx_main = archetype_name_to_img_idx(main_type)
-            idx_aux = archetype_name_to_img_idx(second_type) if second_type != main_type else None
-            idx_supplement = archetype_name_to_img_idx(supplement_type) if supplement_type not in [main_type, second_type] else None
-
+            idx_main = archetype_name_to_img_idx(main_avg)
+            idx_aux = archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None
+            idx_supplement = archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None
             panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supplement)
-            panel_img_path = f"panel_{(main_type or '').lower()}_{(second_type or '') and second_type.lower()}_{(supplement_type or '') and supplement_type.lower()}.png"
+            panel_img_path = f"panel_{(main_avg or '').lower()}_{(aux_avg or '').lower()}_{(supp_avg or '').lower()}.png"
             panel_img.save(panel_img_path)
 
             # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
             docx_buf = export_word_docxtpl(
-                main_type,
-                second_type,
-                supplement_type,
+                main_avg,
+                aux_avg,
+                supp_avg,
                 archetype_features,
                 main_disp,
                 second_disp,
-                supplement_disp,
+                supp_disp,
                 radar_img_path="radar.png",
                 archetype_table=archetype_table,
                 num_ankiet=num_ankiet,
@@ -3185,6 +3951,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 axes_wheel_img_path="axes_wheel.png",
                 dom_color=dom_color,
                 color_progress_img_path=progress_png_path,
+                archetype_stacked_img_path = stacked_png_path,
+                capsule_columns_img_path=capsules_path,
+                show_supplement=SHOW_SUPP
             )
 
             pdf_buf = word_to_pdf(docx_buf)
@@ -3202,10 +3971,13 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                         </span>
                     </div>
                 """, unsafe_allow_html=True)
+            # ⬇️ dodaj tę linię PRZED przyciskami
+            DOCX_FILENAME, PDF_FILENAME = build_report_filenames(study)
+
             st.download_button(
                 "Pobierz raport (Word)",
-                data=docx_buf,
-                file_name="ap48_raport.docx",
+                data=docx_buf,  # jeśli to BytesIO i działa — zostaw
+                file_name=DOCX_FILENAME,  # raport_<nazwisko-imie>.docx
                 key="word_button"
             )
 
@@ -3221,8 +3993,8 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             st.download_button(
                 "Pobierz raport (PDF)",
-                data=pdf_buf,
-                file_name="ap48_raport.pdf",
+                data=pdf_buf,  # jeśli to BytesIO i działa — zostaw
+                file_name=PDF_FILENAME,  # raport_<nazwisko-imie>.pdf
                 key="pdf_button"
             )
 
