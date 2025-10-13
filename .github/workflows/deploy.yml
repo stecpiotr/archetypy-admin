@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
 
 concurrency:
   group: deploy-archetypy
@@ -19,7 +19,23 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
-          script: /usr/local/bin/archetypy-deploy
+          script_stop: true
+          script: |
+            /usr/local/bin/archetypy-deploy
 
       - name: Healthcheck
-        run: curl -fsS https://panel.archetypy.badania.pro/ -o /dev/null
+        shell: bash
+        run: |
+          set -e
+          # Czekamy aż strona zacznie zwracać 200 (max ~90s)
+          for i in {1..30}; do
+            code=$(curl -fsSLk -o /dev/null -w "%{http_code}" https://panel.archetypy.badania.pro/ || true)
+            echo "Probe $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Site is healthy."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Healthcheck failed."
+          exit 1
