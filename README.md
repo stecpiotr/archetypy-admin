@@ -1,1 +1,1 @@
-# ap48-admin
+# archetypy-admin
