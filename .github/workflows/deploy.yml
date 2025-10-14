@@ -2,27 +2,26 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [ "main" ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: SSH (deploy as user 'archetypy')
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SERVER_HOST }}          # np. 158.220.110.193
-          port: ${{ secrets.SERVER_PORT }}          # 22
-          username: ${{ secrets.SERVER_USER }}      # archetypy
-          key: ${{ secrets.SERVER_SSH_KEY }}        # prywatny klucz z /home/archetypy/.ssh/gh_actions
-          fingerprint: ${{ secrets.HOST_FINGERPRINT }}  # dokładnie: SHA256:uAl63TfeWWEtvvpPvGPE4nZ6mcg2T4JE9jVFZTfikt0
-          host_key_algorithms: ssh-ed25519          # <<< to jest kluczowe
+          host:        ${{ secrets.SERVER_HOST }}
+          port:        ${{ secrets.SERVER_PORT }}      # np. 22
+          username:    ${{ secrets.SERVER_USER }}      # archetypy
+          key:         ${{ secrets.SERVER_SSH_KEY }}   # PRYWATNY klucz
+          fingerprint: ${{ secrets.HOST_FINGERPRINT }} # "SHA256:..."
           script_stop: true
-          debug: true
+          timeout: 120s
+          command_timeout: 5m
           script: |
             set -euxo pipefail
             cd /srv/archetypy-admin
@@ -32,4 +31,4 @@ jobs:
             . .venv/bin/activate
             pip install --no-cache-dir -r requirements.txt
             sudo systemctl restart archetypy-admin
-            systemctl --no-pager -l status archetypy-admin | sed -n '1,120p'
+            systemctl --no-pager -l --lines=120 status archetypy-admin
