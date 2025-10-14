@@ -3,25 +3,40 @@ name: Deploy to VPS
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-to-vps
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: SSH (deploy as user 'archetypy')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SSH (deploy as user)
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: 22
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          # jeśli nie masz SERVER_PORT, ten klucz możesz skasować – domyślnie 22
+          port: ${{ secrets.SERVER_PORT }}
+          # jeśli masz fingerprint serwera, zostaw; jeśli nie – usuń tę linię
+          fingerprint: ${{ secrets.HOST_FINGERPRINT }}
+          script_stop: true
+          timeout: 60s
+          command_timeout: 30m
           script: |
-            set -euo pipefail
+            set -euxo pipefail
             cd /srv/archetypy-admin
+            git config --global --add safe.directory /srv/archetypy-admin
             git fetch --all
             git reset --hard origin/main
             . .venv/bin/activate
             pip install --no-cache-dir -r requirements.txt
             sudo systemctl restart archetypy-admin
+            systemctl --no-pager -l status archetypy-admin | sed -n '1,120p'
