@@ -1,5 +1,3 @@
-# app.py — panel administratora Archetypów (Streamlit)
-
 from __future__ import annotations
 from typing import Dict, List, Tuple, Optional
 import contextlib
