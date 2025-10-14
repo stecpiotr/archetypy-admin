@@ -3044,7 +3044,7 @@ def export_word_docxtpl(
         one_img_mm = min(92.0, max(70.0, (rest_mm - gap_between_imgs_mm) / 2.0))
     except Exception:
         # Fallback gdyby sekcja nie była dostępna
-        one_img_mm = 90.0
+        one_img_mm = 118.0
 
     # Radar image (mniejsze, żeby zmieściły się 3 elementy w wierszu Worda)
     if radar_img_path and os.path.exists(radar_img_path):
