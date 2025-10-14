@@ -3,33 +3,23 @@ name: Deploy to VPS
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
-
-concurrency:
-  group: deploy-to-vps
-  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: SSH (deploy as user)
+      - name: SSH (deploy as user 'archetypy')
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          # jeśli nie masz SERVER_PORT, ten klucz możesz skasować – domyślnie 22
-          port: ${{ secrets.SERVER_PORT }}
-          # jeśli masz fingerprint serwera, zostaw; jeśli nie – usuń tę linię
-          fingerprint: ${{ secrets.HOST_FINGERPRINT }}
+          host: ${{ secrets.SERVER_HOST }}          # np. 158.220.110.193
+          port: ${{ secrets.SERVER_PORT }}          # np. 22
+          username: ${{ secrets.SERVER_USER }}      # archetypy
+          key: ${{ secrets.SERVER_SSH_KEY }}        # ZAWARTOŚĆ ~/.ssh/gh_actions (PRIVATE KEY)
+          fingerprint: ${{ secrets.HOST_FINGERPRINT }}  # SHA256:... z ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
           script_stop: true
-          timeout: 60s
-          command_timeout: 30m
+          timeout: "120s"
+          command_timeout: "15m"
           script: |
             set -euxo pipefail
             cd /srv/archetypy-admin
