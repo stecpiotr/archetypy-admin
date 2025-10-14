@@ -3026,13 +3026,33 @@ def export_word_docxtpl(
     _template = template_path or (TEMPLATE_PATH if show_supplement else TEMPLATE_PATH_NOSUPP)
     doc = DocxTemplate(_template)
 
-    # Radar image
+    # [AUTO-FIT] policz pole składu i zaplanuj szerokości obrazków
+    try:
+        sect = doc.docx.part.document.sections[0]
+        page_w_mm = sect.page_width.mm
+        left_mm = sect.left_margin.mm
+        right_mm = sect.right_margin.mm
+        content_mm = page_w_mm - left_mm - right_mm  # efektywna szerokość wiersza
+
+        # Załóż, że lewa kolumna (tabela z liczebnościami) ma ~55 mm.
+        # Zostaje miejsce na 2 obrazki (radar + koło/panel) w jednym wierszu.
+        left_col_mm = 55.0
+        gap_between_imgs_mm = 6.0  # szpara między kolumnami w tabeli
+        rest_mm = max(0.0, content_mm - left_col_mm)
+
+        # Maksymalna szerokość jednego obrazka (po równo) – ale nie więcej niż 92 mm.
+        one_img_mm = min(92.0, max(70.0, (rest_mm - gap_between_imgs_mm) / 2.0))
+    except Exception:
+        # Fallback gdyby sekcja nie była dostępna
+        one_img_mm = 90.0
+
+    # Radar image (mniejsze, żeby zmieściły się 3 elementy w wierszu Worda)
     if radar_img_path and os.path.exists(radar_img_path):
-        radar_image = InlineImage(doc, radar_img_path, width=Mm(115))
+        radar_image = InlineImage(doc, radar_img_path, width=Mm(one_img_mm))
     else:
         radar_image = ""
 
-    # Panel image
+    # Panel image (na bazie koła archetypów)
     panel_image = InlineImage(doc, panel_img_path, width=Mm(105)) if panel_img_path and os.path.exists(panel_img_path) else ""
 
     # Ikony archetypów do Word (główny/wspierający/poboczny)

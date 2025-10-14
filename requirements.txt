@@ -9,7 +9,7 @@ cairosvg
 openpyxl
 markdown
 pytz
-plotly>=5.0.0
+plotly==6.1.1
 kaleido>=0.2.1
 reportlab
 streamlit-charts
