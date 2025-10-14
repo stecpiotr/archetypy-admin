@@ -827,7 +827,7 @@ def results_view() -> None:
         f"{s.get('last_name_nom') or s['last_name']} {s.get('first_name_nom') or s['first_name']} ({s['city']}) – /{s['slug']}"
         : s for s in studies
     }
-    choice = st.selectbox("", options=list(options.keys()), label_visibility="collapsed")
+    choice = st.selectbox("Wybierz widok", options=list(options.keys()), label_visibility="collapsed")
     study = options[choice]
     render_titlebar([
         "Panel", "Wyniki",
