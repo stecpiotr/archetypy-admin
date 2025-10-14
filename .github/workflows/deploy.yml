@@ -18,7 +18,7 @@ jobs:
           port:        ${{ secrets.SERVER_PORT }}      # np. 22
           username:    ${{ secrets.SERVER_USER }}      # archetypy
           key:         ${{ secrets.SERVER_SSH_KEY }}   # PRYWATNY klucz
-          fingerprint: ${{ secrets.HOST_FINGERPRINT }} # "SHA256:..."
+          # fingerprint: ${{ secrets.HOST_FINGERPRINT }} # "SHA256:..."
           script_stop: true
           timeout: 120s
           command_timeout: 5m
