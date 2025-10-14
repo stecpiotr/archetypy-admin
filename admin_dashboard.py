@@ -18,7 +18,7 @@ import os
 from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
-import shutil
+
 import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -32,6 +32,25 @@ else:
 TEMPLATE_PATH = "ap48_raport_template.docx"
 TEMPLATE_PATH_NOSUPP = "ap48_raport_template_nosupp.docx"  # szablon bez sekcji archetypu pobocznego
 logos_dir = "logos_local"
+
+import plotly.io as pio
+import shutil
+
+# Spróbuj wskazać Chromium/Chrome i bezpieczne flagi dla środowisk serwerowych
+_chrome = (shutil.which("chromium")
+           or shutil.which("chromium-browser")
+           or shutil.which("google-chrome")
+           or shutil.which("chrome"))
+if _chrome:
+    try:
+        pio.kaleido.scope.chromium_executable = _chrome
+    except Exception:
+        pass
+
+try:
+    pio.kaleido.scope.chromium_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+except Exception:
+    pass
 
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
