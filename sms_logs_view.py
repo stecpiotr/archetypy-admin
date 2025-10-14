@@ -56,4 +56,4 @@ def render_sms_logs(studies: List[Dict]) -> None:
         )
 
     df = pd.DataFrame(data, columns=["Data", "Telefon", "Status", "Kliknięto", "Rozpoczęto", "Zakończono"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
