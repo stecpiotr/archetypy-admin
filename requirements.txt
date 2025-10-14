@@ -10,7 +10,7 @@ openpyxl
 markdown
 pytz
 plotly==6.1.1
-kaleido>=0.2.1
+kaleido>=1.0.0
 reportlab
 streamlit-charts
 matplotlib==3.9.2
