@@ -1,5 +1,4 @@
 name: Deploy to VPS
-
 on:
   push:
     branches: [ "main" ]
@@ -8,30 +7,20 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: SSH (deploy as root, run app as 'archetypy')
-        uses: appleboy/ssh-action@v1.1.0
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SSH (deploy as user 'archetypy')
+        uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: root
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -euo pipefail
-
-            # 1) Wejście do katalogu aplikacji
             cd /srv/archetypy-admin
-
-            # 2) Operacje GIT i PIP wykonujemy jako użytkownik 'archetypy'
-            sudo -u archetypy -H bash -lc '
-              set -euo pipefail
-              git config --global --add safe.directory /srv/archetypy-admin
-              git fetch --all
-              git reset --hard origin/main
-
-              # aktywacja venv i instalacja zależności
-              . .venv/bin/activate
-              pip install --no-cache-dir -r requirements.txt
-            '
-
-            # 3) Restart usługi (jako root)
-            systemctl restart archetypy-admin
+            git fetch --all
+            git reset --hard origin/main
+            . .venv/bin/activate
+            pip install --no-cache-dir -r requirements.txt
+            sudo systemctl restart archetypy-admin
