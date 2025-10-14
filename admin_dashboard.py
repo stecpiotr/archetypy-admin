@@ -34,23 +34,44 @@ TEMPLATE_PATH_NOSUPP = "ap48_raport_template_nosupp.docx"  # szablon bez sekcji 
 logos_dir = "logos_local"
 
 import plotly.io as pio
-import shutil
+import shutil, os
 
-# Spróbuj wskazać Chromium/Chrome i bezpieczne flagi dla środowisk serwerowych
-_chrome = (shutil.which("chromium")
-           or shutil.which("chromium-browser")
-           or shutil.which("google-chrome")
-           or shutil.which("chrome"))
-if _chrome:
-    try:
-        pio.kaleido.scope.chromium_executable = _chrome
-    except Exception:
-        pass
+# ====== Kaleido + Chrome/Chromium hardening (serwery/headless) ======
+# Szukamy przeglądarki w popularnych lokalizacjach i nazwach (snap, deb, wrappery)
+_CANDIDATES = [
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",            # snap (czasem PATH nie ma /snap/bin)
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "chromium-browser", "chromium", "google-chrome", "chrome"
+]
 
+_chrome = None
+for c in _CANDIDATES:
+    if os.path.isabs(c):
+        if os.path.exists(c):
+            _chrome = c; break
+    else:
+        p = shutil.which(c)
+        if p:
+            _chrome = p; break
+
+# Ustaw ścieżkę Chromium dla Kaleido (jeśli API jest dostępne w tej wersji plotly)
 try:
-    pio.kaleido.scope.chromium_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+    if _chrome and hasattr(pio, "kaleido") and hasattr(pio.kaleido, "scope"):
+        pio.kaleido.scope.chromium_executable = _chrome
+        pio.kaleido.scope.chromium_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
 except Exception:
     pass
+
+# Wymuś render PNG (Kaleido) – a jeśli Kaleido niedostępne, plotly i tak nie wywali apki
+try:
+    pio.renderers.default = "png"
+except Exception:
+    pass
+# ====== /Kaleido hardening ======
+
 
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
