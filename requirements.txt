@@ -16,6 +16,7 @@ streamlit-charts
 matplotlib==3.9.2
 numpy>=1.26
 Pillow>=10.0
+SQLAlchemy>=2.0
 
 pydantic==2.11.7
 pydantic-core==2.33.2

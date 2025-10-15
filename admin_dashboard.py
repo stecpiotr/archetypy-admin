@@ -23,6 +23,8 @@ import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
+from sqlalchemy import create_engine, text
+
 import sys
 if sys.platform.startswith("linux"):
     import subprocess
@@ -65,14 +67,6 @@ try:
 except Exception:
     pass
 
-# Wymuś render PNG (Kaleido) – a jeśli Kaleido niedostępne, plotly i tak nie wywali apki
-try:
-    pio.renderers.default = "png"
-except Exception:
-    pass
-# ====== /Kaleido hardening ======
-
-
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
         logos_dir = "logos_local"
@@ -102,6 +96,15 @@ def get_logo_svg_path(brand_name, logos_dir=None):
     if os.path.exists(path2):
         return path2
     return None
+
+@st.cache_resource
+def get_engine():
+    url = (
+        f"postgresql+psycopg2://{st.secrets['db_user']}:{st.secrets['db_pass']}"
+        f"@{st.secrets['db_host']}:{st.secrets.get('db_port', 5432)}/{st.secrets['db_name']}"
+    )
+    # sslmode=require tak jak było wcześniej
+    return create_engine(url, connect_args={"sslmode": "require"})
 
 from io import BytesIO
 from docxtpl import InlineImage
@@ -2727,27 +2730,25 @@ def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None) -> Im
     _mask_pie_ring(img, idx(main_name), (255,0,0,110))
     return img
 
-
 @st.cache_data(ttl=30)
 def load(study_id=None):
     try:
-        conn = psycopg2.connect(
-            host=st.secrets["db_host"],
-            database=st.secrets["db_name"],
-            user=st.secrets["db_user"],
-            password=st.secrets["db_pass"],
-            port=st.secrets.get("db_port", 5432),
-            sslmode="require"
-        )
-
-        base_sql = "SELECT created_at, answers FROM public.responses"
+        engine = get_engine()
         if study_id:
-            df = pd.read_sql(base_sql + " WHERE study_id = %s ORDER BY created_at",
-                             con=conn, params=(study_id,))
+            sql = text("""
+                SELECT created_at, answers
+                FROM public.responses
+                WHERE study_id = :sid
+                ORDER BY created_at
+            """)
+            df = pd.read_sql_query(sql, engine, params={"sid": study_id})
         else:
-            df = pd.read_sql(base_sql + " ORDER BY created_at", con=conn)
-
-        conn.close()
+            sql = text("""
+                SELECT created_at, answers
+                FROM public.responses
+                ORDER BY created_at
+            """)
+            df = pd.read_sql_query(sql, engine)
 
         def parse_answers(x):
             import json
@@ -2769,21 +2770,15 @@ def load(study_id=None):
 
     except Exception as e:
         st.warning(f"Błąd podczas ładowania danych: {e}")
+        return pd.DataFrame()
+
 
 
 
 @st.cache_data(ttl=30)
 def fetch_studies_list():
-    conn = psycopg2.connect(
-        host=st.secrets["db_host"],
-        database=st.secrets["db_name"],
-        user=st.secrets["db_user"],
-        password=st.secrets["db_pass"],
-        port=st.secrets.get("db_port", 5432),
-        sslmode="require"
-    )
-    df = pd.read_sql(
-        """
+    engine = get_engine()
+    sql = text("""
         SELECT
             id,
             first_name_nom, first_name_gen, first_name_dat, first_name_acc, first_name_ins, first_name_loc, first_name_voc,
@@ -2792,11 +2787,9 @@ def fetch_studies_list():
         FROM public.studies
         WHERE COALESCE(is_active, true)
         ORDER BY created_at DESC
-        """,
-        con=conn
-    )
-    conn.close()
-    return df
+    """)
+    return pd.read_sql_query(sql, engine)
+
 
 def archetype_scores(answers):
     if not isinstance(answers, list) or len(answers) < 48:
@@ -3044,7 +3037,7 @@ def export_word_docxtpl(
         one_img_mm = min(92.0, max(70.0, (rest_mm - gap_between_imgs_mm) / 2.0))
     except Exception:
         # Fallback gdyby sekcja nie była dostępna
-        one_img_mm = 118.0
+        one_img_mm = 115.0
 
     # Radar image (mniejsze, żeby zmieściły się 3 elementy w wierszu Worda)
     if radar_img_path and os.path.exists(radar_img_path):
@@ -3825,7 +3818,6 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     showlegend=False,
                     width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
                 )
-                fig.write_image("radar.png", scale=4)
                 st.plotly_chart(
                     fig,
                     use_container_width=True,
@@ -3997,6 +3989,13 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supplement)
             panel_img_path = f"panel_{(main_avg or '').lower()}_{(aux_avg or '').lower()}_{(supp_avg or '').lower()}.png"
             panel_img.save(panel_img_path)
+
+            # ⬇️ włącz eksporty tylko na żądanie (brak ciężkich operacji przy każdym rerunie)
+            prepare_exports = st.toggle(
+                "Przygotuj pliki Word/PDF (kliknij tylko gdy chcesz pobrać)",
+                value=False,
+                key=f"prep-{study_id}"
+            )
 
             # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
             docx_buf = export_word_docxtpl(
