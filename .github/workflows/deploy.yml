@@ -3,7 +3,7 @@ name: Deploy to VPS
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: {}   # <-- dodaj to
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -29,8 +29,8 @@ jobs:
       - name: Copy deploy.sh and run it
         run: |
           scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-              -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
-              ./deploy.sh "archetypy@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
+            -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
+            ./deploy.sh "archetypy@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-              -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
-              "archetypy@${{ secrets.SERVER_HOST }}" "bash /tmp/deploy.sh"
+            -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
+            "archetypy@${{ secrets.SERVER_HOST }}" "bash /tmp/deploy.sh"
