@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
-echo "== deploy.sh =="
-echo "whoami: $(whoami)"
-echo "host: $(hostname)"
+# Prosty test: zapisz datę na serwerze w HOME użytkownika archetypy
+date > ~/last_deploy.txt
 
-# TU wstawisz właściwe komendy deployu (restart usługi, docker compose itp.)
-# Na próbę zostawmy tylko znacznik:
-date | tee /home/archetypy/last_deploy.txt
-
-echo "DEPLOY OK"
+# (tu później dołożymy co ma się faktycznie deployować)
