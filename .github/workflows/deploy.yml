@@ -4,65 +4,77 @@ on:
   push:
     branches: [ main ]
 
-concurrency:
-  group: deploy-archetypy
-  cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Prepare SSH key from secret (base64)
-        env:
-          KEY_B64: ${{ secrets.SERVER_SSH_KEY_B64 }}
+      # 1) Przygotuj klucz z secreta (base64) i pokaż co naprawdę używa runner
+      - name: Prepare SSH key from secret (base64) + show pubkey
+        shell: bash
         run: |
-          set -euo pipefail
-          test -n "$KEY_B64"
+          set -euxo pipefail
           umask 077
           mkdir -p /home/runner/.ssh
-          # dekodujemy prywatny do ~/.ssh/id_ed25519
-          echo "$KEY_B64" | base64 -d > /home/runner/.ssh/id_ed25519
+          echo "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > /home/runner/.ssh/id_ed25519
           chmod 600 /home/runner/.ssh/id_ed25519
-          # dla porównania wypisujemy PUBLICZNY i fingerprint z klucza z biegacza
-          ssh-keygen -y -f /home/runner/.ssh/id_ed25519 > /home/runner/.ssh/id_ed25519.pub
-          echo "RUNNER PUB:"
-          cat /home/runner/.ssh/id_ed25519.pub
-          echo "RUNNER FPR:"
-          ssh-keygen -lf /home/runner/.ssh/id_ed25519.pub
 
-      - name: Make remote deploy script
+          echo "RUNNER PUB:"
+          ssh-keygen -y -f /home/runner/.ssh/id_ed25519
+
+          echo "RUNNER FPR:"
+          ssh-keygen -lf /home/runner/.ssh/id_ed25519
+
+          echo "CONNECT AS: ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} :${{ secrets.SERVER_PORT }}"
+
+      # 2) Głośny smoke-test SSH – jeśli tu padnie, zobaczysz dokładnie dlaczego
+      - name: SSH smoke test (verbose)
+        shell: bash
         run: |
-          cat > deploy.sh <<'EOF'
+          set -euxo pipefail
+          ssh -vvv \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=no \
+            -p "${{ secrets.SERVER_PORT }}" \
+            -i /home/runner/.ssh/id_ed25519 \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+            "echo OK-from-Runner"
+
+      # 3) Deploy – kopiujemy skrypt i uruchamiamy go zdalnie
+      - name: Make remote deploy script
+        id: mk
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > deploy.sh <<'REMOTE'
           set -euxo pipefail
           cd /srv/archetypy-admin
           git config --global --add safe.directory /srv/archetypy-admin
           git fetch --all
           git reset --hard origin/main
-          # w razie czego tworzymy venv
-          if [ ! -d .venv ]; then python3 -m venv .venv; fi
           . .venv/bin/activate
           pip install --no-cache-dir -r requirements.txt
           sudo systemctl restart archetypy-admin
           systemctl --no-pager -l status archetypy-admin | sed -n '1,120p'
-          EOF
-          chmod +x deploy.sh
+          REMOTE
 
       - name: Copy & run remote script over SSH
-        env:
-          HOST: ${{ secrets.SERVER_HOST }}
-          PORT: ${{ secrets.SERVER_PORT }}
-          USER: ${{ secrets.SERVER_USER }}
+        shell: bash
         run: |
           set -euxo pipefail
-          scp -P "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-              -i /home/runner/.ssh/id_ed25519 deploy.sh "$USER@$HOST:/tmp/deploy.sh"
-          ssh -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-              -i /home/runner/.ssh/id_ed25519 "$USER@$HOST" 'bash /tmp/deploy.sh'
+          scp -P "${{ secrets.SERVER_PORT }}" \
+              -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
+              -i /home/runner/.ssh/id_ed25519 \
+              deploy.sh "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
 
+          ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
+              -p "${{ secrets.SERVER_PORT }}" \
+              -i /home/runner/.ssh/id_ed25519 \
+              "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+              "bash -s" < deploy.sh
+
+      # 4) Healthcheck z retry (max ~90s)
       - name: Healthcheck
         shell: bash
         run: |
@@ -71,7 +83,7 @@ jobs:
             code=$(curl -fsSLk -o /dev/null -w "%{http_code}" https://panel.archetypy.badania.pro/)
             echo "Probe $i -> HTTP $code"
             if [ "$code" = "200" ]; then
-              echo "OK"
+              echo "Site is healthy."
               exit 0
             fi
             sleep 3
