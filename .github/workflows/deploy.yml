@@ -12,20 +12,27 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1) Ładujemy klucz prywatny do agenta SSH
-      - name: Add SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+      - name: Checkout (żeby mieć plik workflow w jobie)
+        uses: actions/checkout@v4
 
-      # 2) Wykonujemy deploy zwykłym ssh (bez fingerprintu)
+      - name: Zapisz klucz prywatny do pliku
+        run: |
+          umask 077
+          printf "%s" '${{ secrets.SERVER_SSH_KEY }}' | tr -d '\r' > id_ed25519
+          chmod 600 id_ed25519
+
       - name: SSH deploy
         shell: bash
         run: |
           set -euxo pipefail
-          ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-              -p "${{ secrets.SERVER_PORT }}" \
-              "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" 'bash -s' <<'REMOTE'
+          # wersja ssh, dla pewności
+          ssh -V
+          # połączenie z PODANIEM klucza -i
+          ssh -i id_ed25519 \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=no \
+              -p '${{ secrets.SERVER_PORT }}' \
+              '${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}' 'bash -s' <<'REMOTE'
           set -euxo pipefail
           cd /srv/archetypy-admin
           git config --global --add safe.directory /srv/archetypy-admin
@@ -35,9 +42,8 @@ jobs:
           pip install --no-cache-dir -r requirements.txt
           sudo systemctl restart archetypy-admin
           systemctl --no-pager -l status archetypy-admin | sed -n '1,120p'
-          REMOTE
+REMOTE
 
-      # 3) Czekamy aż serwis wstanie (pętlą, nie pojedynczym cURL-em)
       - name: Healthcheck
         shell: bash
         run: |
@@ -46,7 +52,7 @@ jobs:
             code=$(curl -fsSLk -o /dev/null -w "%{http_code}" https://panel.archetypy.badania.pro/)
             echo "Probe $i -> HTTP $code"
             if [ "$code" = "200" ]; then
-              echo "Site is healthy."
+              echo "OK"
               exit 0
             fi
             sleep 3
