@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
 
 concurrency:
   group: deploy-archetypy
@@ -11,30 +11,35 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Zapisujemy prywatny klucz z SECRET do pliku i ustawiamy prawa 600
-      - name: Prepare SSH key
+      - name: Prepare SSH key (from secret)
         shell: bash
         run: |
-          set -eu
+          set -euo pipefail
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          # zapis bez "echo" (żeby nie połamać nowy linii)
+          printf '%s' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+          # pokaż fingerprint PUBLICZNEGO klucza z secreta (kontrola)
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub
+          echo "Runner PUBKEY FPR:"
+          ssh-keygen -lf ~/.ssh/id_ed25519.pub
 
-      # Prawdziwe wdrożenie – czyste SSH z -i (bez ssh-agent)
       - name: SSH deploy
         shell: bash
         env:
           HOST: ${{ secrets.SERVER_HOST }}
-          PORT: ${{ secrets.SERVER_PORT }}
           USER: ${{ secrets.SERVER_USER }}
+          PORT: ${{ secrets.SERVER_PORT }}
         run: |
-          set -euxo pipefail
-          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -p "$PORT" "$USER@$HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=no \
+              -p "$PORT" "$USER@$HOST" 'bash -s' <<'REMOTE'
           set -euxo pipefail
           cd /srv/archetypy-admin
           git config --global --add safe.directory /srv/archetypy-admin
@@ -42,11 +47,10 @@ jobs:
           git reset --hard origin/main
           . .venv/bin/activate
           pip install --no-cache-dir -r requirements.txt
-          sudo systemctl restart archetypy-admin
+          sudo systemctl restart archetypy-admin || systemctl restart archetypy-admin
           systemctl --no-pager -l status archetypy-admin | sed -n "1,120p"
-          REMOTE
+REMOTE
 
-      # Czekamy aż panel zacznie zwracać 200 (max ok. 90 s)
       - name: Healthcheck
         shell: bash
         run: |
@@ -55,7 +59,7 @@ jobs:
             code=$(curl -fsSLk -o /dev/null -w "%{http_code}" https://panel.archetypy.badania.pro/)
             echo "Probe $i -> HTTP $code"
             if [ "$code" = "200" ]; then
-              echo "Site is healthy."
+              echo "OK"
               exit 0
             fi
             sleep 3
