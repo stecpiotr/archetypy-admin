@@ -11,38 +11,54 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: SSH deploy
-        # ważne: nowsza wersja akcji
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
-          # Uwaga: NIE podajemy "fingerprint"
-          script_stop: true
-          script: |
-            set -euxo pipefail
-            cd /srv/archetypy-admin
-            git config --global --add safe.directory /srv/archetypy-admin
-            git fetch --all
-            git reset --hard origin/main
-            . .venv/bin/activate
-            pip install --no-cache-dir -r requirements.txt
-            sudo systemctl restart archetypy-admin
-            systemctl --no-pager -l status archetypy-admin | sed -n '1,120p'
 
+    steps:
+      # Zapisujemy klucz prywatny do pliku i ustawiamy prawa
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          cat > id_ed25519 <<'KEY'
+          ${{ secrets.SERVER_SSH_KEY }}
+          KEY
+          chmod 600 id_ed25519
+
+      # Szybki test logowania kluczem (tu wyłapie się błąd, jeżeli klucz nie pasuje)
+      - name: SSH auth test
+        shell: bash
+        run: |
+          ssh -i id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
+              -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+              'echo "AUTH OK:" $(whoami)'
+
+
+      # Właściwy deploy na serwerze
+      - name: SSH deploy
+        shell: bash
+        run: |
+          ssh -i id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
+              -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+              'bash -s' <<'REMOTE'
+          set -euxo pipefail
+          cd /srv/archetypy-admin
+          git config --global --add safe.directory /srv/archetypy-admin
+          git fetch --all
+          git reset --hard origin/main
+          . .venv/bin/activate
+          pip install --no-cache-dir -r requirements.txt
+          sudo systemctl restart archetypy-admin
+          systemctl --no-pager -l status archetypy-admin | sed -n "1,120p"
+REMOTE
+
+      # Czekamy aż panel zacznie zwracać 200
       - name: Healthcheck
         shell: bash
         run: |
           set -e
-          # czekamy aż panel wstanie (max ~90s)
           for i in {1..30}; do
             code=$(curl -fsSLk -o /dev/null -w "%{http_code}" https://panel.archetypy.badania.pro/)
             echo "Probe $i -> HTTP $code"
             if [ "$code" = "200" ]; then
-              echo "OK"
+              echo "Site is healthy."
               exit 0
             fi
             sleep 3
