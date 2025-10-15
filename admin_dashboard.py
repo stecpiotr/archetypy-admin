@@ -3826,7 +3826,12 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
                 )
                 fig.write_image("radar.png", scale=4)
-                st.plotly_chart(fig, width="stretch", key=f"radar-{study_id}")
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True,
+                    config={"displaylogo": False},  # tu wrzucamy opcje Plotly
+                    key=f"radar-{study_id}",
+                )
 
                 st.markdown("""
                 <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
