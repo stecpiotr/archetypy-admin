@@ -2,15 +2,16 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      # 1) Przygotuj klucz z secreta (base64) i pokaż co naprawdę używa runner
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Prepare SSH key from secret (base64) + show pubkey
         shell: bash
         run: |
@@ -22,13 +23,10 @@ jobs:
 
           echo "RUNNER PUB:"
           ssh-keygen -y -f /home/runner/.ssh/id_ed25519
-
           echo "RUNNER FPR:"
           ssh-keygen -lf /home/runner/.ssh/id_ed25519
+          echo "CONNECT AS (hardcoded): archetypy@${{ secrets.SERVER_HOST }} :${{ secrets.SERVER_PORT }}"
 
-          echo "CONNECT AS: ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} :${{ secrets.SERVER_PORT }}"
-
-      # 2) Głośny smoke-test SSH – jeśli tu padnie, zobaczysz dokładnie dlaczego
       - name: SSH smoke test (verbose)
         shell: bash
         run: |
@@ -38,55 +36,20 @@ jobs:
             -o StrictHostKeyChecking=no \
             -p "${{ secrets.SERVER_PORT }}" \
             -i /home/runner/.ssh/id_ed25519 \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+            "archetypy@${{ secrets.SERVER_HOST }}" \
             "echo OK-from-Runner"
 
-      # 3) Deploy – kopiujemy skrypt i uruchamiamy go zdalnie
-      - name: Make remote deploy script
-        id: mk
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cat > deploy.sh <<'REMOTE'
-          set -euxo pipefail
-          cd /srv/archetypy-admin
-          git config --global --add safe.directory /srv/archetypy-admin
-          git fetch --all
-          git reset --hard origin/main
-          . .venv/bin/activate
-          pip install --no-cache-dir -r requirements.txt
-          sudo systemctl restart archetypy-admin
-          systemctl --no-pager -l status archetypy-admin | sed -n '1,120p'
-          REMOTE
-
-      - name: Copy & run remote script over SSH
+      - name: Copy deploy.sh and run it
         shell: bash
         run: |
           set -euxo pipefail
           scp -P "${{ secrets.SERVER_PORT }}" \
               -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i /home/runner/.ssh/id_ed25519 \
-              deploy.sh "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
+              ./deploy.sh "archetypy@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
 
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -p "${{ secrets.SERVER_PORT }}" \
               -i /home/runner/.ssh/id_ed25519 \
-              "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
-              "bash -s" < deploy.sh
-
-      # 4) Healthcheck z retry (max ~90s)
-      - name: Healthcheck
-        shell: bash
-        run: |
-          set -e
-          for i in {1..30}; do
-            code=$(curl -fsSLk -o /dev/null -w "%{http_code}" https://panel.archetypy.badania.pro/)
-            echo "Probe $i -> HTTP $code"
-            if [ "$code" = "200" ]; then
-              echo "Site is healthy."
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Healthcheck failed."
-          exit 1
+              "archetypy@${{ secrets.SERVER_HOST }}" \
+              "bash /tmp/deploy.sh"
