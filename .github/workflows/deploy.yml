@@ -13,22 +13,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare SSH key from secret (base64) + show pubkey
-        shell: bash
         run: |
           set -euxo pipefail
           umask 077
           mkdir -p /home/runner/.ssh
           echo "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > /home/runner/.ssh/id_ed25519
           chmod 600 /home/runner/.ssh/id_ed25519
-
-          echo "RUNNER PUB:"
-          ssh-keygen -y -f /home/runner/.ssh/id_ed25519
-          echo "RUNNER FPR:"
-          ssh-keygen -lf /home/runner/.ssh/id_ed25519
           echo "CONNECT AS (hardcoded): archetypy@${{ secrets.SERVER_HOST }} :${{ secrets.SERVER_PORT }}"
 
+      # Ten krok tylko po to, by upewnić się, że deploy.sh jest w repo
+      - name: Show repo contents (debug)
+        run: |
+          pwd
+          ls -al
+
       - name: SSH smoke test (verbose)
-        shell: bash
         run: |
           set -euxo pipefail
           ssh -vvv \
@@ -40,14 +39,15 @@ jobs:
             "echo OK-from-Runner"
 
       - name: Copy deploy.sh and run it
-        shell: bash
         run: |
           set -euxo pipefail
+          # KOPIUJEMY plik z repo (./deploy.sh) na serwer do /tmp
           scp -P "${{ secrets.SERVER_PORT }}" \
               -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i /home/runner/.ssh/id_ed25519 \
               ./deploy.sh "archetypy@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
 
+          # URUCHAMIAMY skopiowany skrypt na serwerze
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -p "${{ secrets.SERVER_PORT }}" \
               -i /home/runner/.ssh/id_ed25519 \
