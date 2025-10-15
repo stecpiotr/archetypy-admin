@@ -17,7 +17,8 @@ jobs:
           set -euxo pipefail
           umask 077
           mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
+          # UWAGA: printf, nie echo
+          printf '%s' "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
       - name: SSH smoke test (vvv)
@@ -29,8 +30,8 @@ jobs:
       - name: Copy deploy.sh and run it
         run: |
           scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-            -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
-            ./deploy.sh "archetypy@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
+              -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
+              ./deploy.sh "archetypy@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-            -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
-            "archetypy@${{ secrets.SERVER_HOST }}" "bash /tmp/deploy.sh"
+              -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
+              "archetypy@${{ secrets.SERVER_HOST }}" "bash /tmp/deploy.sh"
