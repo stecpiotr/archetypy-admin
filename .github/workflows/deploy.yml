@@ -50,7 +50,7 @@ jobs:
               "archetypy@${{ secrets.SERVER_HOST }}" <<'EOF'
           set -euxo pipefail
 
-          APP_DIR="/srv/panel"
+          APP_DIR="/srv/archetypy-admin"
           ENTRYPOINT="admin_dashboard.py"
           VENV=".venv"
           PORT="8501"
