@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch: {}
 
 jobs:
@@ -17,7 +17,6 @@ jobs:
           set -euxo pipefail
           umask 077
           mkdir -p ~/.ssh
-          # UWAGA: printf, nie echo
           printf '%s' "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
@@ -27,11 +26,58 @@ jobs:
             -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
             "archetypy@${{ secrets.SERVER_HOST }}" "echo OK-from-Runner"
 
-      - name: Copy deploy.sh and run it
+      - name: Spakuj repo (bez .git, .github, __pycache__, .venv)
+        run: |
+          set -euxo pipefail
+          tar -czf /tmp/app.tgz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='__pycache__' \
+            --exclude='.venv' \
+            --exclude='*.log' \
+            -C "$GITHUB_WORKSPACE" .
+
+      - name: Wyślij paczkę na serwer
         run: |
           scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
-              ./deploy.sh "archetypy@${{ secrets.SERVER_HOST }}:/tmp/deploy.sh"
+              /tmp/app.tgz "archetypy@${{ secrets.SERVER_HOST }}:/tmp/app.tgz"
+
+      - name: Rozpakuj, zainstaluj zależności i restartuj Streamlit
+        run: |
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
-              "archetypy@${{ secrets.SERVER_HOST }}" "bash /tmp/deploy.sh"
+              "archetypy@${{ secrets.SERVER_HOST }}" <<'EOF'
+          set -euxo pipefail
+
+          APP_DIR="/srv/panel"
+          ENTRYPOINT="admin_dashboard.py"
+          VENV=".venv"
+          PORT="8501"
+
+          # 1) Rozpakuj nową wersję aplikacji
+          mkdir -p "$APP_DIR"
+          tar -xzf /tmp/app.tgz -C "$APP_DIR"
+          rm -f /tmp/app.tgz
+
+          # 2) Zainstaluj / zaktualizuj zależności w venv
+          cd "$APP_DIR"
+          python3 -m venv "$VENV" || true
+          "$APP_DIR/$VENV/bin/pip" install -U pip setuptools wheel
+          "$APP_DIR/$VENV/bin/pip" install -r requirements.txt
+
+          # 3) Zatrzymaj poprzedni proces Streamlit (jeśli działa)
+          pkill -f "streamlit run $ENTRYPOINT" || true
+
+          # 4) Uruchom nową wersję w tle, loguj do pliku
+          nohup "$APP_DIR/$VENV/bin/streamlit" run "$ENTRYPOINT" \
+            --server.port "$PORT" \
+            --server.headless true \
+            --browser.gatherUsageStats false \
+            > "$APP_DIR/streamlit.log" 2>&1 &
+
+          # 5) Prosta weryfikacja
+          sleep 3
+          pgrep -fl "streamlit run $ENTRYPOINT" || (echo "Streamlit nie wystartował" && tail -n 100 "$APP_DIR/streamlit.log" && exit 1)
+          tail -n 50 "$APP_DIR/streamlit.log" || true
+          EOF
