@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   workflow_dispatch: {}
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
             -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
             "archetypy@${{ secrets.SERVER_HOST }}" "echo OK-from-Runner"
 
-      - name: Spakuj repo do archiwum
+      - name: Spakuj repo bez śmieci (tar.gz)
         run: |
           set -euxo pipefail
           tar -czf /tmp/app.tgz \
@@ -38,42 +38,46 @@ jobs:
             --exclude='*.log' \
             -C "$GITHUB_WORKSPACE" .
 
-      - name: Prześlij archiwum na serwer
+      - name: Wyślij paczkę na serwer (scp)
         run: |
           scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
               /tmp/app.tgz "archetypy@${{ secrets.SERVER_HOST }}:/tmp/app.tgz"
 
-      - name: Rozpakuj, zainstaluj zależności i restartuj Streamlit
+      - name: Rozpakuj, zainstaluj zależności i zrestartuj Streamlit
+        env:
+          SHA: ${{ github.sha }}   # przekaż hash do zdalnego skryptu
         run: |
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-            -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
-            "archetypy@${{ secrets.SERVER_HOST }}" <<'EOF'
+              -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
+              "archetypy@${{ secrets.SERVER_HOST }}" "SHA='${SHA}' bash -s" <<'EOF'
           set -euxo pipefail
 
-          APP_DIR="$HOME/panel"          # /home/archetypy/panel
+          APP_DIR="$HOME/panel"          # = /home/archetypy/panel
           ENTRYPOINT="admin_dashboard.py"
           VENV=".venv"
           PORT="8501"
 
-          # 1) Rozpakuj nową wersję aplikacji
+          # 1) Rozpakuj nową wersję
           mkdir -p "$APP_DIR"
           tar -xzf /tmp/app.tgz -C "$APP_DIR"
           rm -f /tmp/app.tgz
 
-          # Zapisz hash wdrożenia do łatwej weryfikacji
-          echo "${GITHUB_SHA}" > "$APP_DIR/.deployed_sha" || true
+          # 1a) Zapisz hash wdrożenia do weryfikacji
+          echo "${SHA}" > "$APP_DIR/.deployed_sha"
 
-          # 2) Zainstaluj / zaktualizuj zależności w venv
+          # 2) Zainstaluj / zaktualizuj zależności
           cd "$APP_DIR"
           python3 -m venv "$VENV" || true
           "$APP_DIR/$VENV/bin/pip" install -U pip setuptools wheel
-          "$APP_DIR/$VENV/bin/pip" install -r requirements.txt
+          if [ -f requirements.txt ]; then
+            "$APP_DIR/$VENV/bin/pip" install -r requirements.txt
+          fi
 
-          # 3) Zatrzymaj poprzedni proces Streamlit (jeśli działa)
+          # 3) Zabij poprzedni proces (jeśli działa)
           pkill -f "streamlit run $ENTRYPOINT" || true
 
-          # 4) Uruchom nową wersję w tle i loguj
+          # 4) Odpal nową wersję w tle, logi do pliku
           nohup "$APP_DIR/$VENV/bin/streamlit" run "$ENTRYPOINT" \
             --server.port "$PORT" \
             --server.address 0.0.0.0 \
@@ -81,10 +85,9 @@ jobs:
             --browser.gatherUsageStats false \
             > "$APP_DIR/streamlit.log" 2>&1 &
 
-          # 5) Prosta weryfikacja
+          # 5) Szybka weryfikacja procesu i logów
           sleep 3
           pgrep -fl "streamlit run $ENTRYPOINT" \
-            || (echo "Streamlit nie wystartował" && tail -n 100 "$APP_DIR/streamlit.log" && exit 1)
-
-          tail -n 50 "$APP_DIR/streamlit.log" || true
+            || (echo "Streamlit nie wystartował"; tail -n 200 "$APP_DIR/streamlit.log"; exit 1)
+          tail -n 80 "$APP_DIR/streamlit.log" || true
           EOF
