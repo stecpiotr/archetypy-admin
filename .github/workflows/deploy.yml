@@ -1,6 +1,5 @@
 name: Deploy to VPS
 
-# Uruchamiaj po każdym commicie na main + ręcznie z UI
 on:
   push:
     branches: ["main"]
@@ -17,9 +16,9 @@ jobs:
 
       # 2) Przygotuj klucz SSH z secreta (base64)
       #    Wymagane secrety w repo:
-      #    - SERVER_HOST            (np. 158.220.110.193)
-      #    - SERVER_PORT            (np. 22 lub inny)
-      #    - SERVER_SSH_KEY_B64     (id_ed25519 zakodowany base64)
+      #      - SERVER_HOST      (np. 158.220.110.193)
+      #      - SERVER_PORT      (np. 22 lub Twój custom)
+      #      - SERVER_SSH_KEY_B64 (private key w base64; publiczny musi być w ~/.ssh/authorized_keys u użytkownika "archetypy")
       - name: Prepare SSH key from secret (base64)
         run: |
           set -euxo pipefail
@@ -28,14 +27,14 @@ jobs:
           printf '%s' "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-      # 3) Test połączenia (na użytkownika archetypy)
-      - name: SSH smoke test (vvv)
+      # 3) Szybki test połączenia
+      - name: SSH smoke test
         run: |
           ssh -vvv -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
             -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
             "archetypy@${{ secrets.SERVER_HOST }}" "echo OK-from-Runner"
 
-      # 4) Spakuj repo (bez śmieci)
+      # 4) Spakuj projekt bez śmieci
       - name: Pack repo (tar.gz)
         run: |
           set -euxo pipefail
@@ -47,15 +46,15 @@ jobs:
             --exclude='*.log' \
             -C "$GITHUB_WORKSPACE" .
 
-      # 5) Skopiuj paczkę na serwer
+      # 5) Wyślij paczkę na serwer
       - name: Upload package to server (scp)
         run: |
           scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
               /tmp/app.tgz "archetypy@${{ secrets.SERVER_HOST }}:/tmp/app.tgz"
 
-      # 6) Rozpakuj, zainstaluj zależności, uwolnij port 8501 i uruchom
-      - name: Deploy & restart Streamlit
+      # 6) Deploy po stronie serwera
+      - name: Deploy on server (extract, deps, restart)
         env:
           SHA: ${{ github.sha }}
         run: |
@@ -64,21 +63,22 @@ jobs:
               "archetypy@${{ secrets.SERVER_HOST }}" "SHA='${SHA}' bash -s" <<'EOF'
           set -euxo pipefail
 
-          echo "===> Remote user: $(whoami), HOME=$HOME"
-          APP_DIR="$HOME/panel"          # /home/archetypy/panel
+          APP_DIR="$HOME/panel"
           ENTRYPOINT="admin_dashboard.py"
           VENV=".venv"
-          PORT="8501"
+          PORT=8501
+
+          echo "===> BEFORE: who listens on :$PORT"
+          ss -ltnp | (grep ":$PORT" || true)
+          lsof -iTCP:$PORT -sTCP:LISTEN -n -P || true
 
           # 1) Rozpakuj nową wersję
           mkdir -p "$APP_DIR"
           tar -xzf /tmp/app.tgz -C "$APP_DIR"
           rm -f /tmp/app.tgz
-
-          # 1a) Zapisz hash wdrożenia (do weryfikacji)
           echo "${SHA}" > "$APP_DIR/.deployed_sha"
 
-          # 2) Zależności w wirtualnym środowisku
+          # 2) Zależności
           cd "$APP_DIR"
           python3 -m venv "$VENV" || true
           "$APP_DIR/$VENV/bin/pip" install -U pip setuptools wheel
@@ -86,28 +86,40 @@ jobs:
             "$APP_DIR/$VENV/bin/pip" install -r requirements.txt
           fi
 
-          # 3) Uwolnij port 8501 i ubij ewentualne procesy streamlit (niezależnie od użytkownika)
-          fuser -k 8501/tcp || true
-          pkill -f 'streamlit.*admin_dashboard.py' || true
-          sleep 2
-          ss -ltnp | grep ':8501' || echo "Port $PORT jest wolny"
+          # 3) Jeśli masz skonfigurowane sudo bez hasła do systemd/fuser,
+          #    spróbuj zrestartować usługę (lepsze niż nohup).
+          if sudo -n true 2>/dev/null && sudo -n systemctl status archetypy-panel >/dev/null 2>&1; then
+            echo "===> Restart przez systemd"
+            sudo -n systemctl restart archetypy-panel
+            sleep 3
+            sudo -n systemctl --no-pager status archetypy-panel || true
+            sudo -n journalctl -u archetypy-panel -n 120 --no-pager || true
+          else
+            echo "===> Fallback: kill i uruchom przez nohup"
+            (fuser -k ${PORT}/tcp || true)
+            (lsof -ti tcp:${PORT} | xargs -r kill -9 || true)
+            pkill -f '[s]treamlit' || true
+            sleep 2
 
-          # 4) Start w tle + logi do pliku
-          nohup "$APP_DIR/$VENV/bin/streamlit" run "$ENTRYPOINT" \
-            --server.port "$PORT" \
-            --server.address 0.0.0.0 \
-            --server.headless true \
-            --browser.gatherUsageStats false \
-            > "$APP_DIR/streamlit.log" 2>&1 &
-
-          # 5) Weryfikacja działania
-          sleep 3
-          if ! pgrep -fl "streamlit.*$ENTRYPOINT" >/dev/null; then
-            echo "Streamlit nie wystartował"
-            tail -n 200 "$APP_DIR/streamlit.log" || true
-            exit 1
+            nohup "$APP_DIR/$VENV/bin/streamlit" run "$ENTRYPOINT" \
+              --server.port "$PORT" \
+              --server.address 0.0.0.0 \
+              --server.headless true \
+              --browser.gatherUsageStats false \
+              > "$APP_DIR/streamlit.log" 2>&1 &
           fi
 
-          echo "===> Ostatnie logi:"
-          tail -n 80 "$APP_DIR/streamlit.log" || true
+          # 4) Weryfikacja
+          sleep 3
+          echo "===> AFTER: who listens on :$PORT"
+          ss -ltnp | (grep ":$PORT" || true)
+          echo "===> Streamlit PIDs:"
+          pgrep -fl '[s]treamlit' || true
+          echo "===> Tail log:"
+          tail -n 120 "$APP_DIR/streamlit.log" || true
+
+          if ! ss -ltnp | grep -q ":$PORT"; then
+            echo "Streamlit nie wstał (port nie nasłuchuje)."
+            exit 1
+          fi
           EOF
