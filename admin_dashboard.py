@@ -23,7 +23,6 @@ import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
-from sqlalchemy import create_engine, text
 
 import sys
 if sys.platform.startswith("linux"):
@@ -67,6 +66,12 @@ try:
 except Exception:
     pass
 
+import os, streamlit as st
+def _build_sha():
+    try: return open(os.path.join(os.path.dirname(__file__), ".deployed_sha")).read().strip()[:7]
+    except Exception: return "dev"
+st.sidebar.caption(f"Build: {_build_sha()}")
+
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
         logos_dir = "logos_local"
@@ -96,15 +101,6 @@ def get_logo_svg_path(brand_name, logos_dir=None):
     if os.path.exists(path2):
         return path2
     return None
-
-@st.cache_resource
-def get_engine():
-    url = (
-        f"postgresql+psycopg2://{st.secrets['db_user']}:{st.secrets['db_pass']}"
-        f"@{st.secrets['db_host']}:{st.secrets.get('db_port', 5432)}/{st.secrets['db_name']}"
-    )
-    # sslmode=require tak jak było wcześniej
-    return create_engine(url, connect_args={"sslmode": "require"})
 
 from io import BytesIO
 from docxtpl import InlineImage
@@ -2733,22 +2729,23 @@ def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None) -> Im
 @st.cache_data(ttl=30)
 def load(study_id=None):
     try:
-        engine = get_engine()
+        conn = psycopg2.connect(
+            host=st.secrets["db_host"],
+            database=st.secrets["db_name"],
+            user=st.secrets["db_user"],
+            password=st.secrets["db_pass"],
+            port=st.secrets.get("db_port", 5432),
+            sslmode="require"
+        )
+
+        base_sql = "SELECT created_at, answers FROM public.responses"
         if study_id:
-            sql = text("""
-                SELECT created_at, answers
-                FROM public.responses
-                WHERE study_id = :sid
-                ORDER BY created_at
-            """)
-            df = pd.read_sql_query(sql, engine, params={"sid": study_id})
+            df = pd.read_sql(base_sql + " WHERE study_id = %s ORDER BY created_at",
+                             con=conn, params=(study_id,))
         else:
-            sql = text("""
-                SELECT created_at, answers
-                FROM public.responses
-                ORDER BY created_at
-            """)
-            df = pd.read_sql_query(sql, engine)
+            df = pd.read_sql(base_sql + " ORDER BY created_at", con=conn)
+
+        conn.close()
 
         def parse_answers(x):
             import json
@@ -2770,15 +2767,21 @@ def load(study_id=None):
 
     except Exception as e:
         st.warning(f"Błąd podczas ładowania danych: {e}")
-        return pd.DataFrame()
-
 
 
 
 @st.cache_data(ttl=30)
 def fetch_studies_list():
-    engine = get_engine()
-    sql = text("""
+    conn = psycopg2.connect(
+        host=st.secrets["db_host"],
+        database=st.secrets["db_name"],
+        user=st.secrets["db_user"],
+        password=st.secrets["db_pass"],
+        port=st.secrets.get("db_port", 5432),
+        sslmode="require"
+    )
+    df = pd.read_sql(
+        """
         SELECT
             id,
             first_name_nom, first_name_gen, first_name_dat, first_name_acc, first_name_ins, first_name_loc, first_name_voc,
@@ -2787,9 +2790,11 @@ def fetch_studies_list():
         FROM public.studies
         WHERE COALESCE(is_active, true)
         ORDER BY created_at DESC
-    """)
-    return pd.read_sql_query(sql, engine)
-
+        """,
+        con=conn
+    )
+    conn.close()
+    return df
 
 def archetype_scores(answers):
     if not isinstance(answers, list) or len(answers) < 48:
@@ -3818,6 +3823,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     showlegend=False,
                     width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
                 )
+                fig.write_image("radar.png", scale=4)
                 st.plotly_chart(
                     fig,
                     use_container_width=True,
