@@ -1,8 +1,9 @@
 name: Deploy to VPS
 
+# Uruchamiaj po każdym commicie na main + ręcznie z UI
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch: {}
 
 jobs:
@@ -10,9 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1) Pobierz repo
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2) Przygotuj klucz SSH z secreta (base64)
+      #    Wymagane secrety w repo:
+      #    - SERVER_HOST            (np. 158.220.110.193)
+      #    - SERVER_PORT            (np. 22 lub inny)
+      #    - SERVER_SSH_KEY_B64     (id_ed25519 zakodowany base64)
       - name: Prepare SSH key from secret (base64)
         run: |
           set -euxo pipefail
@@ -21,13 +28,15 @@ jobs:
           printf '%s' "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
+      # 3) Test połączenia (na użytkownika archetypy)
       - name: SSH smoke test (vvv)
         run: |
           ssh -vvv -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
             -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
             "archetypy@${{ secrets.SERVER_HOST }}" "echo OK-from-Runner"
 
-      - name: Spakuj repo bez śmieci (tar.gz)
+      # 4) Spakuj repo (bez śmieci)
+      - name: Pack repo (tar.gz)
         run: |
           set -euxo pipefail
           tar -czf /tmp/app.tgz \
@@ -38,22 +47,25 @@ jobs:
             --exclude='*.log' \
             -C "$GITHUB_WORKSPACE" .
 
-      - name: Wyślij paczkę na serwer (scp)
+      # 5) Skopiuj paczkę na serwer
+      - name: Upload package to server (scp)
         run: |
           scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
               /tmp/app.tgz "archetypy@${{ secrets.SERVER_HOST }}:/tmp/app.tgz"
 
-      - name: Rozpakuj, zainstaluj zależności i zrestartuj Streamlit
+      # 6) Rozpakuj, zainstaluj zależności, uwolnij port 8501 i uruchom
+      - name: Deploy & restart Streamlit
         env:
-          SHA: ${{ github.sha }}   # przekaż hash do zdalnego skryptu
+          SHA: ${{ github.sha }}
         run: |
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
               "archetypy@${{ secrets.SERVER_HOST }}" "SHA='${SHA}' bash -s" <<'EOF'
           set -euxo pipefail
 
-          APP_DIR="$HOME/panel"          # = /home/archetypy/panel
+          echo "===> Remote user: $(whoami), HOME=$HOME"
+          APP_DIR="$HOME/panel"          # /home/archetypy/panel
           ENTRYPOINT="admin_dashboard.py"
           VENV=".venv"
           PORT="8501"
@@ -63,10 +75,10 @@ jobs:
           tar -xzf /tmp/app.tgz -C "$APP_DIR"
           rm -f /tmp/app.tgz
 
-          # 1a) Zapisz hash wdrożenia do weryfikacji
+          # 1a) Zapisz hash wdrożenia (do weryfikacji)
           echo "${SHA}" > "$APP_DIR/.deployed_sha"
 
-          # 2) Zainstaluj / zaktualizuj zależności
+          # 2) Zależności w wirtualnym środowisku
           cd "$APP_DIR"
           python3 -m venv "$VENV" || true
           "$APP_DIR/$VENV/bin/pip" install -U pip setuptools wheel
@@ -74,10 +86,13 @@ jobs:
             "$APP_DIR/$VENV/bin/pip" install -r requirements.txt
           fi
 
-          # 3) Zabij poprzedni proces (jeśli działa)
-          pkill -f "streamlit run $ENTRYPOINT" || true
+          # 3) Uwolnij port 8501 i ubij ewentualne procesy streamlit (niezależnie od użytkownika)
+          fuser -k 8501/tcp || true
+          pkill -f 'streamlit.*admin_dashboard.py' || true
+          sleep 2
+          ss -ltnp | grep ':8501' || echo "Port $PORT jest wolny"
 
-          # 4) Odpal nową wersję w tle, logi do pliku
+          # 4) Start w tle + logi do pliku
           nohup "$APP_DIR/$VENV/bin/streamlit" run "$ENTRYPOINT" \
             --server.port "$PORT" \
             --server.address 0.0.0.0 \
@@ -85,9 +100,14 @@ jobs:
             --browser.gatherUsageStats false \
             > "$APP_DIR/streamlit.log" 2>&1 &
 
-          # 5) Szybka weryfikacja procesu i logów
+          # 5) Weryfikacja działania
           sleep 3
-          pgrep -fl "streamlit run $ENTRYPOINT" \
-            || (echo "Streamlit nie wystartował"; tail -n 200 "$APP_DIR/streamlit.log"; exit 1)
+          if ! pgrep -fl "streamlit.*$ENTRYPOINT" >/dev/null; then
+            echo "Streamlit nie wystartował"
+            tail -n 200 "$APP_DIR/streamlit.log" || true
+            exit 1
+          fi
+
+          echo "===> Ostatnie logi:"
           tail -n 80 "$APP_DIR/streamlit.log" || true
           EOF
