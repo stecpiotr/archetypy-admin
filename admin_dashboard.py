@@ -72,6 +72,7 @@ def _build_sha():
     except Exception: return "dev"
 st.sidebar.caption(f"Build: {_build_sha()}")
 
+
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
         logos_dir = "logos_local"
