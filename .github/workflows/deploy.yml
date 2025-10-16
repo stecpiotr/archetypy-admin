@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,7 +27,7 @@ jobs:
             -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
             "archetypy@${{ secrets.SERVER_HOST }}" "echo OK-from-Runner"
 
-      - name: Spakuj repo (bez .git, .github, __pycache__, .venv)
+      - name: Spakuj repo do archiwum
         run: |
           set -euxo pipefail
           tar -czf /tmp/app.tgz \
@@ -37,7 +38,7 @@ jobs:
             --exclude='*.log' \
             -C "$GITHUB_WORKSPACE" .
 
-      - name: Wyślij paczkę na serwer
+      - name: Prześlij archiwum na serwer
         run: |
           scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_ed25519 -P "${{ secrets.SERVER_PORT }}" \
@@ -46,11 +47,11 @@ jobs:
       - name: Rozpakuj, zainstaluj zależności i restartuj Streamlit
         run: |
           ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-              -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
-              "archetypy@${{ secrets.SERVER_HOST }}" <<'EOF'
+            -i ~/.ssh/id_ed25519 -p "${{ secrets.SERVER_PORT }}" \
+            "archetypy@${{ secrets.SERVER_HOST }}" <<'EOF'
           set -euxo pipefail
 
-          APP_DIR="/srv/archetypy-admin"
+          APP_DIR="$HOME/panel"          # /home/archetypy/panel
           ENTRYPOINT="admin_dashboard.py"
           VENV=".venv"
           PORT="8501"
@@ -59,6 +60,9 @@ jobs:
           mkdir -p "$APP_DIR"
           tar -xzf /tmp/app.tgz -C "$APP_DIR"
           rm -f /tmp/app.tgz
+
+          # Zapisz hash wdrożenia do łatwej weryfikacji
+          echo "${GITHUB_SHA}" > "$APP_DIR/.deployed_sha" || true
 
           # 2) Zainstaluj / zaktualizuj zależności w venv
           cd "$APP_DIR"
@@ -69,15 +73,18 @@ jobs:
           # 3) Zatrzymaj poprzedni proces Streamlit (jeśli działa)
           pkill -f "streamlit run $ENTRYPOINT" || true
 
-          # 4) Uruchom nową wersję w tle, loguj do pliku
+          # 4) Uruchom nową wersję w tle i loguj
           nohup "$APP_DIR/$VENV/bin/streamlit" run "$ENTRYPOINT" \
             --server.port "$PORT" \
+            --server.address 0.0.0.0 \
             --server.headless true \
             --browser.gatherUsageStats false \
             > "$APP_DIR/streamlit.log" 2>&1 &
 
           # 5) Prosta weryfikacja
           sleep 3
-          pgrep -fl "streamlit run $ENTRYPOINT" || (echo "Streamlit nie wystartował" && tail -n 100 "$APP_DIR/streamlit.log" && exit 1)
+          pgrep -fl "streamlit run $ENTRYPOINT" \
+            || (echo "Streamlit nie wystartował" && tail -n 100 "$APP_DIR/streamlit.log" && exit 1)
+
           tail -n 50 "$APP_DIR/streamlit.log" || true
           EOF
