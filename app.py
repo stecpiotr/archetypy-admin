@@ -741,35 +741,37 @@ def stats_panel() -> None:
             # pionowe paddingi wewnątrz ramki
             st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 
-            # (opcjonalnie) minimalny „gutter” lewo/prawo dla treści
-            gL, body, gR = st.columns([1, 20, 1], gap="small")
-            with body:
-                # tytuł
-                st.markdown(
-                    "<div style='font-weight:700; font-size:25px; "
-                    "margin:5px 0 40px 0; padding-bottom:8px; "
-                    "border-bottom:1px solid #E6E9EE;'>Statystyki</div>",
-                    unsafe_allow_html=True
-                )
+            # 🔧 UPROSZCZENIE: żadnych kolumn w kolumnach – tylko jeden poziom
+            # margines wewnętrzny robimy CSS-em
+            st.markdown("<div style='padding:0 8px'>", unsafe_allow_html=True)
 
-                # dane + metryki
-                total, df = fetch_stats_table()
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.metric('Łączna liczba uczestników badań', int(total))
-                with c2:
-                    st.metric('Liczba badań w bazie', len(df))
+            # tytuł
+            st.markdown(
+                "<div style='font-weight:700; font-size:25px; "
+                "margin:5px 0 40px 0; padding-bottom:8px; "
+                "border-bottom:1px solid #E6E9EE;'>Statystyki</div>",
+                unsafe_allow_html=True
+            )
 
-                # tabela
-                rows = len(df)
-                st.dataframe(
-                    df,
-                    width="stretch",
-                    height=max(rows * 36 + 15, 120),
-                    hide_index=True
-                )
+            # metryki – to JEDYNE zagnieżdżone kolumny
+            total, df = fetch_stats_table()
+            m1, m2 = st.columns(2)
+            with m1:
+                st.metric('Łączna liczba uczestników badań', int(total))
+            with m2:
+                st.metric('Liczba badań w bazie', len(df))
 
-            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+            # tabela
+            rows = len(df)
+            st.dataframe(
+                df,
+                width="stretch",
+                height=max(rows * 36 + 15, 120),
+                hide_index=True
+            )
+
+            st.markdown("</div><div style='height:16px;'></div>", unsafe_allow_html=True)
+
 
 
 
