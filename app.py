@@ -29,7 +29,11 @@ from utils import make_token
 from send_link import render as render_send_link
 from streamlit.components.v1 import html as html_component
 
-st.set_page_config(page_title="Archetypy – panel", layout="wide")
+st.set_page_config(
+    page_title="Archetypy – panel",
+    layout="wide",
+    initial_sidebar_state="collapsed"   # ← domyślnie zwinięty sidebar
+)
 
 # ▼ dodaj po importach, PRZED pierwszym użyciem Plotly/kaleido
 import os

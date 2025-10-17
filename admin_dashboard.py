@@ -18,6 +18,7 @@ import os
 from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
+import os, shutil, subprocess
 
 import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
@@ -72,6 +73,17 @@ def _build_sha():
     except Exception: return "dev"
 st.sidebar.caption(f"Build: {_build_sha()}")
 
+# ── szukanie LibreOffice ─────────────────────────────────────────────────────
+def _find_soffice() -> str | None:
+    # 1) zmienna środowiskowa (możesz nadpisać w systemd)
+    cand = os.environ.get("SOFFICE_PATH") or os.environ.get("LIBREOFFICE_BIN")
+    # 2) typowe ścieżki
+    for p in [cand, "/usr/bin/soffice", "/usr/local/bin/soffice"]:
+        if p and os.path.isfile(p):
+            return p
+    # 3) PATH procesu
+    return shutil.which("soffice")
+# ─────────────────────────────────────────────────────────────────────────────
 
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
@@ -3998,11 +4010,20 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             panel_img.save(panel_img_path)
 
             # ⬇️ włącz eksporty tylko na żądanie (brak ciężkich operacji przy każdym rerunie)
-            prepare_exports = st.toggle(
+            prep = st.toggle(
                 "Przygotuj pliki Word/PDF (kliknij tylko gdy chcesz pobrać)",
-                value=False,
-                key=f"prep-{study_id}"
+                key="prep_docs",
+                value=False  # ← DOMYŚLNIE WYŁĄCZONE
             )
+
+            if prep:
+                soffice = _find_soffice()
+                if not soffice:
+                    st.error("Nie udało się wczytać raportu: LibreOffice (soffice) nie jest dostępny w systemie.")
+                    return
+                # ...generowanie docx/pdf...
+                # pamiętaj, by użyć *konkretnej ścieżki* `soffice`:
+                # subprocess.run([soffice, "--headless", "--convert-to", "pdf", docx_path, "--outdir", outdir], check=True)
 
             # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
             docx_buf = export_word_docxtpl(

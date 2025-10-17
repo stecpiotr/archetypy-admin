@@ -1,22 +1,42 @@
+# --- grafika/PNG/SVG/PDF ---
 libcairo2
-libpango1.0-0
-libgdk-pixbuf2.0-0
-libffi-dev
+libpango-1.0-0
+libpangocairo-1.0-0
+libgdk-pixbuf-2.0-0
 libjpeg-dev
 libxml2
 libxml2-dev
 libxslt1-dev
 zlib1g-dev
-libpq-dev
-libfreetype6-dev
+libfreetype6
 libfontconfig1
-libglib2.0-0
-libsm6
+
+# --- bazy/kompilacja ---
+libpq-dev
+libffi-dev
+
+# --- X11 / headless GUI (export, kaleido itp.) ---
+libnss3
+libxss1
+libxcomposite1
+libxrandr2
+libxdamage1
+libxfixes3
+libgbm1
+libx11-6
 libxext6
-libxrender-dev
-libasound2
-libpangocairo-1.0-0
+libsm6
+libdrm2
+libatk1.0-0
+libgtk-3-0
 fonts-liberation
+libasound2t64
+
+# --- konwersje dokumentów (wymagane: soffice) ---
 libreoffice
-ghostscript
-chromium
+python3-uno
+
+# --- przeglądarka (WYBIERZ JEDNĄ) ---
+chromium-browser
+
+# google-chrome-stable
