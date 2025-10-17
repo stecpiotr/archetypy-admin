@@ -1,33 +1,56 @@
 name: Deploy Hetman static
+
 on:
   push:
     branches: [ main ]
     paths:
-      - 'front/**'
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/package.json'
       - '.github/workflows/deploy-hetman-static.yml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Detect frontend directory
+        id: detect
+        run: |
+          set -e
+          if [ -f package.json ]; then
+            echo "dir=." >> $GITHUB_OUTPUT
+          elif [ -f front/package.json ]; then
+            echo "dir=front" >> $GITHUB_OUTPUT
+          elif [ -f web/package.json ]; then
+            echo "dir=web" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Nie znaleziono package.json (ani w ./, ani w front/, ani w web/)"
+            exit 1
+          fi
+          echo "Frontend dir: $(cat $GITHUB_OUTPUT)"
 
       - name: Use Node 20
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
 
       - name: Build
-        working-directory: front
         run: |
+          set -e
+          cd "${{ steps.detect.outputs.dir }}"
           npm ci
           npm run build
+        shell: bash
 
       - name: Rsync to server (/srv/hetman/html)
         uses: burnett01/rsync-deployments@7.1.0
         with:
           switches: -az --delete
-          path: front/dist/
+          path: ${{ steps.detect.outputs.dir }}/dist/
           remote_path: /srv/hetman/html/
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USER }}
