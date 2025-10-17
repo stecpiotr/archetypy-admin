@@ -89,3 +89,6 @@ ext.py
 .config/google-chrome-for-testing/
 .config/chromium/
 **/nssdb/
+
+# tylko root
+/*.png
