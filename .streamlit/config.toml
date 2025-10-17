@@ -1,5 +1,5 @@
 [server]
-address = "0.0.0.0"
+address = "127.0.0.1"   # zamiast 0.0.0.0 – bezpieczniej za Nginxem
 port = 8501
 headless = true
 enableCORS = false
