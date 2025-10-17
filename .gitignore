@@ -81,3 +81,11 @@ parcel-cache/
 backup_admin.py
 admin_dashboard2.py
 ext.py
+
+# Chrome/Chromium test profile & NSS (tworzą się przy eksporcie/kaleido)
+.config/
+.pki/
+.config/google-chrome/
+.config/google-chrome-for-testing/
+.config/chromium/
+**/nssdb/
