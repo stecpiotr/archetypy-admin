@@ -1,7 +1,60 @@
-.streamlit/secrets.toml
-admin_dashboard2.py
-backup_admin.py
-ext.py
-.idea/
+# --- Python / Streamlit ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Wirtualne środowiska
+.venv/
+venv/
 .env
+.env.*
+.envrc
+
+# Build / dystrybucja
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+
+# Logi / pliki tymczasowe
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# Systemowe "śmieci"
+.DS_Store
+Thumbs.db
+
+# IDE/edytory
+.vscode/
+.idea/
+
+# Cache i lokalne dane
+.cache/
+.local/
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/*.lock
+
+# Docker / runtime (nie wersjonujemy)
+docker-data/
+db-data/
+app-data/
+caddy/data/
+caddy/logs/
+
+# --- Specyficzne dla projektu ---
+backup_admin.py
+admin_dashboard2.py
+ext.py
 .backup/
