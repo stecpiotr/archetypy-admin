@@ -8,13 +8,15 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
+.python-version
 
-# Wirtualne środowiska
+# Wirtualne środowiska i sekrety
 .venv/
 venv/
 .env
 .env.*
 .envrc
+.streamlit/secrets.toml
 
 # Build / dystrybucja
 build/
@@ -29,10 +31,19 @@ logs/
 tmp/
 temp/
 *.tmp
+*.bak
+*.old
+*.orig
+*.rej
 
-# Systemowe "śmieci"
+# Systemowe śmieci
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
 
 # IDE/edytory
 .vscode/
@@ -41,9 +52,9 @@ Thumbs.db
 # Cache i lokalne dane
 .cache/
 .local/
+.rsync-partial/
 
 # Streamlit
-.streamlit/secrets.toml
 .streamlit/*.lock
 
 # Docker / runtime (nie wersjonujemy)
@@ -53,8 +64,20 @@ app-data/
 caddy/data/
 caddy/logs/
 
+# Node/TS (jeśli używasz komponentów TS/React)
+node_modules/
+.npm/
+.pnpm-store/
+.turbo/
+.next/
+parcel-cache/
+.eslintcache
+
+# Pliki Office – autosave'y
+~$*
+
 # --- Specyficzne dla projektu ---
+.backup/
 backup_admin.py
 admin_dashboard2.py
 ext.py
-.backup/
