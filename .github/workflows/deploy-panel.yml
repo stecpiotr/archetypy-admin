@@ -1,0 +1,38 @@
+name: Deploy Panel
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'panel/**'
+      - '.github/workflows/deploy-panel.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rsync code to server (/srv/hetman/panel)
+        uses: burnett01/rsync-deployments@7.1.0
+        with:
+          switches: -az --delete --exclude=".venv/"
+          path: panel/
+          remote_path: /srv/hetman/panel/
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USER }}
+          remote_key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Install deps + restart service
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd /srv/hetman/panel
+            python3 -m venv .venv
+            . .venv/bin/activate
+            pip -q install --upgrade pip
+            if [ -f requirements.txt ]; then pip -q install -r requirements.txt; fi
+            sudo systemctl restart panel
