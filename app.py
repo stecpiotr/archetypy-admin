@@ -31,6 +31,10 @@ from streamlit.components.v1 import html as html_component
 
 st.set_page_config(page_title="Archetypy – panel", layout="wide")
 
+# ▼ dodaj po importach, PRZED pierwszym użyciem Plotly/kaleido
+import os
+os.environ.setdefault("PLOTLY_CHROME_PATH", "/usr/local/bin/google-chrome-headless")
+
 # globalna kotwica na samym szczycie aplikacji
 st.markdown('<a id="__top__"></a>', unsafe_allow_html=True)
 
@@ -732,18 +736,10 @@ def stats_panel() -> None:
     # Tu sterujesz SZEROKOŚCIĄ całej ramki:
     # [1, 6, 1] ≈ 75% szerokości kontenera strony
     # np. [1, 5, 1] węższa, [1, 8, 1] szersza
-    L, C, R = st.columns([1, 45, 1], gap="small")
-    # ⬅️➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➤➡️
-
+    L, C, R = st.columns([1, 8, 1], gap="small")  # szerokość ramki ~ środkowa kolumna
     with C:
-        card = st.container(border=True)
-        with card:
-            # pionowe paddingi wewnątrz ramki
+        with st.container(border=True):
             st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
-
-            # 🔧 UPROSZCZENIE: żadnych kolumn w kolumnach – tylko jeden poziom
-            # margines wewnętrzny robimy CSS-em
-            st.markdown("<div style='padding:0 8px'>", unsafe_allow_html=True)
 
             # tytuł
             st.markdown(
@@ -753,24 +749,25 @@ def stats_panel() -> None:
                 unsafe_allow_html=True
             )
 
-            # metryki – to JEDYNE zagnieżdżone kolumny
+            # dane + metryki
             total, df = fetch_stats_table()
-            m1, m2 = st.columns(2)
-            with m1:
+            c1, c2 = st.columns(2)  # ← JEDEN poziom zagnieżdżenia OK
+            with c1:
                 st.metric('Łączna liczba uczestników badań', int(total))
-            with m2:
+            with c2:
                 st.metric('Liczba badań w bazie', len(df))
 
             # tabela
             rows = len(df)
             st.dataframe(
                 df,
-                width="stretch",
+                use_container_width=True,              # ← patrz pkt 3
                 height=max(rows * 36 + 15, 120),
                 hide_index=True
             )
 
-            st.markdown("</div><div style='height:16px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+
 
 
 
