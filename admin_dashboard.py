@@ -18,7 +18,6 @@ import os
 from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
-import os, shutil, subprocess
 
 import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
@@ -73,17 +72,6 @@ def _build_sha():
     except Exception: return "dev"
 st.sidebar.caption(f"Build: {_build_sha()}")
 
-# ── szukanie LibreOffice ─────────────────────────────────────────────────────
-def _find_soffice() -> str | None:
-    # 1) zmienna środowiskowa (możesz nadpisać w systemd)
-    cand = os.environ.get("SOFFICE_PATH") or os.environ.get("LIBREOFFICE_BIN")
-    # 2) typowe ścieżki
-    for p in [cand, "/usr/bin/soffice", "/usr/local/bin/soffice"]:
-        if p and os.path.isfile(p):
-            return p
-    # 3) PATH procesu
-    return shutil.which("soffice")
-# ─────────────────────────────────────────────────────────────────────────────
 
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
@@ -3171,7 +3159,32 @@ def export_word_docxtpl(
     buf.seek(0)
     return buf
 
-def word_to_pdf(docx_bytes_io):
+def _find_soffice() -> str | None:
+    """
+    Znajdź binarkę 'soffice' dla LibreOffice (Linux). Na Windows zwraca None.
+    Respektuje zmienną środowiskową SOFFICE_BIN.
+    """
+    import sys, os, shutil
+    if sys.platform.startswith("win"):
+        return None
+    # 1) ręcznie wskazana ścieżka
+    env = os.environ.get("SOFFICE_BIN")
+    if env and os.path.isfile(env):
+        return env
+    # 2) PATH / najczęstsze lokalizacje
+    candidates = [
+        shutil.which("soffice"),
+        "/usr/bin/soffice",
+        "/usr/local/bin/soffice",
+        "/usr/lib/libreoffice/program/soffice",
+        "/snap/bin/libreoffice",
+    ]
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+def word_to_pdf(docx_bytes_io, soffice_bin: str | None = None):
     import sys
     import tempfile, os, shutil
     from io import BytesIO
@@ -3216,14 +3229,14 @@ def word_to_pdf(docx_bytes_io):
             except Exception:
                 pass  # jeśli fc-cache niedostępny w środowisku, i tak próbujemy dalej
 
-            # 3) Konwersja LibreOffice
+            # 3) Konwersja LibreOffice (z możliwością podania ścieżki)
             try:
-                result = subprocess.run([
-                    "soffice", "--headless", "--convert-to", "pdf",
-                    "--outdir", tmpdir, docx_path
-                ], capture_output=True)
+                cmd = [soffice_bin or "soffice", "--headless", "--convert-to", "pdf",
+                       "--outdir", tmpdir, docx_path]
+                result = subprocess.run(cmd, capture_output=True)
                 if result.returncode != 0 or not os.path.isfile(pdf_path):
-                    raise RuntimeError("LibreOffice PDF error: " + result.stderr.decode(errors="ignore"))
+                    raise RuntimeError(
+                        "LibreOffice PDF error: " + result.stderr.decode(errors="ignore"))
             except FileNotFoundError:
                 raise RuntimeError("LibreOffice (soffice) nie jest dostępny w systemie.")
             with open(pdf_path, "rb") as f:
@@ -3472,6 +3485,9 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
 # ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
 
 def show_report(sb, study: dict, wide: bool = True) -> None:
+    # stan przełącznika eksportu (bezpieczeństwo przy pierwszym renderze)
+    st.session_state.setdefault("prep_docs", False)
+
     # --- NOWE: płeć + mapowanie nazw do żeńskich ---
     gender_raw = (study.get("gender") or study.get("sex") or study.get("plec") or "").strip().lower()
     IS_FEMALE = gender_raw in {"k", "kobieta", "female", "f"}
@@ -3836,11 +3852,10 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     showlegend=False,
                     width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
                 )
-                fig.write_image("radar.png", scale=4)
                 st.plotly_chart(
                     fig,
                     use_container_width=True,
-                    config={"displaylogo": False},  # tu wrzucamy opcje Plotly
+                    config={"displaylogo": False},
                     key=f"radar-{study_id}",
                 )
 
@@ -3910,18 +3925,6 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             color_pcts = calc_color_percentages_from_df(data)
 
-            progress_png_path = make_color_progress_png_for_word(
-                color_pcts,
-                width_px=1600,
-                pad=32,
-                bar_h=66,          # wyższe pastylki
-                bar_gap=30,          # odstęp między paskami
-                dot_radius=10,
-                label_gap_px=35,  # << mniejszy odstęp etykieta→pasek
-                label_font_size=36,  # << mniejsze fonty
-                pct_font_size=32,  # większe %
-                pct_margin=14
-            )
 
             # Dane opisowe dominującego koloru do Worda
             dom_meta = COLOR_LONG[dom_name]  # masz już COLOR_LONG w pliku
@@ -3936,25 +3939,6 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 "hex": dom_meta["hex"],
             }
 
-            # (pierścień już zapisujesz wcześniej jako color_ring.png)
-
-            # zapisz PNG z dużego pierścienia do użycia w Wordzie
-            big_color = max(color_pcts.items(), key=lambda kv: kv[1])[0]
-            big_svg = _ring_svg(color_pcts[big_color], COLOR_HEX[big_color], size=600, stroke=48)
-            with open("color_ring.svg", "w", encoding="utf-8") as f:
-                f.write(big_svg)
-            cairosvg.svg2png(url="color_ring.svg", write_to="color_ring.png")
-
-            # -- PNG 2: Rozkład archetypów na osiach potrzeb (twoje koło)
-            kolo_axes_img.save("axes_wheel.png")  # <= zapis
-
-            # --- ŚREDNIE % archetypów → kapsułki do Worda ---
-            means_pct = mean_pct_by_archetype_from_df(data)  # {archetyp: % z dwoma miejscami}
-            capsules_path = make_capsule_columns_png_for_word(
-                means_pct,
-                out_path="arche_capsules.png",
-                top_title=None  # albo np. "Średnie wyniki archetypów"
-            )
 
             with col3:
                 st.markdown(
@@ -4005,90 +3989,149 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             idx_main = archetype_name_to_img_idx(main_avg)
             idx_aux = archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None
             idx_supplement = archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None
-            panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supplement)
-            panel_img_path = f"panel_{(main_avg or '').lower()}_{(aux_avg or '').lower()}_{(supp_avg or '').lower()}.png"
-            panel_img.save(panel_img_path)
 
-            # ⬇️ włącz eksporty tylko na żądanie (brak ciężkich operacji przy każdym rerunie)
+            # === Przygotowanie eksportów tylko na żądanie ===
             prep = st.toggle(
                 "Przygotuj pliki Word/PDF (kliknij tylko gdy chcesz pobrać)",
                 key="prep_docs",
-                value=False  # ← DOMYŚLNIE WYŁĄCZONE
+                value=st.session_state.get("prep_docs", False)
             )
 
+            # Ustal nazwy plików z góry (przydadzą się też przy cache)
+            DOCX_FILENAME, PDF_FILENAME = build_report_filenames(study)
+            cache_key = f"exports_{study_id}"
+
+            def _build_exports() -> tuple[bytes, bytes]:
+                """Liczy wszystkie obrazy do Worda, buduje DOCX i PDF. Zwraca bajty."""
+                # 1) Zapisz PNG z radaru (do DOCX)
+                try:
+                    fig.write_image("radar.png", scale=4)
+                except Exception:
+                    pass
+
+                # 2) Koło osi potrzeb → PNG
+                aux = aux_avg if aux_avg != main_avg else None
+                supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
+                kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
+                kolo_axes_img.save("axes_wheel.png")
+
+                # 3) Dominujący pierścień koloru → SVG/PNG
+                big_color = max(color_pcts.items(), key=lambda kv: kv[1])[0]
+                big_svg = _ring_svg(color_pcts[big_color], COLOR_HEX[big_color], size=600,
+                                    stroke=48)
+                with open("color_ring.svg", "w", encoding="utf-8") as f:
+                    f.write(big_svg)
+                cairosvg.svg2png(url="color_ring.svg", write_to="color_ring.png")
+
+                # 4) Pastylki kolorów (PNG)
+                progress_png_path = make_color_progress_png_for_word(
+                    color_pcts, width_px=1600, pad=32, bar_h=66, bar_gap=30,
+                    dot_radius=10, label_gap_px=35, label_font_size=36, pct_font_size=32,
+                    pct_margin=14
+                )
+
+                # 5) Skumulowany wykres liczebności (PNG)
+                stacked_png_path = make_stacked_bar_png_for_word(
+                    archetype_names=ARCHE_NAMES_ORDER,
+                    counts_main=counts_main, counts_aux=counts_aux, counts_supp=counts_supp,
+                    out_path="archetypes_stacked.png",
+                )
+
+                # 6) Kapsuły średnich (PNG)
+                means_pct = mean_pct_by_archetype_from_df(data)
+                capsules_path = make_capsule_columns_png_for_word(
+                    means_pct, out_path="arche_capsules.png", top_title=None
+                )
+
+                # 7) Panel (czerwony/żółty/zielony) → PNG
+                idx_main = archetype_name_to_img_idx(main_avg)
+                idx_aux = archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None
+                idx_supp = archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg,
+                                                                                   aux_avg] else None
+                panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supp)
+                panel_img_path = f"panel_{(main_avg or '').lower()}_{(aux_avg or '').lower()}_{(supp_avg or '').lower()}.png"
+                panel_img.save(panel_img_path)
+
+                # 8) DOCX
+                docx_io = export_word_docxtpl(
+                    main_avg,
+                    aux_avg,
+                    supp_avg,
+                    archetype_features,
+                    main_disp,
+                    second_disp,
+                    supp_disp,
+                    radar_img_path="radar.png",
+                    archetype_table=archetype_table,
+                    num_ankiet=num_ankiet,
+                    panel_img_path=panel_img_path,
+                    person=person,
+                    gender_code=("K" if IS_FEMALE else "M"),
+                    axes_wheel_img_path="axes_wheel.png",
+                    dom_color=dom_color,
+                    color_progress_img_path=progress_png_path,
+                    archetype_stacked_img_path=stacked_png_path,
+                    capsule_columns_img_path=capsules_path,
+                    show_supplement=SHOW_SUPP
+                )
+
+                # 9) PDF – platformowo:
+                import sys as _sys
+                if _sys.platform.startswith("win"):
+                    # Windows: używa MS Word/docx2pdf wewnątrz word_to_pdf
+                    pdf_io = word_to_pdf(docx_io)
+                else:
+                    # Linux: LibreOffice (soffice)
+                    soffice_path = _find_soffice()
+                    if not soffice_path:
+                        raise RuntimeError("LibreOffice (soffice) nie jest dostępny w systemie.")
+                    pdf_io = word_to_pdf(docx_io, soffice_bin=soffice_path)
+
+                return docx_io.getvalue(), pdf_io.getvalue()
+
+            # — logika UI — generuj tylko na żądanie, ale pozwól pobrać poprzednie
             if prep:
-                soffice = _find_soffice()
-                if not soffice:
-                    st.error("Nie udało się wczytać raportu: LibreOffice (soffice) nie jest dostępny w systemie.")
-                    return
-                # ...generowanie docx/pdf...
-                # pamiętaj, by użyć *konkretnej ścieżki* `soffice`:
-                # subprocess.run([soffice, "--headless", "--convert-to", "pdf", docx_path, "--outdir", outdir], check=True)
+                with st.spinner("Przygotowuję raport Word/PDF…"):
+                    try:
+                        docx_bytes, pdf_bytes = _build_exports()
+                        st.session_state[cache_key] = {
+                            "docx": docx_bytes, "pdf": pdf_bytes,
+                            "docx_name": DOCX_FILENAME, "pdf_name": PDF_FILENAME
+                        }
+                        st.success("Gotowe. Możesz pobrać pliki poniżej.")
+                    except Exception as e:
+                        st.error(f"Nie udało się przygotować raportu: {e}")
 
-            # ----------- EKSPORT WORD I PDF - pionowo, z ikonkami -----------
-            docx_buf = export_word_docxtpl(
-                main_avg,
-                aux_avg,
-                supp_avg,
-                archetype_features,
-                main_disp,
-                second_disp,
-                supp_disp,
-                radar_img_path="radar.png",
-                archetype_table=archetype_table,
-                num_ankiet=num_ankiet,
-                panel_img_path=panel_img_path,
-                person=person,
-                gender_code=("K" if IS_FEMALE else "M"),
-                axes_wheel_img_path="axes_wheel.png",
-                dom_color=dom_color,
-                color_progress_img_path=progress_png_path,
-                archetype_stacked_img_path = stacked_png_path,
-                capsule_columns_img_path=capsules_path,
-                show_supplement=SHOW_SUPP
-            )
-
-            pdf_buf = word_to_pdf(docx_buf)
+            cache = st.session_state.get(cache_key)
 
             word_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#185abd'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>W</text></svg>"
             pdf_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#d32f2f'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>PDF</text></svg>"
 
             st.markdown(
-                f"""
-                <div style="display:flex;flex-direction:column;align-items:flex-start;">
-                    <div style="margin-bottom:11px;">
-                        {word_icon}
-                        <span style="vertical-align:middle;">
-                            <b>Eksport do Word (.docx)</b>
-                        </span>
-                    </div>
-                """, unsafe_allow_html=True)
-            # ⬇️ dodaj tę linię PRZED przyciskami
-            DOCX_FILENAME, PDF_FILENAME = build_report_filenames(study)
-
+                f"<div style='margin-bottom:11px;'>{word_icon}<b>Eksport do Word (.docx)</b></div>",
+                unsafe_allow_html=True)
             st.download_button(
                 "Pobierz raport (Word)",
-                data=docx_buf,  # jeśli to BytesIO i działa — zostaw
-                file_name=DOCX_FILENAME,  # raport_<nazwisko-imie>.docx
+                data=(cache["docx"] if cache else b""),
+                file_name=(cache["docx_name"] if cache else DOCX_FILENAME),
+                disabled=not bool(cache),
                 key="word_button"
             )
 
             st.markdown(
-                f"""
-                    <div style="margin-top:21px; margin-bottom:11px;">
-                        {pdf_icon}
-                        <span style="vertical-align:middle;">
-                            <b>Eksport do PDF (.pdf)</b>
-                        </span>
-                    </div>
-                """, unsafe_allow_html=True)
-
+                f"<div style='margin-top:21px; margin-bottom:11px;'>{pdf_icon}<b>Eksport do PDF (.pdf)</b></div>",
+                unsafe_allow_html=True)
             st.download_button(
                 "Pobierz raport (PDF)",
-                data=pdf_buf,  # jeśli to BytesIO i działa — zostaw
-                file_name=PDF_FILENAME,  # raport_<nazwisko-imie>.pdf
+                data=(cache["pdf"] if cache else b""),
+                file_name=(cache["pdf_name"] if cache else PDF_FILENAME),
+                disabled=not bool(cache),
                 key="pdf_button"
             )
+
+            if not cache and not prep:
+                st.caption(
+                    "Pliki nie są jeszcze przygotowane. Włącz przełącznik powyżej, żeby je wygenerować.")
 
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:38px; margin-bottom:24px;" />
