@@ -1,5 +1,5 @@
 # --- grafika/PNG/SVG/PDF ---
-libcairo2 1.16
+libcairo2
 libpango-1.0-0
 libpangocairo-1.0-0
 libgdk-pixbuf-2.0-0
@@ -33,7 +33,7 @@ fonts-liberation
 libasound2t64
 
 # --- konwersje dokumentów (wymagane: soffice) ---
-libreoffice --headless
+libreoffice
 python3-uno
 
 # --- przeglądarka (WYBIERZ JEDNĄ) ---
