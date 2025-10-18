@@ -3732,26 +3732,40 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     unsafe_allow_html=True
                 )
 
+                # 1) procent „natężenia” jak w raporcie Word (średnie % 0..100 na podstawie odpowiedzi)
+                means_pct = mean_pct_by_archetype_from_df(data)  # {archetyp: %}
+
+                # 2) kolejność wierszy – sortujemy malejąco po procencie
+                ordered_names = sorted(
+                    archetype_names,
+                    key=lambda n: means_pct.get(n, 0.0),
+                    reverse=True
+                )
+
+                # 3) budowa tabeli z nową kolumną „% natężenie archetypu”
                 archetype_table = pd.DataFrame({
-                    "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in archetype_names],
-                    "Główny<br/>archetyp": [zero_to_dash(counts_main.get(normalize(k), 0)) for k in
-                                            archetype_names],
-                    "Wspierający<br/>archetyp": [zero_to_dash(counts_aux.get(normalize(k), 0)) for k
-                                                 in archetype_names],
-                    "Poboczny<br/>archetyp": [zero_to_dash(counts_supp.get(normalize(k), 0)) for k
-                                              in archetype_names],
+                    "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in ordered_names],
+                    "Główny<br/>archetyp": [
+                        zero_to_dash(counts_main.get(normalize(n), 0)) for n in ordered_names
+                    ],
+                    "Wspierający<br/>archetyp": [
+                        zero_to_dash(counts_aux.get(normalize(n), 0)) for n in ordered_names
+                    ],
+                    "Poboczny<br/>archetyp": [
+                        zero_to_dash(counts_supp.get(normalize(n), 0)) for n in ordered_names
+                    ],
+                    "% natężenie archetypu": [f"{means_pct.get(n, 0.0):.1f}%" for n in ordered_names],
                 })
 
-                # HTML tabeli – BEZ indeksu, pozwól na <br/> w nagłówkach
+                # 4) render HTML – BEZ indeksu, pozwól na <br/> w nagłówkach
                 html_table = archetype_table.to_html(index=False, escape=False, border=0)
-                # podmień klasę (różne wersje pandas różnie piszą border=…)
                 html_table = (
                     html_table
                     .replace('class="dataframe"', 'class="ap-table"')
                     .replace('border="1"', 'border="0"')
                 )
 
-                # CSS do tabeli (bez iframa, bez scrolla)
+                # 5) CSS – szerokości dla 5 kolumn (1=Archetyp, 2..4=liczebności, 5=%)
                 st.markdown("""
                 <style>
                   .ap-table{
@@ -3771,18 +3785,23 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                   }
                   .ap-table th:nth-child(1), .ap-table td:nth-child(1){
                     text-align: left !important;
-                    width: 37%;
+                    width: 34%;
                   }
                   .ap-table th:nth-child(2), .ap-table td:nth-child(2),
                   .ap-table th:nth-child(3), .ap-table td:nth-child(3),
                   .ap-table th:nth-child(4), .ap-table td:nth-child(4){
+                    width: 15%;
+                  }
+                  .ap-table th:nth-child(5), .ap-table td:nth-child(5){
                     width: 21%;
+                    font-weight: 700;
                   }
                 </style>
                 """, unsafe_allow_html=True)
 
-                # 🔴 WAŻNE: tylko st.markdown + unsafe_allow_html=True (NIE st.write!)
+                # 6) wyświetlenie
                 st.markdown(html_table, unsafe_allow_html=True)
+
 
             with col2:
                 theta_labels = []
