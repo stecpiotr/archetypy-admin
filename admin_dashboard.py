@@ -3,6 +3,24 @@
 import pandas as pd
 import streamlit as st
 import psycopg2
+import sqlalchemy as sa
+
+def _sa_engine():
+    """
+    Silnik SQLAlchemy do Postgresa z SSL. Używamy go w pd.read_sql.
+    Wymaga pakietu SQLAlchemy (pip install SQLAlchemy).
+    """
+    url = sa.URL.create(
+        "postgresql+psycopg2",
+        username=st.secrets["db_user"],
+        password=st.secrets["db_pass"],
+        host=st.secrets["db_host"],
+        port=int(st.secrets.get("db_port", 5432)),
+        database=st.secrets["db_name"],
+        query={"sslmode": "require"},
+    )
+    return sa.create_engine(url, pool_pre_ping=True)
+
 import ast
 import plotly.graph_objects as go
 from fpdf import FPDF
@@ -18,6 +36,13 @@ import os
 from docxtpl import DocxTemplate, InlineImage
 from io import BytesIO
 import tempfile
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning,
+    module="docxcompose.properties",
+)
 
 import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
@@ -2729,27 +2754,21 @@ def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None) -> Im
 
 @st.cache_data(ttl=30)
 def load(study_id=None):
+    import json
     try:
-        conn = psycopg2.connect(
-            host=st.secrets["db_host"],
-            database=st.secrets["db_name"],
-            user=st.secrets["db_user"],
-            password=st.secrets["db_pass"],
-            port=st.secrets.get("db_port", 5432),
-            sslmode="require"
-        )
-
+        engine = _sa_engine()
         base_sql = "SELECT created_at, answers FROM public.responses"
         if study_id:
-            df = pd.read_sql(base_sql + " WHERE study_id = %s ORDER BY created_at",
-                             con=conn, params=(study_id,))
+            query = sa.text(base_sql + " WHERE study_id = :sid ORDER BY created_at")
+            with engine.begin() as conn:
+                df = pd.read_sql(query, con=conn, params={"sid": study_id})
         else:
-            df = pd.read_sql(base_sql + " ORDER BY created_at", con=conn)
-
-        conn.close()
+            query = sa.text(base_sql + " ORDER BY created_at")
+            with engine.begin() as conn:
+                df = pd.read_sql(query, con=conn)
+        engine.dispose()
 
         def parse_answers(x):
-            import json
             if isinstance(x, list):
                 return [int(v) for v in x] if x and isinstance(x[0], (int, str)) else x
             if isinstance(x, str):
@@ -2771,18 +2790,11 @@ def load(study_id=None):
 
 
 
+
 @st.cache_data(ttl=30)
 def fetch_studies_list():
-    conn = psycopg2.connect(
-        host=st.secrets["db_host"],
-        database=st.secrets["db_name"],
-        user=st.secrets["db_user"],
-        password=st.secrets["db_pass"],
-        port=st.secrets.get("db_port", 5432),
-        sslmode="require"
-    )
-    df = pd.read_sql(
-        """
+    engine = _sa_engine()
+    query = sa.text("""
         SELECT
             id,
             first_name_nom, first_name_gen, first_name_dat, first_name_acc, first_name_ins, first_name_loc, first_name_voc,
@@ -2791,11 +2803,12 @@ def fetch_studies_list():
         FROM public.studies
         WHERE COALESCE(is_active, true)
         ORDER BY created_at DESC
-        """,
-        con=conn
-    )
-    conn.close()
+    """)
+    with engine.begin() as conn:
+        df = pd.read_sql(query, con=conn)
+    engine.dispose()
     return df
+
 
 def archetype_scores(answers):
     if not isinstance(answers, list) or len(answers) < 48:
@@ -3861,7 +3874,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
                 st.plotly_chart(
                     fig,
-                    use_container_width=True,
+                    width="content", # wcześniej było: use_container_width=True,
                     config={"displaylogo": False},
                     key=f"radar-{study_id}",
                 )
