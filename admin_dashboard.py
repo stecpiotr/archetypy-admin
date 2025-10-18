@@ -2595,7 +2595,10 @@ GLOBAL_CSS = (css_ff or "") + """
 .jump-btn:hover{ background:#e6f3ff; }
 :target{ scroll-margin-top: 90px; }
 
-/* selectbox */
+/* selectbox – ciaśniej pod spodem */
+div[data-testid="stSelectbox"]{
+  margin-bottom: 4px !important;   /* ← tu ściskasz odstęp (np. 4–10 px) */
+}
 div[data-testid="stSelectbox"] > div{
   border:1.5px solid #1a93e3 !important;
   border-radius:10px !important;
@@ -3697,7 +3700,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             if supp_data:
                 supp_disp["name"] = disp_name(supp_avg or "")
 
-            col1, col2, col3 = st.columns([0.26, 0.36, 0.38], gap="small")
+            col1, col2, col3 = st.columns([0.25, 0.37, 0.38], gap="small")
 
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (
@@ -3728,10 +3731,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             with col1:
                 st.markdown(
-                    '<div class="ap-h2">Liczebność archetypów głównych, wspierających i pobocznych</div>',
+                    '<div class="ap-h2" style="margin-bottom:8px">Liczebność archetypów głównych, wspierających i pobocznych</div>',
                     unsafe_allow_html=True
                 )
-
                 # 1) procent „natężenia” jak w raporcie Word (średnie % 0..100 na podstawie odpowiedzi)
                 means_pct = mean_pct_by_archetype_from_df(data)  # {archetyp: %}
 
@@ -3743,65 +3745,117 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 )
 
                 # 3) budowa tabeli z nową kolumną „% natężenie archetypu”
+                # 1) nazwa kolumny z łamaniem w 2 linie
+                NAT_COL = "% natężenie<br/>archetypu"
+
                 archetype_table = pd.DataFrame({
                     "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in ordered_names],
-                    "Główny<br/>archetyp": [
-                        zero_to_dash(counts_main.get(normalize(n), 0)) for n in ordered_names
-                    ],
-                    "Wspierający<br/>archetyp": [
-                        zero_to_dash(counts_aux.get(normalize(n), 0)) for n in ordered_names
-                    ],
-                    "Poboczny<br/>archetyp": [
-                        zero_to_dash(counts_supp.get(normalize(n), 0)) for n in ordered_names
-                    ],
-                    "% natężenie archetypu": [f"{means_pct.get(n, 0.0):.1f}%" for n in ordered_names],
+                    "Główny<br/>archetyp": [zero_to_dash(counts_main.get(normalize(n), 0)) for n in
+                                            ordered_names],
+                    "Wspierający<br/>archetyp": [zero_to_dash(counts_aux.get(normalize(n), 0)) for n
+                                                 in ordered_names],
+                    "Poboczny<br/>archetyp": [zero_to_dash(counts_supp.get(normalize(n), 0)) for n
+                                              in ordered_names],
+                    NAT_COL: [f"{means_pct.get(n, 0.0):.1f}%" for n in ordered_names],
                 })
 
-                # 4) render HTML – BEZ indeksu, pozwól na <br/> w nagłówkach
-                html_table = archetype_table.to_html(index=False, escape=False, border=0)
+                # 2) sort po procencie (obsługa wartości typu "60.0%")
+                _pct_series = archetype_table[NAT_COL]
+                _pct_val = (
+                    _pct_series.astype(str)
+                    .str.replace("%", "", regex=False)
+                    .str.replace(",", ".", regex=False)
+                    .astype(float)
+                )
+                archetype_table = (
+                    archetype_table.assign(_pct_val=_pct_val)
+                    .sort_values("_pct_val", ascending=False)
+                    .drop(columns=["_pct_val"])
+                    .reset_index(drop=True)
+                )
+
+                # 3) HTML tabeli (pozwól na <br/> w nagłówkach)
                 html_table = (
-                    html_table
+                    archetype_table.to_html(index=False, escape=False, border=0)
                     .replace('class="dataframe"', 'class="ap-table"')
                     .replace('border="1"', 'border="0"')
                 )
 
-                # 5) CSS – szerokości dla 5 kolumn (1=Archetyp, 2..4=liczebności, 5=%)
-                st.markdown("""
+                # --- Sterowanie rozmiarami i wysokością wierszy (zmieniaj tu) ---
+                TABLE_HEAD_FS = 14  # px – nagłówki tabeli
+                TABLE_CELL_FS = 14.5  # px – komórki danych
+                ROW_PAD_Y = 13  # px – ↑↓ padding pionowy (większa wartość = wyższe wiersze)
+                ROW_LINE_HEIGHT = 1.22  # bez jednostki – wysokość linii tekstu
+                ROW_MIN_H = 40  # px – miękki minimalny cel wysokości wiersza
+
+                st.markdown(f"""
                 <style>
-                  .ap-table{
+                  .ap-table {{
                     table-layout: fixed;
                     width: 100%;
                     border-collapse: collapse;
                     font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
-                    font-size: 16px;
-                  }
-                  .ap-table th, .ap-table td{
-                    padding: 11px 11px;
+                    font-size: {TABLE_CELL_FS}px;               /* ← rozmiar czcionki w danych */
+                    margin-top: 3px;                            /* ← margones górny tabeli */
+                  }}
+
+                  /* Wysokość wierszy = padding + line-height. (min-height na td bywa ignorowany) */
+                  .ap-table th, .ap-table td {{
+                    padding: {ROW_PAD_Y}px 10px;               /* ← główna dźwignia wysokości */
                     border-bottom: 1px solid #eaeaea;
-                    text-align: center;
                     vertical-align: middle;
-                    white-space: nowrap;
-                    line-height: 1.15;
-                  }
-                  .ap-table th:nth-child(1), .ap-table td:nth-child(1){
-                    text-align: left !important;
-                    width: 34%;
-                  }
+                    line-height: {ROW_LINE_HEIGHT};
+                  }}
+                  /* Opcjonalny miękki cel: jeżeli chcesz twardo wymusić minimum, odkomentuj linię height */
+                  .ap-table tr {{
+                    min-height: {ROW_MIN_H}px;
+                    /* height: {ROW_MIN_H}px; */                /* UWAGA: ucina wielolinijkowe treści */
+                  }}
+
+                  /* Nagłówki */
+                  .ap-table th {{
+                    font-weight: 600;
+                    font-size: {TABLE_HEAD_FS}px;              /* ← rozmiar czcionki nagłówków */
+                    white-space: normal;                       /* <br/> działa jak trzeba */
+                    word-break: normal;
+                    hyphens: auto;
+                    text-align: center;
+                  }}
+
+                  /* Kolumny 2–4 wyśrodkowane (nagłówki i dane) */
                   .ap-table th:nth-child(2), .ap-table td:nth-child(2),
                   .ap-table th:nth-child(3), .ap-table td:nth-child(3),
-                  .ap-table th:nth-child(4), .ap-table td:nth-child(4){
-                    width: 15%;
-                  }
-                  .ap-table th:nth-child(5), .ap-table td:nth-child(5){
-                    width: 21%;
-                    font-weight: 700;
-                  }
+                  .ap-table th:nth-child(4), .ap-table td:nth-child(4) {{
+                    text-align: center !important;
+                  }}
+
+                  /* Kolumna 1 – do lewej + szerokość */
+                  .ap-table th:nth-child(1), .ap-table td:nth-child(1) {{
+                    text-align: left !important;
+                    width: 26%;
+                  }}
+
+                  /* Kolumny 2–4 – stałe szerokości */
+                  .ap-table th:nth-child(2), .ap-table td:nth-child(2),
+                  .ap-table th:nth-child(3), .ap-table td:nth-child(3),
+                  .ap-table th:nth-child(4), .ap-table td:nth-child(4) {{
+                    width: 16%;
+                  }}
+
+                  /* Kolumna 5 – do prawej */
+                  .ap-table th:nth-child(5), .ap-table td:nth-child(5) {{
+                    width: 18%;
+                    text-align: right !important;
+                    padding-right: 15px;
+                  }}
+
+                  /* Bez pogrubień w danych */
+                  .ap-table td {{ font-weight: 400 !important; }}
                 </style>
                 """, unsafe_allow_html=True)
 
-                # 6) wyświetlenie
+                # 5) render
                 st.markdown(html_table, unsafe_allow_html=True)
-
 
             with col2:
                 theta_labels = []

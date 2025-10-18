@@ -765,7 +765,7 @@ def stats_panel() -> None:
             rows = len(df)
             st.dataframe(
                 df,
-                width="stretch", # wcześniej było: use_container_width=True,
+                use_container_width=True,
                 height=max(rows * 36 + 15, 120),
                 hide_index=True
             )
