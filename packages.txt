@@ -29,3 +29,4 @@ libasound2t64
 libreoffice
 python3-uno
 chromium-browser
+google-chrome-stable
