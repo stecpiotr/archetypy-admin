@@ -3814,18 +3814,22 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                             r=mean_vals_ordered + [mean_vals_ordered[0]],
                             theta=archetype_names + [archetype_names[0]],
                             fill='toself',
-                            name='Średnia wszystkich',
+                            name='średnia wszystkich',
                             line=dict(color="royalblue", width=3),
-                            marker=dict(size=6)
+                            marker=dict(size=6),
+                            # 👇 własny tooltip: bez "r:" i "θ:", zaokrąglenie do 2 miejsc
+                            hovertemplate="<b>%{theta}</b><br>średnia: %{r:.2f}<extra></extra>",
                         ),
                         go.Scatterpolar(
                             r=highlight_r,
                             theta=archetype_names,
                             mode='markers',
-                            marker=dict(size=18, color=highlight_marker_color, opacity=0.95,
-                                        line=dict(color="black", width=2)),
+                            marker=dict(size=18, color=highlight_marker_color, opacity=0.90,
+                                        line=dict(color="black", width=3)),
                             name='Archetyp główny/wspierający/poboczny',
                             showlegend=False,
+                            # 👇 spójny tooltip z 2 miejscami po przecinku
+                            hovertemplate="<b>%{theta}</b><br>wartość: %{r:.2f}<extra></extra>",
                         )
                     ],
                     layout=go.Layout(
@@ -3852,6 +3856,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     showlegend=False,
                     width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
                 )
+                # 👇 większa czcionka w dymkach hover
+                fig.update_layout(hoverlabel=dict(font=dict(size=17)))
+
                 st.plotly_chart(
                     fig,
                     use_container_width=True,
