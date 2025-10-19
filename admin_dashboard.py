@@ -3953,11 +3953,11 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 fig.update_layout(hoverlabel=dict(font=dict(size=17)))
 
                 # węższe boczne „bufory” + środkowa kolumna z wykresem → centrowanie
-                padL, mid, padR = st.columns([0.12, 0.76, 0.12], gap="small")
+                padL, mid, padR = st.columns([0.05, 0.90, 0.05], gap="small")
                 with mid:
                     st.plotly_chart(
                         fig,
-                        width="content", # wcześniej było: use_container_width=True,
+                        use_container_width=True, #width="content",
                         config={"displaylogo": False},
                         key=f"radar-{study_id}",
                     )
