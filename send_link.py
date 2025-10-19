@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import List, Dict, Tuple, Optional, Callable
 import os
 import base64
+import json
 from datetime import datetime, timezone, timedelta
 import time  # ⬅️ do auto-odświeżania (sleep + rerun)
 
@@ -14,8 +15,12 @@ import re
 # Importy bezwzględne (plik leży obok app.py)
 from db_utils import get_supabase, fetch_studies
 from utils import make_token
-from db_sms import create_sms_record, mark_sms_sent, list_sms_for_study, DuplicateTokenError
+from db_sms import create_sms_record, mark_sms_sent, list_sms_for_study, DuplicateTokenError as DuplicateSmsTokenError
 from smsapi_client import send_sms  # send_sms(api_token, to_phone, text, sender=None)
+
+# [NOWE – e-mail]
+from db_email import create_email_record, mark_email_sent, list_email_for_study, DuplicateTokenError as DuplicateEmailTokenError
+from email_client import send_email
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -27,6 +32,34 @@ MOCKUP_TOP = 95
 MOCKUP_LEFT = 38
 MOCKUP_WIDTH = 229
 MOCKUP_HEIGHT = 407
+
+# [NOWE] MOCKUP MONITORA (PNG z białym „ekranem” w środku)
+EMAIL_MOCKUP_PATH = "assets/komputer.png"  # wgraj plik do ./assets
+EMAIL_TOP = 54        # dopasuj po otrzymaniu finalnego PNG
+EMAIL_LEFT = 72
+EMAIL_WIDTH = 409
+EMAIL_HEIGHT = 255
+
+# Plik z domyślnymi ustawieniami mockupów (lokalnie w repo)
+MOCKUP_PREFS_FILE = os.path.join("assets", "mockup_prefs.json")
+
+def _load_mockup_prefs() -> dict:
+    """Wczytaj słownik ustawień mockupów z JSON (jeśli jest)."""
+    try:
+        if os.path.exists(MOCKUP_PREFS_FILE):
+            with open(MOCKUP_PREFS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f) or {}
+    except Exception:
+        pass
+    return {}
+
+def _save_mockup_prefs(prefs: dict) -> None:
+    """Zapisz słownik ustawień mockupów do JSON."""
+    try:
+        with open(MOCKUP_PREFS_FILE, "w", encoding="utf-8") as f:
+            json.dump(prefs, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.warning(f"Nie udało się zapisać ustawień mockupu: {e}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -55,6 +88,33 @@ def _sms_env() -> Tuple[str, Optional[str], str]:
         raise RuntimeError("Brak SURVEY_BASE_URL w st.secrets.")
     return token, sender, base_url
 
+# [NOWE] Parsowanie i walidacja e-mail
+_EMAIL_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.I)
+
+def _normalize_emails(s: str) -> List[str]:
+    if not s:
+        return []
+    for ch in ("\n", ";", " "):
+        s = s.replace(ch, ",")
+    out = []
+    for x in [x.strip() for x in s.split(",") if x.strip()]:
+        if _EMAIL_RE.match(x):
+            out.append(x)
+    return out
+
+def _email_env():
+    host = st.secrets.get("SMTP_HOST", "")
+    port = int(st.secrets.get("SMTP_PORT", 0) or 0)
+    user = st.secrets.get("SMTP_USER", "")
+    pwd  = st.secrets.get("SMTP_PASS", "")
+    secure = (st.secrets.get("SMTP_SECURE", "ssl") or "ssl").lower()
+    from_email = st.secrets.get("FROM_EMAIL", "")
+    from_name  = st.secrets.get("FROM_NAME", "")
+    base_url = (st.secrets.get("SURVEY_BASE_URL", "") or "").rstrip("/")
+    if not all([host, port, user, pwd, from_email, base_url]):
+        raise RuntimeError("Brak ustawień SMTP albo SURVEY_BASE_URL w st.secrets.")
+    return host, port, user, pwd, secure, from_email, from_name, base_url
+
 
 _PL_MAP = str.maketrans({
     "ą": "a", "ć": "c", "ę": "e", "ł": "l", "ń": "n", "ó": "o", "ś": "s", "ż": "z", "ź": "z",
@@ -65,6 +125,40 @@ _PL_MAP = str.maketrans({
 def _strip_pl_diacritics(text: str) -> str:
     """Zamień polskie znaki diakrytyczne na ASCII."""
     return (text or "").translate(_PL_MAP)
+
+def _ensure_name_placeholders(subj: str) -> str:
+    """
+    Jeśli w temacie nie ma {fn_gen}/{ln_gen}, doklej ' dla {fn_gen} {ln_gen}'.
+    Dzięki temu imię i nazwisko będą zawsze w wysyłanym temacie,
+    nawet jeśli ktoś ręcznie usunie placeholdery w polu 'Temat (e-mail)'.
+    """
+    subj = (subj or "").strip()
+    if "{fn_gen}" in subj or "{ln_gen}" in subj:
+        return subj
+    # brak placeholderów -> doklej
+    return f"{subj} dla {{fn_gen}} {{ln_gen}}"
+
+def _render_subject(user_subject: Optional[str], fn_gen: str, ln_gen: str) -> str:
+    """
+    Zwraca finalny temat e-maila:
+    - jeśli zawiera placeholdery → podstaw,
+    - jeśli już zawiera imię+nazwisko → zostaw jak jest,
+    - w przeciwnym razie doklej 'dla <fn_gen> <ln_gen>'.
+    """
+    s = (user_subject or "").strip()
+
+    if "{fn_gen}" in s or "{ln_gen}" in s:
+        try:
+            return s.format(fn_gen=fn_gen, ln_gen=ln_gen)
+        except Exception:
+            pass  # na wszelki wypadek, jeśli format się wysypie
+
+    full = f"{fn_gen} {ln_gen}".strip()
+    if full and full in s:
+        return s
+
+    base = s or "Prośba o wypełnienie ankiety"
+    return f"{base} dla {fn_gen} {ln_gen}".strip()
 
 
 def _fmt_dt(val: Optional[str]) -> str:
@@ -123,18 +217,17 @@ def _build_link(base_url: str, slug: str, token: str) -> str:
     return f"{base}/{s}?t={token}" if s else f"{base}/?t={token}"
 
 
-def _logs_dataframe(sb, study_id: str, cache_bust: Optional[int] = None) -> pd.DataFrame:
+def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = None) -> pd.DataFrame:
     """
-    Buduje ramkę pod tabelę statusów.
-    cache_bust jest tu tylko po to, by podpis funkcji pasował do wywołań; nie używamy go.
+    mode: 'sms' | 'email'
     """
-    rows = list_sms_for_study(sb, study_id) or []
+    rows = (list_sms_for_study if mode == "sms" else list_email_for_study)(sb, study_id) or []
     out: List[Dict[str, str]] = []
     for r in rows:
         out.append(
             {
                 "Data": _fmt_dt(r.get("created_at") or r.get("created_at_pl")),
-                "Telefon": r.get("phone", ""),
+                ("Telefon" if mode == "sms" else "E-mail"): r.get("phone", "") if mode == "sms" else r.get("email", ""),
                 "Status": _status_icon(r),
                 "Wysłano": "✓" if (r.get("status") or "").lower() in ("sent", "delivered") else "",
                 "Kliknięto": _fmt_dt(r.get("clicked_at")),
@@ -143,27 +236,17 @@ def _logs_dataframe(sb, study_id: str, cache_bust: Optional[int] = None) -> pd.D
                 "Błąd": "✖" if (r.get("status") or "").lower() == "failed" else "",
             }
         )
-    return pd.DataFrame(
-        out,
-        columns=[
-            "Data",
-            "Telefon",
-            "Status",
-            "Wysłano",
-            "Kliknięto",
-            "Rozpoczęto",
-            "Zakończono",
-            "Błąd",
-        ],
-    )
+    cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Wysłano", "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
+    return pd.DataFrame(out, columns=cols)
 
 
-def _mockup_css_bg() -> Optional[str]:
+
+def _mockup_css_bg(path: str) -> Optional[str]:
     """Zwraca data-URL PNG mockupu jeśli plik istnieje, inaczej None."""
-    if not os.path.exists(MOCKUP_PATH):
+    if not os.path.exists(path):
         return None
     try:
-        with open(MOCKUP_PATH, "rb") as f:
+        with open(path, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("ascii")
         return f"data:image/png;base64,{b64}"
     except Exception:
@@ -192,6 +275,21 @@ def render(back_btn: Callable[[], None]) -> None:
 
     # przycisk „Cofnij”
     back_btn()
+
+    # — jednorazowe wczytanie domyślnych ustawień mockupu e-mail z pliku —
+    if not st.session_state.get("_e_prefs_loaded", False):
+        _prefs = _load_mockup_prefs()
+        _e = _prefs.get("email", {})
+        # domyślne fallbacki z bieżących stałych
+        st.session_state.setdefault("_e_wrap_w", int(_e.get("wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60)))
+        st.session_state.setdefault("_e_wrap_h", int(_e.get("wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100)))
+        st.session_state.setdefault("_e_top",     int(_e.get("top", EMAIL_TOP)))
+        st.session_state.setdefault("_e_left",    int(_e.get("left", EMAIL_LEFT)))
+        st.session_state.setdefault("_e_w",       int(_e.get("w", EMAIL_WIDTH)))
+        st.session_state.setdefault("_e_h",       int(_e.get("h", EMAIL_HEIGHT)))
+        st.session_state.setdefault("_e_pad",     int(_e.get("pad", 18)))
+        st.session_state.setdefault("_e_pad_top", int(_e.get("pad_top", 18)))
+        st.session_state["_e_prefs_loaded"] = True
 
     # ── Style etykiet + przycisków ────────────────────────────────────────────
     st.markdown(
@@ -314,11 +412,34 @@ def render(back_btn: Callable[[], None]) -> None:
     placeholder = "48500123456, 48600111222" if method == "SMS" else "jan@firma.pl, ola@urzad.gov.pl"
     recipients = st.text_area("Odbiorcy", placeholder=placeholder, height=100, label_visibility="collapsed")
 
+
     # ── Treść (podgląd) ───────────────────────────────────────────────────────
     ln = study.get("last_name_nom") or study.get("last_name") or ""
     fn = study.get("first_name_nom") or study.get("first_name") or ""
     ln_gen = study.get("last_name_gen") or ln
     fn_gen = study.get("first_name_gen") or fn
+
+    # Temat (e-mail) – automatyczne podstawienie {fn_gen}/{ln_gen} i „doklejka” jeśli brak
+    if method == "E-mail":
+        base_tpl = st.secrets.get("EMAIL_SUBJECT", "Prośba o wypełnienie ankiety")
+        subject_tpl = _ensure_name_placeholders(base_tpl)
+        auto_subject = subject_tpl.format(fn_gen=fn_gen, ln_gen=ln_gen)
+
+        # auto-reset jak przy treści SMS (tylko gdy user nie edytował ręcznie)
+        if "email_subject" not in st.session_state:
+            st.session_state.email_subject = auto_subject
+            st.session_state._auto_email_subject = auto_subject
+            st.session_state._email_last_person_label = label
+        else:
+            if label != st.session_state.get("_email_last_person_label"):
+                if st.session_state.email_subject == st.session_state.get("_auto_email_subject"):
+                    st.session_state.email_subject = auto_subject
+                st.session_state._auto_email_subject = auto_subject
+                st.session_state._email_last_person_label = label
+            else:
+                st.session_state._auto_email_subject = auto_subject
+
+        st.text_input("Temat (e-mail)", key="email_subject", label_visibility="visible")
 
     # Placeholder linku do podglądu
     base_url = (st.secrets.get("SURVEY_BASE_URL") or "").rstrip("/")
@@ -364,17 +485,18 @@ def render(back_btn: Callable[[], None]) -> None:
         st.markdown('<div class="field-label">Treść wiadomości</div>', unsafe_allow_html=True)
         st.text_area("Treść wiadomości", key="sms_body", height=180, label_visibility="collapsed")
 
-        # licznik
-        ascii_msg = _strip_pl_diacritics(st.session_state.sms_body)
-        seg_len = 160
-        msg_len = len(ascii_msg)
-        segments = (msg_len + seg_len - 1) // seg_len
-        remain = seg_len - (msg_len % seg_len or seg_len)
-        coding = "GSM-7" if all(ord(c) < 128 for c in ascii_msg) else "Unicode"
-        st.markdown(
-            f'<div class="sms-counter">Długość: {msg_len} znaków • Segmenty: {segments} • Pozostało w bieżącym: {remain} • Kodowanie: {coding}</div>',
-            unsafe_allow_html=True,
-        )
+        # licznik tylko dla SMS; e-mail nie pokazuje licznika i zachowuje polskie znaki
+        if method == "SMS":
+            ascii_msg = _strip_pl_diacritics(st.session_state.sms_body)
+            seg_len = 160
+            msg_len = len(ascii_msg)
+            segments = (msg_len + seg_len - 1) // seg_len
+            remain = seg_len - (msg_len % seg_len or seg_len)
+            coding = "GSM-7" if all(ord(c) < 128 for c in ascii_msg) else "Unicode"
+            st.markdown(
+                f'<div class="sms-counter">Długość: {msg_len} znaków • Segmenty: {segments} • Pozostało w bieżącym: {remain} • Kodowanie: {coding}</div>',
+                unsafe_allow_html=True,
+            )
 
         # przyciski – „Przywróć” wyżej, „Wyślij” dużo niżej
         st.markdown('<div class="btn-stack">', unsafe_allow_html=True)
@@ -390,216 +512,382 @@ def render(back_btn: Callable[[], None]) -> None:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Podgląd telefonu (marginesy + ŁAMANIE: całe wyrazy, linki łamane gdy muszą)
+    # Podgląd po prawej: telefon (SMS) albo monitor (e-mail)
     with cols[1]:
-        ascii_msg = _strip_pl_diacritics(st.session_state.sms_body)
-        data_url = _mockup_css_bg()
-        if data_url:
-            st.markdown(
-                f"""
-                <div class="mock-wrap">
-                  <div class="mock-bg"></div>
-                  <div class="mock-screen v2">{ascii_msg.replace("\n","<br/>")}</div>
-                </div>
-                <style>
-                  .mock-wrap {{
-                    position:relative; width:{MOCKUP_LEFT + MOCKUP_WIDTH + 40}px;
-                    height:{MOCKUP_TOP + MOCKUP_HEIGHT + 80}px;  /* mniejszy zapas → Statusy wyżej */
-                  }}
-                  .mock-bg {{
-                    position:absolute; inset:0;
-                    background-image:url('{data_url}');
-                    background-size:contain; background-repeat:no-repeat; background-position:center top;
-                  }}
-                  .mock-screen.v2 {{
-                    position:absolute;
-                    top:{MOCKUP_TOP}px; left:{MOCKUP_LEFT}px;
-                    width:{MOCKUP_WIDTH}px; height:{MOCKUP_HEIGHT}px;
-                    background:transparent; border:none;
-                    padding:50px 25px; overflow:auto;     /* marginesy wewnętrzne: góra/dół 40, boki 22 */
-                    font:13px/1.4 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111;
+        msg_preview = _strip_pl_diacritics(st.session_state.sms_body) if method == "SMS" else st.session_state.sms_body
 
-                    /* ŁAMANIE TEKSTU:
-                       - preferuj przenoszenie CAŁYCH WYRAZÓW
-                       - bardzo długie ciągi (np. URL) mogą się złamać, aby nie wyjść poza ekran
-                    */
-                    white-space:pre-wrap;
-                    overflow-wrap:break-word;  /* przenosi długie niełamalne ciągi, ale preferuje całe wyrazy */
-                    word-break:normal;         /* nie rozrywa zwykłych słów */
-                    word-break:break-word;     /* fallback dla WebKit/Safari */
-                    hyphens:auto;
-                    line-break:auto;
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f"""
-                <div class="phone-wrap">
-                  <div class="phone">
-                    <div class="speaker"></div>
-                    <div class="screen" style="white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; word-break:break-word; hyphens:auto; line-break:auto; font:12.5px/1.4 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; padding:40px 22px;">
-                      {ascii_msg.replace("\n","<br/>")}
+        if method == "SMS":
+            data_url = _mockup_css_bg(MOCKUP_PATH)
+
+            with st.expander("Dopasuj mockup SMS (ręcznie)", expanded=False):
+                _sms_top = st.number_input("Top (px)",
+                                           value=st.session_state.get("_sms_top", MOCKUP_TOP),
+                                           step=1)
+                _sms_left = st.number_input("Left (px)",
+                                            value=st.session_state.get("_sms_left", MOCKUP_LEFT),
+                                            step=1)
+                _sms_w = st.number_input("Szerokość (px)",
+                                         value=st.session_state.get("_sms_w", MOCKUP_WIDTH), step=1)
+                _sms_h = st.number_input("Wysokość (px)",
+                                         value=st.session_state.get("_sms_h", MOCKUP_HEIGHT),
+                                         step=1)
+                _sms_pad = st.number_input("Padding wewnątrz (px)",
+                                           value=st.session_state.get("_sms_pad", 50), step=1)
+                st.session_state.update(_sms_top=_sms_top, _sms_left=_sms_left, _sms_w=_sms_w,
+                                        _sms_h=_sms_h, _sms_pad=_sms_pad)
+
+            if data_url:
+                st.markdown(
+                    f"""
+                    <div class="mock-wrap">
+                      <div class="mock-bg"></div>
+                      <div class="mock-screen v2">{msg_preview.replace("\n", "<br/>")}</div>
                     </div>
-                    <div class="homebtn"></div>
-                  </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                    <style>
+                      .mock-wrap {{
+                        position:relative; width:{st.session_state._sms_left + st.session_state._sms_w + 40}px;
+                        height:{st.session_state._sms_top + st.session_state._sms_h + 80}px;
+                      }}
+                      .mock-bg {{
+                        position:absolute; inset:0;
+                        background-image:url('{data_url}');
+                        background-size:contain; background-repeat:no-repeat; background-position:center top;
+                      }}
+                      .mock-screen.v2 {{
+                        position:absolute;
+                        top:{st.session_state._sms_top}px; left:{st.session_state._sms_left}px;
+                        width:{st.session_state._sms_w}px; height:{st.session_state._sms_h}px;
+                        background:transparent; border:none;
+                        padding:{st.session_state._sms_pad}px 25px; overflow:auto;
+                        font:13px/1.4 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111;
+                        white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; word-break:break-word; hyphens:auto; line-break:auto;
+                      }}
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"""<div style="border:1px solid #e5e7eb;border-radius:8px;padding:18px;font:13px/1.5 system-ui;">
+                           {msg_preview.replace("\n", "<br/>")}
+                        </div>""",
+                    unsafe_allow_html=True,
+                )
+
+        else:
+            # E-MAIL – monitor
+            data_url = _mockup_css_bg(EMAIL_MOCKUP_PATH)
+
+            with st.expander("Dopasuj mockup E-mail (ręcznie)", expanded=False):
+                # rozmiar całej grafiki (kontenera)
+                _e_wrap_w = st.number_input(
+                    "Szerokość mockupu (px)",
+                    value=int(st.session_state.get("_e_wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60)),
+                    step=10,
+                )
+                _e_wrap_h = st.number_input(
+                    "Wysokość mockupu (px)",
+                    value=int(st.session_state.get("_e_wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100)),
+                    step=10,
+                )
+
+                # pozycja i „ekran”
+                _e_top = st.number_input("Top (px)",  value=int(st.session_state.get("_e_top", EMAIL_TOP)),   step=1)
+                _e_left = st.number_input("Left (px)", value=int(st.session_state.get("_e_left", EMAIL_LEFT)), step=1)
+                _e_w = st.number_input("Szerokość ekranu (px)",  value=int(st.session_state.get("_e_w", EMAIL_WIDTH)),   step=1)
+                _e_h = st.number_input("Wysokość ekranu (px)",   value=int(st.session_state.get("_e_h", EMAIL_HEIGHT)),  step=1)
+
+                # paddingi
+                _e_pad_top = st.number_input("Padding góra (px)",
+                                             value=int(st.session_state.get("_e_pad_top", 18)), step=1)
+                _e_pad = st.number_input("Padding wewnątrz (lewy/prawy/dolny) (px)",
+                                         value=int(st.session_state.get("_e_pad", 18)), step=1)
+
+                st.session_state.update(
+                    _e_wrap_w=_e_wrap_w, _e_wrap_h=_e_wrap_h,
+                    _e_top=_e_top, _e_left=_e_left, _e_w=_e_w, _e_h=_e_h,
+                    _e_pad=_e_pad, _e_pad_top=_e_pad_top
+                )
+
+                # Przyciski zapisu/odczytu domyślnych ustawień (trwałe między odświeżeniami)
+                c1, c2, c3 = st.columns([3,3,1])
+                if c1.button("💾 Zapisz jako domyślne", use_container_width=True):
+                    prefs = _load_mockup_prefs()
+                    prefs.setdefault("email", {})
+                    prefs["email"] = {
+                        "wrap_w": int(st.session_state._e_wrap_w),
+                        "wrap_h": int(st.session_state._e_wrap_h),
+                        "top":     int(st.session_state._e_top),
+                        "left":    int(st.session_state._e_left),
+                        "w":       int(st.session_state._e_w),
+                        "h":       int(st.session_state._e_h),
+                        "pad":     int(st.session_state._e_pad),
+                        "pad_top": int(st.session_state._e_pad_top),
+                    }
+                    _save_mockup_prefs(prefs)
+                    st.success("Zapisano jako domyślne.")
+
+                if c2.button("↩ Przywróć zapisane", use_container_width=True):
+                    prefs = _load_mockup_prefs()
+                    e = prefs.get("email", {})
+                    if e:
+                        st.session_state._e_wrap_w = int(e.get("wrap_w", st.session_state._e_wrap_w))
+                        st.session_state._e_wrap_h = int(e.get("wrap_h", st.session_state._e_wrap_h))
+                        st.session_state._e_top     = int(e.get("top",     st.session_state._e_top))
+                        st.session_state._e_left    = int(e.get("left",    st.session_state._e_left))
+                        st.session_state._e_w       = int(e.get("w",       st.session_state._e_w))
+                        st.session_state._e_h       = int(e.get("h",       st.session_state._e_h))
+                        st.session_state._e_pad     = int(e.get("pad",     st.session_state._e_pad))
+                        st.session_state._e_pad_top = int(e.get("pad_top", st.session_state._e_pad_top))
+                        st.experimental_rerun()
+                    else:
+                        st.info("Brak zapisanych ustawień – najpierw użyj „Zapisz jako domyślne”.")
+
+
+            # temat do podglądu – bez duplikowania imienia/nazwiska
+            _subject_preview = _render_subject(st.session_state.get("email_subject"), fn_gen, ln_gen)
+
+
+            if data_url:
+                st.markdown(
+                    f"""
+                    <div class="mock-wrap">
+                      <div class="mock-bg-email"></div>
+                      <div class="mock-screen-email">
+                        <div style="opacity:.7;margin-bottom:8px">{_subject_preview}</div>
+                        {msg_preview.replace("\n", "<br/>")}
+                      </div>
+                    </div>
+                    <style>
+                      .mock-wrap {{
+                        position:relative;
+                        width:{st.session_state._e_wrap_w}px;
+                        height:{st.session_state._e_wrap_h}px;
+                      }}
+                      .mock-bg-email {{
+                        position:absolute; inset:0;
+                        background-image:url('{data_url}');
+                        background-size:contain; background-repeat:no-repeat; background-position:center top;
+                      }}
+                      .mock-screen-email {{
+                        position:absolute;
+                        top:{st.session_state._e_top}px; left:{st.session_state._e_left}px;
+                        width:{st.session_state._e_w}px; height:{st.session_state._e_h}px;
+                        background:#fff; border:1px solid #e5e7eb; border-radius:2px;
+                        padding:{st.session_state._e_pad_top}px {st.session_state._e_pad}px {st.session_state._e_pad}px {st.session_state._e_pad}px; overflow:auto;
+                        font:13.5px/1.5 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111;
+                        white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; word-break:break-word; hyphens:auto; line-break:auto;
+                      }}
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                # (fallback)
+                _subject_preview = _render_subject(st.session_state.get("email_subject"), fn_gen, ln_gen)
+
+                st.markdown(
+                    f"""<div style="border:1px solid #e5e7eb;border-radius:8px;padding:18px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/0.04);font:13.5px/1.5 system-ui;">
+                        <div style="opacity:.7;margin-bottom:8px">{_subject_preview}</div>
+                        {msg_preview.replace("\n", "<br/>")}
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
 
     # ── Wysyłka ───────────────────────────────────────────────────────────────
     if 'send_btn' in locals() and send_btn:
-        if method != "SMS":
-            st.warning("Obsługa e-mail będzie dodana osobno. Aktualnie wysyłamy tylko SMS.")
-            return
-
-        try:
-            api_token, sender, base_url = _sms_env()
-        except RuntimeError as e:
-            st.error(str(e))
-            return
-
-        phones = _normalize_recipients(recipients)
-        if not phones:
-            st.warning("Podaj co najmniej jeden numer telefonu.")
-            return
-
         body = st.session_state.sms_body
 
-        sent_ok = 0
-        for ph in phones:
-            # 1) token + link docelowy
-            token = make_token(5)
-            final_link = _build_link(base_url, slug, token)
+        if method == "SMS":
+            try:
+                api_token, sender, base_url = _sms_env()
+            except RuntimeError as e:
+                st.error(str(e));
+                st.stop()
 
-            # 2) zbuduj treść z podmianą podglądu lub starych linków
-            preview = st.session_state.get("sms_link_preview", link_preview)
-            msg = body
-            if preview and preview in msg:
-                msg = msg.replace(preview, final_link)
-            else:
-                if base_url and slug:
-                    pattern = re.compile(
-                        rf"{re.escape(base_url.rstrip('/'))}/{re.escape(slug.lstrip('/'))}\?t=[A-Za-z0-9]+")
-                    msg = pattern.sub(final_link, msg)
-                if final_link not in msg:
-                    msg = (msg.rstrip() + "\n" + final_link)
+            phones = _normalize_recipients(recipients)
+            if not phones:
+                st.warning("Podaj co najmniej jeden numer telefonu.");
+                st.stop()
 
-            # 3) zapis do DB z obsługą kolizji tokenu (retry do 5 razy)
-            for _ in range(5):
-                try:
-                    msg_ascii = _strip_pl_diacritics(msg)
-                    rec = create_sms_record(
-                        sb,
-                        study_id=study["id"],
-                        phone=ph,
-                        text=msg_ascii,
-                        token=token,
-                    )
-                    break  # OK
-                except DuplicateTokenError:
-                    # wygeneruj nowy token i link; podmień w treści i ponów
-                    new_token = make_token(5)
-                    new_link = _build_link(base_url, slug, new_token)
-                    msg = msg.replace(final_link, new_link)
-                    token, final_link = new_token, new_link
-            else:
-                st.error(f"Nie udało się wygenerować unikalnego linku dla {ph}.")
-                continue
+            sent_ok = 0
+            for ph in phones:
+                token = make_token(5)
+                final_link = _build_link(base_url, slug, token)
 
-            # 4) wysyłka do SMS API
-            ok, provider_id, err = send_sms(
-                api_token=api_token,
-                to_phone=ph,
-                text=_strip_pl_diacritics(msg),
-                sender=sender,
+                preview = st.session_state.get("sms_link_preview", link_preview)
+                msg = body
+                if preview and preview in msg:
+                    msg = msg.replace(preview, final_link)
+                else:
+                    if base_url and slug:
+                        pattern = re.compile(
+                            rf"{re.escape(base_url.rstrip('/'))}/{re.escape(slug.lstrip('/'))}\?t=[A-Za-z0-9]+")
+                        msg = pattern.sub(final_link, msg)
+                    if final_link not in msg:
+                        msg = (msg.rstrip() + "\n" + final_link)
+
+                # zapis do DB
+                for _ in range(5):
+                    try:
+                        rec = create_sms_record(sb, study_id=study["id"], phone=ph,
+                                                text=_strip_pl_diacritics(msg), token=token)
+                        break
+                    except DuplicateSmsTokenError:
+                        new_token = make_token(5)
+                        new_link = _build_link(base_url, slug, new_token)
+                        msg = msg.replace(final_link, new_link)
+                        token, final_link = new_token, new_link
+                else:
+                    st.error(f"Nie udało się wygenerować unikalnego linku dla {ph}.");
+                    continue
+
+                ok, provider_id, err = send_sms(api_token=api_token, to_phone=ph,
+                                                text=_strip_pl_diacritics(msg), sender=sender)
+                if ok:
+                    mark_sms_sent(sb, sms_id=rec["id"], provider_message_id=provider_id or "");
+                    sent_ok += 1
+                else:
+                    st.error(f"Nie wysłano do {ph}: {err or 'unknown error'}")
+            st.success(f"Wysłano {sent_ok} / {len(phones)}.")
+
+        else:  # E-MAIL
+            try:
+                host, port, user, pwd, secure, from_email, from_name, base_url = _email_env()
+            except RuntimeError as e:
+                st.error(str(e));
+                st.stop()
+
+            emails = _normalize_emails(recipients)
+            if not emails:
+                st.warning("Podaj poprawne adresy e-mail (oddzielone przecinkami).");
+                st.stop()
+
+            # pokaż ewentualnie niepoprawne adresy (dla jasności)
+            raw_parts = [x.strip() for x in re.split(r"[,\n; ]+", recipients) if x.strip()]
+            invalid = [x for x in raw_parts if not _EMAIL_RE.match(x)]
+            if invalid:
+                st.error(f"Niepoprawne adresy: {', '.join(invalid)}");
+                st.stop()
+
+            # Finalny temat – bez podwajania, z automatycznym dopięciem imienia/nazwiska gdy brak
+            subject = _render_subject(
+                st.session_state.get("email_subject") or st.secrets.get("EMAIL_SUBJECT", "Prośba o wypełnienie ankiety"),
+                fn_gen, ln_gen
             )
 
-            if ok:
-                mark_sms_sent(sb, sms_id=rec["id"], provider_message_id=provider_id or "")
-                sent_ok += 1
-            else:
-                st.error(f"Nie wysłano do {ph}: {err or 'unknown error'}")
+            sent_ok = 0
+            for em in emails:
+                token = make_token(5)
+                final_link = _build_link(base_url, slug, token)
 
-        st.success(f"Wysłano {sent_ok} / {len(phones)}.")
+                preview = st.session_state.get("sms_link_preview", link_preview)
+                msg = body
+                if preview and preview in msg:
+                    msg = msg.replace(preview, final_link)
+                else:
+                    if base_url and slug:
+                        pattern = re.compile(
+                            rf"{re.escape(base_url.rstrip('/'))}/{re.escape(slug.lstrip('/'))}\?t=[A-Za-z0-9]+")
+                        msg = pattern.sub(final_link, msg)
+                    if final_link not in msg:
+                        msg = (msg.rstrip() + "\n" + final_link)
+
+                # zapis do DB (e-mail)
+                for _ in range(5):
+                    try:
+                        rec = create_email_record(sb, study_id=study["id"], email=em,
+                                                  subject=subject, text=msg, token=token)
+                        break
+                    except DuplicateEmailTokenError:
+                        new_token = make_token(5)
+                        new_link = _build_link(base_url, slug, new_token)
+                        msg = msg.replace(final_link, new_link)
+                        token, final_link = new_token, new_link
+                else:
+                    st.error(f"Nie udało się wygenerować unikalnego linku dla {em}.");
+                    continue
+
+                ok, message_id, err = send_email(
+                    host=host, port=port, username=user, password=pwd, secure=secure,
+                    from_email=from_email, from_name=from_name,
+                    to_email=em, subject=subject, text=msg
+                )
+                if ok:
+                    mark_email_sent(sb, email_id=rec["id"], provider_message_id=message_id or "")
+                    sent_ok += 1
+                else:
+                    st.error(f"Nie wysłano do {em}: {err or 'unknown error'}")
+            st.success(f"Wysłano {sent_ok} / {len(emails)}.")
 
     # ── Statusy w tej samej sekcji ────────────────────────────────────────────
     st.markdown('<hr class="hr-thin status-top-tight">', unsafe_allow_html=True)
+
+    label_status = "Statusy SMS" if method == "SMS" else "Statusy e-mail"
     st.markdown(
-        '<div class="form-label-strong" style="font-size:18px;margin-bottom:16px;">Statusy SMS</div>',
+        f'<div class="form-label-strong" style="font-size:18px;margin-bottom:16px;">{label_status}</div>',
         unsafe_allow_html=True
     )
 
     # 🔄 Ręczne + auto odświeżanie
     col1, col2 = st.columns([1, 5])
     with col1:
-        if st.button("⟳ Odśwież statusy", key="refresh_sms"):
-            st.session_state["_sms_tick"] = st.session_state.get("_sms_tick", 0) + 1
+        if st.button("⟳ Odśwież statusy",
+                     key=("refresh_sms" if method == "SMS" else "refresh_email")):
+            st.session_state["_status_tick"] = st.session_state.get("_status_tick", 0) + 1
             st.rerun()
     with col2:
-        auto_refresh = st.checkbox(
-            "Auto-odśwież co 15 sekund",
-            value=st.session_state.get("auto_refresh_sms", False),
-            key="auto_refresh_sms",
-        )
+        auto_refresh_key = "auto_refresh_sms" if method == "SMS" else "auto_refresh_email"
+        auto_refresh = st.checkbox("Auto-odśwież co 15 sekund",
+                                   value=st.session_state.get(auto_refresh_key, False),
+                                   key=auto_refresh_key)
 
-    # --- pobranie danych (bez cache_bust; widok sam jest „świeży”) ---
-    df_logs = _logs_dataframe(sb, study_id=study["id"])
+    # Pobierz logi
+    mode = "sms" if method == "SMS" else "email"
+    df_logs = _logs_dataframe(sb, study_id=study["id"], mode=mode)
 
-    # stały zestaw kolumn + nazwy
+    # Wymuś kolumny i kolejność
     from streamlit import column_config as cc
-    wanted_cols = ["Data", "Telefon", "Status", "Wysłano", "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
+    wanted_cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Wysłano",
+                   "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
     for c in wanted_cols:
         if c not in df_logs.columns:
             df_logs[c] = ""
     df_logs = df_logs[wanted_cols]
 
-    # poprawiona kolejność ikon
+    # ikony wg surowych danych
+    raw_rows = (list_sms_for_study if mode == "sms" else list_email_for_study)(sb,
+                                                                               study["id"]) or []
+
     def _status_icon_fixed(row: Dict) -> str:
         status = (row.get("status") or "").lower()
-        if status == "failed":
-            return "✖"
-        if row.get("completed_at"):
-            return "✅"
-        if row.get("started_at"):
-            return "🏁"
-        if row.get("clicked_at"):
-            return "🔗"
-        if status == "delivered":
-            return "📬"
-        if status == "sent":
-            return "📤"
-        if status == "queued":
-            return "⏳"
+        if status == "failed": return "✖"
+        if row.get("completed_at"): return "✅"
+        if row.get("started_at"): return "🏁"
+        if row.get("clicked_at"): return "🔗"
+        if status == "delivered": return "📬"
+        if status == "sent": return "📤"
+        if status == "queued": return "⏳"
         return "•"
 
-    raw_rows = list_sms_for_study(sb, study["id"]) or []
     icons = [_status_icon_fixed(r) for r in raw_rows]
     if len(icons) == len(df_logs):
         df_logs["Status"] = icons
 
-    # === WĄSKA, WYŚRODKOWANA TABELA ===
+    # wąska tabela
     st.markdown(
         """
-        <style>
-          .narrow-table {
-            max-width: 920px;
-            margin: 0 auto;
-          }
-        </style>
+        <style>.narrow-table { max-width: 920px; margin: 0 auto; }</style>
         """,
         unsafe_allow_html=True,
     )
     st.markdown('<div class="narrow-table">', unsafe_allow_html=True)
-
     st.dataframe(
-        df_logs,
-        hide_index=True,  # nie używamy use_container_width
+        df_logs, hide_index=True,
         column_config={
             "Data": cc.Column(width="medium"),
-            "Telefon": cc.Column(width="small"),
+            ("Telefon" if mode == "sms" else "E-mail"): cc.Column(width="small"),
             "Status": cc.Column(width="small"),
             "Wysłano": cc.Column(width="small"),
             "Kliknięto": cc.Column(width="medium"),
@@ -610,22 +898,32 @@ def render(back_btn: Callable[[], None]) -> None:
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Legenda + odstępy
-    st.markdown("""
-    <div style="margin-top:18px"></div>
-    <div style="font-size:14px; line-height:1.6;">
-      <b>Legenda statusów:</b><br>
-      📤 – SMS wysłany<br>
-      📬 – SMS doręczony (jeśli provider zwróci potwierdzenie)<br>
-      🔗 – Odbiorca kliknął w link<br>
-      🏁 – Ankieta rozpoczęta<br>
-      ✅ – Ankieta zakończona<br>
-      ✖ – Błąd wysyłki<br>
-      ⏳ – Oczekuje w kolejce<br>
-      • – Inny / nieznany status
-    </div>
-    <div style="margin-bottom:60px"></div>
-    """, unsafe_allow_html=True)
+    # Legenda
+    if mode == "sms":
+        legenda = """
+          📤 – SMS wysłany<br>
+          📬 – SMS doręczony (jeśli provider zwróci potwierdzenie)<br>
+          🔗 – Odbiorca kliknął w link<br>
+          🏁 – Ankieta rozpoczęta<br>
+          ✅ – Ankieta zakończona<br>
+          ✖ – Błąd wysyłki<br>
+          ⏳ – Oczekuje w kolejce<br>
+          • – Inny / nieznany status
+        """
+    else:
+        # SMTP nie daje real-time 'delivered', więc nie pokazujemy 📬
+        legenda = """
+          📤 – E-mail wysłany<br>
+          🔗 – Odbiorca kliknął w link<br>
+          🏁 – Ankieta rozpoczęta<br>
+          ✅ – Ankieta zakończona<br>
+          ✖ – Błąd wysyłki<br>
+          ⏳ – Oczekuje w kolejce (wysłanie w toku)<br>
+          • – Inny / nieznany status
+        """
+    st.markdown(
+        f"""<div style="margin-top:18px;font-size:14px;line-height:1.6;"><b>Legenda statusów:</b><br>{legenda}</div><div style="margin-bottom:60px"></div>""",
+        unsafe_allow_html=True)
 
     # --- AUTO-REFRESH NA KOŃCU: realny impuls (sleep → rerun) ---
     if auto_refresh:
