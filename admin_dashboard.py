@@ -3934,23 +3934,33 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     polar=dict(
+                        domain=dict(x=[0, 1], y=[0, 1]),  # pełna szerokość/wysokość domeny
                         bgcolor="rgba(0,0,0,0)",
                         radialaxis=dict(visible=True, range=[0, 20]),
-                        angularaxis=dict(tickfont=dict(size=17), tickvals=archetype_names,
-                                         ticktext=theta_labels),
+                        angularaxis=dict(
+                            tickfont=dict(size=17),
+                            tickvals=archetype_names,
+                            ticktext=theta_labels,
+                        ),
                     ),
+                    autosize=False,
+                    width=550, height=550,
+                    margin=dict(l=0, r=0, t=32, b=32),  # brak bocznych marginesów
                     showlegend=False,
-                    width=550, height=550, margin=dict(l=20, r=20, t=32, b=32),
                 )
+
                 # 👇 większa czcionka w dymkach hover
                 fig.update_layout(hoverlabel=dict(font=dict(size=17)))
 
-                st.plotly_chart(
-                    fig,
-                    width="content", # wcześniej było: use_container_width=True,
-                    config={"displaylogo": False},
-                    key=f"radar-{study_id}",
-                )
+                # węższe boczne „bufory” + środkowa kolumna z wykresem → centrowanie
+                padL, mid, padR = st.columns([0.12, 0.76, 0.12], gap="small")
+                with mid:
+                    st.plotly_chart(
+                        fig,
+                        width="content", # wcześniej było: use_container_width=True,
+                        config={"displaylogo": False},
+                        key=f"radar-{study_id}",
+                    )
 
                 st.markdown("""
                 <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
