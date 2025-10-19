@@ -461,9 +461,10 @@ def render(back_btn: Callable[[], None]) -> None:
     link_preview = st.session_state[sess_key_lp]
 
     default_body = (
-        f"Zwracamy sie z prosba o wypelnienie ankiety dla {fn_gen} {ln_gen}."
+        f"Zwracamy się z prośbą o wypełnienie ankiety w badaniu realizowanym na prośbę  {fn_gen} {ln_gen}. "
         f"\n\nLink do ankiety: {link_preview}"
-        f"\n\nDziekujemy!"
+        f"\n\nDziękujemy,"
+        f"\nZespół badawczy Badania.pro®"
     )
 
     # Personalizacja: auto-reset jeśli brak edycji
@@ -483,7 +484,7 @@ def render(back_btn: Callable[[], None]) -> None:
     cols = st.columns([3, 2], gap="large")
     with cols[0]:
         st.markdown('<div class="field-label">Treść wiadomości</div>', unsafe_allow_html=True)
-        st.text_area("Treść wiadomości", key="sms_body", height=180, label_visibility="collapsed")
+        st.text_area("Treść wiadomości", key="sms_body", height=200, label_visibility="collapsed")
 
         # licznik tylko dla SMS; e-mail nie pokazuje licznika i zachowuje polskie znaki
         if method == "SMS":
