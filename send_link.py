@@ -5,6 +5,7 @@ from typing import List, Dict, Tuple, Optional, Callable
 import os
 import base64
 import json
+from io import BytesIO
 from datetime import datetime, timezone, timedelta
 import time  # ⬅️ do auto-odświeżania (sleep + rerun)
 
@@ -126,6 +127,11 @@ def _strip_pl_diacritics(text: str) -> str:
     """Zamień polskie znaki diakrytyczne na ASCII."""
     return (text or "").translate(_PL_MAP)
 
+def _safe_name(ln: str, fn: str) -> str:
+    base = _strip_pl_diacritics(f"{(ln or '').strip()}-{(fn or '').strip()}").lower()
+    base = re.sub(r"[^a-z0-9\-]+", "", base.replace(" ", "-"))
+    return base.strip("-") or "osoba"
+
 def _ensure_name_placeholders(subj: str) -> str:
     """
     Jeśli w temacie nie ma {fn_gen}/{ln_gen}, doklej ' dla {fn_gen} {ln_gen}'.
@@ -138,27 +144,35 @@ def _ensure_name_placeholders(subj: str) -> str:
     # brak placeholderów -> doklej
     return f"{subj} dla {{fn_gen}} {{ln_gen}}"
 
+def _mark_email_subject_edited():
+    """Ustaw znacznik, że użytkownik ręcznie zmienił temat."""
+    st.session_state._email_dirty = True
+
 def _render_subject(user_subject: Optional[str], fn_gen: str, ln_gen: str) -> str:
     """
-    Zwraca finalny temat e-maila:
-    - jeśli zawiera placeholdery → podstaw,
-    - jeśli już zawiera imię+nazwisko → zostaw jak jest,
-    - w przeciwnym razie doklej 'dla <fn_gen> <ln_gen>'.
+    Zwraca finalny temat e-maila w sposób odporny na dublowanie „dla …”.
+    Zasady:
+    - Jeśli są placeholdery {fn_gen}/{ln_gen} → podstaw i zwróć.
+    - W przeciwnym razie utnij wszystko od „ dla …” (jeśli występuje) i dopnij
+      aktualne „dla <fn_gen> <ln_gen>”.
     """
     s = (user_subject or "").strip()
+    if not s:
+        s = "Prośba o wypełnienie ankiety"
 
+    # 1) obsługa placeholderów
     if "{fn_gen}" in s or "{ln_gen}" in s:
         try:
             return s.format(fn_gen=fn_gen, ln_gen=ln_gen)
         except Exception:
-            pass  # na wszelki wypadek, jeśli format się wysypie
+            # gdyby format się wysypał, spadamy do normalizacji poniżej
+            pass
 
-    full = f"{fn_gen} {ln_gen}".strip()
-    if full and full in s:
-        return s
+    # 2) jeśli temat ma już „dla ...” (np. z poprzedniej osoby) → utnij ogon
+    s = re.sub(r"\s+dla\s+.*$", "", s, flags=re.IGNORECASE).strip()
 
-    base = s or "Prośba o wypełnienie ankiety"
-    return f"{base} dla {fn_gen} {ln_gen}".strip()
+    # 3) dołącz bieżące imię+nazwisko (dopełniacz)
+    return f"{s} dla {fn_gen} {ln_gen}".strip()
 
 
 def _fmt_dt(val: Optional[str]) -> str:
@@ -222,6 +236,20 @@ def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = No
     mode: 'sms' | 'email'
     """
     rows = (list_sms_for_study if mode == "sms" else list_email_for_study)(sb, study_id) or []
+
+    def _dur_str(click_iso, done_iso) -> str:
+        """mm:ss + 🔴 jeśli < 2 min."""
+        try:
+            c1 = pd.to_datetime(click_iso, utc=True)
+            c2 = pd.to_datetime(done_iso,  utc=True)
+            if pd.isna(c1) or pd.isna(c2):
+                return ""
+            sec = int((c2 - c1).total_seconds())
+            mm, ss = divmod(max(0, sec), 60)
+            return f"{mm:02d}:{ss:02d}" + (" 🔴" if sec < 120 else "")
+        except Exception:
+            return ""
+
     out: List[Dict[str, str]] = []
     for r in rows:
         out.append(
@@ -229,6 +257,7 @@ def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = No
                 "Data": _fmt_dt(r.get("created_at") or r.get("created_at_pl")),
                 ("Telefon" if mode == "sms" else "E-mail"): r.get("phone", "") if mode == "sms" else r.get("email", ""),
                 "Status": _status_icon(r),
+                "Czas wyp.": _dur_str(r.get("clicked_at"), r.get("completed_at")),
                 "Wysłano": "✓" if (r.get("status") or "").lower() in ("sent", "delivered") else "",
                 "Kliknięto": _fmt_dt(r.get("clicked_at")),
                 "Rozpoczęto": _fmt_dt(r.get("started_at")),
@@ -236,9 +265,164 @@ def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = No
                 "Błąd": "✖" if (r.get("status") or "").lower() == "failed" else "",
             }
         )
-    cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Wysłano", "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
+    cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Czas wyp.", "Wysłano",
+            "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
     return pd.DataFrame(out, columns=cols)
 
+
+
+def _df_to_xlsx_bytes(
+    df: pd.DataFrame,
+    sheet_name: str = "Statusy",
+    borders: str = "none"  # "none" = brak ramek (domyślnie), "all" = ramki w całej tabeli (bez nagłówka)
+) -> bytes:
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="xlsxwriter") as wr:
+        # Zapis danych
+        df.to_excel(wr, index=False, sheet_name=sheet_name)
+        ws = wr.sheets[sheet_name]
+        book = wr.book
+
+        # Format nagłówka – BEZ OBRAMOWAŃ
+        header_fmt = book.add_format({
+            "bold": True,
+            "bg_color": "#f3f4f6",
+            "font_color": "#111111",
+            "align": "left",
+            "valign": "vcenter",
+            "border": 0
+        })
+
+        # Format komórek – zależny od przełącznika
+        cell_fmt = book.add_format({
+            "border": 1 if str(borders).lower() == "all" else 0
+        })
+
+        # Nadpisz nagłówki, aby dostały nasz format (bez ramek)
+        for col, title in enumerate(df.columns):
+            ws.write(0, col, title, header_fmt)
+
+        # Sformatuj wszystkie komórki danych jednym strzałem
+        nrows, ncols = df.shape
+        if nrows and ncols:
+            # nadaj format zarówno komórkom niepustym, jak i pustym
+            ws.conditional_format(1, 0, nrows, ncols - 1, {"type": "no_blanks", "format": cell_fmt})
+            ws.conditional_format(1, 0, nrows, ncols - 1, {"type": "blanks", "format": cell_fmt})
+
+        # Szerokości kolumn – jak wcześniej
+        for i, col in enumerate(df.columns):
+            maxlen = df[col].astype(str).map(len).max()
+            try:
+                maxlen = int(maxlen) if pd.notna(maxlen) else 0
+            except Exception:
+                maxlen = 0
+            width = max(8, min(36, int(maxlen * 0.9 + 4)))
+            ws.set_column(i, i, width)
+
+    return buf.getvalue()
+
+
+def _df_to_pdf_bytes(df: pd.DataFrame, title: str = "Statusy") -> bytes | None:
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        font_path = os.path.join("assets", "DejaVuSans.ttf")
+        font_bold_path = os.path.join("assets", "DejaVuSans-Bold.ttf")
+
+        if os.path.exists(font_path):
+            pdfmetrics.registerFont(TTFont("DejaVuSans", font_path))
+            base_font = "DejaVuSans"
+
+            # jeśli masz plik pogrubienia – użyj go w tytule
+            if os.path.exists(font_bold_path):
+                pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", font_bold_path))
+                title_font = "DejaVuSans-Bold"
+            else:
+                title_font = base_font
+        else:
+            # fallback (brak pełnych polskich znaków)
+            base_font = "Helvetica"
+            title_font = base_font
+
+    except Exception:
+        return None
+
+    # Wersja do PDF: status jako tekst (bez emoji), żeby uniknąć „krzaczków”.
+    def _status_to_text(s: str) -> str:
+        s = (s or "").strip()
+        return {
+            "📤": "wysłano",
+            "📬": "doręczono",
+            "🔗": "kliknięto",
+            "🏁": "rozpoczęto",
+            "✅": "zakończono",
+            "✖": "błąd",
+            "⏳": "w kolejce",
+            "•":  "inny",
+        }.get(s, s)
+
+    df_pdf = df.copy()
+    if "Status" in df_pdf.columns:
+        df_pdf["Status"] = df_pdf["Status"].map(_status_to_text)
+    if "Czas wyp." in df_pdf.columns:
+        df_pdf["Czas wyp."] = df_pdf["Czas wyp."].astype(str).str.replace("🔴", "", regex=False)
+
+    data = [list(df_pdf.columns)] + df_pdf.astype(str).values.tolist()
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=landscape(A4),
+        leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+    )
+    styles = getSampleStyleSheet()
+
+    # Tytuł musi używać fontu z polskimi znakami
+    from reportlab.lib.styles import ParagraphStyle
+    title_style = ParagraphStyle(
+        "TitleUnicode",
+        parent=styles["Heading3"],
+        fontName=("title_font" in locals() and title_font) or base_font  # DejaVuSans-Bold jeśli jest
+    )
+
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#f3f4f6")),
+        ("TEXTCOLOR",  (0,0), (-1,0), colors.HexColor("#111111")),
+        ("GRID",       (0,0), (-1,-1), 0.25, colors.HexColor("#d1d5db")),
+        ("FONTNAME",   (0,0), (-1,-1), base_font),
+        ("FONTSIZE",   (0,0), (-1,-1), 9),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#fafafa")]),
+        ("ALIGN", (0,0), (-1,-1), "LEFT"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+    ]))
+
+    story = [Paragraph(title, title_style), Spacer(1, 8), table]
+    doc.build(story)
+    return buf.getvalue()
+
+
+
+def _auto_col_widths(df: pd.DataFrame) -> dict[str, int]:
+    """Węższe, bezpieczne szerokości; działa też dla pustych DF."""
+    widths: dict[str, int] = {}
+    if df is None or df.empty:
+        # minimalne szerokości nagłówków
+        return {c: 120 for c in (df.columns if df is not None else [])}
+    for c in df.columns:
+        ser = df[c].astype(str)
+        max_in_col = ser.map(len).max()
+        try:
+            max_in_col = int(max_in_col) if pd.notna(max_in_col) else 0
+        except Exception:
+            max_in_col = 0
+        maxlen = max(len(str(c)), max_in_col)
+        widths[c] = max(90, min(360, int(maxlen * 6 + 18)))  # węższy przelicznik
+    return widths
 
 
 def _mockup_css_bg(path: str) -> Optional[str]:
@@ -280,15 +464,18 @@ def render(back_btn: Callable[[], None]) -> None:
     if not st.session_state.get("_e_prefs_loaded", False):
         _prefs = _load_mockup_prefs()
         _e = _prefs.get("email", {})
-        # domyślne fallbacki z bieżących stałych
-        st.session_state.setdefault("_e_wrap_w", int(_e.get("wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60)))
-        st.session_state.setdefault("_e_wrap_h", int(_e.get("wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100)))
-        st.session_state.setdefault("_e_top",     int(_e.get("top", EMAIL_TOP)))
-        st.session_state.setdefault("_e_left",    int(_e.get("left", EMAIL_LEFT)))
-        st.session_state.setdefault("_e_w",       int(_e.get("w", EMAIL_WIDTH)))
-        st.session_state.setdefault("_e_h",       int(_e.get("h", EMAIL_HEIGHT)))
-        st.session_state.setdefault("_e_pad",     int(_e.get("pad", 18)))
+        st.session_state.setdefault("_e_wrap_w",
+                                    int(_e.get("wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60)))
+        st.session_state.setdefault("_e_wrap_h",
+                                    int(_e.get("wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100)))
+        st.session_state.setdefault("_e_top", int(_e.get("top", EMAIL_TOP)))
+        st.session_state.setdefault("_e_left", int(_e.get("left", EMAIL_LEFT)))
+        st.session_state.setdefault("_e_w", int(_e.get("w", EMAIL_WIDTH)))
+        st.session_state.setdefault("_e_h", int(_e.get("h", EMAIL_HEIGHT)))
+        st.session_state.setdefault("_e_pad", int(_e.get("pad", 18)))
         st.session_state.setdefault("_e_pad_top", int(_e.get("pad_top", 18)))
+        # nowość: możliwość korekty marginesu tytułu (może być ujemny)
+        st.session_state.setdefault("_e_subj_mt", int(_e.get("subj_mt", 0)))
         st.session_state["_e_prefs_loaded"] = True
 
     # ── Style etykiet + przycisków ────────────────────────────────────────────
@@ -419,27 +606,47 @@ def render(back_btn: Callable[[], None]) -> None:
     ln_gen = study.get("last_name_gen") or ln
     fn_gen = study.get("first_name_gen") or fn
 
-    # Temat (e-mail) – automatyczne podstawienie {fn_gen}/{ln_gen} i „doklejka” jeśli brak
+    # Temat (e-mail) – zawsze wylicz na podstawie bieżącej osoby
+    base_tpl = st.secrets.get("EMAIL_SUBJECT", "Prośba o wypełnienie ankiety")
+    subject_tpl = _ensure_name_placeholders(base_tpl)
+    auto_subject = subject_tpl.format(fn_gen=fn_gen, ln_gen=ln_gen)
+
+    # Inicjalizacja znacznika "czy użytkownik edytował temat ręcznie"
+    if "_email_dirty" not in st.session_state:
+        st.session_state._email_dirty = False
+
+    # Inicjalizacja pierwszej wartości tematu
+    if "email_subject" not in st.session_state:
+        st.session_state.email_subject = auto_subject
+
+    # Zapamiętujemy poprzednie wartości, aby wykryć zmiany
+    prev_person = st.session_state.get("_email_last_person_label")
+    prev_method = st.session_state.get("_email_last_method")
+
+    changed_person = (prev_person is not None and label != prev_person)
+    changed_to_email = (method == "E-mail" and prev_method == "SMS")
+
+    # Jeśli użytkownik NIE edytował ręcznie, to aktualizuj temat przy zmianie osoby
+    # lub gdy wracamy z SMS do E-mail.
+    if (changed_person or changed_to_email) and not st.session_state._email_dirty:
+        st.session_state.email_subject = auto_subject
+
+    # Gdy temat z jakiegoś powodu jest pusty – uzupełnij automatem
+    if not (st.session_state.email_subject or "").strip():
+        st.session_state.email_subject = auto_subject
+
+    # Zapisz aktualny stan do porównań w kolejnych renderach
+    st.session_state._email_last_person_label = label
+    st.session_state._email_last_method = method
+
     if method == "E-mail":
-        base_tpl = st.secrets.get("EMAIL_SUBJECT", "Prośba o wypełnienie ankiety")
-        subject_tpl = _ensure_name_placeholders(base_tpl)
-        auto_subject = subject_tpl.format(fn_gen=fn_gen, ln_gen=ln_gen)
-
-        # auto-reset jak przy treści SMS (tylko gdy user nie edytował ręcznie)
-        if "email_subject" not in st.session_state:
-            st.session_state.email_subject = auto_subject
-            st.session_state._auto_email_subject = auto_subject
-            st.session_state._email_last_person_label = label
-        else:
-            if label != st.session_state.get("_email_last_person_label"):
-                if st.session_state.email_subject == st.session_state.get("_auto_email_subject"):
-                    st.session_state.email_subject = auto_subject
-                st.session_state._auto_email_subject = auto_subject
-                st.session_state._email_last_person_label = label
-            else:
-                st.session_state._auto_email_subject = auto_subject
-
-        st.text_input("Temat (e-mail)", key="email_subject", label_visibility="visible")
+        st.text_input(
+            "Temat (e-mail)",
+            value=st.session_state.email_subject,
+            key="email_subject",
+            label_visibility="visible",
+            on_change=_mark_email_subject_edited  # <- zaznacz, że użytkownik ruszył temat
+        )
 
     # Placeholder linku do podglądu
     base_url = (st.secrets.get("SURVEY_BASE_URL") or "").rstrip("/")
@@ -460,31 +667,44 @@ def render(back_btn: Callable[[], None]) -> None:
 
     link_preview = st.session_state[sess_key_lp]
 
-    default_body = (
-        f"Zwracamy się z prośbą o wypełnienie ankiety w badaniu realizowanym na prośbę  {fn_gen} {ln_gen}. "
-        f"\n\nLink do ankiety: {link_preview}"
-        f"\n\nDziękujemy,"
-        f"\nZespół badawczy Badania.pro®"
-    )
+    # ➜ dwa różne domyślne szablony – zależne od "method"
+    if method == "E-mail":
+        default_body = (
+            f"Zwracamy się z prośbą o wypełnienie ankiety w badaniu realizowanym na prośbę {fn_gen} {ln_gen}."
+            f"\n\nLink do ankiety: {link_preview}"
+            f"\n\nDziękujemy,"
+            f"\nZespół badawczy Badania.pro®"
+        )
+    else:  # SMS
+        default_body = (
+            f"Zwracamy sie z prosba o wypelnienie ankiety dla {fn_gen} {ln_gen}."
+            f"\n\nLink do ankiety: {link_preview}"
+            f"\n\nDziekujemy!"
+        )
 
-    # Personalizacja: auto-reset jeśli brak edycji
+    # Personalizacja/reset gdy zmienisz osobę LUB tryb (SMS/E-mail),
+    # ale tylko jeśli użytkownik nie edytował pola ręcznie.
     if "sms_body" not in st.session_state:
         st.session_state.sms_body = default_body
         st.session_state.auto_sms_template = default_body
         st.session_state.last_person_label = label
+        st.session_state.last_method = method
     else:
-        if label != st.session_state.get("last_person_label"):
+        changed_person = (label != st.session_state.get("last_person_label"))
+        changed_method = (method != st.session_state.get("last_method"))
+        if changed_person or changed_method:
             if st.session_state.sms_body == st.session_state.get("auto_sms_template"):
                 st.session_state.sms_body = default_body
             st.session_state.auto_sms_template = default_body
             st.session_state.last_person_label = label
+            st.session_state.last_method = method
         else:
             st.session_state.auto_sms_template = default_body
 
-    cols = st.columns([3, 2], gap="large")
+    cols = st.columns([3, 3], gap="medium")
     with cols[0]:
-        st.markdown('<div class="field-label">Treść wiadomości</div>', unsafe_allow_html=True)
-        st.text_area("Treść wiadomości", key="sms_body", height=200, label_visibility="collapsed")
+        st.markdown('<div class="field-label">Treść wiadomości:</div>', unsafe_allow_html=True)
+        st.text_area("Treść wiadomości", key="sms_body", height=240, label_visibility="collapsed")
 
         # licznik tylko dla SMS; e-mail nie pokazuje licznika i zachowuje polskie znaki
         if method == "SMS":
@@ -593,37 +813,49 @@ def render(back_btn: Callable[[], None]) -> None:
                 )
 
                 # pozycja i „ekran”
-                _e_top = st.number_input("Top (px)",  value=int(st.session_state.get("_e_top", EMAIL_TOP)),   step=1)
-                _e_left = st.number_input("Left (px)", value=int(st.session_state.get("_e_left", EMAIL_LEFT)), step=1)
-                _e_w = st.number_input("Szerokość ekranu (px)",  value=int(st.session_state.get("_e_w", EMAIL_WIDTH)),   step=1)
-                _e_h = st.number_input("Wysokość ekranu (px)",   value=int(st.session_state.get("_e_h", EMAIL_HEIGHT)),  step=1)
+                _e_top = st.number_input("Top (px)",
+                                         value=int(st.session_state.get("_e_top", EMAIL_TOP)),
+                                         step=1)
+                _e_left = st.number_input("Left (px)",
+                                          value=int(st.session_state.get("_e_left", EMAIL_LEFT)),
+                                          step=1)
+                _e_w = st.number_input("Szerokość ekranu (px)",
+                                       value=int(st.session_state.get("_e_w", EMAIL_WIDTH)), step=1)
+                _e_h = st.number_input("Wysokość ekranu (px)",
+                                       value=int(st.session_state.get("_e_h", EMAIL_HEIGHT)),
+                                       step=1)
 
-                # paddingi
+                # paddingi + offset tytułu
                 _e_pad_top = st.number_input("Padding góra (px)",
-                                             value=int(st.session_state.get("_e_pad_top", 18)), step=1)
+                                             value=int(st.session_state.get("_e_pad_top", 18)),
+                                             step=1)
                 _e_pad = st.number_input("Padding wewnątrz (lewy/prawy/dolny) (px)",
                                          value=int(st.session_state.get("_e_pad", 18)), step=1)
+                _e_subj_mt = st.number_input("Offset tytułu (px; może być ujemny)",
+                                             value=int(st.session_state.get("_e_subj_mt", 0)),
+                                             step=1)
 
                 st.session_state.update(
                     _e_wrap_w=_e_wrap_w, _e_wrap_h=_e_wrap_h,
                     _e_top=_e_top, _e_left=_e_left, _e_w=_e_w, _e_h=_e_h,
-                    _e_pad=_e_pad, _e_pad_top=_e_pad_top
+                    _e_pad=_e_pad, _e_pad_top=_e_pad_top, _e_subj_mt=_e_subj_mt
                 )
 
-                # Przyciski zapisu/odczytu domyślnych ustawień (trwałe między odświeżeniami)
-                c1, c2, c3 = st.columns([3,3,1])
+                # zapisz / odczytaj
+                c1, c2, _ = st.columns([3, 3, 1])
                 if c1.button("💾 Zapisz jako domyślne", use_container_width=True):
                     prefs = _load_mockup_prefs()
                     prefs.setdefault("email", {})
                     prefs["email"] = {
                         "wrap_w": int(st.session_state._e_wrap_w),
                         "wrap_h": int(st.session_state._e_wrap_h),
-                        "top":     int(st.session_state._e_top),
-                        "left":    int(st.session_state._e_left),
-                        "w":       int(st.session_state._e_w),
-                        "h":       int(st.session_state._e_h),
-                        "pad":     int(st.session_state._e_pad),
+                        "top": int(st.session_state._e_top),
+                        "left": int(st.session_state._e_left),
+                        "w": int(st.session_state._e_w),
+                        "h": int(st.session_state._e_h),
+                        "pad": int(st.session_state._e_pad),
                         "pad_top": int(st.session_state._e_pad_top),
+                        "subj_mt": int(st.session_state._e_subj_mt),
                     }
                     _save_mockup_prefs(prefs)
                     st.success("Zapisano jako domyślne.")
@@ -632,60 +864,75 @@ def render(back_btn: Callable[[], None]) -> None:
                     prefs = _load_mockup_prefs()
                     e = prefs.get("email", {})
                     if e:
-                        st.session_state._e_wrap_w = int(e.get("wrap_w", st.session_state._e_wrap_w))
-                        st.session_state._e_wrap_h = int(e.get("wrap_h", st.session_state._e_wrap_h))
-                        st.session_state._e_top     = int(e.get("top",     st.session_state._e_top))
-                        st.session_state._e_left    = int(e.get("left",    st.session_state._e_left))
-                        st.session_state._e_w       = int(e.get("w",       st.session_state._e_w))
-                        st.session_state._e_h       = int(e.get("h",       st.session_state._e_h))
-                        st.session_state._e_pad     = int(e.get("pad",     st.session_state._e_pad))
-                        st.session_state._e_pad_top = int(e.get("pad_top", st.session_state._e_pad_top))
+                        st.session_state._e_wrap_w = int(
+                            e.get("wrap_w", st.session_state._e_wrap_w))
+                        st.session_state._e_wrap_h = int(
+                            e.get("wrap_h", st.session_state._e_wrap_h))
+                        st.session_state._e_top = int(e.get("top", st.session_state._e_top))
+                        st.session_state._e_left = int(e.get("left", st.session_state._e_left))
+                        st.session_state._e_w = int(e.get("w", st.session_state._e_w))
+                        st.session_state._e_h = int(e.get("h", st.session_state._e_h))
+                        st.session_state._e_pad = int(e.get("pad", st.session_state._e_pad))
+                        st.session_state._e_pad_top = int(
+                            e.get("pad_top", st.session_state._e_pad_top))
+                        st.session_state._e_subj_mt = int(
+                            e.get("subj_mt", st.session_state._e_subj_mt))
                         st.experimental_rerun()
                     else:
                         st.info("Brak zapisanych ustawień – najpierw użyj „Zapisz jako domyślne”.")
 
-
             # temat do podglądu – bez duplikowania imienia/nazwiska
-            _subject_preview = _render_subject(st.session_state.get("email_subject"), fn_gen, ln_gen)
+            _subject_preview = _render_subject(st.session_state.get("email_subject") or auto_subject, fn_gen, ln_gen)
+
 
 
             if data_url:
                 st.markdown(
                     f"""
-                    <div class="mock-wrap">
-                      <div class="mock-bg-email"></div>
-                      <div class="mock-screen-email">
-                        <div style="opacity:.7;margin-bottom:8px">{_subject_preview}</div>
-                        {msg_preview.replace("\n", "<br/>")}
-                      </div>
-                    </div>
-                    <style>
-                      .mock-wrap {{
-                        position:relative;
-                        width:{st.session_state._e_wrap_w}px;
-                        height:{st.session_state._e_wrap_h}px;
-                      }}
-                      .mock-bg-email {{
-                        position:absolute; inset:0;
-                        background-image:url('{data_url}');
-                        background-size:contain; background-repeat:no-repeat; background-position:center top;
-                      }}
-                      .mock-screen-email {{
-                        position:absolute;
-                        top:{st.session_state._e_top}px; left:{st.session_state._e_left}px;
-                        width:{st.session_state._e_w}px; height:{st.session_state._e_h}px;
-                        background:#fff; border:1px solid #e5e7eb; border-radius:2px;
-                        padding:{st.session_state._e_pad_top}px {st.session_state._e_pad}px {st.session_state._e_pad}px {st.session_state._e_pad}px; overflow:auto;
-                        font:13.5px/1.5 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111;
-                        white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; word-break:break-word; hyphens:auto; line-break:auto;
-                      }}
-                    </style>
+                        <div class="mock-wrap">
+                          <div class="mock-bg-email"></div>
+                          <div class="mock-screen-email">
+                            <div class="mock-email-subj">{_subject_preview}</div>
+                            <div class="email-body">{msg_preview.replace("\n", "<br/>")}</div>
+                          </div>
+                        </div>
+                        <style>
+                          .mock-wrap{{
+                            position:relative;
+                            width:{st.session_state._e_wrap_w}px;
+                            height:{st.session_state._e_wrap_h}px;
+                          }}
+                          .mock-bg-email{{
+                            position:absolute; inset:0;
+                            background-image:url('{data_url}');
+                            background-size:contain; background-repeat:no-repeat; background-position:center top;
+                          }}
+                          .mock-screen-email{{
+                            position:absolute;
+                            top:{st.session_state._e_top}px; left:{st.session_state._e_left}px;
+                            width:{st.session_state._e_w}px; height:{st.session_state._e_h}px;
+                            background:#fff; border:1px solid #e5e7eb; border-radius:2px;
+                            padding:{st.session_state._e_pad_top}px {st.session_state._e_pad}px {st.session_state._e_pad}px {st.session_state._e_pad}px; overflow:auto;
+                            font:13.5px/1.5 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111;
+                            white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; word-break:break-word; hyphens:auto; line-break:auto;
+                            text-indent:0;  /* brak wcięcia pierwszej linii */
+                          }}
+                          .mock-email-subj{{
+                            opacity:.7;
+                            margin:{st.session_state._e_subj_mt}px 0 8px 0;  /* sterujesz suwakiem */
+                          }}
+                          .email-body, .email-body *{{
+                            margin-top:0;  /* usuń domyślne górne marginesy pierwszego akapitu */
+                            text-indent:0;
+                          }}
+                        </style>
+
                     """,
                     unsafe_allow_html=True,
                 )
             else:
                 # (fallback)
-                _subject_preview = _render_subject(st.session_state.get("email_subject"), fn_gen, ln_gen)
+                _subject_preview = _render_subject(st.session_state.get("email_subject") or auto_subject, fn_gen, ln_gen)
 
                 st.markdown(
                     f"""<div style="border:1px solid #e5e7eb;border-radius:8px;padding:18px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/0.04);font:13.5px/1.5 system-ui;">
@@ -774,7 +1021,8 @@ def render(back_btn: Callable[[], None]) -> None:
 
             # Finalny temat – bez podwajania, z automatycznym dopięciem imienia/nazwiska gdy brak
             subject = _render_subject(
-                st.session_state.get("email_subject") or st.secrets.get("EMAIL_SUBJECT", "Prośba o wypełnienie ankiety"),
+                (st.session_state.get("email_subject") or auto_subject or st.secrets.get(
+                    "EMAIL_SUBJECT", "Prośba o wypełnienie ankiety")),
                 fn_gen, ln_gen
             )
 
@@ -850,7 +1098,8 @@ def render(back_btn: Callable[[], None]) -> None:
 
     # Wymuś kolumny i kolejność
     from streamlit import column_config as cc
-    wanted_cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Wysłano",
+    wanted_cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Czas wyp.",
+                   "Wysłano",
                    "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
     for c in wanted_cols:
         if c not in df_logs.columns:
@@ -879,25 +1128,44 @@ def render(back_btn: Callable[[], None]) -> None:
     # wąska tabela
     st.markdown(
         """
-        <style>.narrow-table { max-width: 920px; margin: 0 auto; }</style>
+        <style>.narrow-table { max-width: 1120px; margin: 0 auto; }</style>
         """,
         unsafe_allow_html=True,
     )
+    # auto-szerokości na podstawie zawartości
+    widths = _auto_col_widths(df_logs)
+    col_cfg = {
+        col: cc.Column(width=widths.get(col, 100))
+        for col in df_logs.columns
+    }
+
     st.markdown('<div class="narrow-table">', unsafe_allow_html=True)
-    st.dataframe(
-        df_logs, hide_index=True,
-        column_config={
-            "Data": cc.Column(width="medium"),
-            ("Telefon" if mode == "sms" else "E-mail"): cc.Column(width="small"),
-            "Status": cc.Column(width="small"),
-            "Wysłano": cc.Column(width="small"),
-            "Kliknięto": cc.Column(width="medium"),
-            "Rozpoczęto": cc.Column(width="medium"),
-            "Zakończono": cc.Column(width="medium"),
-            "Błąd": cc.Column(width="small"),
-        },
-    )
+    st.dataframe(df_logs, hide_index=True, column_config=col_cfg)
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # Eksport
+    who = _safe_name(ln, fn)
+    prefix = 'sms' if mode == 'sms' else 'email'
+    xlsx_bytes = _df_to_xlsx_bytes(df_logs, sheet_name=("SMS" if mode == "sms" else "EMAIL"))
+    c1, c2 = st.columns([1, 1])
+    c1.download_button(
+        "📊 Eksport XLSX",
+        data=xlsx_bytes,
+        file_name=f"statusy_{prefix}_{who}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+    pdf_bytes = _df_to_pdf_bytes(df_logs, title=f"Statusy – {'SMS' if mode == 'sms' else 'E-mail'} z wysyłki dla {fn_gen} {ln_gen}")
+    if pdf_bytes:
+        c2.download_button(
+            "📄 Eksport PDF",
+            data=pdf_bytes,
+            file_name=f"statusy_{prefix}_{who}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    else:
+        c2.caption("PDF: zainstaluj pakiet `reportlab` na serwerze, aby włączyć eksport.")
 
     # Legenda
     if mode == "sms":
