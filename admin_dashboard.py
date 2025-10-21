@@ -2750,8 +2750,8 @@ GLOBAL_CSS = (css_ff or "") + """
 /* jednolity nagłówek sekcji */
 .ap-h2{
   font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
-  font-weight: 700 !important;
-  font-size: 1.23rem;
+  font-weight: 600 !important;
+  font-size: 1.21rem;
   line-height: 1.3;
   letter-spacing: 0;
   color:#1f2937;
