@@ -1024,6 +1024,195 @@ archetype_features = {
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
 }
 
+# === Progi i opisy "🧭 Interpretacja natężenia procentowego archetypu" ===
+AR_INTENSITY_SCHEME = [
+    #  lo,  hi,  etykieta_krótka,                               etykieta_pełna,                         opis_jakościowy
+    (0,  29, "marginalne",       "marginalne natężenie",
+     "Archetyp prawie nie występuje. Obszar „cienia” — wzorce zachowań i motywacje tego typu są marginalne lub tłumione. Pojawia się incydentalnie, w stresie lub pod wpływem otoczenia. Brak wpływu na decyzje i styl komunikacji. Nie buduje wizerunku."),
+    (30, 49, "słabe",            "słabe natężenie",
+     "Archetyp widoczny tylko w tle. Ujawnia się w określonych sytuacjach społecznych — głównie gdy trzeba się dostosować. Ograniczony wpływ na komunikację, zachowania i wizerunek."),
+    (50, 59, "umiarkowane",      "umiarkowane natężenie",
+     "Archetyp częściowo aktywny – równoważy się z innymi. Poziom neutralny lub „potencjalny rdzeń”, który może się rozwinąć. Zaznacza się w komunikacji, ma wpływ pomocniczy."),
+    (60, 69, "znaczące",         "znaczące natężenie",
+     "Archetyp wyraźny, widoczny w zachowaniu, decyzjach, wartościach. Zauważalnie kształtuje styl działania i odbiór. Wzmacnia kluczowy archetyp, ale sam nie prowadzi decyzji."),
+    (70, 79, "wysokie",          "wysokie natężenie",
+     "Archetyp mocno ukształtowany. Centralny motyw sposobu myślenia, postrzegania świata i działania — buduje tożsamość. Nadaje ton komunikacji / przywództwu."),
+    (80, 89, "bardzo wysokie",   "bardzo wysokie natężenie (rdzeń)",
+     "Archetyp niemal jednoznacznie dominuje nad resztą i w dużym stopniu określa charakter oraz wizerunek. Zwykle prowadzi do jednoznacznego stylu (np. przywódczego, opiekuńczego, buntowniczego, wizjonerskiego). Typowe dla silnych osobowości."),
+    (90,100, "ekstremalne",      "ekstremalne natężenie",
+     "Archetyp w „czystej” postaci — rzadkie, często idealizowane lub przerysowane ujęcie (np. „czysty Bohater”, „czysty Władca”). Ogromna spójność i autentyczność, ale niska elastyczność i zamknięcie na inne perspektywy."),
+]
+
+def interpret_archetype_intensity(pct: float) -> dict:
+    """
+    Zwraca słownik:
+      {'short': 'wysokie', 'full': 'Wysokie natężenie', 'desc': '...'}
+    """
+    try:
+        v = float(pct)
+    except Exception:
+        v = 0.0
+    v = max(0.0, min(100.0, v))
+    for lo, hi, short, full, desc in AR_INTENSITY_SCHEME:
+        if lo <= v <= hi:
+            return {"short": short, "full": full, "desc": desc}
+    return {"short": "-", "full": "-", "desc": ""}
+
+def intensity_icon_color(short_label: str) -> str:
+    """Kolor kwadracika przy opisie natężenia (większy kontrast między „szarym” i „stalowym”)."""
+    m = (short_label or "").strip().lower()
+    return {
+        "marginalne":     "#9CA3AF",  # szary (jaśniejszy)
+        "słabe":          "#6B7280",  # stalowy (wyraźnie ciemniejszy)
+        "umiarkowane":    "#FBBF24",  # bursztyn
+        "znaczące":       "#F59E0B",  # pomarańcz
+        "wysokie":        "#EF4444",  # czerwony
+        "bardzo wysokie": "#DC2626",  # ciemny czerwony
+        "ekstremalne":    "#7F1D1D",  # bordo
+    }.get(m, "#9CA3AF")
+
+def intensity_icon_html(short_label: str) -> str:
+    """Zwraca HTML: [kolorowy KWADRAT] + tekst (np. 'umiarkowane')."""
+    c = intensity_icon_color(short_label)
+    return f"<span class='ap-int-ico' style='background:{c}'></span>{short_label or ''}"
+
+def intensity_help_modal_html() -> str:
+    """Modal 'Interpretacja natężenia' – 3 kolumny: Przedział; Interpretacja; Znaczenie i opis jakościowy."""
+    rows = "".join(
+        (
+            "<tr>"
+            f"<td>{lo}–{hi}%</td>"
+            f"<td><b>{full}</b></td>"
+            f"<td><span style='color:#4b5563'>{desc}</span></td>"
+            "</tr>"
+        )
+        for (lo, hi, short, full, desc) in AR_INTENSITY_SCHEME
+    )
+    return f"""
+    <style>
+      /* Modal + USTAWIENIA (tu zmieniasz marginesy i szerokości kolumn) */
+      #ap-intensity-modal{{
+        display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:9999;
+    
+        /* 👉 marginesy wierszy tabeli w MODALU */
+        --ap-row-pad-top: 16px;     /* góra */
+        --ap-row-pad-bottom: 16px;  /* dół */
+        --ap-cell-pad-h: 12px;      /* lewo/prawo */
+    
+        /* 👉 szerokości kolumn (px lub %) */
+        --ap-col-w1: 110px;  /* „Przedział” */
+        --ap-col-w2: 230px;  /* „Interpretacja” */
+        --ap-col-w3: auto;   /* „Znaczenie i opis jakościowy” (reszta miejsca) */
+    
+        /* 👉 kolory kwadracików */
+        --ap-col-1: #9CA3AF;  /* 0–29%   */
+        --ap-col-2: #6B7280;  /* 30–49%  */
+        --ap-col-3: #FBBF24;  /* 50–59%  */
+        --ap-col-4: #F59E0B;  /* 60–69%  */
+        --ap-col-5: #EF4444;  /* 70–79%  */
+        --ap-col-6: #DC2626;  /* 80–89%  */
+        --ap-col-7: #7F1D1D;  /* 90–100% */
+      }}
+      #ap-intensity-modal:target{{display:block;}}
+    
+      #ap-intensity-modal .ap-int-modal{{
+        position:fixed; left:50%; top:8%; transform:translateX(-50%);
+        max-width:980px; background:#fff; border-radius:16px;
+        box-shadow:0 20px 60px rgba(0,0,0,.25); padding:22px 24px;
+      }}
+      #ap-intensity-modal .ap-int-head{{display:flex; align-items:center; gap:10px; margin-bottom:10px;}}
+      #ap-intensity-modal .ap-int-title{{font:700 18px/1.2 'Segoe UI',system-ui,Arial;}}
+      #ap-intensity-modal .ap-int-close{{margin-left:auto; text-decoration:none; cursor:pointer; font:700 18px/1 monospace; color:#111}}
+    
+      /* Tabela w MODALU – używa zmiennych powyżej */
+      .ap-int-table{{
+        width:100%; border-collapse:collapse; font:400 14px/1.45 'Segoe UI',system-ui;
+        table-layout: fixed;   /* trzyma szerokości kolumn */
+      }}
+      .ap-int-table th,
+      .ap-int-table td{{
+        border-bottom:1px solid #eef2f7;
+        padding: var(--ap-row-pad-top) var(--ap-cell-pad-h) var(--ap-row-pad-bottom) var(--ap-cell-pad-h);
+        vertical-align:top;
+      }}
+      .ap-int-table th{{text-align:left; font-weight:700; color:#374151;}}
+      .ap-int-table td:first-child{{white-space:nowrap;}}
+    
+      /* Szerokości kolumn (łatwe do zmiany wyżej) */
+      .ap-int-table th:nth-child(1), .ap-int-table td:nth-child(1){{ width: var(--ap-col-w1); text-align:center; }}
+      .ap-int-table th:nth-child(2), .ap-int-table td:nth-child(2){{ width: var(--ap-col-w2); }}
+      .ap-int-table th:nth-child(3), .ap-int-table td:nth-child(3){{ width: var(--ap-col-w3); }}
+    
+      /* Kwadracik + jego kolory */
+      .ap-int-ico{{
+        display:inline-block; width:12px; height:12px; border-radius:3px;
+        border:1px solid #d1d5db; margin-right:6px; vertical-align:-2px;
+      }}
+      .ap-i--1{{ background:var(--ap-col-1); }}
+      .ap-i--2{{ background:var(--ap-col-2); }}
+      .ap-i--3{{ background:var(--ap-col-3); }}
+      .ap-i--4{{ background:var(--ap-col-4); }}
+      .ap-i--5{{ background:var(--ap-col-5); }}
+      .ap-i--6{{ background:var(--ap-col-6); }}
+      .ap-i--7{{ background:var(--ap-col-7); border-color:var(--ap-col-7); }}
+    </style>
+
+    <div id="ap-intensity-modal">
+      <div class="ap-int-modal" role="dialog" aria-modal="true" aria-label="Interpretacja natężenia">
+        <div class="ap-int-head">
+          <div class="ap-int-title">🧭 Interpretacja natężenia procentowego archetypu</div>
+          <a href="#" class="ap-int-close" title="Zamknij">×</a>
+        </div>
+        <table class="ap-int-table">
+          <thead>
+            <tr>
+              <th>Przedział</th>
+              <th>Interpretacja</th>
+              <th>Znaczenie i opis jakościowy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>0–29%</td>
+              <td><span class="ap-int-ico ap-i--1"></span><span class="ap-int-label">Marginalne natężenie</span></td>
+              <td>Archetyp prawie nie występuje. Obszar „cienia” — wzorce zachowań i motywacje tego typu są marginalne lub tłumione. Pojawia się incydentalnie, w stresie lub pod wpływem otoczenia. Brak wpływu na decyzje i styl komunikacji. Nie buduje wizerunku.</td>
+            </tr>
+            <tr>
+              <td>30–49%</td>
+              <td><span class="ap-int-ico ap-i--2"></span><span class="ap-int-label">Słabe natężenie</span></td>
+              <td>Archetyp widoczny tylko w tle. Ujawnia się w określonych sytuacjach społecznych — głównie gdy trzeba się dostosować. Ograniczony wpływ na komunikację, zachowania i wizerunek.</td>
+            </tr>
+            <tr>
+              <td>50–59%</td>
+              <td><span class="ap-int-ico ap-i--3"></span><span class="ap-int-label">Umiarkowane natężenie</span></td>
+              <td>Archetyp częściowo aktywny — równoważy się z innymi. Poziom neutralny lub „potencjalny rdzeń”, który może się rozwinąć. Zaznacza się w komunikacji, ma wpływ pomocniczy.</td>
+            </tr>
+            <tr>
+              <td>60–69%</td>
+              <td><span class="ap-int-ico ap-i--4"></span><span class="ap-int-label">Znaczące natężenie</span></td>
+              <td>Archetyp wyraźny, widoczny w zachowaniu, decyzjach, wartościach. Zauważalnie kształtuje styl działania i odbiór. Wzmacnia kluczowy archetyp, ale sam nie prowadzi decyzji.</td>
+            </tr>
+            <tr>
+              <td>70–79%</td>
+              <td><span class="ap-int-ico ap-i--5"></span><span class="ap-int-label">Wysokie natężenie</span></td>
+              <td>Archetyp mocno ukształtowany. Centralny motyw sposobu myślenia, postrzegania świata i działania — buduje tożsamość. Nadaje ton komunikacji / przywództwu.</td>
+            </tr>
+            <tr>
+              <td>80–89%</td>
+              <td><span class="ap-int-ico ap-i--6"></span><span class="ap-int-label">Bardzo wysokie natężenie (rdzeń)</span></td>
+              <td>Archetyp niemal jednoznacznie dominuje nad resztą i w dużym stopniu określa charakter oraz wizerunek. Zwykle prowadzi do jednoznacznego stylu (np. przywódczego, opiekuńczego, buntowniczego, wizjonerskiego). Typowe dla silnych osobowości.</td>
+            </tr>
+            <tr>
+              <td>90–100%</td>
+              <td><span class="ap-int-ico ap-i--7"></span><span class="ap-int-label">Ekstremalne natężenie</span></td>
+              <td>Archetyp w „czystej” postaci — rzadkie, często idealizowane lub przerysowane ujęcie (np. „czysty Bohater”, „czysty Władca”). Ogromna spójność i autentyczność, ale niska elastyczność i zamknięcie na inne perspektywy.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    """
+
 # --- KOLORY: mapowanie pytań (1..48) do 4 kolorów i kalkulator % ---
 COLOR_QUESTION_MAP = {
     "Niebieski": [9,10,11,12,37,38,39,40,41,42,43,44],
@@ -2561,7 +2750,7 @@ GLOBAL_CSS = (css_ff or "") + """
 /* jednolity nagłówek sekcji */
 .ap-h2{
   font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
-  font-weight: 600;
+  font-weight: 700 !important;
   font-size: 1.23rem;
   line-height: 1.3;
   letter-spacing: 0;
@@ -2575,12 +2764,13 @@ GLOBAL_CSS = (css_ff or "") + """
 /* tytuły sekcji */
 .section-title{
   font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
-  font-weight: 605;
-  font-size: 1.25em;
+  font-weight: 530 !important;
+  font-size: 1.22em;
   margin: 15px 0 25px 0;
   line-height: 1.15;
   color:#182433;
 }
+
 .section-title--padTop{ margin-top:0px !important; }
 .mt-28{ margin-top:0px !important; }
 .section-title--blue{ color:#1a93e3; }
@@ -2599,6 +2789,12 @@ GLOBAL_CSS = (css_ff or "") + """
 div[data-testid="stSelectbox"]{
   margin-bottom: 4px !important;   /* ← tu ściskasz odstęp (np. 4–10 px) */
 }
+/* zbicie odstępu pod selectem */
+div[data-testid="stSelectbox"] { padding-bottom: 0 !important; margin-bottom: 6px !important; }
+div[data-testid="stSelectbox"] label { margin-bottom: 2px !important; }
+/* usuń dodatkowy margines pierwszego elementu po selekcie (czasem Streamlit dodaje „poduchę”) */
+div[data-testid="stSelectbox"] + div { margin-top: 0 !important; }
+
 div[data-testid="stSelectbox"] > div{
   border:1.5px solid #1a93e3 !important;
   border-radius:10px !important;
@@ -3161,6 +3357,38 @@ def export_word_docxtpl(
         if (capsule_columns_img_path and os.path.exists(capsule_columns_img_path))
         else "")
 
+    # === Natężenie archetypu: etykiety i opisy dla Worda ===
+    # Używamy 'mean_scores' przekazanych do funkcji (to słownik {archetyp: %}).
+    _ms = mean_scores or {}
+
+    def _lab_desc_for(name: str):
+        if not name:
+            return {"short": "", "full": "", "desc": ""}
+        pct = float(_ms.get(name, 0.0))
+        return interpret_archetype_intensity(pct)
+
+    _main = _lab_desc_for(main_type)
+    _aux = _lab_desc_for(second_type)
+    _supp = _lab_desc_for(supplement_type)
+
+    # Krótkie linie „Natężenie archetypu: …”
+    context["ARCHETYPE_MAIN_INTENSITY_LINE"] = f"Natężenie archetypu: {_main['short']}" if _main[
+        "short"] else ""
+    context["ARCHETYPE_AUX_INTENSITY_LINE"] = f"Natężenie archetypu: {_aux['short']}" if _aux[
+        "short"] else ""
+    context["ARCHETYPE_SUPP_INTENSITY_LINE"] = f"Natężenie archetypu: {_supp['short']}" if _supp[
+        "short"] else ""
+
+    # Same etykiety (np. „Wysokie natężenie”) — gdybyś wolał użyć oddzielnie
+    context["ARCHETYPE_MAIN_INTENSITY_LABEL"] = _main["full"]
+    context["ARCHETYPE_AUX_INTENSITY_LABEL"] = _aux["full"]
+    context["ARCHETYPE_SUPP_INTENSITY_LABEL"] = _supp["full"]
+
+    # Opisy jakościowe (kolumna „Znaczenie i opis jakościowy”)
+    context["ARCHETYPE_MAIN_INTENSITY_DESC"] = _main["desc"]
+    context["ARCHETYPE_AUX_INTENSITY_DESC"] = _aux["desc"]
+    context["ARCHETYPE_SUPP_INTENSITY_DESC"] = _supp["desc"]
+
     doc.render(context)
 
     # (opcja) hiperłącza do osób – jak było
@@ -3700,7 +3928,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             if supp_data:
                 supp_disp["name"] = disp_name(supp_avg or "")
 
-            col1, col2, col3 = st.columns([0.25, 0.37, 0.38], gap="small")
+            col1, col2, col3 = st.columns([0.28, 0.36, 0.36], gap="small")
 
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (
@@ -3731,9 +3959,10 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             with col1:
                 st.markdown(
-                    '<div class="ap-h2" style="margin-bottom:8px">Liczebność archetypów głównych, wspierających i pobocznych</div>',
+                    '<div class="ap-h2" style="margin-bottom:8px">Podsumowanie archetypów (liczebność i natężenie)</div>',
                     unsafe_allow_html=True
                 )
+
                 # 1) procent „natężenia” jak w raporcie Word (średnie % 0..100 na podstawie odpowiedzi)
                 means_pct = mean_pct_by_archetype_from_df(data)  # {archetyp: %}
 
@@ -3745,117 +3974,250 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 )
 
                 # 3) budowa tabeli z nową kolumną „% natężenie archetypu”
-                # 1) nazwa kolumny z łamaniem w 2 linie
-                NAT_COL = "% natężenie<br/>archetypu"
+                # 1) nagłówek grupy + link „i” (bez JS – otwiera modal CSS)
+                NAT_GRP = (
+                    "<a href='#ap-intensity-modal' class='ap-int-info' title='Co oznaczają progi?'>"
+                    "<img src='https://cdn3.iconfinder.com/data/icons/thunderstorm-5/80/5-32-512.png' "
+                    "alt='info' style='width:16px;height:16px'/>"
+                    "</a>"
+                )
+
+                # 2) wartości % i opisy słowne (z ikonką – kolorowe KWADRATY, nie kółka)
+                _pct_vals = [float(means_pct.get(n, 0.0)) for n in ordered_names]
+                _pct_strs = [f"{v:.1f}%" for v in _pct_vals]
+                _labels = [interpret_archetype_intensity(v)["short"] for v in _pct_vals]
+                _labels_ico = [intensity_icon_html(s) for s in _labels]
+
+                # 3) MultiIndex → powstaje nagłówek dwupoziomowy z 2 „podkolumnami”
+                _cols = pd.MultiIndex.from_tuples([
+                    ("", "Archetyp"),
+                    ("", "Główny<br/>archetyp"),
+                    ("", "Wspierający<br/>archetyp"),
+                    ("", "Poboczny<br/>archetyp"),
+                    (NAT_GRP, "%"),
+                    (NAT_GRP, "opis"),
+                ])
 
                 archetype_table = pd.DataFrame({
-                    "Archetyp": [f"{get_emoji(n)} {disp_name(n)}" for n in ordered_names],
-                    "Główny<br/>archetyp": [zero_to_dash(counts_main.get(normalize(n), 0)) for n in
-                                            ordered_names],
-                    "Wspierający<br/>archetyp": [zero_to_dash(counts_aux.get(normalize(n), 0)) for n
-                                                 in ordered_names],
-                    "Poboczny<br/>archetyp": [zero_to_dash(counts_supp.get(normalize(n), 0)) for n
-                                              in ordered_names],
-                    NAT_COL: [f"{means_pct.get(n, 0.0):.1f}%" for n in ordered_names],
-                })
+                    ("", "Archetyp"): [f"{get_emoji(n)} {disp_name(n)}" for n in ordered_names],
+                    ("", "Główny<br/>archetyp"): [zero_to_dash(counts_main.get(normalize(n), 0)) for
+                                                  n in ordered_names],
+                    ("", "Wspierający<br/>archetyp"): [zero_to_dash(counts_aux.get(normalize(n), 0))
+                                                       for n in ordered_names],
+                    ("", "Poboczny<br/>archetyp"): [zero_to_dash(counts_supp.get(normalize(n), 0))
+                                                    for n in ordered_names],
+                    (NAT_GRP, "%"): _pct_strs,
+                    (NAT_GRP, "opis"): _labels_ico,
+                }, columns=_cols)
 
-                # 2) sort po procencie (obsługa wartości typu "60.0%")
-                _pct_series = archetype_table[NAT_COL]
-                _pct_val = (
-                    _pct_series.astype(str)
-                    .str.replace("%", "", regex=False)
-                    .str.replace(",", ".", regex=False)
-                    .astype(float)
-                )
+                # 4) sortowanie po wartości %
+                archetype_table["_sort"] = _pct_vals
                 archetype_table = (
-                    archetype_table.assign(_pct_val=_pct_val)
-                    .sort_values("_pct_val", ascending=False)
-                    .drop(columns=["_pct_val"])
+                    archetype_table.sort_values("_sort", ascending=False)
+                    .drop(columns=["_sort"])
                     .reset_index(drop=True)
                 )
 
-                # 3) HTML tabeli (pozwól na <br/> w nagłówkach)
-                html_table = (
-                    archetype_table.to_html(index=False, escape=False, border=0)
+                # 5) HTML + CSS tabeli
+                # --- ŁATWE DO ZMIANY SZEROKOŚCI (procenty) ---
+                COL_W = {"c1": "21%",
+                         "c2": "12%",
+                         "c3": "16%",
+                         "c4": "12%",
+                         "c5": "5%",
+                         "c6": "36%"}
+
+                # Budujemy body tabeli bez nagłówka (header=False), a nagłówek zrobimy ręcznie (rowspan/colspan).
+                _body = (
+                    archetype_table.to_html(index=False, header=False, escape=False, border=0)
                     .replace('class="dataframe"', 'class="ap-table"')
                     .replace('border="1"', 'border="0"')
                 )
 
-                # --- Sterowanie rozmiarami i wysokością wierszy (zmieniaj tu) ---
-                TABLE_HEAD_FS = 14  # px – nagłówki tabeli
-                TABLE_CELL_FS = 14.5  # px – komórki danych
-                ROW_PAD_Y = 13  # px – ↑↓ padding pionowy (większa wartość = wyższe wiersze)
-                ROW_LINE_HEIGHT = 1.22  # bez jednostki – wysokość linii tekstu
-                ROW_MIN_H = 40  # px – miękki minimalny cel wysokości wiersza
+                # Ręcznie złożony nagłówek (scalenia jak na screenie: 4 kolumny z rowspan=2 i grupa 2-kolumnowa)
+                thead_html = f"""
+                <thead>
+                  <tr>
+                    <th rowspan="2" style="width:{COL_W['c1']}">Archetyp</th>
+                    <th rowspan="2" style="width:{COL_W['c2']}">Główny archetyp</th>
+                    <th rowspan="2" style="width:{COL_W['c3']}">Wspierający archetyp</th>
+                    <th rowspan="2" style="width:{COL_W['c4']}">Poboczny archetyp</th>
+                    <th colspan="2" style="width:calc({COL_W['c5']} + {COL_W['c6']})">
+                      % natężenie archetypu&nbsp;{NAT_GRP}
+                    </th>
+                  </tr>
+                  <tr>
+                    <th style="width:{COL_W['c5']}">%</th>
+                    <th style="width:{COL_W['c6']}">opis</th>
+                  </tr>
+                </thead>
+                """
+
+                # Wstrzykujemy thead przed <tbody>
+                html_table = _body.replace("<tbody>", thead_html + "<tbody>", 1)
 
                 st.markdown(f"""
                 <style>
                   .ap-table {{
-                    table-layout: fixed;
-                    width: 100%;
-                    border-collapse: collapse;
+                    table-layout: fixed; width: 100%; border-collapse: collapse;
                     font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
-                    font-size: {TABLE_CELL_FS}px;               /* ← rozmiar czcionki w danych */
-                    margin-top: 3px;                            /* ← margones górny tabeli */
+                    font-size: 14px; margin-top: 3px;
                   }}
-
-                  /* Wysokość wierszy = padding + line-height. (min-height na td bywa ignorowany) */
                   .ap-table th, .ap-table td {{
-                    padding: {ROW_PAD_Y}px 10px;               /* ← główna dźwignia wysokości */
-                    border-bottom: 1px solid #eaeaea;
-                    vertical-align: middle;
-                    line-height: {ROW_LINE_HEIGHT};
+                    padding: 13px 10px; border-bottom: 1px solid #eaeaea;
+                    vertical-align: middle; line-height: 1.22; text-align: center;
                   }}
-                  /* Opcjonalny miękki cel: jeżeli chcesz twardo wymusić minimum, odkomentuj linię height */
-                  .ap-table tr {{
-                    min-height: {ROW_MIN_H}px;
-                    /* height: {ROW_MIN_H}px; */                /* UWAGA: ucina wielolinijkowe treści */
-                  }}
+                  .ap-table thead th {{ font-weight: 700; }}
 
-                  /* Nagłówki */
-                  .ap-table th {{
-                    font-weight: 600;
-                    font-size: {TABLE_HEAD_FS}px;              /* ← rozmiar czcionki nagłówków */
-                    white-space: normal;                       /* <br/> działa jak trzeba */
-                    word-break: normal;
-                    hyphens: auto;
-                    text-align: center;
-                  }}
+                  /* Wyrównania tylko dla WIERZY (tbody) w kolumnach 1 i 6 */
+                  .ap-table tbody td:nth-child(1),
+                  .ap-table tbody td:nth-child(6) {{ text-align: left !important; }}
 
-                  /* Kolumny 2–4 wyśrodkowane (nagłówki i dane) */
-                  .ap-table th:nth-child(2), .ap-table td:nth-child(2),
-                  .ap-table th:nth-child(3), .ap-table td:nth-child(3),
-                  .ap-table th:nth-child(4), .ap-table td:nth-child(4) {{
-                    text-align: center !important;
+                  /* Delikatna, szara ikonka „info” */
+                  .ap-int-info img {{
+                    opacity:.65; filter:grayscale(100%); vertical-align:-3px;
+                    width:16px; height:16px;
                   }}
+                  .ap-int-info:hover img {{ opacity:1; filter:none; }}
 
-                  /* Kolumna 1 – do lewej + szerokość */
-                  .ap-table th:nth-child(1), .ap-table td:nth-child(1) {{
-                    text-align: left !important;
-                    width: 26%;
+                  /* Kwadracik przy opisie natężenia */
+                  .ap-int-ico {{
+                    display:inline-block; width:12px; height:12px; border-radius:3px;
+                    border:1px solid #d1d5db; margin-right:6px; vertical-align:-2px;
                   }}
-
-                  /* Kolumny 2–4 – stałe szerokości */
-                  .ap-table th:nth-child(2), .ap-table td:nth-child(2),
-                  .ap-table th:nth-child(3), .ap-table td:nth-child(3),
-                  .ap-table th:nth-child(4), .ap-table td:nth-child(4) {{
-                    width: 16%;
-                  }}
-
-                  /* Kolumna 5 – do prawej */
-                  .ap-table th:nth-child(5), .ap-table td:nth-child(5) {{
-                    width: 18%;
-                    text-align: right !important;
-                    padding-right: 15px;
-                  }}
-
-                  /* Bez pogrubień w danych */
-                  .ap-table td {{ font-weight: 400 !important; }}
                 </style>
                 """, unsafe_allow_html=True)
 
-                # 5) render
-                st.markdown(html_table, unsafe_allow_html=True)
+                # 👉 Auto-wysokość i brak iframa (Streamlit ≥ 1.38 ma st.html)
+                _table_rows = len(ordered_names) if isinstance(ordered_names, list) else 12
+                # trochę większy zapas na nagłówek i odstępy
+                _table_height = 240 + 56 * _table_rows
+
+                # --- NOWY FRAGMENT DO WSTAWIENIA ---
+                _html_block = f"""
+                <style>
+                  .ap-table {{
+                    table-layout: fixed; width: 100%; border-collapse: collapse;
+                    font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+                    font-size: 14px; margin-top: 3px;
+                  }}
+                  .ap-table th, .ap-table td {{
+                    padding: 13px 10px; border-bottom: 1px solid #eaeaea;
+                    vertical-align: middle; line-height: 1.22; text-align: center;
+                  }}
+                  .ap-table thead th {{ font-weight: 700; }}
+                  .ap-table tbody td:nth-child(1),
+                  .ap-table tbody td:nth-child(6) {{ text-align: left !important; }}
+
+                  .ap-int-info img {{
+                    opacity:.65; filter:grayscale(100%); vertical-align:-3px; width:16px; height:16px;
+                  }}
+                  .ap-int-info:hover img {{ opacity:1; filter:none; }}
+
+                  .ap-int-ico {{
+                    display:inline-block; width:12px; height:12px; border-radius:3px;
+                    border:1px solid #d1d5db; margin-right:6px; vertical-align:-2px;
+                  }}
+
+                  /* 👉 KONFIGURACJA — tu zmieniasz marginesy/paddingi */
+                  :root{{
+                    --ap-tip-offset: 10px;   /* odległość dymka od ikonki */
+                    --ap-tip-pad-v: 10px;    /* padding GÓRA/DÓŁ w dymku */
+                    --ap-tip-pad-h: 12px;    /* padding LEWO/PRAWO w dymku */
+                  }}
+
+                  /* kontener tooltipa */
+                  .ap-tip{{ position:relative; display:inline-block; }}
+
+                  /* sam dymek */
+                  .ap-tip-box{{
+                    position:absolute;
+                    left:50%; transform:translateX(-50%) translateY(4px);
+                    top: calc(100% + var(--ap-tip-offset));
+                    background:#111827; color:#fff;
+                    padding: var(--ap-tip-pad-v) var(--ap-tip-pad-h);
+                    border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.18);
+                    white-space:nowrap; font-size:12px; line-height:1.35;
+                    z-index:15; opacity:0; pointer-events:none;
+                    transition:opacity .15s ease, transform .15s ease;
+                  }}
+
+                  /* strzałka */
+                  .ap-tip-box::after{{
+                    content:""; position:absolute; top:-6px; left:50%; transform:translateX(-50%);
+                    border:6px solid transparent; border-bottom-color:#111827;
+                  }}
+
+                  /* pokaż przy najechaniu */
+                  .ap-tip:hover .ap-tip-box{{ opacity:1; transform:translateX(-50%) translateY(0); }}
+
+                  /* opcja: dymek NAD ikoną */
+                  .ap-tip.ap-tip--above .ap-tip-box{{
+                    bottom: calc(100% + var(--ap-tip-offset)); top:auto;
+                  }}
+                  .ap-tip.ap-tip--above .ap-tip-box::after{{
+                    top:auto; bottom:-6px; border-bottom-color:transparent; border-top-color:#111827;
+                  }}
+
+                  /* jeśli w tooltipie masz mini-tabelkę */
+                    /* 👉 USTAWIENIA — tu ręcznie regulujesz odstępy w wierszach */
+                    :root{{
+                      --ap-row-pad-top: 18px;       /* górny akapit (padding TOP) w wierszu */
+                      --ap-row-pad-bottom: 18px;    /* dolny akapit (padding BOTTOM) w wierszu */
+                      --ap-cell-pad-h: 12px;        /* poziomy padding w komórkach tabeli */
+                    
+                      /* paleta kolorów dla kwadracików (natężenia) — możesz zmieniać */
+                      --ap-col-1: #e5e7eb; /* 0–29%  */
+                      --ap-col-2: #bfdbfe; /* 30–49% */
+                      --ap-col-3: #fde68a; /* 50–59% */
+                      --ap-col-4: #fdba74; /* 60–69% */
+                      --ap-col-5: #f87171; /* 70–79% */
+                      --ap-col-6: #c084fc; /* 80–89% */
+                      --ap-col-7: #111827; /* 90–100% */
+                    }}
+                    
+                    /* tabela w modalu z interpretacją */
+                    .ap-tip-box .ap-int-table{{
+                      border-collapse: collapse; margin-block: 6px; width: 100%;
+                    }}
+                    .ap-tip-box .ap-int-table th,
+                    .ap-tip-box .ap-int-table td{{
+                      padding: var(--ap-row-pad-top) var(--ap-cell-pad-h) var(--ap-row-pad-bottom) var(--ap-cell-pad-h);
+                      border-bottom: 1px solid #e5e7eb;
+                      vertical-align: top; text-align: left;
+                    }}
+                    .ap-tip-box .ap-int-table thead th{{ font-weight: 700; }}
+                    
+                    /* szerokości kolumn – opcjonalnie dopasuj pod siebie */
+                    .ap-tip-box .ap-int-table th:nth-child(1),
+                    .ap-tip-box .ap-int-table td:nth-child(1){{ width: 100px; text-align: center; }}
+                    .ap-tip-box .ap-int-table th:nth-child(2),
+                    .ap-tip-box .ap-int-table td:nth-child(2){{ width: 450px; }}
+                    
+                    /* kwadraciki natężenia */
+                    .ap-tip-box .ap-int-ico{{
+                      display:inline-block; width:12px; height:12px; border-radius:3px;
+                      border:1px solid #d1d5db; margin-right:8px; vertical-align:-2px;
+                    }}
+                    .ap-tip-box .ap-i--1{{ background:var(--ap-col-1); }}
+                    .ap-tip-box .ap-i--2{{ background:var(--ap-col-2); }}
+                    .ap-tip-box .ap-i--3{{ background:var(--ap-col-3); }}
+                    .ap-tip-box .ap-i--4{{ background:var(--ap-col-4); }}
+                    .ap-tip-box .ap-i--5{{ background:var(--ap-col-5); }}
+                    .ap-tip-box .ap-i--6{{ background:var(--ap-col-6); }}
+                    .ap-tip-box .ap-i--7{{ background:var(--ap-col-7); border-color:var(--ap-col-7); }}
+                    
+                    .ap-tip-box .ap-int-label{{ font-weight: 600; }}
+
+                </style>
+                """ + html_table + intensity_help_modal_html()
+
+                # jeśli masz nowe Streamlit: prawdziwy, „wbudowany” HTML bez iframa
+                if hasattr(st, "html"):
+                    st.html(_html_block)  # auto-dopasowanie wysokości, brak dodatkowego scrolla
+                else:
+                    # starszy Streamlit – zostaje components, ale bez przewijania (duża wysokość)
+                    components.html(_html_block, height=_table_height, scrolling=False)
 
             with col2:
                 theta_labels = []
@@ -4164,6 +4526,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     main_disp,
                     second_disp,
                     supp_disp,
+                    mean_scores=means_pct,  # ⬅️ przekażemy % do wyliczenia natężenia
                     radar_img_path="radar.png",
                     archetype_table=archetype_table,
                     num_ankiet=num_ankiet,
