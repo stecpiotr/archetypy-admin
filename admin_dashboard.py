@@ -1101,7 +1101,7 @@ def intensity_help_modal_html() -> str:
     
         /* 👉 szerokości kolumn (px lub %) */
         --ap-col-w1: 110px;  /* „Przedział” */
-        --ap-col-w2: 230px;  /* „Interpretacja” */
+        --ap-col-w2: 250px;  /* „Interpretacja” */
         --ap-col-w3: auto;   /* „Znaczenie i opis jakościowy” (reszta miejsca) */
     
         /* 👉 kolory kwadracików */
@@ -1136,7 +1136,12 @@ def intensity_help_modal_html() -> str:
         vertical-align:top;
       }}
       .ap-int-table th{{text-align:left; font-weight:700; color:#374151;}}
-      .ap-int-table td:first-child{{white-space:nowrap;}}
+      .ap-intensity-modal .ap-int-table th:nth-child(1){{ font-weight:800; }}
+      .ap-intensity-modal .ap-int-table td:nth-child(1){{ font-weight:700; color:#111; }}
+
+        /* POGRUBIENIE pierwszej kolumny w MODALU */
+        #ap-intensity-modal .ap-int-table th:nth-child(1){{ font-weight:800; }}
+        #ap-intensity-modal .ap-int-table td:nth-child(1){{ font-weight:700; color:#111; }}
     
       /* Szerokości kolumn (łatwe do zmiany wyżej) */
       .ap-int-table th:nth-child(1), .ap-int-table td:nth-child(1){{ width: var(--ap-col-w1); text-align:center; }}
@@ -1205,7 +1210,7 @@ def intensity_help_modal_html() -> str:
             <tr>
               <td>90–100%</td>
               <td><span class="ap-int-ico ap-i--7"></span><span class="ap-int-label">Ekstremalne natężenie</span></td>
-              <td>Archetyp w „czystej” postaci — rzadkie, często idealizowane lub przerysowane ujęcie (np. „czysty Bohater”, „czysty Władca”). Ogromna spójność i autentyczność, ale niska elastyczność i zamknięcie na inne perspektywy.</td>
+              <td>Archetyp w „czystej” postaci — rzadkie, często idealizowane lub przerysowane ujęcie (np. „czysty Bohater”, „czysty Władca”). Ogromna spójność i autentyczność, ale bardzo niska (często praktycznie zerowa) elastyczność i zamknięcie na inne perspektywy.</td>
             </tr>
           </tbody>
         </table>
@@ -1323,19 +1328,19 @@ def color_progress_bars_html(
         color = COLOR_HEX[name]
         inside = pct >= 10.0
         rows.append(f"""
-          <div class="cp-row">
-            <div class="cp-label">
-              <span class="cp-dot" style="background:{color}"></span>
-              <span class="cp-label-text">{name}</span>
-            </div>
-            <div class="cp-track">
-              <div class="cp-fill" style="width:{width_css}; background:{color}">
-                <div class="cp-badge {'in' if inside else 'out'}">{pct_int}%</div>
-              </div>
-            </div>
-          </div>
-        """)
-
+                  <div class="cp-row">
+                    <div class="cp-label">
+                      <span class="cp-dot" style="background:{color}"></span>
+                      <span class="cp-label-text">{name}</span>
+                    </div>
+                    <div class="cp-track" title="{COLOR_LONG.get(name, {}).get('title', '').replace('"', '&quot;')}">
+                      <div class="cp-fill" style="width:{width_css}; background:{color}"
+                           title="{COLOR_LONG.get(name, {}).get('title', '').replace('"', '&quot;')}">
+                        <div class="cp-badge {'in' if inside else 'out'}">{pct_int}%</div>
+                      </div>
+                    </div>
+                  </div>
+                """)
     return f"""
     <style>
       .cp-row{{
@@ -4209,6 +4214,28 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     
                     .ap-tip-box .ap-int-label{{ font-weight: 600; }}
 
+                    /* Tooltip nad kolorowym paskiem heurystyki */
+                    .ap-hc-fill[data-tip]{{ position: relative; }}
+                    .ap-hc-fill[data-tip]:hover::after{{
+                      content: attr(data-tip);
+                      position: absolute;
+                      left: 14px;                 /* startuje lekko od lewej krawędzi paska */
+                      bottom: calc(100% + 8px);   /* nad paskiem */
+                      max-width: 520px;
+                      background:#111827; color:#fff;
+                      padding:8px 10px; border-radius:8px;
+                      font:500 13px/1.35 'Segoe UI', system-ui, Arial;
+                      box-shadow:0 8px 24px rgba(0,0,0,.2);
+                      white-space:normal; z-index:10;
+                    }}
+                    .ap-hc-fill[data-tip]:hover::before{{
+                      content:"";
+                      position:absolute; left: 20px; bottom: 100%;
+                      border:6px solid transparent;
+                      border-top-color:#111827;   /* „trójkącik” */
+                      transform: translateY(2px);
+                    }}
+
                 </style>
                 """ + html_table + intensity_help_modal_html()
 
@@ -4630,4 +4657,4 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     else:
-        st.info("Brak danych 'answers' – nie wykryto odpowiedzi w bazie danych.")
+        st.info("Brak danych – nie ma żadnych odpowiedzi w tym badaniu.")
