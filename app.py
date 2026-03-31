@@ -4,6 +4,7 @@ import contextlib
 from datetime import datetime, timedelta, timezone
 import warnings
 import re
+from urllib.parse import urlparse
 import pandas as pd
 import streamlit as st
 
@@ -347,6 +348,18 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
   border-color:#fecaca;
   color:#991b1b;
 }
+
+/* "Przyznaj ponownie" – spokojniejszy kolor niż domyślny primary */
+#regrant-anchor + div button{
+  background:#f4f6fb !important;
+  color:#1f2937 !important;
+  border:1px solid #cfd8e3 !important;
+  border-radius:10px !important;
+}
+#regrant-anchor + div button:hover{
+  background:#e9eef6 !important;
+  border-color:#b8c4d6 !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -501,15 +514,38 @@ def _fmt_local_ts(ts) -> str:
         return str(ts)
 
 
+def _sanitize_base_url(raw: str) -> str:
+    txt = (raw or "").strip()
+    if not txt:
+        return ""
+    if not txt.startswith(("http://", "https://")):
+        txt = "https://" + txt.lstrip("/")
+    try:
+        parsed = urlparse(txt)
+    except Exception:
+        return ""
+    host = (parsed.netloc or "").strip()
+    if not host:
+        return ""
+    scheme = parsed.scheme or "https"
+    return f"{scheme}://{host}".rstrip("/")
+
+
 def _build_report_link(token: str) -> str:
-    base = (st.secrets.get("REPORT_BASE_URL", "") or "").strip()
-    # Preferuj domenę raportową; jeśli w secrets zostawiono streamlit.app, przełącz na raportową.
-    if (not base) or ("streamlit.app" in base.lower()):
-        base = (st.secrets.get("REPORT_PUBLIC_BASE_URL", "") or "").strip() or "https://raport.archetypy.badania.pro/"
-    if not base.startswith("http://") and not base.startswith("https://"):
-        base = "https://" + base.lstrip("/")
-    joiner = "&" if "?" in base else "?"
-    return f"{base}{joiner}token={token}"
+    base_public = _sanitize_base_url(st.secrets.get("REPORT_PUBLIC_BASE_URL", ""))
+    base_secret = _sanitize_base_url(st.secrets.get("REPORT_BASE_URL", ""))
+
+    base = base_public
+    if not base and base_secret:
+        host = (urlparse(base_secret).netloc or "").lower()
+        # Bierz REPORT_BASE_URL tylko jeśli faktycznie wskazuje domenę raportową/lokalną.
+        if ("raport." in host or host.startswith("localhost") or host.startswith("127.0.0.1")) and "streamlit.app" not in host:
+            base = base_secret
+
+    if not base:
+        base = "https://raport.archetypy.badania.pro"
+
+    return f"{base}?token={token}"
 
 
 def _access_validity_text(row: Dict, hours_value: Optional[int] = None, indefinite: Optional[bool] = None) -> str:
@@ -1002,52 +1038,30 @@ def stats_panel() -> None:
 
 def _render_public_gate(token: str) -> bool:
     if bool(st.session_state.get(f"public_ok_{token}", False)):
-        # Po odblokowaniu przywróć jasne tło i NIE renderuj już warstwy blokady.
-        st.markdown(
-            """
-            <style>
-            html, body{
-              background:#fafafa !important;
-              color:#0f172a !important;
-            }
-            [data-testid="stAppViewContainer"]{
-              background:#fafafa !important;
-            }
-            .stApp, .stApp > header{
-              background:#fafafa !important;
-            }
-            .stApp, .stApp *{
-              color:inherit;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
         return True
 
     st.markdown(
         """
         <style>
-        .stApp, .stApp > header{
-          background:
-            radial-gradient(1200px 420px at 50% -120px, rgba(41,69,118,.35), rgba(4,8,14,.94) 70%),
-            #02050a !important;
+        .public-lock-overlay{
+          position:fixed;
+          inset:0;
+          z-index:9990;
+          background:rgba(2, 7, 16, .84);
+          backdrop-filter:blur(1.2px);
+          pointer-events:none;
         }
-        .public-lock-wrap{
-          min-height:74vh;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          margin-top:2vh;
-        }
-        .public-lock-card{
+        .public-lock-card,
+        .public-form-wrap{
           width:min(560px, 94vw);
           border:1px solid rgba(255,255,255,.20);
-          background:rgba(10,15,25,.78);
+          background:rgba(10,15,25,.92);
           border-radius:16px;
-          padding:20px 22px 16px;
+          position:relative;
+          z-index:9993;
           box-shadow:0 20px 54px rgba(0,0,0,.45);
         }
+        .public-lock-card{ padding:20px 22px 16px; }
         .public-lock-title{
           color:#f3f6ff;
           font-size:1.38rem;
@@ -1060,14 +1074,7 @@ def _render_public_gate(token: str) -> bool:
           line-height:1.45;
           font-size:0.98rem;
         }
-        .public-form-wrap{
-          width:min(560px, 94vw);
-          border:1px solid rgba(255,255,255,.20);
-          background:rgba(10,15,25,.78);
-          border-radius:16px;
-          padding:14px 18px 16px;
-          box-shadow:0 20px 54px rgba(0,0,0,.45);
-        }
+        .public-form-wrap{ padding:14px 18px 16px; }
         .public-form-wrap label,
         .public-form-wrap p,
         .public-form-wrap span{
@@ -1078,8 +1085,11 @@ def _render_public_gate(token: str) -> bool:
         unsafe_allow_html=True,
     )
 
-    lock_l, lock_c, lock_r = st.columns([0.33, 0.34, 0.33], gap="small")
+    st.markdown("<div class='public-lock-overlay'></div>", unsafe_allow_html=True)
+
+    lock_l, lock_c, lock_r = st.columns([0.30, 0.40, 0.30], gap="small")
     with lock_c:
+        st.markdown("<div style='height:16vh;'></div>", unsafe_allow_html=True)
         st.markdown(
             "<div class='public-lock-card'>"
             "<div class='public-lock-title'>Podgląd raportu jest zabezpieczony</div>"
@@ -1087,7 +1097,7 @@ def _render_public_gate(token: str) -> bool:
             "</div>",
             unsafe_allow_html=True,
         )
-        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
         st.markdown("<div class='public-form-wrap'>", unsafe_allow_html=True)
         with st.form(f"public_unlock_{token}", clear_on_submit=False):
             email = st.text_input("E-mail", key=f"public_email_{token}")
@@ -1136,6 +1146,10 @@ def public_report_view(token: str) -> None:
         st.error("Nie udało się odnaleźć badania przypisanego do tego linku.")
         st.stop()
 
+    st.markdown(
+        "<style>.block-container{max-width:98vw !important;padding-left:1.2rem !important;padding-right:1.2rem !important;}</style>",
+        unsafe_allow_html=True,
+    )
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     try:
         import admin_dashboard as AD
@@ -1377,7 +1391,7 @@ def results_view() -> None:
                 unsafe_allow_html=True,
             )
 
-            b1, b2, b3 = st.columns(3)
+            b1, b2, b3, _btn_spacer = st.columns([0.16, 0.16, 0.16, 0.52], gap="small")
             with b1:
                 if st.button("⏸️ Zawieś", key=f"suspend_{selected['id']}", use_container_width=True, disabled=selected_status != "active"):
                     set_report_access_status(selected["id"], "suspended")
@@ -1407,19 +1421,22 @@ def results_view() -> None:
                     value=48,
                     key=f"regrant_hours_{study['id']}",
                 )
-            regrant_password = st.text_input(
-                "Hasło przy przyznaniu ponownie",
-                type="password",
-                key=f"regrant_password_{study['id']}",
-                help="To hasło zostanie wysłane ponownie e-mailem razem z nowym linkiem.",
-            )
-            rg_l, rg_r = st.columns([0.72, 0.28], gap="small")
+            pw_col, _pw_spacer = st.columns([0.34, 0.66], gap="small")
+            with pw_col:
+                regrant_password = st.text_input(
+                    "Hasło przy przyznaniu ponownie",
+                    type="password",
+                    key=f"regrant_password_{study['id']}",
+                    help="To hasło zostanie wysłane ponownie e-mailem razem z nowym linkiem.",
+                )
+            rg_l, rg_r = st.columns([0.82, 0.18], gap="small")
             with rg_r:
+                st.markdown("<div id='regrant-anchor'></div>", unsafe_allow_html=True)
                 do_regrant = st.button(
                     "🔁 Przyznaj ponownie",
                     key=f"regrant_btn_{selected['id']}",
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                 )
             if do_regrant:
                 if len((regrant_password or "").strip()) < 4:

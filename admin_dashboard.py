@@ -4018,91 +4018,250 @@ def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
     """
 
 
-def _expanded_subsection_content_html(content_lines: list[str]) -> str:
+SECTION_ICON_MAP = {
+    "1": "🧠",
+    "2": "🏛️",
+    "3": "🗣️",
+    "4": "✅",
+    "5": "🎨",
+    "6": "🧭",
+    "7": "🛡️",
+    "8": "⚖️",
+    "9": "🧰",
+}
+
+
+def _expanded_subsection_content_html(content_lines: list[str], subsection_title: str = "") -> str:
     if not content_lines:
         return ""
 
-    blocks: list[str] = []
-    root_bullets: list[str] = []
-    nested_bullets: list[str] = []
-    current_topic: str | None = None
-
-    def flush_root():
-        nonlocal root_bullets
-        if root_bullets:
-            blocks.append("<ul class='ap-ext-list'>" + "".join(f"<li>{b}</li>" for b in root_bullets) + "</ul>")
-            root_bullets = []
-
-    def flush_nested():
-        nonlocal nested_bullets, current_topic
-        if current_topic is not None:
-            if nested_bullets:
-                blocks.append(
-                    "<div class='ap-ext-topic'>"
-                    f"{current_topic}"
-                    "<ul class='ap-ext-list ap-ext-list-nested'>"
-                    + "".join(f"<li>{b}</li>" for b in nested_bullets)
-                    + "</ul></div>"
-                )
-            else:
-                blocks.append(f"<div class='ap-ext-topic'>{current_topic}</div>")
-        nested_bullets = []
-        current_topic = None
-
-    def split_listish_line(raw_line: str) -> list[str]:
-        if ";" in raw_line:
-            parts = [p.strip(" ,.;") for p in re.split(r"\s*;\s*", raw_line) if p.strip(" ,.;")]
-        else:
-            parts = [p.strip(" ,.;") for p in re.split(r"\s*,\s*", raw_line) if p.strip(" ,.;")]
-        if len(parts) < 3:
-            return []
-        if any(len(p) > 90 for p in parts):
-            return []
-        return parts
-
+    lines = []
     for raw in content_lines:
-        line = str(raw).strip()
-        if not line:
+        txt = str(raw or "").strip()
+        if not txt:
             continue
+        txt = re.sub(r"^[•\-\u2013\u2014]\s*", "", txt).strip()
+        if txt:
+            lines.append(txt)
+    if not lines:
+        return ""
 
-        bullet_match = re.match(r"^[•\-\u2013\u2014]\s*(.+)$", line)
-        if bullet_match:
-            bullet_txt = html.escape(bullet_match.group(1).strip())
-            if bullet_txt.endswith(":"):
-                flush_root()
-                flush_nested()
-                current_topic = bullet_txt
+    subtitle = str(subsection_title or "").strip()
+    m = re.match(r"^(\d+\.\d+(?:\.\d+)?)\.", subtitle)
+    sub_prefix = (m.group(1) + ".") if m else ""
+
+    bullet_only_prefixes = {
+        "1.6.", "2.1.", "2.3.", "2.4.", "2.5.",
+        "3.6.", "3.8.",
+        "4.1.", "4.2.", "4.3.",
+        "5.2.", "5.3.",
+        "6.1.", "6.2.",
+        "7.1.", "7.2.", "7.4.",
+        "8.2.",
+        "9.2.",
+    }
+    numbered_prefixes = {"3.4.", "3.5.5.", "9.3."}
+
+    def p(text: str, cls: str = "") -> str:
+        cls_attr = f" class='{cls}'" if cls else ""
+        return f"<p{cls_attr}>{html.escape(text)}</p>"
+
+    def p_bold_prefix(text: str, allowed_labels: set[str], cls: str = "") -> str:
+        m_local = re.match(r"^([^:]{1,40}):\s*(.*)$", text)
+        if not m_local:
+            return p(text, cls=cls)
+        label = m_local.group(1).strip()
+        value = m_local.group(2).strip()
+        if label not in allowed_labels:
+            return p(text, cls=cls)
+        cls_attr = f" class='{cls}'" if cls else ""
+        return f"<p{cls_attr}><b>{html.escape(label)}:</b> {html.escape(value)}</p>"
+
+    def split_semicolon_items(src_lines: list[str]) -> list[str]:
+        out: list[str] = []
+        for ln in src_lines:
+            if ";" in ln:
+                parts = [x.strip(" ;") for x in re.split(r"\s*;\s*", ln) if x.strip(" ;")]
+                out.extend(parts if parts else [ln])
             else:
-                if current_topic is not None:
-                    nested_bullets.append(bullet_txt)
-                else:
-                    root_bullets.append(bullet_txt)
-            continue
+                out.append(ln)
+        return [x for x in out if x]
 
-        compact_list = split_listish_line(line)
-        if current_topic is not None and compact_list:
-            nested_bullets.extend(html.escape(item) for item in compact_list)
-            continue
-        if current_topic is None and compact_list:
-            root_bullets.extend(html.escape(item) for item in compact_list)
-            continue
+    def ul(items: list[str], cls: str = "ap-ext-list") -> str:
+        if not items:
+            return ""
+        return f"<ul class='{cls}'>" + "".join(f"<li>{html.escape(i)}</li>" for i in items if i.strip()) + "</ul>"
 
-        flush_root()
-        if re.match(r"^\d+\)\s+", line):
-            flush_nested()
-            current_topic = html.escape(line)
-            continue
-        flush_nested()
+    def ol(items: list[str], cls: str = "ap-ext-ol") -> str:
+        if not items:
+            return ""
+        return f"<ol class='{cls}'>" + "".join(f"<li>{html.escape(i)}</li>" for i in items if i.strip()) + "</ol>"
 
-        safe_line = html.escape(line)
-        if safe_line.endswith(":"):
-            current_topic = safe_line
-        else:
-            blocks.append(f"<p>{safe_line}</p>")
+    if sub_prefix == "1.2.":
+        return "".join(p(x) for x in lines)
 
-    flush_root()
-    flush_nested()
-    return "".join(blocks)
+    if sub_prefix == "1.3.":
+        first_two = lines[:2]
+        rest = lines[2:]
+        return ul(first_two) + "".join(p(x) for x in rest)
+
+    if sub_prefix in {"1.4.", "1.5.", "8.1."}:
+        lead = lines[0]
+        rest_items = split_semicolon_items(lines[1:])
+        return p(lead) + ul(rest_items)
+
+    if sub_prefix == "2.2.":
+        allowed = {"Decyzje", "Tempo", "Priorytety"}
+        return "".join(p_bold_prefix(x, allowed) for x in lines)
+
+    if sub_prefix == "3.2.":
+        allowed = {"Ton", "Emocja po kontakcie"}
+        return "".join(p_bold_prefix(x, allowed) for x in lines)
+
+    if sub_prefix == "3.3.":
+        blocks: list[str] = []
+        idx_limit = None
+        for i, ln in enumerate(lines):
+            if ln.casefold().startswith("do ograniczenia"):
+                idx_limit = i
+                break
+        if idx_limit is None:
+            return "".join(p(x) for x in lines)
+        before = lines[:idx_limit]
+        after = lines[idx_limit + 1:]
+        if before:
+            blocks.extend(p(x) for x in before)
+        blocks.append("<div class='ap-ext-topic'><b>Do ograniczenia:</b></div>")
+        blocks.append(ul(split_semicolon_items(after)))
+        return "".join(blocks)
+
+    if sub_prefix in numbered_prefixes:
+        return ol(lines)
+
+    if sub_prefix == "7.3.":
+        num_items: list[str] = []
+        tail: list[str] = []
+        for ln in lines:
+            if ln.casefold().startswith("zakaz:"):
+                tail.append(ln)
+            else:
+                num_items.append(ln)
+        out = ol(num_items)
+        for t in tail:
+            out += p_bold_prefix(t, {"Zakaz"})
+        return out
+
+    if sub_prefix == "9.1.":
+        do_items: list[str] = []
+        dont_items: list[str] = []
+        mode: str | None = None
+        for ln in lines:
+            low = ln.casefold()
+            if low.startswith("do:"):
+                mode = "do"
+                continue
+            if ("don't" in low) or ("don’t" in low) or ("dont" in low):
+                mode = "dont"
+                continue
+            if mode == "do":
+                do_items.extend(split_semicolon_items([ln]))
+            elif mode == "dont":
+                dont_items.extend(split_semicolon_items([ln]))
+        blocks = []
+        if do_items:
+            blocks.append("<div class='ap-ext-topic'><b>DO:</b></div>")
+            blocks.append(ul(do_items))
+        if dont_items:
+            blocks.append("<div class='ap-ext-topic'><b>DON'T:</b></div>")
+            blocks.append(ul(dont_items))
+        return "".join(blocks) if blocks else "".join(p(x) for x in lines)
+
+    if sub_prefix == "9.4.":
+        diag_idx = None
+        for i, ln in enumerate(lines):
+            if ln.casefold().startswith("pytania diagnostyczne"):
+                diag_idx = i
+                break
+        if diag_idx is None:
+            return ul(split_semicolon_items(lines))
+        first = split_semicolon_items(lines[:diag_idx])
+        second = split_semicolon_items(lines[diag_idx + 1:])
+        blocks = []
+        if first:
+            blocks.append(ul(first))
+        blocks.append("<div class='ap-ext-topic'><b>Pytania diagnostyczne:</b></div>")
+        if second:
+            blocks.append(ul(second))
+        return "".join(blocks)
+
+    if sub_prefix == "8.2.":
+        items = split_semicolon_items(lines)
+        rendered = []
+        for item in items:
+            m_line = re.match(r"^([A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]+)\s+[–-]\s+(.+)$", item)
+            if m_line:
+                rendered.append(f"<li><b>{html.escape(m_line.group(1))}</b> — {html.escape(m_line.group(2))}</li>")
+            else:
+                rendered.append(f"<li>{html.escape(item)}</li>")
+        return "<ul class='ap-ext-list'>" + "".join(rendered) + "</ul>"
+
+    if sub_prefix == "5.1.2.":
+        groups: list[tuple[str, list[str]]] = []
+        current_head = ""
+        current_items: list[str] = []
+        for ln in lines:
+            if re.match(r"^Zestaw\s+\d+", ln, flags=re.IGNORECASE):
+                if current_head or current_items:
+                    groups.append((current_head, current_items))
+                current_head = ln
+                current_items = []
+            else:
+                current_items.extend(split_semicolon_items([ln]))
+        if current_head or current_items:
+            groups.append((current_head, current_items))
+
+        out = []
+        for head, items in groups:
+            if head:
+                out.append(p(head, cls="ap-ext-step-head"))
+            if items:
+                out.append(ul(items))
+        return "".join(out)
+
+    if sub_prefix == "3.7.":
+        blocks: list[str] = []
+        prev_technika = False
+        for ln in lines:
+            if re.match(r"^\d+\)\s+", ln):
+                blocks.append(p(ln, cls="ap-ext-step-head"))
+                prev_technika = False
+                continue
+            if ln.casefold().startswith("technika:"):
+                blocks.append(p_bold_prefix(ln, {"Technika"}))
+                prev_technika = True
+                continue
+            if ln.casefold().startswith("schemat:"):
+                blocks.append(p_bold_prefix(ln, {"Schemat"}))
+                prev_technika = False
+                continue
+            if ln.casefold().startswith("po co?"):
+                blocks.append(p_bold_prefix(ln, {"Po co?"}))
+                prev_technika = False
+                continue
+            if prev_technika and "," in ln and ("„" in ln or "\"" in ln):
+                parts = [x.strip() for x in re.split(r"\s*,\s*", ln) if x.strip()]
+                blocks.append(ul(parts))
+                prev_technika = False
+                continue
+            blocks.append(p(ln))
+            prev_technika = False
+        return "".join(blocks)
+
+    if sub_prefix in bullet_only_prefixes:
+        return ul(split_semicolon_items(lines))
+
+    # Domyślnie: akapity (bez agresywnego dzielenia po przecinkach)
+    return "".join(p(x) for x in lines)
 
 
 def _expanded_sections_html(archetype_data: dict) -> str:
@@ -4112,14 +4271,20 @@ def _expanded_sections_html(archetype_data: dict) -> str:
 
     section_blocks: list[str] = []
     for section in sections:
-        sec_title = html.escape(str(section.get("title", "")).strip())
+        sec_title_raw = str(section.get("title", "")).strip()
+        sec_title = html.escape(sec_title_raw)
+        icon = ""
+        m_sec = re.match(r"^([1-9])\.\s+", sec_title_raw)
+        if m_sec:
+            icon = SECTION_ICON_MAP.get(m_sec.group(1), "")
         subsection_blocks: list[str] = []
         for subsection in section.get("subsections", []):
-            sub_title = html.escape(str(subsection.get("title", "")).strip())
+            sub_title_raw = str(subsection.get("title", "")).strip()
+            sub_title = html.escape(sub_title_raw)
             content_lines = [str(line).strip() for line in subsection.get("content", []) if str(line).strip()]
             if not content_lines and not sub_title:
                 continue
-            content_html = _expanded_subsection_content_html(content_lines)
+            content_html = _expanded_subsection_content_html(content_lines, sub_title_raw)
 
             subsection_blocks.append(
                 f"""
@@ -4133,7 +4298,7 @@ def _expanded_sections_html(archetype_data: dict) -> str:
         section_blocks.append(
             f"""
             <section class="ap-ext-section">
-                <div class="ap-ext-title">{sec_title}</div>
+                <div class="ap-ext-title">{f"<span class='ap-ext-title-icon'>{icon}</span>" if icon else ""}<span>{sec_title}</span></div>
                 <div class="ap-ext-body">{''.join(subsection_blocks)}</div>
             </section>
             """
@@ -4254,7 +4419,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 margin-bottom:18px;
             }}
             #{card_dom_id} .ap-card-name {{
-                font-size:2.25em;
+                font-size:2.38em;
                 font-weight:700;
                 line-height:1.08;
                 margin-top:12px;
@@ -4270,7 +4435,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 font-weight:600;
             }}
             #{card_dom_id} .ap-metric-title {{
-                font-size:1.75em;
+                font-size:1.62em;
                 font-weight:700;
                 color:{text_color};
                 margin:22px 0 16px;
@@ -4280,7 +4445,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 border:none;
                 border-radius:0;
                 padding:0;
-                margin-top:34px;
+                margin-top:40px;
                 margin-bottom:0;
                 background:transparent;
             }}
@@ -4291,8 +4456,8 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 font-size:1.15em;
                 font-weight:700;
                 color:{text_color};
-                margin-top:2px;
-                margin-bottom:0;
+                margin-top:0;
+                margin-bottom:1px;
                 letter-spacing:.02em;
             }}
             #{card_dom_id} .ap-example-head {{
@@ -4360,7 +4525,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 line-height:1.2;
             }}
             #{card_dom_id} .ap-metric-row-chips .ap-metric-label {{
-                margin-bottom:12px;
+                margin-bottom:16px;
             }}
             #{card_dom_id} .ap-metric-grid {{
                 display:grid;
@@ -4464,13 +4629,20 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 font-size:1.03em;
                 font-weight:700;
                 color:{text_color};
+                display:flex;
+                align-items:center;
+                gap:8px;
+            }}
+            #{card_dom_id} .ap-ext-title-icon {{
+                font-size:1.08em;
+                line-height:1;
             }}
             #{card_dom_id} .ap-ext-body {{
                 padding:10px 12px 6px;
             }}
             #{card_dom_id} .ap-ext-subsection {{
-                margin-bottom:8px;
-                padding-bottom:8px;
+                margin-bottom:12px;
+                padding-bottom:11px;
                 border-bottom:1px dashed {details_border_color};
             }}
             #{card_dom_id} .ap-ext-subsection:last-child {{
@@ -4482,30 +4654,44 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 font-size:1.02em;
                 font-weight:700;
                 color:{details_subtitle_color};
-                margin-bottom:5px;
+                margin-top:12px;
+                margin-bottom:4px;
             }}
             #{card_dom_id} .ap-ext-content p {{
                 margin:0 0 6px 0;
                 font-size:.95em;
-                line-height:1.45;
+                line-height:1.5;
                 color:{details_text_color};
             }}
+            #{card_dom_id} .ap-ext-content .ap-ext-step-head {{
+                margin-top:13px;
+                margin-bottom:6px;
+                font-weight:700;
+            }}
+            #{card_dom_id} .ap-ext-content p:first-child.ap-ext-step-head {{
+                margin-top:2px;
+            }}
             #{card_dom_id} .ap-ext-topic {{
-                margin:0 0 6px 0;
+                margin:8px 0 5px 0;
                 font-weight:600;
                 color:{details_text_color};
             }}
             #{card_dom_id} .ap-ext-list {{
-                margin:0 0 6px 0;
+                margin:1px 0 10px 0;
                 padding-left:20px;
+            }}
+            #{card_dom_id} .ap-ext-ol {{
+                margin:1px 0 10px 0;
+                padding-left:24px;
             }}
             #{card_dom_id} .ap-ext-list-nested {{
                 margin-top:4px;
             }}
-            #{card_dom_id} .ap-ext-list li {{
-                margin-bottom:3px;
+            #{card_dom_id} .ap-ext-list li,
+            #{card_dom_id} .ap-ext-ol li {{
+                margin-bottom:5px;
                 font-size:.94em;
-                line-height:1.4;
+                line-height:1.42;
                 color:{details_text_color};
             }}
             #{card_dom_id} .ap-ext-empty {{
@@ -4523,7 +4709,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 }}
                 #{card_dom_id} .ap-card-name {{
                     margin-top:0;
-                    font-size:1.72em;
+                    font-size:1.82em;
                 }}
                 #{card_dom_id} .ap-metric-grid {{
                     grid-template-columns:1fr;
@@ -4533,7 +4719,7 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
         <div id="{card_dom_id}" class="ap-card-wrap">
             <div class="ap-card-head">
                 <div style="flex-shrink:0;">
-                    {arche_icon_img_html(archetype_data.get('name', '?'), height_px=130, gender_code=gender_code)}
+                    {arche_icon_img_html(archetype_data.get('name', '?'), height_px=146, gender_code=gender_code)}
                 </div>
                 <div>
                     <div class="ap-card-name">{html.escape(str(archetype_data.get('name', '?')))}</div>
@@ -5312,7 +5498,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 ),
                 unsafe_allow_html=True,
             )
-            st.image(segment_profile_png_path, width=620)
+            st.image(segment_profile_png_path, width=713)
             st.markdown(
                 """
                 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
