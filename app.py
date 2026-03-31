@@ -439,15 +439,53 @@ def _normalize_emails(raw: str) -> List[str]:
 
 
 def _email_env():
-    host = st.secrets.get("SMTP_HOST", "")
-    port = int(st.secrets.get("SMTP_PORT", 0) or 0)
-    user = st.secrets.get("SMTP_USER", "")
-    pwd = st.secrets.get("SMTP_PASS", "")
-    secure = (st.secrets.get("SMTP_SECURE", "ssl") or "ssl").lower()
-    from_email = st.secrets.get("FROM_EMAIL", "")
-    from_name = st.secrets.get("FROM_NAME", "")
-    if not all([host, port, user, pwd, from_email]):
-        raise RuntimeError("Brak konfiguracji SMTP w secrets.toml")
+    host = (
+        st.secrets.get("SMTP_HOST", "")
+        or st.secrets.get("EMAIL_HOST", "")
+        or st.secrets.get("MAIL_HOST", "")
+    )
+    port_raw = (
+        st.secrets.get("SMTP_PORT", 0)
+        or st.secrets.get("EMAIL_PORT", 0)
+        or st.secrets.get("MAIL_PORT", 0)
+    )
+    port = int(port_raw or 0)
+    user = (
+        st.secrets.get("SMTP_USER", "")
+        or st.secrets.get("EMAIL_USER", "")
+        or st.secrets.get("MAIL_USER", "")
+    )
+    pwd = (
+        st.secrets.get("SMTP_PASS", "")
+        or st.secrets.get("EMAIL_PASS", "")
+        or st.secrets.get("MAIL_PASS", "")
+    )
+    secure = (
+        st.secrets.get("SMTP_SECURE", "")
+        or st.secrets.get("EMAIL_SECURE", "")
+        or st.secrets.get("MAIL_SECURE", "")
+    )
+    secure = (secure or ("ssl" if port == 465 else "starttls")).lower()
+    from_email = (
+        st.secrets.get("FROM_EMAIL", "")
+        or st.secrets.get("SMTP_FROM", "")
+        or user
+    )
+    from_name = st.secrets.get("FROM_NAME", "") or st.secrets.get("SMTP_FROM_NAME", "")
+
+    missing = []
+    if not host:
+        missing.append("SMTP_HOST")
+    if not port:
+        missing.append("SMTP_PORT")
+    if not user:
+        missing.append("SMTP_USER")
+    if not pwd:
+        missing.append("SMTP_PASS")
+    if not from_email:
+        missing.append("FROM_EMAIL")
+    if missing:
+        raise RuntimeError("Brak konfiguracji SMTP w secrets.toml: " + ", ".join(missing))
     return host, port, user, pwd, secure, from_email, from_name
 
 
@@ -465,9 +503,9 @@ def _fmt_local_ts(ts) -> str:
 
 def _build_report_link(token: str) -> str:
     base = (st.secrets.get("REPORT_BASE_URL", "") or "").strip()
-    # Wymuszenie domeny raportowej, gdy w secrets jest pusty/stary adres streamlit.
+    # Preferuj domenę raportową; jeśli w secrets zostawiono streamlit.app, przełącz na raportową.
     if (not base) or ("streamlit.app" in base.lower()):
-        base = "https://raport.archetypy.badania.pro/"
+        base = (st.secrets.get("REPORT_PUBLIC_BASE_URL", "") or "").strip() or "https://raport.archetypy.badania.pro/"
     if not base.startswith("http://") and not base.startswith("https://"):
         base = "https://" + base.lstrip("/")
     joiner = "&" if "?" in base else "?"
@@ -963,6 +1001,20 @@ def stats_panel() -> None:
 
 
 def _render_public_gate(token: str) -> bool:
+    if bool(st.session_state.get(f"public_ok_{token}", False)):
+        # Po odblokowaniu przywróć jasne tło i NIE renderuj już warstwy blokady.
+        st.markdown(
+            """
+            <style>
+            .stApp, .stApp > header{
+              background:#fafafa !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        return True
+
     st.markdown(
         """
         <style>
@@ -994,27 +1046,44 @@ def _render_public_gate(token: str) -> bool:
         }
         .public-lock-sub{
           color:#c7d2e9;
-          margin:0 0 14px 0;
+          margin:0 0 10px 0;
           line-height:1.45;
           font-size:0.98rem;
+        }
+        .public-form-wrap{
+          width:min(560px, 94vw);
+          border:1px solid rgba(255,255,255,.20);
+          background:rgba(10,15,25,.78);
+          border-radius:16px;
+          padding:14px 18px 16px;
+          box-shadow:0 20px 54px rgba(0,0,0,.45);
+        }
+        .public-form-wrap label,
+        .public-form-wrap p,
+        .public-form-wrap span{
+          color:#dbe6ff !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown(
-        "<div class='public-lock-wrap'><div class='public-lock-card'>"
-        "<div class='public-lock-title'>Podgląd raportu jest zabezpieczony</div>"
-        "<div class='public-lock-sub'>Podaj e-mail, na który wysłano link, oraz hasło dostępu.</div>",
-        unsafe_allow_html=True,
-    )
 
-    with st.form(f"public_unlock_{token}", clear_on_submit=False):
-        email = st.text_input("E-mail", key=f"public_email_{token}")
-        password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}")
-        unlock = st.form_submit_button("Odblokuj raport", type="primary")
-
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    lock_l, lock_c, lock_r = st.columns([0.33, 0.34, 0.33], gap="small")
+    with lock_c:
+        st.markdown(
+            "<div class='public-lock-card'>"
+            "<div class='public-lock-title'>Podgląd raportu jest zabezpieczony</div>"
+            "<div class='public-lock-sub'>Podaj e-mail, na który wysłano link, oraz hasło dostępu.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='public-form-wrap'>", unsafe_allow_html=True)
+        with st.form(f"public_unlock_{token}", clear_on_submit=False):
+            email = st.text_input("E-mail", key=f"public_email_{token}")
+            password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}")
+            unlock = st.form_submit_button("Odblokuj raport", type="primary")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if unlock:
         res = verify_report_token_credentials(token, email, password)
@@ -1300,15 +1369,15 @@ def results_view() -> None:
 
             b1, b2, b3 = st.columns(3)
             with b1:
-                if st.button("Zawieś", key=f"suspend_{selected['id']}", use_container_width=True, disabled=selected_status != "active"):
+                if st.button("⏸️ Zawieś", key=f"suspend_{selected['id']}", use_container_width=True, disabled=selected_status != "active"):
                     set_report_access_status(selected["id"], "suspended")
                     st.rerun()
             with b2:
-                if st.button("Odwieś", key=f"unsuspend_{selected['id']}", use_container_width=True, disabled=selected_status != "suspended"):
+                if st.button("▶️ Odwieś", key=f"unsuspend_{selected['id']}", use_container_width=True, disabled=selected_status != "suspended"):
                     set_report_access_status(selected["id"], "active")
                     st.rerun()
             with b3:
-                if st.button("Odwołaj", key=f"revoke_{selected['id']}", use_container_width=True, disabled=selected_status == "revoked"):
+                if st.button("🛑 Odwołaj", key=f"revoke_{selected['id']}", use_container_width=True, disabled=selected_status == "revoked"):
                     set_report_access_status(selected["id"], "revoked")
                     st.rerun()
 
@@ -1334,7 +1403,15 @@ def results_view() -> None:
                 key=f"regrant_password_{study['id']}",
                 help="To hasło zostanie wysłane ponownie e-mailem razem z nowym linkiem.",
             )
-            if st.button("Przyznaj ponownie", key=f"regrant_btn_{selected['id']}", use_container_width=True):
+            rg_l, rg_r = st.columns([0.72, 0.28], gap="small")
+            with rg_r:
+                do_regrant = st.button(
+                    "🔁 Przyznaj ponownie",
+                    key=f"regrant_btn_{selected['id']}",
+                    use_container_width=True,
+                    type="primary",
+                )
+            if do_regrant:
                 if len((regrant_password or "").strip()) < 4:
                     st.error("Przy przyznaniu ponownie podaj hasło (min. 4 znaki).")
                 else:

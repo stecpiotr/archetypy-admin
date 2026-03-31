@@ -104,16 +104,56 @@ def _normalize_emails(s: str) -> List[str]:
     return out
 
 def _email_env():
-    host = st.secrets.get("SMTP_HOST", "")
-    port = int(st.secrets.get("SMTP_PORT", 0) or 0)
-    user = st.secrets.get("SMTP_USER", "")
-    pwd  = st.secrets.get("SMTP_PASS", "")
-    secure = (st.secrets.get("SMTP_SECURE", "ssl") or "ssl").lower()
-    from_email = st.secrets.get("FROM_EMAIL", "")
-    from_name  = st.secrets.get("FROM_NAME", "")
+    host = (
+        st.secrets.get("SMTP_HOST", "")
+        or st.secrets.get("EMAIL_HOST", "")
+        or st.secrets.get("MAIL_HOST", "")
+    )
+    port_raw = (
+        st.secrets.get("SMTP_PORT", 0)
+        or st.secrets.get("EMAIL_PORT", 0)
+        or st.secrets.get("MAIL_PORT", 0)
+    )
+    port = int(port_raw or 0)
+    user = (
+        st.secrets.get("SMTP_USER", "")
+        or st.secrets.get("EMAIL_USER", "")
+        or st.secrets.get("MAIL_USER", "")
+    )
+    pwd = (
+        st.secrets.get("SMTP_PASS", "")
+        or st.secrets.get("EMAIL_PASS", "")
+        or st.secrets.get("MAIL_PASS", "")
+    )
+    secure = (
+        st.secrets.get("SMTP_SECURE", "")
+        or st.secrets.get("EMAIL_SECURE", "")
+        or st.secrets.get("MAIL_SECURE", "")
+    )
+    secure = (secure or ("ssl" if port == 465 else "starttls")).lower()
+    from_email = (
+        st.secrets.get("FROM_EMAIL", "")
+        or st.secrets.get("SMTP_FROM", "")
+        or user
+    )
+    from_name  = st.secrets.get("FROM_NAME", "") or st.secrets.get("SMTP_FROM_NAME", "")
     base_url = (st.secrets.get("SURVEY_BASE_URL", "") or "").rstrip("/")
-    if not all([host, port, user, pwd, from_email, base_url]):
-        raise RuntimeError("Brak ustawień SMTP albo SURVEY_BASE_URL w st.secrets.")
+
+    missing = []
+    if not host:
+        missing.append("SMTP_HOST")
+    if not port:
+        missing.append("SMTP_PORT")
+    if not user:
+        missing.append("SMTP_USER")
+    if not pwd:
+        missing.append("SMTP_PASS")
+    if not from_email:
+        missing.append("FROM_EMAIL")
+    if not base_url:
+        missing.append("SURVEY_BASE_URL")
+    if missing:
+        raise RuntimeError("Brak ustawień SMTP/SURVEY w st.secrets: " + ", ".join(missing))
     return host, port, user, pwd, secure, from_email, from_name, base_url
 
 

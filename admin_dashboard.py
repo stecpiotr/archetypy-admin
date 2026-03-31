@@ -4562,6 +4562,13 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
 def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -> None:
     # stan przełącznika eksportu (bezpieczeństwo przy pierwszym renderze)
     st.session_state.setdefault("prep_docs", False)
+    # CSS musi być doładowywany na każdym rerunie (zmiana osoby w selectboxie).
+    inject_global_css(GLOBAL_CSS)
+    # Szerokość raportu (również dla widoku publicznego).
+    st.markdown(
+        f"<style>.block-container{{max-width:{'98vw' if wide else '1160px'} !important;}}</style>",
+        unsafe_allow_html=True,
+    )
 
     # --- NOWE: płeć + mapowanie nazw do żeńskich ---
     gender_raw = (study.get("gender") or study.get("sex") or study.get("plec") or "").strip().lower()
@@ -5305,20 +5312,18 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 ),
                 unsafe_allow_html=True,
             )
-            sp_l, sp_c, sp_r = st.columns([0.16, 0.68, 0.16], gap="small")
-            with sp_c:
-                st.image(segment_profile_png_path, width=660)
-                st.markdown(
-                    """
-                    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#de4b43;border-radius:2px;display:inline-block;"></span>Zmiana</span>
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2d5ad5;border-radius:2px;display:inline-block;"></span>Ludzie</span>
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2f8a45;border-radius:2px;display:inline-block;"></span>Porządek</span>
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#6f53d4;border-radius:2px;display:inline-block;"></span>Niezależność</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            st.image(segment_profile_png_path, width=620)
+            st.markdown(
+                """
+                <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
+                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#de4b43;border-radius:2px;display:inline-block;"></span>Zmiana</span>
+                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2d5ad5;border-radius:2px;display:inline-block;"></span>Ludzie</span>
+                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2f8a45;border-radius:2px;display:inline-block;"></span>Porządek</span>
+                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#6f53d4;border-radius:2px;display:inline-block;"></span>Niezależność</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
