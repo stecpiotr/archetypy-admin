@@ -37,6 +37,8 @@ import pytz
 from functools import lru_cache
 from urllib.parse import quote
 from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 import os
 from pathlib import Path
 from docxtpl import DocxTemplate, InlineImage
@@ -3106,6 +3108,117 @@ def _doc_add_paragraph(doc_obj, text: str, style_name: str | None = None):
     return doc_obj.add_paragraph(text)
 
 
+def _remove_table_borders(table_obj):
+    """Ukrywa obramowanie tabeli (dla siatek zdjęć w DOCX)."""
+    try:
+        tbl = table_obj._tbl
+        tbl_pr = tbl.tblPr
+        borders = OxmlElement("w:tblBorders")
+        for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            elem = OxmlElement(f"w:{edge}")
+            elem.set(qn("w:val"), "nil")
+            borders.append(elem)
+        tbl_pr.append(borders)
+    except Exception:
+        pass
+
+
+def _add_people_photo_grid_docx(
+    doc_obj,
+    names: list[str],
+    category: str = "person",
+    columns: int = 5,
+    image_width_mm: float = 20.0,
+) -> bool:
+    """
+    Wstawia do DOCX siatkę zdjęć + podpisów.
+    Zwraca True, jeśli udało się wyrenderować przynajmniej jedną pozycję.
+    """
+    raw = [str(x).strip() for x in (names or []) if str(x).strip()]
+    if not raw:
+        return False
+
+    unique = list(dict.fromkeys(raw))
+    if not unique:
+        return False
+
+    cols = max(1, int(columns))
+    rows = (len(unique) + cols - 1) // cols
+    table = doc_obj.add_table(rows=rows, cols=cols)
+    try:
+        table.alignment = WD_TABLE_ALIGNMENT.LEFT
+        table.autofit = True
+    except Exception:
+        pass
+    _remove_table_borders(table)
+
+    rendered_any = False
+    for idx, raw_name in enumerate(unique):
+        row_idx = idx // cols
+        col_idx = idx % cols
+        cell = table.cell(row_idx, col_idx)
+        try:
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+        except Exception:
+            pass
+
+        display_name = canonical_person_name(raw_name) if category == "person" else raw_name
+        photo_path = _resolve_photo_path(raw_name, category=category)
+
+        # domyślny pierwszy akapit w komórce
+        p_img = cell.paragraphs[0]
+        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_img.text = ""
+
+        if photo_path and os.path.exists(photo_path):
+            add_image(p_img, photo_path, width=Mm(image_width_mm))
+            rendered_any = True
+
+        p_cap = cell.add_paragraph()
+        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        link_url = None
+        if category == "person":
+            link_url = person_wikipedia_links.get(canonical_person_name(raw_name))
+        if link_url:
+            add_hyperlink(p_cap, display_name, link_url)
+        else:
+            run = p_cap.add_run(display_name)
+            run.font.size = Pt(8.5)
+
+    return rendered_any
+
+
+def _append_examples_block_docx(doc_obj, label: str, examples_map: dict):
+    """Render sekcji 'Przykłady archetypów' do DOCX, razem ze zdjęciami osób."""
+    _doc_add_paragraph(doc_obj, f"{label}:", "Heading 4")
+    examples_map = examples_map or {}
+
+    groups = (
+        ("Politycy", "person"),
+        ("Marki/organizacje", None),
+        ("Popkultura/postacie", "popculture"),
+    )
+
+    for group_name, category in groups:
+        values = [str(v).strip() for v in (examples_map.get(group_name) or []) if str(v).strip()]
+        if not values:
+            continue
+
+        _doc_add_paragraph(doc_obj, f"{group_name}:", "Heading 4")
+        if category in {"person", "popculture"}:
+            rendered = _add_people_photo_grid_docx(
+                doc_obj,
+                values,
+                category=category,
+                columns=5,
+                image_width_mm=20.0,
+            )
+            if not rendered:
+                _doc_add_paragraph(doc_obj, ", ".join(values))
+        else:
+            _doc_add_paragraph(doc_obj, ", ".join(values))
+
+
 def _append_archetype_appendix(doc_tpl, appendix_items: list[tuple[str, dict]]):
     valid_items = []
     for role_label, arche_data in appendix_items:
@@ -3143,20 +3256,19 @@ def _append_archetype_appendix(doc_tpl, appendix_items: list[tuple[str, dict]]):
                     continue
 
                 if kind == "examples":
-                    _doc_add_paragraph(doc_obj, f"{label}:", "Heading 4")
-                    examples_map = value or {}
-                    for group in ("Politycy", "Marki/organizacje", "Popkultura/postacie"):
-                        values = examples_map.get(group) or []
-                        if values:
-                            _doc_add_paragraph(doc_obj, f"- {group}: {', '.join(values)}")
+                    _append_examples_block_docx(doc_obj, label, value or {})
                     continue
 
                 if isinstance(value, list):
-                    if not value:
+                    vals = [str(v).strip() for v in value if str(v).strip()]
+                    vals = _romanize_metric_items_if_needed(label, vals)
+                    if not vals:
                         continue
                     _doc_add_paragraph(doc_obj, f"{label}:", "Heading 4")
-                    for item in value:
-                        if str(item).strip():
+                    for item in vals:
+                        if label.casefold() == "4 filary wartości":
+                            _doc_add_paragraph(doc_obj, item)
+                        else:
                             _doc_add_paragraph(doc_obj, f"- {item}")
                     continue
 
@@ -3245,21 +3357,20 @@ def export_word_metrics_only(
                 continue
 
             if kind == "examples":
-                doc.add_heading(label, level=4)
-                examples_map = value or {}
-                for group in ("Politycy", "Marki/organizacje", "Popkultura/postacie"):
-                    vals = [str(v).strip() for v in (examples_map.get(group) or []) if str(v).strip()]
-                    if vals:
-                        doc.add_paragraph(f"- {group}: {', '.join(vals)}")
+                _append_examples_block_docx(doc, label, value or {})
                 continue
 
             if isinstance(value, list):
                 vals = [str(v).strip() for v in value if str(v).strip()]
+                vals = _romanize_metric_items_if_needed(label, vals)
                 if not vals:
                     continue
                 doc.add_heading(label, level=4)
                 for item in vals:
-                    doc.add_paragraph(f"- {item}")
+                    if label.casefold() == "4 filary wartości":
+                        doc.add_paragraph(item)
+                    else:
+                        doc.add_paragraph(f"- {item}")
                 continue
 
             txt = str(value or "").strip()
@@ -4063,6 +4174,40 @@ def _metric_text_plain(value) -> str:
     return " ".join(parts).strip()
 
 
+def _to_roman(num: int) -> str:
+    """Konwersja liczby całkowitej (>=1) do zapisu rzymskiego."""
+    if num <= 0:
+        return str(num)
+    mapping = [
+        (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+        (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+        (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+    ]
+    out = []
+    n = int(num)
+    for value, sym in mapping:
+        while n >= value:
+            out.append(sym)
+            n -= value
+    return "".join(out)
+
+
+def _romanize_metric_items_if_needed(label_raw: str, items: list[str]) -> list[str]:
+    """
+    Dla pola '4 filary wartości' wymusza numerację: I., II., III., IV.
+    Dla innych pól zwraca bez zmian.
+    """
+    label_cf = str(label_raw or "").strip().casefold()
+    if label_cf != "4 filary wartości":
+        return items
+    normalized: list[str] = []
+    for idx, item in enumerate(items, start=1):
+        clean = re.sub(r"^\s*(?:[IVXLCDM]+\.|\d+\.)\s*", "", str(item or "").strip(), flags=re.IGNORECASE)
+        if clean:
+            normalized.append(f"{_to_roman(idx)}. {clean}")
+    return normalized
+
+
 def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
     label_raw = str(row.get("label", "")).strip()
     if label_raw.casefold() == "core triplet":
@@ -4114,11 +4259,18 @@ def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
 
     if isinstance(value, list):
         items = [str(item).strip() for item in value if str(item).strip()]
+        items = _romanize_metric_items_if_needed(label_raw, items)
         label_cf = label_raw.casefold()
         row_extra_cls = ""
 
         if not items:
             value_html = "<span style='color:#7c8799;'>—</span>"
+        elif label_cf == "4 filary wartości":
+            value_html = (
+                "<div class='ap-roman-list'>"
+                + "".join(f"<p>{html.escape(item)}</p>" for item in items)
+                + "</div>"
+            )
         elif label_cf in {"kluczowe atrybuty", "słowa-klucze (talking points)"}:
             row_extra_cls = " ap-metric-row-chips"
             chips = "".join(f"<span class='ap-pill'>{html.escape(item)}</span>" for item in items)
@@ -4167,6 +4319,17 @@ def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
             )
         elif label_raw.casefold() == "oś narracyjna i antagonista":
             value_html = _story_antagonist_html(text)
+        elif label_raw.casefold() == "4 filary wartości":
+            items = _split_metric_line_items(text)
+            items = _romanize_metric_items_if_needed(label_raw, items)
+            if items:
+                value_html = (
+                    "<div class='ap-roman-list'>"
+                    + "".join(f"<p>{html.escape(item)}</p>" for item in items)
+                    + "</div>"
+                )
+            else:
+                value_html = f"<p>{html.escape(text)}</p>"
         else:
             paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
             value_html = "".join(f"<p>{html.escape(p)}</p>" for p in paragraphs)
@@ -4710,6 +4873,17 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
             #{card_dom_id} .ap-metric-value p {{
                 margin:0 0 6px 0;
             }}
+            #{card_dom_id} .ap-roman-list {{
+                margin:6px 0 10px 0;
+                padding-left:24px;
+            }}
+            #{card_dom_id} .ap-roman-list p {{
+                margin:0 0 9px 0;
+                text-indent:0;
+            }}
+            #{card_dom_id} .ap-roman-list p:last-child {{
+                margin-bottom:0;
+            }}
             #{card_dom_id} .ap-simple-list {{
                 margin:2px 0 4px 0;
                 padding-left:21px;
@@ -4829,8 +5003,38 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 color:{link_color};
                 text-decoration:underline;
             }}
-            #{card_dom_id} .ap-details {{
+            #{card_dom_id} .ap-details-row {{
                 margin-top:18px;
+                position:relative;
+            }}
+            #{card_dom_id} .ap-expand-cue {{
+                position:absolute;
+                left:-18px;
+                top:50%;
+                transform:translateY(-50%);
+                width:0;
+                height:0;
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                pointer-events:none;
+            }}
+            #{card_dom_id} .ap-expand-cue-arrow {{
+                color:{tagline_color};
+                font-size:1.09em;
+                font-weight:800;
+                line-height:1;
+                opacity:.9;
+                animation:ap-expand-nudge 1.2s ease-in-out infinite;
+                user-select:none;
+            }}
+            @keyframes ap-expand-nudge {{
+                0% {{ transform:translateX(0); opacity:.82; }}
+                45% {{ transform:translateX(4px); opacity:1; }}
+                100% {{ transform:translateX(0); opacity:.82; }}
+            }}
+            #{card_dom_id} .ap-details {{
+                margin-top:0;
                 border:1px solid {details_border_color};
                 border-radius:14px;
                 background:{details_bg_color};
@@ -5111,6 +5315,11 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 #{card_dom_id}.ap-card-wrap {{
                     padding:1.35em 1.0em 1.05em 2.15em;
                 }}
+                #{card_dom_id} .ap-expand-cue {{
+                    left:-12px;
+                    top:50%;
+                    transform:translateY(-50%);
+                }}
                 #{card_dom_id} .ap-card-head {{
                     flex-direction:column;
                     gap:8px;
@@ -5151,21 +5360,24 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
             </div>
             <div class="ap-metric-title">Metryka archetypu</div>
             {metric_rows_html}
-            <details class="ap-details">
-                <summary>
-                    <span class="ap-summary-left">
-                        <span class="ap-summary-badge">🔎 Rozszerzona analiza</span>
-                        <span class="ap-summary-text">
-                            <span class="ap-summary-open">Pokaż rozbudowany opis</span>
-                            <span class="ap-summary-close">Zwiń rozbudowany opis</span>
+            <div class="ap-details-row">
+                <div class="ap-expand-cue" aria-hidden="true"><span class="ap-expand-cue-arrow">➜</span></div>
+                <details class="ap-details">
+                    <summary>
+                        <span class="ap-summary-left">
+                            <span class="ap-summary-badge">🔎 Rozszerzona analiza</span>
+                            <span class="ap-summary-text">
+                                <span class="ap-summary-open">Pokaż rozbudowany opis</span>
+                                <span class="ap-summary-close">Zwiń rozbudowany opis</span>
+                            </span>
                         </span>
-                    </span>
-                    <span class="ap-summary-arrow">▾</span>
-                </summary>
-                <div class="ap-expanded-wrap">
-                    {expanded_html}
-                </div>
-            </details>
+                        <span class="ap-summary-arrow">▾</span>
+                    </summary>
+                    <div class="ap-expanded-wrap">
+                        {expanded_html}
+                    </div>
+                </details>
+            </div>
         </div>
     """)
     # Usuń wcięcia na początku linii: inaczej markdown Streamlit traktuje HTML jak code block.

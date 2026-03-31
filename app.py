@@ -1201,6 +1201,15 @@ def results_view() -> None:
 
     # lokalny wrapper, żeby CSS działał tylko tutaj
     st.markdown('<div id="results-choose"><div class="section-label">Wybierz osobę:</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div id="ff-autofill-trap" aria-hidden="true" style="position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;">
+          <input type="text" name="username" autocomplete="username" tabindex="-1" />
+          <input type="password" name="current-password" autocomplete="current-password" tabindex="-1" />
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     options = {
         f"{s.get('last_name_nom') or s['last_name']} {s.get('first_name_nom') or s['first_name']} ({s['city']}) – /{s['slug']}"
@@ -1213,23 +1222,36 @@ def results_view() -> None:
         (function(){
           const scope = document.getElementById('results-choose');
           if(!scope) return;
-          const apply = () => {
-            const targets = scope.querySelectorAll('input,[role="combobox"],[contenteditable="true"]');
-            targets.forEach((el, idx) => {
+
+          const harden = () => {
+            let idx = 0;
+            const direct = scope.querySelectorAll('input,[role="combobox"],[contenteditable="true"]');
+            const globalCombobox = document.querySelectorAll('input[role="combobox"], [data-baseweb="select"] input, [data-baseweb="select"] [contenteditable="true"]');
+            const all = [...direct, ...globalCombobox];
+            all.forEach((el) => {
               try{
-                el.setAttribute('autocomplete','off');
+                el.setAttribute('autocomplete','new-password');
                 el.setAttribute('autocorrect','off');
                 el.setAttribute('autocapitalize','off');
                 el.setAttribute('spellcheck','false');
                 el.setAttribute('data-lpignore','true');
                 el.setAttribute('data-1p-ignore','true');
-                el.setAttribute('name','results_selector_' + idx);
+                el.setAttribute('name','results_selector_' + (idx++));
+                if (el.matches('input[role="combobox"]')) {
+                  el.readOnly = true;
+                }
               }catch(_e){}
             });
           };
-          apply();
-          setTimeout(apply, 120);
-          setTimeout(apply, 600);
+
+          harden();
+          setTimeout(harden, 120);
+          setTimeout(harden, 600);
+          setTimeout(harden, 1200);
+
+          const mo = new MutationObserver(() => harden());
+          mo.observe(document.body, { childList:true, subtree:true, attributes:true });
+          setTimeout(() => { try { mo.disconnect(); } catch(_e){} }, 12000);
         })();
         </script>
         """,
