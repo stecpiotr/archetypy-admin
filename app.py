@@ -1,7 +1,9 @@
 from __future__ import annotations
 from typing import Dict, List, Tuple, Optional
 import contextlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import warnings
+import re
 import pandas as pd
 import streamlit as st
 
@@ -28,6 +30,25 @@ except Exception:
 from utils import make_token
 from send_link import render as render_send_link
 from streamlit.components.v1 import html as html_component
+from email_client import send_email
+from report_share import (
+    ensure_schema as ensure_report_share_schema,
+    create_access as create_report_access,
+    list_accesses as list_report_accesses,
+    set_status as set_report_access_status,
+    regrant_access as regrant_report_access,
+    set_password as set_report_access_password,
+    verify_token_credentials as verify_report_token_credentials,
+    get_access_by_token as get_report_access_by_token,
+    mark_sent as mark_report_access_sent,
+)
+
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning,
+    module="docxcompose.properties",
+)
 
 st.set_page_config(
     page_title="Archetypy – panel",
@@ -332,6 +353,104 @@ def modal(title: str):
     def _fake_modal():
         st.warning(title); yield
     return _fake_modal()
+
+
+EMAIL_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.I)
+
+
+def _normalize_emails(raw: str) -> List[str]:
+    src = (raw or "").replace("\n", ",").replace(";", ",")
+    seen = set()
+    out: List[str] = []
+    for chunk in src.split(","):
+        email = chunk.strip().lower()
+        if not email:
+            continue
+        if not EMAIL_RE.match(email):
+            continue
+        if email in seen:
+            continue
+        seen.add(email)
+        out.append(email)
+    return out
+
+
+def _email_env():
+    host = st.secrets.get("SMTP_HOST", "")
+    port = int(st.secrets.get("SMTP_PORT", 0) or 0)
+    user = st.secrets.get("SMTP_USER", "")
+    pwd = st.secrets.get("SMTP_PASS", "")
+    secure = (st.secrets.get("SMTP_SECURE", "ssl") or "ssl").lower()
+    from_email = st.secrets.get("FROM_EMAIL", "")
+    from_name = st.secrets.get("FROM_NAME", "")
+    if not all([host, port, user, pwd, from_email]):
+        raise RuntimeError("Brak konfiguracji SMTP w secrets.toml")
+    return host, port, user, pwd, secure, from_email, from_name
+
+
+def _fmt_local_ts(ts) -> str:
+    if not ts:
+        return ""
+    try:
+        val = pd.to_datetime(ts, utc=True, errors="coerce")
+        if pd.isna(val):
+            return ""
+        return val.tz_convert("Europe/Warsaw").strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return str(ts)
+
+
+def _build_report_link(token: str) -> str:
+    base = (st.secrets.get("REPORT_BASE_URL", "") or "").strip()
+    if not base:
+        return f"/?token={token}"
+    joiner = "&" if "?" in base else "?"
+    return f"{base}{joiner}token={token}"
+
+
+def _access_validity_text(row: Dict, hours_value: Optional[int] = None, indefinite: Optional[bool] = None) -> str:
+    if indefinite is None:
+        indefinite = bool(row.get("indefinite"))
+    if indefinite:
+        return "do odwołania"
+
+    if hours_value:
+        return f"{int(hours_value)} godzin"
+
+    expires = _fmt_local_ts(row.get("expires_at"))
+    if expires:
+        return f"do {expires}"
+    return "czasowo"
+
+
+def _person_genitive(study: Dict) -> str:
+    first = (study.get("first_name_gen") or study.get("first_name_nom") or study.get("first_name") or "").strip()
+    last = (study.get("last_name_gen") or study.get("last_name_nom") or study.get("last_name") or "").strip()
+    full = f"{first} {last}".strip()
+    return full or "tej osoby"
+
+
+def _fetch_study_by_id(study_id: str) -> Optional[Dict]:
+    try:
+        res = sb.table("studies").select("*").eq("id", study_id).limit(1).execute()
+        data = getattr(res, "data", None) or []
+        return data[0] if data else None
+    except Exception:
+        return None
+
+
+def _get_query_token() -> str:
+    try:
+        token = st.query_params.get("token", "")
+        if isinstance(token, list):
+            token = token[0] if token else ""
+        return str(token or "").strip()
+    except Exception:
+        try:
+            qp = st.experimental_get_query_params()
+            return str((qp.get("token") or [""])[0]).strip()
+        except Exception:
+            return ""
 
 CASES = ["nom", "gen", "dat", "acc", "ins", "loc", "voc"]
 
@@ -776,6 +895,116 @@ def stats_panel() -> None:
 
 
 
+def _render_public_gate(token: str) -> bool:
+    st.markdown(
+        """
+        <style>
+        .stApp, .stApp > header{
+          background:
+            radial-gradient(1200px 420px at 50% -120px, rgba(41,69,118,.35), rgba(4,8,14,.94) 70%),
+            #02050a !important;
+        }
+        .public-lock-wrap{
+          min-height:74vh;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          margin-top:2vh;
+        }
+        .public-lock-card{
+          width:min(560px, 94vw);
+          border:1px solid rgba(255,255,255,.20);
+          background:rgba(10,15,25,.78);
+          border-radius:16px;
+          padding:20px 22px 16px;
+          box-shadow:0 20px 54px rgba(0,0,0,.45);
+        }
+        .public-lock-title{
+          color:#f3f6ff;
+          font-size:1.38rem;
+          font-weight:700;
+          margin:0 0 4px 0;
+        }
+        .public-lock-sub{
+          color:#c7d2e9;
+          margin:0 0 14px 0;
+          line-height:1.45;
+          font-size:0.98rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div class='public-lock-wrap'><div class='public-lock-card'>"
+        "<div class='public-lock-title'>Podgląd raportu jest zabezpieczony</div>"
+        "<div class='public-lock-sub'>Podaj e-mail, na który wysłano link, oraz hasło dostępu.</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.form(f"public_unlock_{token}", clear_on_submit=False):
+        email = st.text_input("E-mail", key=f"public_email_{token}")
+        password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}")
+        unlock = st.form_submit_button("Odblokuj raport", type="primary")
+
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+    if unlock:
+        res = verify_report_token_credentials(token, email, password)
+        if res.ok:
+            st.session_state[f"public_ok_{token}"] = True
+            st.rerun()
+        st.error(res.message or "Brak dostępu.")
+    return bool(st.session_state.get(f"public_ok_{token}", False))
+
+
+def public_report_view(token: str) -> None:
+    ensure_report_share_schema()
+    grant = get_report_access_by_token(token)
+    if not grant:
+        st.error("Nieprawidłowy lub nieaktywny link podglądu raportu.")
+        st.stop()
+
+    status = str(grant.get("status") or "").lower()
+    if status != "active":
+        st.error("Dostęp do tego raportu jest obecnie nieaktywny.")
+        st.stop()
+    if (not bool(grant.get("indefinite"))) and grant.get("expires_at"):
+        try:
+            if datetime.now().astimezone().tzinfo is None:
+                now_utc = datetime.utcnow()
+            else:
+                now_utc = datetime.now(timezone.utc)
+            exp_utc = pd.to_datetime(grant.get("expires_at"), utc=True, errors="coerce")
+            if pd.notna(exp_utc) and now_utc > exp_utc.to_pydatetime():
+                st.error("Ten link wygasł.")
+                st.stop()
+        except Exception:
+            pass
+
+    if not _render_public_gate(token):
+        st.stop()
+
+    study = _fetch_study_by_id(str(grant.get("study_id") or ""))
+    if not study:
+        st.error("Nie udało się odnaleźć badania przypisanego do tego linku.")
+        st.stop()
+
+    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+    try:
+        import admin_dashboard as AD
+        if hasattr(AD, "show_report"):
+            try:
+                AD.show_report(sb, study, wide=True, public_view=True)
+            except TypeError:
+                AD.show_report(sb, study, wide=True)
+        else:
+            st.error("Brak funkcji renderującej raport.")
+    except Exception as e:
+        st.error(f"Nie udało się wyrenderować podglądu raportu: {e}")
+    st.stop()
+
+
 def results_view() -> None:
     require_auth()
     header("📊 Sprawdź wyniki badania archetypu")
@@ -872,31 +1101,212 @@ def results_view() -> None:
     # szara linia + kotwica + nagłówek
     st.markdown("<hr class='soft-hr' /><div id='udostepnij'></div>", unsafe_allow_html=True)
     st.markdown('<div class="section-title share-title">Udostępnij raport</div>', unsafe_allow_html=True)
+    ensure_report_share_schema()
 
-    with st.form("share_form"):
-        method = st.radio("Metoda", ["E-mail","SMS"], horizontal=True, index=0)
-        recipients_raw = st.text_area("Adresaci", placeholder="Oddziel przecinkami: np. jan@firma.pl, ola@urzad.gov.pl (lub numery telefonów dla SMS)")
-        hours = st.number_input("Ważność (godziny)", min_value=1, max_value=720, value=48)
-        submit_share = st.form_submit_button("Wygeneruj i zapisz linki", type="primary")
+    with st.form(f"share_form_{study['id']}"):
+        recipients_raw = st.text_area(
+            "Adresy e-mail",
+            placeholder="Oddziel przecinkami: np. jan@firma.pl, ola@urzad.gov.pl",
+        )
+        password = st.text_input(
+            "Hasło dostępu",
+            type="password",
+            help="To hasło będzie wymagane przy otwieraniu linku do raportu.",
+        )
+        validity_mode = st.radio(
+            "Ważność linku",
+            ["Ważny przez liczbę godzin", "Ważny do odwołania"],
+            horizontal=True,
+            index=0,
+        )
+        hours = None
+        if validity_mode == "Ważny przez liczbę godzin":
+            hours = st.number_input("Liczba godzin", min_value=1, max_value=7200, value=48)
+        submit_share = st.form_submit_button("Przyznaj dostęp i wyślij e-mail", type="primary")
+
     if submit_share:
-        recips = [x.strip() for x in recipients_raw.split(",") if x.strip()]
-        if not recips:
-            st.error("Podaj co najmniej jednego adresata.")
+        emails = _normalize_emails(recipients_raw)
+        if not emails:
+            st.error("Podaj co najmniej jeden poprawny adres e-mail.")
+        elif len((password or "").strip()) < 4:
+            st.error("Hasło musi mieć co najmniej 4 znaki.")
         else:
-            exp = datetime.utcnow() + timedelta(hours=hours)
-            saved_links: List[str] = []
-            for r in recips:
-                token = make_token(40)
-                try:
-                    rc = sb.table("share_recipients").insert({"contact": r}).select("id").single().execute().data
-                    rid = rc["id"]
-                    sb.table("share_tokens").insert({"token": token, "study_id": study["id"], "recipient_id": rid, "method": "email" if method=="E-mail" else "sms", "expires_at": exp.isoformat()}).execute()
-                    saved_links.append(f"/public/report?token={token}")
-                except Exception as e:
-                    st.error(f"Nie udało się zapisać udostępnienia dla „{r}”: {e}")
-            if saved_links:
-                st.success("Utworzono udostępnienia:")
-                for L in saved_links: st.code(L)
+            try:
+                host, port, user, pwd, secure, from_email, from_name = _email_env()
+                person_gen = _person_genitive(study)
+                sent_links: List[Tuple[str, str]] = []
+                indefinite = validity_mode == "Ważny do odwołania"
+                for email in emails:
+                    rec = create_report_access(
+                        str(study["id"]),
+                        email,
+                        password.strip(),
+                        hours_valid=(None if indefinite else int(hours or 48)),
+                        indefinite=indefinite,
+                        token=make_token(40),
+                    )
+                    link = _build_report_link(rec["token"])
+                    validity_text = _access_validity_text(rec, hours_value=(None if indefinite else int(hours or 48)), indefinite=indefinite)
+
+                    msg = (
+                        f"Została udostępniona Ci możliwość podglądu raportu z badania archetypu {person_gen}.\n\n"
+                        f"Aby zobaczyć raport kliknij w link: {link}.\n\n"
+                        f"Link jest ważny: {validity_text}.\n\n"
+                        f"Hasło dostępowe umożliwiające dostęp do raportu: {password.strip()}. "
+                        f"Pamiętaj, aby nie udostępniać nikomu hasła!\n\n"
+                        "W przypadku pytań lub wątpliwości skontaktuj się z:\n"
+                        "Piotr Stec\n"
+                        "Badania.pro®\n"
+                        "e-mail: piotr.stec@badania.pro"
+                    )
+                    subject = f"Dostęp do raportu archetypu {person_gen}"
+                    ok, provider_id, err = send_email(
+                        host=host,
+                        port=port,
+                        username=user,
+                        password=pwd,
+                        secure=secure,
+                        from_email=from_email,
+                        from_name=from_name,
+                        to_email=email,
+                        subject=subject,
+                        text=msg,
+                    )
+                    if ok:
+                        mark_report_access_sent(rec["id"])
+                        sent_links.append((email, link))
+                    else:
+                        st.error(f"Nie udało się wysłać e-maila do {email}: {err}")
+
+                if sent_links:
+                    st.success("Dostęp został przyznany i wiadomości e-mail zostały wysłane.")
+                    for email, link in sent_links:
+                        st.markdown(f"**{email}**")
+                        st.code(link)
+            except Exception as e:
+                st.error(f"Nie udało się utworzyć udostępnień: {e}")
+
+    access_rows = list_report_accesses(str(study["id"]))
+    if access_rows:
+        st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+        st.markdown("**Aktywne i historyczne dostępy (e-mail):**")
+        status_map = {"active": "aktywne", "suspended": "zawieszone", "revoked": "odwołane"}
+        table_rows = []
+        for row in access_rows:
+            expiry = "do odwołania" if row.get("indefinite") else (_fmt_local_ts(row.get("expires_at")) or "—")
+            table_rows.append(
+                {
+                    "E-mail": row.get("email", ""),
+                    "Status": status_map.get(str(row.get("status") or "").lower(), str(row.get("status") or "")),
+                    "Ważny do": expiry,
+                    "Utworzono": _fmt_local_ts(row.get("created_at")),
+                    "Ostatnia wysyłka": _fmt_local_ts(row.get("last_sent_at")),
+                }
+            )
+        st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+
+        manage_options = {
+            f"{r.get('email','')} | {status_map.get(str(r.get('status') or '').lower(), str(r.get('status') or ''))} | {_fmt_local_ts(r.get('created_at'))}": r
+            for r in access_rows
+        }
+        selected_key = st.selectbox(
+            "Wybierz dostęp do zarządzania",
+            options=list(manage_options.keys()),
+            key=f"share_manage_{study['id']}",
+        )
+        selected = manage_options[selected_key]
+        selected_status = str(selected.get("status") or "").lower()
+
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+        b1, b2, b3, b4 = st.columns(4)
+        with b1:
+            if st.button("Zawieś", key=f"suspend_{selected['id']}", disabled=selected_status != "active"):
+                set_report_access_status(selected["id"], "suspended")
+                st.rerun()
+        with b2:
+            if st.button("Odwieś", key=f"unsuspend_{selected['id']}", disabled=selected_status != "suspended"):
+                set_report_access_status(selected["id"], "active")
+                st.rerun()
+        with b3:
+            if st.button("Odwołaj", key=f"revoke_{selected['id']}", disabled=selected_status == "revoked"):
+                set_report_access_status(selected["id"], "revoked")
+                st.rerun()
+        with b4:
+            pass
+
+        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+        regrant_mode = st.radio(
+            "Przyznaj ponownie — ważność",
+            ["Ważny przez liczbę godzin", "Ważny do odwołania"],
+            horizontal=True,
+            key=f"regrant_mode_{study['id']}",
+        )
+        regrant_hours = None
+        if regrant_mode == "Ważny przez liczbę godzin":
+            regrant_hours = st.number_input(
+                "Liczba godzin (przyznaj ponownie)",
+                min_value=1,
+                max_value=7200,
+                value=48,
+                key=f"regrant_hours_{study['id']}",
+            )
+        regrant_password = st.text_input(
+            "Hasło przy przyznaniu ponownie",
+            type="password",
+            key=f"regrant_password_{study['id']}",
+            help="To hasło zostanie wysłane ponownie e-mailem razem z nowym linkiem.",
+        )
+        if st.button("Przyznaj ponownie", key=f"regrant_btn_{selected['id']}"):
+            if len((regrant_password or "").strip()) < 4:
+                st.error("Przy przyznaniu ponownie podaj hasło (min. 4 znaki).")
+            else:
+                indefinite = regrant_mode == "Ważny do odwołania"
+                rec = regrant_report_access(
+                    selected["id"],
+                    hours_valid=(None if indefinite else int(regrant_hours or 48)),
+                    indefinite=indefinite,
+                )
+                if not rec:
+                    st.error("Nie udało się przyznać dostępu ponownie.")
+                else:
+                    set_report_access_password(rec["id"], regrant_password.strip())
+                    link = _build_report_link(rec["token"])
+                    person_gen = _person_genitive(study)
+                    validity_text = _access_validity_text(rec, hours_value=(None if indefinite else int(regrant_hours or 48)), indefinite=indefinite)
+                    msg = (
+                        f"Została udostępniona Ci możliwość podglądu raportu z badania archetypu {person_gen}.\n\n"
+                        f"Aby zobaczyć raport kliknij w link: {link}.\n\n"
+                        f"Link jest ważny: {validity_text}.\n\n"
+                        f"Hasło dostępowe umożliwiające dostęp do raportu: {regrant_password.strip()}. "
+                        f"Pamiętaj, aby nie udostępniać nikomu hasła!\n\n"
+                        "W przypadku pytań lub wątpliwości skontaktuj się z:\n"
+                        "Piotr Stec\n"
+                        "Badania.pro®\n"
+                        "e-mail: piotr.stec@badania.pro"
+                    )
+                    try:
+                        host, port, user, pwd, secure, from_email, from_name = _email_env()
+                        ok, _provider_id, err = send_email(
+                            host=host,
+                            port=port,
+                            username=user,
+                            password=pwd,
+                            secure=secure,
+                            from_email=from_email,
+                            from_name=from_name,
+                            to_email=rec["email"],
+                            subject=f"Dostęp do raportu archetypu {person_gen}",
+                            text=msg,
+                        )
+                        if ok:
+                            mark_report_access_sent(rec["id"])
+                            st.success("Dostęp przyznano ponownie i wysłano nowy link.")
+                            st.code(link)
+                            st.rerun()
+                        else:
+                            st.error(f"Dostęp przyznano, ale nie udało się wysłać e-maila: {err}")
+                    except Exception as e:
+                        st.error(f"Dostęp przyznano, ale wysyłka e-maila nie powiodła się: {e}")
 
 def send_link_view() -> None:
     require_auth()
@@ -910,11 +1320,15 @@ with st.sidebar:
     if logged_in():
         if st.button("Wyloguj"): st.session_state.clear(); st.rerun()
 
-view = st.session_state["view"]
-if view=="login": login_view()
-elif view=="home": home_view()
-elif view=="add": add_view()
-elif view=="edit": edit_view()
-elif view=="results": results_view()
-elif view=="send": send_link_view()
-else: home_view()
+public_token = _get_query_token()
+if public_token:
+    public_report_view(public_token)
+else:
+    view = st.session_state["view"]
+    if view=="login": login_view()
+    elif view=="home": home_view()
+    elif view=="add": add_view()
+    elif view=="edit": edit_view()
+    elif view=="results": results_view()
+    elif view=="send": send_link_view()
+    else: home_view()

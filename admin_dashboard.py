@@ -29,11 +29,17 @@ import requests
 from PIL import Image, ImageDraw
 import io
 import re
+import html
+from textwrap import dedent
 from datetime import datetime
 import pytz
+from functools import lru_cache
+from urllib.parse import quote
 from docx.shared import Pt
 import os
+from pathlib import Path
 from docxtpl import DocxTemplate, InlineImage
+from docx import Document
 from io import BytesIO
 import tempfile
 import warnings
@@ -48,6 +54,7 @@ import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
+from archetype_docx_loader import load_archetype_extended
 
 import sys
 if sys.platform.startswith("linux"):
@@ -57,7 +64,7 @@ else:
 
 TEMPLATE_PATH = "ap48_raport_template.docx"
 TEMPLATE_PATH_NOSUPP = "ap48_raport_template_nosupp.docx"  # szablon bez sekcji archetypu pobocznego
-logos_dir = "logos_local"
+logos_dir = str(Path(__file__).with_name("logos_local"))
 
 import plotly.io as pio
 import shutil, os
@@ -98,12 +105,67 @@ def _build_sha():
 st.sidebar.caption(f"Build: {_build_sha()}")
 
 
+def _logo_norm_key(value: str) -> str:
+    if value is None:
+        return ""
+    normalized = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode("ascii")
+    normalized = normalized.lower().replace("&", "and")
+    normalized = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
+    return normalized
+
+
+@lru_cache(maxsize=16)
+def _logo_lookup_index(logos_dir: str) -> dict[str, str]:
+    index: dict[str, str] = {}
+    if not logos_dir or not os.path.isdir(logos_dir):
+        return index
+
+    for filename in os.listdir(logos_dir):
+        if os.path.splitext(filename)[1].lower() not in {".svg", ".png", ".jpg", ".jpeg", ".webp"}:
+            continue
+        stem = os.path.splitext(filename)[0]
+        abs_path = os.path.join(logos_dir, filename)
+        keys = {
+            stem.casefold(),
+            stem.replace("-", "").casefold(),
+            _logo_norm_key(stem),
+            re.sub(r"[^a-z0-9]+", "", _logo_norm_key(stem)),
+        }
+        for key in keys:
+            if key:
+                index.setdefault(key, abs_path)
+    return index
+
+
+LOGO_BRAND_ALIASES = {
+    "Victoria’s Secret": "Victorias Secrets",
+    "Victoria's Secret": "Victorias Secrets",
+    "PKN ORLEN": "Orlen",
+    "PZU SA": "PZU",
+}
+
+
 def get_logo_svg_path(brand_name, logos_dir=None):
     if logos_dir is None:
-        logos_dir = "logos_local"
-    # Konwersja dla strategii zapisu plików: "Alfa Romeo" → "alfa-romeo.svg"
-    filename = (
-        brand_name.lower()
+        logos_dir = str(Path(__file__).with_name("logos_local"))
+
+    if not brand_name:
+        return None
+
+    raw = str(brand_name).strip()
+    if not raw:
+        return None
+
+    raw_variants = [raw]
+    alias = LOGO_BRAND_ALIASES.get(raw)
+    if alias:
+        raw_variants.append(alias)
+
+    # Próby "po staremu" (kompatybilność)
+    candidate_filenames = []
+    for variant in raw_variants:
+        base_kebab = (
+            variant.lower()
             .replace(" ", "-")
             .replace("'", "")
             .replace("’", "")
@@ -115,17 +177,34 @@ def get_logo_svg_path(brand_name, logos_dir=None):
             .replace("ń", "n")
             .replace("ę", "e")
             .replace("ą", "a")
-            .replace("ś", "s") +
-        ".svg"
-    )
-    path = os.path.join(logos_dir, filename)
-    if os.path.exists(path):
-        return path
-    # fallback: spróbuj bez myślnika, wersje alternatywne
-    filename_nodash = brand_name.lower().replace(" ", "").replace("'", "").replace("’", "") + ".svg"
-    path2 = os.path.join(logos_dir, filename_nodash)
-    if os.path.exists(path2):
-        return path2
+            .replace("ś", "s")
+        )
+        base_flat = variant.lower().replace(" ", "").replace("'", "").replace("’", "")
+        for ext in (".svg", ".png", ".jpg", ".jpeg", ".webp"):
+            candidate_filenames.append(base_kebab + ext)
+            candidate_filenames.append(base_flat + ext)
+
+    for filename in candidate_filenames:
+        path = os.path.join(logos_dir, filename)
+        if os.path.exists(path):
+            return path
+
+    # Fallback: dopasowanie odporne na case/diakrytyki/znaki specjalne.
+    lookup = _logo_lookup_index(logos_dir)
+    probe_keys = []
+    for variant in raw_variants:
+        probe_keys.extend(
+            [
+                variant.casefold(),
+                variant.replace(" ", "").casefold(),
+                _logo_norm_key(variant),
+                re.sub(r"[^a-z0-9]+", "", _logo_norm_key(variant)),
+            ]
+        )
+    for key in probe_keys:
+        if key in lookup:
+            return lookup[key]
+
     return None
 
 from io import BytesIO
@@ -194,6 +273,24 @@ person_wikipedia_links = {
     "Deng Xiaoping": "https://en.wikipedia.org/wiki/Deng_Xiaoping",
 }
 
+
+def _person_norm_key(name: str) -> str:
+    normalized = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii")
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized.lower())
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+PERSON_CANONICAL_BY_NORM = {_person_norm_key(name): name for name in person_wikipedia_links}
+PERSON_LINK_BY_NORM = {_person_norm_key(name): url for name, url in person_wikipedia_links.items()}
+
+
+def canonical_person_name(name: str) -> str:
+    clean = str(name or "").strip().strip(".")
+    if clean in person_wikipedia_links:
+        return clean
+    return PERSON_CANONICAL_BY_NORM.get(_person_norm_key(clean), clean)
+
+
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -219,10 +316,11 @@ def add_hyperlink(paragraph, text, url):
     return hyperlink
 
 def person_link(name):
-    url = person_wikipedia_links.get(name)
+    canonical = canonical_person_name(name)
+    url = person_wikipedia_links.get(canonical) or PERSON_LINK_BY_NORM.get(_person_norm_key(name))
     if url:
-        return f"<a href='{url}' target='_blank'>{name}</a>"
-    return name
+        return f"<a href='{url}' target='_blank'>{canonical}</a>"
+    return canonical
 
 def svg_to_png_bytes(svg_path, width_mm=None, height_mm=None):
     import cairosvg
@@ -802,7 +900,6 @@ def build_brands_for_word(
     return out
 
 
-from pathlib import Path
 import base64
 
 # --- IKONY ARCHETYPÓW (SVG) ---
@@ -833,6 +930,14 @@ def build_report_filenames(study: dict) -> tuple[str, str]:
     base = (f"{last_nom} {first_nom}").strip() or "raport"
     slug = _slug_pl(base)  # już masz zdefiniowane wyżej
     return (f"raport_{slug}.docx", f"raport_{slug}.pdf")
+
+
+def build_short_report_filenames(study: dict) -> tuple[str, str]:
+    docx_name, pdf_name = build_report_filenames(study)
+    return (
+        docx_name.replace(".docx", "_skrocony.docx"),
+        pdf_name.replace(".pdf", "_skrocony.pdf"),
+    )
 
 
 # Gdyby Twoje pliki miały inne nazwy niż slug (opcjonalnie dopisz mapę wyjątków)
@@ -887,80 +992,124 @@ import cairosvg
 
 COLOR_NAME_MAP = {
     "#000000": "czerń",
-    "#FFD700": "złoto",
-    "#282C34": "granat (antracyt)",
-    "#800020": "burgund",
-    "#E10600": "czerwień",
+    "#002366": "granat królewski",
+    "#0070B5": "błękit corporate",
+    "#0192D3": "turkus morski",
+    "#0C223F": "granat atramentowy",
+    "#0E0D13": "grafit bardzo ciemny",
+    "#17BECF": "niebieski morski",
+    "#181C3A": "granat nocny",
+    "#1B1715": "brąz prawie czarny",
+    "#1E90FF": "błękit dodger",
+    "#1F77B4": "chabrowy",
+    "#212809": "oliwkowy głęboki",
+    "#282C34": "granat antracytowy",
+    "#2B2D41": "granat ciemny",
+    "#2C7D78": "turkus ciemny",
+    "#2CA02C": "zieleń trawiasta",
+    "#2D4900": "zieleń boru głęboka",
     "#2E3141": "grafitowy granat",
-    "#FFFFFF": "biel",
-    "#4682B4": "stalowy błękit",
-    "#B0C4DE": "jasny niebieskoszary",
-    "#6C7A89": "popielaty szary",
-    "#B4D6B4": "miętowa zieleń",
-    "#A7C7E7": "pastelowy błękit",
-    "#FFD580": "pastelowy żółty / beżowy",
-    "#FA709A": "róż malinowy",
-    "#FEE140": "jasny żółty",
-    "#FFD6E0": "bardzo jasny róż",
-    "#FFB300": "mocna żółć",
-    "#FF8300": "pomarańcz",
-    "#FFD93D": "pastelowa żółć",
-    "#7C53C3": "fiolet",
-    "#3BE8B0": "miętowy cyjan",
-    "#87CEEB": "błękit (sky blue)",
+    "#2F4F4F": "grafit morski",
+    "#3BE8B0": "mięta neonowa",
+    "#40E0D0": "turkus świetlisty",
     "#43C6DB": "turkusowy błękit",
-    "#A0E8AF": "seledyn",
-    "#F9D371": "złocisty żółty",
-    "#8F00FF": "fiolet intensywny",
-    "#181C3A": "granat bardzo ciemny",
-    "#E0BBE4": "pastelowy fiolet",
-    "#F9F9F9": "biel bardzo jasna",
+    "#4682B4": "stalowy błękit",
+    "#4B0000": "bordo głębokie",
+    "#4B0082": "indygo klasyczne",
+    "#556B2F": "oliwka zgaszona",
+    "#588A4F": "zieleń średnia",
+    "#5B6979": "grafit stalowy",
+    "#61681C": "oliwkowy",
+    "#663399": "purpura rebeccy",
+    "#696812": "oliwkowy ciemny",
+    "#6C7A89": "popielaty szary",
     "#6CA0DC": "błękit średni",
+    "#7AA571": "zieleń jasna",
+    "#7C46C5": "fiolet szafirowy",
+    "#7C53C3": "fiolet głęboki",
+    "#7D0B0B": "czerwony krwisty",
+    "#800020": "burgund",
+    "#86725D": "taupe mineralny",
+    "#8681E8": "fiolet lawendowy",
+    "#87CEEB": "błękit nieba",
+    "#8B4513": "brąz siodłowy",
+    "#8C564B": "ciemny brąz",
+    "#8F00FF": "fiolet intensywny",
+    "#906C46": "brąz średni",
+    "#9467BD": "fiolet śliwkowy",
+    "#9BD6F4": "pastelowy błękit jasny",
+    "#A0E8AF": "seledyn",
+    "#A1B1C2": "szaroniebieski jasny",
     "#A3C1AD": "pastelowa zieleń",
-    "#FFF6C3": "jasny kremowy",
+    "#A7C7E7": "pastelowy błękit",
+    "#A9A9A9": "szary ciemny",
     "#AAC9CE": "pastelowy niebieskoszary",
-    "#FFF200": "żółty (cytrynowy)",
+    "#AB3941": "czerwony wiśniowy",
+    "#ACE7FF": "błękit lodowy",
+    "#ADD8E6": "błękit pastelowy",
+    "#B0C4DE": "niebieskoszary jasny",
+    "#B22222": "czerwony ceglasty ciemny",
+    "#B2F2BB": "mięta jasna",
+    "#B4D6B4": "miętowa zieleń",
+    "#B6019A": "fuksja",
+    "#B8B8B8": "szary satynowy",
+    "#BBBDA0": "khaki jasne",
+    "#C0C0C0": "srebrny",
+    "#C2BCC1": "szary perłowy",
+    "#CC3E2F": "czerwony ceglasty",
+    "#D3D3D3": "szary jasny",
+    "#D4AF37": "złoty klasyczny",
+    "#D5C6AF": "beż jasny",
+    "#D62728": "czerwień karmazynowa",
+    "#DAA520": "złoto stare",
+    "#E0BBE4": "lawenda pudrowa",
+    "#E10209": "czerwony żywy",
+    "#E10600": "czerwień flagowa",
+    "#E377C2": "róż fioletowy pastelowy",
+    "#EEEEEE": "szary mglisty",
+    "#F2A93B": "miodowy żółty",
+    "#F4F1ED": "biały ciepły",
+    "#F5F5DC": "beż kremowy",
+    "#F8BBD0": "róż pudrowy",
+    "#F9D371": "złocisty żółty",
+    "#F9ED06": "żółty intensywny",
+    "#F9F9F9": "biel lodowa",
+    "#FA709A": "róż malinowy",
+    "#FADADD": "róż blady",
+    "#FD4431": "czerwony pomarańczowy żywy",
+    "#FE89BE": "róż neonowy jasny",
+    "#FEE140": "żółty cytrynowy jasny",
     "#FF0000": "czerwień intensywna",
     "#FF6F61": "łososiowy róż",
-    "#8C564B": "ciemny brąz",
-    "#D62728": "czerwień karmazynowa",
-    "#1F77B4": "chabrowy",
-    "#9467BD": "fiolet śliwkowy",
-    "#F2A93B": "miodowy żółty",
-    "#17BECF": "niebieski morski",
-    "#E377C2": "pastelowy róż fioletowy",
-    "#7C46C5": "fiolet szafirowy",
-    "#2CA02C": "zieleń trawiasta",
-    "#9BD6F4": "pastelowy błękit jasny",
-    "#FF7F0E": "jaskrawy pomarańcz",
-    "#D5C6AF": "beż jasny",
-    "#906C46": "brąz średni",
-    "#696812": "oliwkowy ciemny",
-    "#212809": "oliwkowy głęboki",
-    "#B6019A": "fuksja",
-    "#E10209": "czerwony żywy",
-    "#1B1715": "brąz bardzo ciemny",
-    "#F9ED06": "żółty intensywny",
-    "#588A4F": "zielony średni",
-    "#7AA571": "zielony jasny",
-    "#AB3941": "czerwony wiśniowy",
-    "#61681C": "oliwkowy",
-    "#0070B5": "niebieski",
-    "#8681E8": "fiolet jasny",
-    "#FE89BE": "róż jasny",
-    "#FD4431": "pomarańczowy żywy",
-    "#5B6979": "grafitowy",
-    "#A1B1C2": "szary jasny",
-    "#0192D3": "turkus",
-    "#2C7D78": "turkus ciemny",
-    "#86725D": "brąz jasny",
-    "#F4F1ED": "biały ciepły",
-    "#BBBDA0": "khaki jasne",
-    "#2D4900": "oliwkowy bardzo ciemny",
-    "#0E0D13": "grafit bardzo ciemny",
-    "#2B2D41": "granat ciemny",
-    "#C2BCC1": "szary bardzo jasny",
-    "#CC3E2F": "czerwony ceglasty",
+    "#FF7F0E": "pomarańcz jaskrawy",
+    "#FF8300": "pomarańcz mocny",
+    "#FF8C00": "pomarańcz ciemny",
+    "#FFB300": "żółty bursztynowy",
+    "#FFC0CB": "róż klasyczny",
+    "#FFD580": "beż morelowy",
+    "#FFD6E0": "róż bardzo jasny",
+    "#FFD700": "złoto",
+    "#FFD93D": "żółty pastelowy",
+    "#FFF200": "żółty cytrynowy",
+    "#FFF6C3": "krem waniliowy",
+    "#FFF9B0": "żółty bananowy blady",
+    "#FFFACD": "cytryna kremowa",
+    "#FFFFFF": "biel",
+}
+
+ARCHETYPE_REQUIRED_PALETTES = {
+    "Władca": ["#800020", "#FFD700", "#282C34", "#800020", "#000000", "#8C564B"],
+    "Bohater": ["#E10600", "#2E3141", "#FFFFFF", "#D62728", "#0E0D13", "#2B2D41", "#C2BCC1", "#CC3E2F"],
+    "Mędrzec": ["#4682B4", "#B0C4DE", "#6C7A89", "#1F77B4", "#86725D", "#F4F1ED", "#BBBDA0", "#2D4900"],
+    "Opiekun": ["#0192D3", "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD", "#5B6979", "#A1B1C2", "#2C7D78"],
+    "Kochanek": ["#FA709A", "#FEE140", "#FFD6E0", "#FA709A"],
+    "Błazen": ["#AB3941", "#F2A93B", "#FFB300", "#FFD93D", "#588A4F", "#7AA571", "#61681C", "#FF8300"],
+    "Twórca": ["#7C53C3", "#3BE8B0", "#87CEEB", "#17BECF", "#B6019A", "#E10209", "#1B1715", "#F9ED06"],
+    "Odkrywca": ["#212809", "#A0E8AF", "#F9D371", "#E377C2", "#D5C6AF", "#906C46", "#43C6DB", "#696812"],
+    "Czarodziej": ["#181C3A", "#E0BBE4", "#8F00FF", "#7C46C5", "#0070B5", "#8681E8", "#FE89BE", "#FD4431"],
+    "Towarzysz": ["#A3C1AD", "#F9F9F9", "#6CA0DC", "#2CA02C"],
+    "Niewinny": ["#9BD6F4", "#FFF6C3", "#AAC9CE", "#FFF200"],
+    "Buntownik": ["#FF0000", "#FF6F61", "#000000", "#FF7F0E"],
 }
 
 ARCHE_NAMES_ORDER = [
@@ -1022,6 +1171,21 @@ archetype_features = {
     "Towarzysz": "Autentyczność, wspólnota, prostota, bycie częścią grupy.",
     "Niewinny": "Optymizm, ufność, unikanie konfliktów, pozytywne nastawienie.",
     "Buntownik": "Kwestionowanie norm, odwaga w burzeniu zasad, radykalna zmiana."
+}
+
+CORE_TRIPLET_MAP = {
+    "Bohater": "Odwaga. Determinacja. Wyzwanie.",
+    "Władca": "Skuteczność. Autorytet. Kontrola.",
+    "Mędrzec": "Racjonalność. Wiedza. Analiza.",
+    "Opiekun": "Troska. Empatia. Bezpieczeństwo.",
+    "Kochanek": "Relacje. Bliskość. Emocje.",
+    "Błazen": "Otwartość. Poczucie humoru. Dystans.",
+    "Twórca": "Rozwój. Kreatywność. Innowacja.",
+    "Odkrywca": "Wolność. Ciekawość. Nowe horyzonty.",
+    "Czarodziej": "Wizja. Transformacja. Inspiracja.",
+    "Towarzysz": "Współpraca. Wspólnota. Swojskość.",
+    "Niewinny": "Przejrzystość. Optymizm. Uczciwość.",
+    "Buntownik": "Odnowa. Zmiana. Sprzeciw.",
 }
 
 # === Progi i opisy "🧭 Interpretacja natężenia procentowego archetypu" ===
@@ -2057,664 +2221,58 @@ def base_masc_from_any(name: str) -> str:
     return name
 
 
+def _dedupe_hex_palette(values) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in (values or []):
+        code = str(raw or "").strip().upper()
+        if not code:
+            continue
+        if not code.startswith("#"):
+            code = f"#{code}"
+        if not re.match(r"^#[0-9A-F]{6}$", code):
+            continue
+        if code in seen:
+            continue
+        seen.add(code)
+        out.append(code)
+    return out
+
+
+def _enforce_required_palettes(arche_map: dict[str, dict]) -> None:
+    for arche_name, required_palette in ARCHETYPE_REQUIRED_PALETTES.items():
+        required = _dedupe_hex_palette(required_palette)
+        if not required:
+            continue
+
+        for code in required:
+            COLOR_NAME_MAP.setdefault(code, f"kolor-{code[1:].lower()}")
+
+        payload = arche_map.get(arche_name)
+        if not payload:
+            continue
+
+        existing = _dedupe_hex_palette(payload.get("color_palette", []))
+        merged = list(existing)
+        for code in required:
+            if code not in merged:
+                merged.append(code)
+
+        payload["color_palette"] = merged
+
+        metric_rows = payload.get("metric_rows") or []
+        for row in metric_rows:
+            if str(row.get("label", "")).strip().casefold() == "paleta kolorów (hex)":
+                row["kind"] = "colors"
+                row["value"] = merged
+                break
+
+
 # <<<--- TUTAJ WKLEJ własne archetype_extended = {...}
-archetype_extended = {
-    "Władca": {
-        "name": "Władca",
-        "tagline": "Autorytet. Kontrola. Doskonałość.",
-        "description": (
-            "Archetyp Władcy w polityce uosabia siłę przywództwa, stabilność, pewność działania, kontrolę i odpowiedzialność za porządek społeczny. "
-            "Władcy dążą do stabilności, bezpieczeństwa i efektywnego zarządzania. Politycy o tym archetypie często podkreślają swoją zdolność do podejmowania trudnych decyzji i utrzymywania porządku, nawet w trudnych czasach. "
-            "Władca stawia na porządek, wyznaczanie standardów rozwoju i podejmowanie stanowczych decyzji dla dobra wspólnego. "
-            "Jest symbolem autentycznego autorytetu, przewodzenia i skutecznego zarządzania miastem. "
-            "Buduje zaufanie, komunikując skuteczność, odpowiedzialność i gwarantując bezpieczeństwo mieszkańcom."
-        ),
-        "storyline": (
-            "Narracja kampanii oparta na Władcy podkreśla spójność działań, panowanie nad trudnymi sytuacjami i sprawność w zarządzaniu miastem. "
-            "Władca nie podąża za modą – wyznacza nowe standardy w samorządzie. "
-            "Akcentuje dokonania, referencje i doświadczenie. Buduje obraz lidera odpowiadającego za przyszłość i prestiż miasta."
-        ),
-        "recommendations": [
-            "Używaj kolorystyki kojarzącej się z autorytetem – czerń, złoto, ciemny granat, burgund.",
-            "Projektuj symbole: sygnety, herby miasta, podkreślając prestiż i zarządzanie.",
-            "Komunikuj się językiem odpowiedzialności i troski o przyszłość miasta.",
-            "Przekazuj komunikaty stanowczo, jednoznacznie, jako gospodarz miasta.",
-            "Pokazuj osiągnięcia, inwestycje, referencje mieszkańców.",
-            "Zadbaj o trwałość i jakość działań – nie obniżaj standardów.",
-            "Twórz aurę elitarności: zamknięte konsultacje, spotkania liderów opinii.",
-            "Przyciągaj wyborców ceniących bezpieczeństwo, stabilizację i prestiż miasta.",
-            "Unikaj luźnego, żartobliwego tonu – postaw na klasę i profesjonalizm."
-        ],
-        "core_traits": [
-            "Przywództwo", "Autorytet", "Stabilność", "Prestiż", "Kontrola", "Inspiracja", "Mistrzostwo"
-        ],
-        "strengths": [
-            "przywództwo", "zdecydowanie", "umiejętności organizacyjne"
-        ],
-        "weaknesses": [
-            "autorytaryzm", "kontrola", "oderwanie od rzeczywistości"
-        ],
-        "examples_person": [
-            "Vladimir Putin", "Margaret Thatcher", "Xi Jinping", "Ludwik XIV", "Napoleon Bonaparte",
-            "Jarosław Kaczyński"
-        ],
-        "example_brands": [
-            "Rolex", "Mercedes-Benz", "IBM", "Microsoft", "Hugo Boss", "BMW", "Silny samorząd"
-        ],
-        "color_palette": [
-            "#800020", "#FFD700", "#282C34", "#800020","#000000", "#8C564B"
-        ],
-        "visual_elements": [
-            "korona", "herb Miasta", "sygnet", "monogram", "geometryczna, masywna typografia", "symetria"
-        ],
-        "keyword_messaging": [
-            "Lider miasta", "Siła samorządu", "Stabilność", "Doskonałość działań", "Elita miasta", "Bezpieczeństwo"
-        ],
-        "watchword": [
-            "Silne przywództwo i stabilność w niepewnych czasach."
-        ],
-        "questions": [
-            "Jak komunikujesz mieszkańcom swoją pozycję lidera w mieście?",
-            "W jaki sposób Twoje działania budują autorytet i zaufanie mieszkańców?",
-            "Co robisz, by decyzje były stanowcze i jednoznaczne?",
-            "Jak Twoje dokonania i inwestycje wzmacniają prestiż oraz bezpieczeństwo miasta?",
-            "Jak zachęcasz wyborców do świadomego, silnego przywództwa?"
-        ]
-    },
-    "Bohater": {
-        "name": "Bohater",
-        "tagline": "Determinacja. Odwaga. Sukces.",
-        "description": (
-            "Bohater w polityce to archetyp waleczności, determinacji i odwagi w podejmowaniu trudnych decyzji dla społeczności. "
-            "Bohaterowie są gotowi stawić czoła wyzwaniom, pokonywać przeszkody i walczyć o lepszą przyszłość dla wszystkich. Ich celem jest udowodnienie swojej wartości poprzez odważne działania i inspirowanie innych do przekraczania własnych granic. Politycy o tym archetypie często podkreślają swoją gotowość do podejmowania trudnych decyzji i stawiania czoła przeciwnościom w imię dobra wspólnego. "
-            "Bohater mobilizuje mieszkańców do działania, bierze odpowiedzialność w najtrudniejszych momentach i broni interesów miasta nawet pod presją."
-        ),
-        "storyline": (
-            "Opowieść Bohatera to historia przezwyciężania kryzysów i stawania po stronie obywateli. "
-            "Bohater nie rezygnuje nigdy, nawet w obliczu przeciwności. Jego postawa inspiruje i daje przykład innym samorządowcom."
-        ),
-        "recommendations": [
-            "Komunikuj gotowość do działania, podkreślaj determinację w rozwiązywaniu problemów.",
-            "Pokaż sukcesy i przykłady walki o interes mieszkańców.",
-            "Stosuj dynamiczny język: zaznaczaj odwagę, mobilizację, sukces.",
-            "Kolorystyka: czerwień, granat, biel.",
-            "Pokazuj się w trudnych sytuacjach – reaguj natychmiast.",
-            "Inspiruj współpracowników i mieszkańców do aktywności.",
-            "Unikaj bierności, podkreślaj proaktywność."
-        ],
-        "core_traits": [
-            "Odwaga", "Siła", "Determinacja", "Poświęcenie", "Sukces", "Inspiracja"
-        ],
-        "strengths": [
-            "odwaga", "determinacja", "kompetencja", "inspirowanie innych"
-        ],
-        "weaknesses": [
-            "arogancja", "obsesja na punkcie zwycięstwa", "skłonność do przechwalania się",
-        ],
-        "examples_person": [
-            "Winston Churchill", "Wołodymyr Zełenski", "George Washington", "Józef Piłsudski"
-        ],
-        "example_brands": [
-            "Nike", "Duracell", "FedEx", "Ferrari", "Polska Husaria", "Patriotyczny samorząd"
-        ],
-        "color_palette": [
-            "#E10600", "#2E3141", "#FFFFFF", "#D62728", "#0E0D13", "#2B2D41", "#C2BCC1", "#CC3E2F",
-        ],
-        "visual_elements": [
-            "peleryna", "tarcza", "aura odwagi", "podniesiona dłoń", "gwiazda"
-        ],
-        "keyword_messaging": [
-            "Siła", "Zwycięstwo", "Poświęcenie", "Mobilizacja"
-        ],
-        "watchword": [
-            "Odważne przywództwo dla lepszej przyszłości."
-        ],
-        "questions": [
-            "Jak komunikujesz skuteczność w przezwyciężaniu kryzysów?",
-            "Jak budujesz wizerunek walczącego o dobro mieszkańców?",
-            "Jak pokazać determinację i niezłomność w działaniu publicznym?",
-            "Które sukcesy świadczą o Twoim zaangażowaniu w trudnych sprawach?"
-        ]
-    },
-    "Mędrzec": {
-        "name": "Mędrzec",
-        "tagline": "Wiedza. Racjonalność. Strategia.",
-        "description": (
-            "Mędrzec w polityce opiera komunikację na wiedzy, argumentacji i logicznym rozumowaniu oraz analitycznym podejściu. "
-            "Mędrcy poszukują prawdy i wiedzy, wierząc, że informacja i zrozumienie są kluczem do rozwiązywania problemów. Politycy o tym archetypie często prezentują się jako eksperci, którzy podejmują decyzje w oparciu o fakty i analizy, a nie emocje czy ideologię. "
-            "Mędrzec wykorzystuje rozsądne analizy, doświadczenie oraz ekspercką wiedzę, by podejmować najlepsze decyzje dla całej społeczności."
-        ),
-        "storyline": (
-            "Opowieść Mędrca to budowanie zaufania kompetencjami, przejrzystym uzasadnieniem propozycji i edukacją mieszkańców. "
-            "Mędrzec nie działa pod wpływem impulsu; każda decyzja jest przemyślana i poparta faktami oraz wsłuchaniem się w potrzeby miasta."
-        ),
-        "recommendations": [
-            "Wskazuj kompetencje, doświadczenie i eksperckość w zarządzaniu miastem.",
-            "Komunikuj zrozumiale zawiłości miejskich inwestycji i decyzji.",
-            "Stosuj wykresy, dane, analizy i argumenty – przemawiaj do rozumu obywateli.",
-            "Zachowaj spokojny, opanowany ton.",
-            "Używaj kolorystyki: błękit, szarość, granat.",
-            "Podkreślaj racjonalność decyzji i transparentność działań.",
-            "Unikaj populizmu – opieraj komunikację na faktach."
-        ],
-        "core_traits": [
-            "Wiedza", "Rozwój", "Analiza", "Strategia", "Refleksja"
-        ],
-        "strengths": [
-            "inteligencja", "obiektywizm", "umiejętność analizy złożonych problemów"
-        ],
-        "weaknesses": [
-            "nadmierna rozwaga", "brak zdecydowania", "oderwanie od codziennych problemów"
-        ],
-        "examples_person": [
-            "Angela Merkel", "Thomas Jefferson", "Lee Kuan Yew", "Bronisław Geremek"
-        ],
-        "example_brands": [
-            "BBC", "Google", "MIT", "CNN", "Audi", "think tanki"
-        ],
-        "color_palette": [
-            "#4682B4", "#B0C4DE", "#6C7A89", "#1F77B4", "#86725D", "#F4F1ED", "#BBBDA0", "#2D4900",
-        ],
-        "visual_elements": [
-            "okulary", "księga", "wykres", "lupa", "symbole nauki"
-        ],
-        "keyword_messaging": [
-            "Wiedza", "Argument", "Racjonalność", "Rozwój miasta"
-        ],
-        "watchword": [
-            "Mądrość i wiedza w służbie społeczeństwa."
-        ],
-        "questions": [
-            "Jak podkreślasz swoje doświadczenie i kompetencje?",
-            "Jak przekonujesz mieszkańców argumentami i faktami?",
-            "Jak edukujesz oraz tłumaczysz skomplikowane zmiany w mieście?",
-            "W czym wyrażasz przewagę eksperckiej wiedzy nad populizmem?"
-        ]
-    },
-    "Opiekun": {
-        "name": "Opiekun",
-        "tagline": "Empatia. Troska. Bezpieczeństwo.",
-        "description": (
-            "Opiekun w polityce to archetyp zaangażowania, wspierania i budowania poczucia wspólnoty. "
-            "Archetyp Opiekuna reprezentuje troskę, empatię i chęć pomocy innym. "
-            "Opiekunowie pragną chronić obywateli i zapewniać im bezpieczeństwo oraz wsparcie. Politycy o tym archetypie często skupiają się na polityce społecznej, ochronie zdrowia, edukacji i innych usługach publicznych, które poprawiają jakość życia obywateli. "
-            "Opiekun dba o najsłabszych, promuje działania prospołeczne, wdraża programy pomocowe i społecznie odpowiedzialne."
-        ),
-        "storyline": (
-            "Narracja Opiekuna podkreśla działania integrujące, troskę o seniorów, rodziny, niepełnosprawnych i osoby wykluczone. "
-            "Buduje poczucie bezpieczeństwa oraz odpowiedzialności urzędu miasta za wszystkich obywateli."
-        ),
-        "recommendations": [
-            "Akcentuj działania na rzecz integracji i wsparcia mieszkańców.",
-            "Pokaż realne efekty programów prospołecznych i pomocowych.",
-            "Stosuj ciepłą kolorystykę: zieleń, błękit, żółcie.",
-            "Używaj symboliki: dłonie, serca, uścisk.",
-            "Komunikuj empatię i autentyczną troskę o każdą grupę mieszkańców.",
-            "Prowadź otwarte konsultacje społeczne.",
-            "Unikaj twardego, technokratycznego tonu."
-        ],
-        "core_traits": [
-            "Empatia", "Troska", "Wspólnota", "Bezpieczeństwo", "Solidarność"
-        ],
-        "strengths": [
-            "empatia", "troska o innych", "budowanie zaufania"
-        ],
-        "weaknesses": [
-            "nadopiekuńczość", "unikanie trudnych decyzji", "podatność na manipulację"
-        ],
-        "examples_person": [
-            "Jacinda Ardern", "Franklin D. Roosevelt", "Clement Attlee", "Władysław Kosiniak-Kamysz", "Jacek Kuroń"
-        ],
-        "example_brands": [
-            "UNICEF", "Nivea", "Caritas", "WOŚP", "Pampers", "Volvo",
-        ],
-        "color_palette": [
-            "#0192D3", "#B4D6B4", "#A7C7E7", "#FFD580", "#9467BD", "#5B6979", "#A1B1C2", "#2C7D78",
-        ],
-        "visual_elements": [
-            "dłonie", "serce", "koło wspólnoty", "symbol opieki"
-        ],
-        "keyword_messaging": [
-            "Bezpieczeństwo mieszkańców", "Troska", "Wspólnota"
-        ],
-        "watchword": [
-            "Troska i wsparcie dla każdego obywatela."
-        ],
-        "questions": [
-            "Jak pokazujesz troskę i empatię wobec wszystkich mieszkańców?",
-            "Jakie realne efekty mają wdrożone przez Ciebie programy pomocowe?",
-            "W czym przejawia się Twoja polityka integrująca?",
-            "Jak oceniasz skuteczność działań społecznych w mieście?"
-        ]
-    },
-    "Kochanek": {
-        "name": "Kochanek",
-        "tagline": "Bliskość. Relacje. Pasja.",
-        "description": (
-            "Kochanek w polityce buduje pozytywne relacje z mieszkańcami, jest otwarty, komunikatywny i wzbudza zaufanie. "
-            "Politycy Kochankowie podkreślają bliskość, autentyczność i partnerski dialog, sprawiając, że wyborcy czują się zauważeni i docenieni. "
-            "Kochanek potrafi zbliżyć do siebie wyborców i sprawić, by czuli się zauważeni oraz docenieni."
-        ),
-        "storyline": (
-            "Narracja Kochanka promuje serdeczność, ciepło i partnerskie traktowanie obywateli. "
-            "Akcentuje jakość relacji z mieszkańcami, zespołem i innymi samorządami."
-        ),
-        "recommendations": [
-            "Buduj relacje oparte na dialogu i wzajemnym szacunku.",
-            "Stosuj ciepły, otwarty ton komunikacji.",
-            "Promuj wydarzenia i inicjatywy integrujące społeczność.",
-            "Używaj kolorystyki: czerwienie, róże, delikatne fiolety.",
-            "Pokazuj, że wyborca jest dla Ciebie ważny.",
-            "Doceniaj pozytywne postawy, sukcesy mieszkańców.",
-            "Unikaj oficjalnego, zimnego tonu."
-        ],
-        "core_traits": [
-            "Ciepło", "Relacje", "Bliskość", "Pasja", "Akceptacja"
-        ],
-        "strengths": [
-            "empatia", "bliskość", "autentyczność", "pasja"
-        ],
-        "weaknesses": [
-            "nadmierna emocjonalność", "faworyzowanie bliskich grup", "podatność na krytykę"
-        ],
-        "examples_person": [
-            "Justin Trudeau", "Sanna Marin", "Eva Perón", "John F. Kennedy", "Benito Juárez", "François Mitterrand",
-            "Aleksandra Dulkiewicz"
-        ],
-        "example_brands": [
-            "Playboy", "Magnum", "Victoria's Secrets", "Alfa Romeo"
-        ],
-        "color_palette": [
-            "#FA709A", "#FEE140", "#FFD6E0", "#FA709A"
-        ],
-        "visual_elements": [
-            "serce", "uśmiech", "gest bliskości"
-        ],
-        "keyword_messaging": [
-            "Relacje", "Bliskość", "Społeczność"
-        ],
-        "watchword": [
-            "Bliskość i pasja w służbie społeczeństwa."
-        ],
-        "questions": [
-            "Jak komunikujesz otwartość i serdeczność wyborcom?",
-            "Jakie działania podejmujesz, aby budować pozytywne relacje w mieście?",
-            "Co robisz, by mieszkańcy czuli się ważni i zauważeni?"
-        ]
-    },
-    "Błazen": {
-        "name": "Błazen",
-        "tagline": "Poczucie humoru. Dystans. Entuzjazm.",
-        "description": (
-            "Błazen w polityce wnosi lekkość, dystans i rozładowanie napięć. "
-            "Używa humoru i autoironii, by rozbrajać napięcia oraz tworzyć wrażenie bliskości z wyborcami."
-            "Błazen potrafi rozbawić, rozproszyć atmosferę, ale nigdy nie traci dystansu do siebie i powagi spraw publicznych."
-        ),
-        "storyline": (
-            "Narracja Błazna to umiejętność śmiania się z problemów i codziennych wyzwań miasta, ale też dawania mieszkańcom nadziei oraz pozytywnej energii."
-        ),
-        "recommendations": [
-            "Stosuj humor w komunikacji (ale z umiarem i klasą!).",
-            "Rozluźniaj atmosferę podczas spotkań i debat.",
-            "Podkreślaj pozytywne aspekty życia w mieście.",
-            "Kolorystyka: żółcie, pomarańcze, intensywne kolory.",
-            "Nie bój się autoironii.",
-            "Promuj wydarzenia integrujące, rozrywkowe.",
-            "Unikaj przesadnego formalizmu."
-        ],
-        "core_traits": [
-            "Poczucie humoru", "Entuzjazm", "Dystans", "Optymizm"
-        ],
-        "strengths": [
-            "buduje rozpoznawalność", "umie odwrócić uwagę od trudnych tematów", "kreuje wizerunek 'swojskiego' lidera"
-        ],
-        "weaknesses": [
-            "łatwo przekracza granicę powagi", "ryzyko, że wyborcy nie odbiorą go serio"
-        ],
-        "examples_person": [
-            "Boris Johnson", "Silvio Berlusconi", "Janusz Palikot",
-        ],
-        "example_brands": [
-            "Old Spice", "M&Ms", "Fanta", "Łomża", "kabarety"
-        ],
-        "color_palette": [
-            "#AB3941", "#F2A93B", "#FFB300", "#FFD93D", "#588A4F", "#7AA571", "#61681C", "#FF8300",
-        ],
-        "visual_elements": [
-            "uśmiech", "czapka błazna", "kolorowe akcenty"
-        ],
-        "keyword_messaging": [
-            "Dystans", "Entuzjazm", "Radość"
-        ],
-        "watchword": [
-            "Rozbraja śmiechem, inspiruje luzem."
-        ],
-        "questions": [
-            "W jaki sposób wykorzystujesz humor w komunikacji publicznej?",
-            "Jak rozładowujesz napięcia w sytuacjach kryzysowych?",
-            "Co robisz, aby mieszkańcy mogli wspólnie się bawić i śmiać?"
-        ]
-    },
-    "Twórca": {
-        "name": "Twórca",
-        "tagline": "Kreatywność. Innowacja. Wizja.",
-        "description": (
-            "Twórca charakteryzuje się innowacyjnością, kreatywnością i wizją. "
-            "Twórcy dążą do budowania nowych rozwiązań i struktur, które odpowiadają na wyzwania przyszłości. Politycy o tym archetypie często podkreślają swoje innowacyjne podejście do rządzenia i zdolność do wprowadzania pozytywnych zmian. "
-            "Jako polityk Twórca nie boi się wdrażać oryginalnych, często nieszablonowych strategii."
-        ),
-        "storyline": (
-            "Opowieść Twórcy jest oparta na zmianie, wprowadzaniu kreatywnych rozwiązań oraz inspirowaniu innych do współdziałania dla rozwoju miasta."
-        ),
-        "recommendations": [
-            "Proponuj i wdrażaj nietypowe rozwiązania w mieście.",
-            "Pokazuj przykłady innowacyjnych projektów.",
-            "Promuj kreatywność i otwartość na zmiany.",
-            "Stosuj kolorystykę: zielenie, lazurowe błękity, fiolety.",
-            "Doceniaj artystów, startupy, lokalne inicjatywy.",
-            "Buduj wizerunek miasta-innowatora.",
-            "Unikaj schematów i powtarzalnych projektów."
-        ],
-        "core_traits": [
-            "Kreatywność", "Odwaga twórcza", "Inspiracja", "Wizja", "Nowatorstwo"
-        ],
-        "strengths": [
-            "innowacyjność", "wizjonerstwo", "kreatywność"
-        ],
-        "weaknesses": [
-            "brak realizmu", "ignorowanie praktycznych ograniczeń", "perfekcjonizm"
-        ],
-        "examples_person": [
-            "Emmanuel Macron", "Tony Blair", "Konrad Adenauer", "Deng Xiaoping", "Mustafa Kemal Atatürk"
-        ],
-        "example_brands": [
-            "Apple", "Lego", "Adobe", "Toyota", "startupy"
-        ],
-        "color_palette": [
-            "#7C53C3", "#3BE8B0", "#87CEEB", "#17BECF", "#B6019A", "#E10209", "#1B1715", "#F9ED06",
-        ],
-        "visual_elements": [
-            "kostka Rubika", "żarówka", "kolorowe fale"
-        ],
-        "keyword_messaging": [
-            "Innowacja", "Twórczość", "Wizja rozwoju"
-        ],
-        "watchword": [
-            "Innowacyjne rozwiązania dla współczesnych wyzwań."
-        ],
-        "questions": [
-            "Jak promujesz kreatywność i innowacyjność w mieście?",
-            "Jakie oryginalne projekty wdrożyłeś lub planujesz wdrożyć?",
-            "Jak inspirować mieszkańców do kreatywnego działania?"
-        ]
-    },
-    "Odkrywca": {
-        "name": "Odkrywca",
-        "tagline": "Odwaga. Ciekawość. Nowe horyzonty.",
-        "description": (
-            "Archetyp Odkrywcy charakteryzuje się ciekawością, poszukiwaniem nowych możliwości i pragnieniem wolności. "
-            "Odkrywcy pragną przełamywać granice i eksplorować nieznane terytoria. Politycy o tym archetypie często prezentują się jako wizjonerzy, którzy mogą poprowadzić społeczeństwo ku nowym horyzontom i możliwościom. "
-            "Odkrywca poszukuje nowych rozwiązań, jest otwarty na zmiany i śledzi światowe trendy, które wdraża w polityce lokalnej czy krajowej. "
-            "Wybiera nowatorskie, nieoczywiste drogi dla rozwoju miasta i jego mieszkańców."
-        ),
-        "storyline": (
-            "Opowieść Odkrywcy to wędrowanie poza schematami, miasto bez barier, eksperymentowanie z nowościami oraz angażowanie mieszkańców w odkrywcze projekty."
-        ),
-        "recommendations": [
-            "Inicjuj nowe projekty i szukaj innowacji także poza Polską.",
-            "Promuj przełamywanie standardów i aktywność obywatelską.",
-            "Stosuj kolorystykę: turkusy, błękity, odcienie zieleni.",
-            "Publikuj inspiracje z innych miast i krajów.",
-            "Wspieraj wymiany młodzieży, startupy, koła naukowe.",
-            "Unikaj stagnacji i powielania dawnych schematów."
-        ],
-        "core_traits": [
-            "Odwaga", "Ciekawość", "Niezależność", "Nowatorstwo"
-        ],
-        "strengths": [
-            "innowacyjność", "adaptacyjność", "odwaga w podejmowaniu ryzyka"
-        ],
-        "weaknesses": [
-            "brak cierpliwości", "trudności z dokończeniem projektów", "ignorowanie tradycji"
-        ],
-        "examples_person": [
-            "Olof Palme", "Shimon Peres", "Theodore Roosevelt", "Jawaharlal Nehru", "Elon Musk"
-        ],
-        "example_brands": [
-            "NASA", "Jeep", "Red Bull", "National Geographic", "The North Face", "Amazon", "Nomadzi"
-        ],
-        "color_palette": [
-            "#212809", "#A0E8AF", "#F9D371", "#E377C2", "#D5C6AF", "#906C46", "#43C6DB", "#696812",
-        ],
-        "visual_elements": [
-            "mapa", "kompas", "droga", "lupa"
-        ],
-        "keyword_messaging": [
-            "Odkrywanie", "Nowe horyzonty", "Zmiana"
-        ],
-        "watchword": [
-            "Odkrywanie nowych możliwości dla wspólnego rozwoju."
-        ],
-        "questions": [
-            "Jak zachęcasz do odkrywania nowości w mieście?",
-            "Jakie projekty wdrażasz, które nie były jeszcze realizowane w innych miastach?",
-            "Jak budujesz wizerunek miasta jako miejsca wolnego od barier?"
-        ]
-    },
-    "Czarodziej": {
-        "name": "Czarodziej",
-        "tagline": "Transformacja. Inspiracja. Przełom.",
-        "description": (
-            "Czarodziej w polityce to wizjoner i transformator – wytycza nowy kierunek i inspiruje do zmian niemożliwych na pierwszy rzut oka. "
-            "Czarodziej obiecuje głęboką przemianę społeczeństwa i nadaje wydarzeniom niemal magiczny sens. "
-            "Dzięki jego inicjatywom miasto przechodzi metamorfozy, w których niemożliwe staje się możliwe."
-        ),
-        "storyline": (
-            "Opowieść Czarodzieja to zmiana wykraczająca poza rutynę, wyobraźnia, inspiracja, a także odwaga w stawianiu pytań i szukaniu odpowiedzi poza schematami."
-        ),
-        "recommendations": [
-            "Wprowadzaj śmiałe, czasem kontrowersyjne pomysły w życie.",
-            "Podkreślaj rolę wizji i inspiracji.",
-            "Stosuj symbolikę: gwiazdy, zmiany, światło, 'magiczne' efekty.",
-            "Stosuj kolorystykę: fiolety, granaty, akcent perłowy.",
-            "Buduj wyobrażenie miasta jako miejsca możliwości.",
-            "Unikaj banalnych, powtarzalnych rozwiązań."
-        ],
-        "core_traits": [
-            "Inspiracja", "Przemiana", "Wyobraźnia", "Transcendencja"
-        ],
-        "strengths": [
-            "porywa wielką ideą", "motywuje do zmian", "potrafi łączyć symbole i narracje w spójny mit założycielski"
-        ],
-        "weaknesses": [
-            "oczekiwania mogą przerosnąć realne możliwości", "ryzyko oskarżeń o 'czcze zaklęcia'"
-        ],
-        "examples_person": [
-            "Barack Obama", "Václav Klaus", "Nelson Mandela", "Martin Luther King"
-        ],
-        "example_brands": [
-            "Intel", "Disney", "XBox", "Sony", "Polaroid", "Tesla",
-        ],
-        "color_palette": [
-            "#181C3A", "#E0BBE4", "#8F00FF", "#7C46C5", "#0070B5", "#8681E8", "#FE89BE", "#FD4431",
-        ],
-        "visual_elements": [
-            "gwiazda", "iskra", "łuk magiczny"
-        ],
-        "keyword_messaging": [
-            "Zmiana", "Inspiracja", "Możliwość"
-        ],
-        "watchword": [
-            "Zmieniam rzeczywistość w to, co dziś wydaje się niemożliwe."
-        ],
-        "questions": [
-            "Jak pokazujesz mieszkańcom, że niemożliwe jest możliwe?",
-            "Jakie innowacje budują wizerunek miasta kreatywnego i nowoczesnego?",
-            "Jak inspirujesz społeczność do patrzenia dalej?"
-        ]
-    },
-    "Towarzysz": {
-        "name": "Towarzysz",
-        "tagline": "Wspólnota. Prostota. Bliskość.",
-        "description": (
-            "Towarzysz w polityce stoi blisko ludzi, jest autentyczny, stawia na prostotę, tworzenie bezpiecznej wspólnoty społecznej oraz zrozumienie codziennych problemów obywateli. "
-            "Nie udaje, nie buduje dystansu – jest 'swojakiem', na którym można polegać. "
-            "Politycy o tym archetypie podkreślają swoje zwyczajne pochodzenie i doświadczenia, pokazując, że rozumieją troski i aspiracje przeciętnych ludzi. "
-            "Ich siłą jest umiejętność budowania relacji i tworzenia poczucia wspólnoty."
-        ),
-        "storyline": (
-            "Opowieść Towarzysza koncentruje się wokół wartości rodzinnych, codziennych wyzwań, pracy od podstaw oraz pielęgnowania lokalnej tradycji."
-        ),
-        "recommendations": [
-            "Podkreślaj prostotę i codzienność w komunikacji.",
-            "Stosuj jasne, proste słowa i obrazy.",
-            "Buduj atmosferę równości (każdy ma głos).",
-            "Stosuj kolorystykę: beże, błękity, zielone akcenty.",
-            "Doceniaj lokalność i rodzinność.",
-            "Promuj wspólnotowe inicjatywy.",
-            "Unikaj dystansu i języka eksperckiego."
-        ],
-        "core_traits": [
-            "Autentyczność", "Wspólnota", "Prostota", "Równość"
-        ],
-        "strengths": [
-            "autentyczność", "empatia", "umiejętność komunikacji z obywatelami"
-        ],
-        "weaknesses": [
-            "brak wizji", "ograniczona perspektywa", "unikanie trudnych decyzji"
-        ],
-        "examples_person": [
-            "Joe Biden", "Bernie Sanders", "Andrzej Duda", "Pedro Sánchez", "Jeremy Corbyn"
-        ],
-        "example_brands": [
-            "Ikea", "Skoda", "Żabka", "Ford", "VW"
-        ],
-        "color_palette": [
-            "#A3C1AD", "#F9F9F9", "#6CA0DC", "#2CA02C"
-        ],
-        "visual_elements": [
-            "dom", "krąg ludzi", "prosta ikona dłoni"
-        ],
-        "keyword_messaging": [
-            "Bliskość", "Razem", "Prostota"
-        ],
-        "watchword": [
-            "Blisko ludzi i ich codziennych spraw."
-        ],
-        "questions": [
-            "Jak podkreślasz autentyczność i codzienność?",
-            "Jak pielęgnujesz lokalność i wspólnotę?",
-            "Co robisz, by każdy mieszkaniec czuł się zauważony?"
-        ]
-    },
-    "Niewinny": {
-        "name": "Niewinny",
-        "tagline": "Optymizm. Nadzieja. Nowy początek.",
-        "description": (
-            "Niewinny w polityce otwarcie komunikuje pozytywne wartości, niesie nadzieję i podkreśla wiarę w zmiany na lepsze. "
-            "Głosi prostą, pozytywną wizję dobra wspólnego i nadziei. "
-            "Niewinny buduje zaufanie szczerością i skutecznie apeluje o współpracę dla wspólnego dobra."
-        ),
-        "storyline": (
-            "Opowieść Niewinnego buduje napięcie wokół pozytywnych emocji, odwołuje się do marzeń o lepszym mieście i wiary we wspólny sukces."
-        ),
-        "recommendations": [
-            "Komunikuj optymizm, wiarę w ludzi i dobre intencje.",
-            "Stosuj jasną kolorystykę: biele, pastele, żółcie.",
-            "Dziel się sukcesami społeczności.",
-            "Stawiaj na transparentność działań.",
-            "Angażuj się w kampanie edukacyjne i społeczne.",
-            "Unikaj negatywnego przekazu, straszenia, manipulacji."
-        ],
-        "core_traits": [
-            "Optymizm", "Nadzieja", "Współpraca", "Szlachetność"
-        ],
-        "strengths": [
-            "łatwo zyskuje zaufanie", "łagodzi polaryzację", "odwołuje się do uniwersalnych wartości."
-        ],
-        "weaknesses": [
-            "może być postrzegany jako naiwny", "trudniej mu prowadzić twarde negocjacje"
-        ],
-        "examples_person": [
-            "Jimmy Carter", "Václav Havel", "Szymon Hołownia"
-        ],
-        "example_brands": [
-            "Dove", "Milka", "Kinder", "Polska Akcja Humanitarna"
-        ],
-        "color_palette": [
-            "#9BD6F4", "#FFF6C3", "#AAC9CE", "#FFF200",
-        ],
-        "visual_elements": [
-            "gołąb", "słońce", "dziecko"
-        ],
-        "keyword_messaging": [
-            "Nadzieja", "Optymizm", "Wspólnie"
-        ],
-        "watchword": [
-            "Uczciwość i nadzieja prowadzą naprzód."
-        ],
-        "questions": [
-            "Jak budujesz wizerunek pozytywnego samorządowca?",
-            "Jak zachęcasz mieszkańców do dzielenia się nadzieją?",
-            "Jak komunikujesz szczerość i otwartość?"
-        ]
-    },
-    "Buntownik": {
-        "name": "Buntownik",
-        "tagline": "Zmiana. Odwaga. Przełom.",
-        "description": (
-            "Buntownik w polityce odważnie kwestionuje zastane układy, nawołuje do zmiany i walczy o nowe, lepsze reguły gry. "
-            "Archetyp Buntownika charakteryzuje się odwagą w kwestionowaniu status quo i dążeniem do fundamentalnych zmian. "
-            "Buntownicy sprzeciwiają się istniejącym strukturom władzy i konwencjom, proponując radykalne rozwiązania."
-            "Politycy o tym archetypie często prezentują się jako outsiderzy, którzy chcą zburzyć skorumpowany system i wprowadzić nowy porządek."
-            "Buntownik odważnie kwestionuje zastane układy, nawołuje do zmiany i walczy o nowe, lepsze reguły gry w mieście. "
-            "Potrafi ściągnąć uwagę i zjednoczyć mieszkańców wokół śmiałych idei. "
-        ),
-        "storyline": (
-            "Narracja Buntownika podkreśla walkę z niesprawiedliwością i stagnacją, wytykanie błędów władzy i radykalne pomysły na rozwój miasta."
-        ),
-        "recommendations": [
-            "Akcentuj odwagę do mówienia „nie” starym rozwiązaniom.",
-            "Publikuj manifesty i odważne postulaty.",
-            "Stosuj wyrazistą kolorystykę: czernie, czerwienie, ostre kolory.",
-            "Inspiruj mieszkańców do aktywnego sprzeciwu wobec barier rozwojowych.",
-            "Podkreślaj wolność słowa, swobody obywatelskie.",
-            "Unikaj koncentrowania się wyłącznie na krytyce – pokazuj pozytywne rozwiązania."
-        ],
-        "core_traits": [
-            "Odwaga", "Bezpardonowość", "Radykalizm", "Niepokorność"
-        ],
-        "strengths": [
-            "odwaga", "autentyczność", "zdolność inspirowania do zmian"
-        ],
-        "weaknesses": [
-            "nadmierna konfrontacyjność", "brak kompromisu", "trudności w budowaniu koalicji"
-        ],
-        "examples_person": [
-            "Donald Trump", "Marine Le Pen", "Sławomir Mentzen", "Lech Wałęsa", "Aleksiej Nawalny"
-        ],
-        "example_brands": [
-            "Harley Davidson", "Jack Daniel's", "Greenpeace", "Virgin", "Bitcoin"
-        ],
-        "color_palette": [
-            "#FF0000", "#FF6F61", "#000000", "#FF7F0E"
-        ],
-        "visual_elements": [
-            "piorun", "megafon", "odwrócona korona"
-        ],
-        "keyword_messaging": [
-            "Zmiana", "Rewolucja", "Nowe reguły"
-        ],
-        "watchword": [
-            "Rewolucyjne zmiany dla lepszego jutra."
-        ],
-        "questions": [
-            "Jak komunikujesz odwagę i gotowość do zmiany?",
-            "Jak mobilizujesz do zrywania z przeszłością?",
-            "Co robisz, by mieszkańcy mieli w Tobie rzecznika zmiany?"
-        ]
-    }
-}
+archetype_extended = load_archetype_extended(
+    os.path.join(os.path.dirname(__file__), 'opisy_archetypow')
+)
+_enforce_required_palettes(archetype_extended)
 # --- KONIEC archetype_extended ---
 
 from pathlib import Path
@@ -2744,7 +2302,6 @@ css_ff += _font_face_css("fonts/RobotoCondensed-Regular.ttf", "Roboto Condensed"
 css_ff += _font_face_css("fonts/RobotoCondensed-Light.ttf", "Roboto Condensed", "300")
 
 # >>> BEGIN CSS INJECTOR (wklej po zbudowaniu css_ff) >>>
-import json
 import streamlit.components.v1 as components  # masz już import wyżej, ale zostaw – jest idempotentne
 
 # 1) Złóż jeden łańcuch CSS: @font-face (css_ff) + Twoje reguły globalne
@@ -2765,6 +2322,24 @@ GLOBAL_CSS = (css_ff or "") + """
   word-break: keep-all;
 }
 .ap-h2.center{ text-align:center; }
+
+/* wymuszone nagłówki sekcji raportu */
+.ap-heading-force{
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif !important;
+  font-weight: 640 !important;
+  font-size: 1.34rem !important;
+  line-height: 1.27 !important;
+  letter-spacing: 0 !important;
+  color:#1f2937 !important;
+  margin: 6px 0 10px 0 !important;
+}
+@media (max-width: 1280px){
+  .ap-heading-force{
+    font-size: 1.25rem !important;
+  }
+}
+.ap-heading-force.ap-heading-center{ text-align:center !important; }
+.ap-heading-force.ap-heading-left{ text-align:left !important; }
 
 /* tytuły sekcji */
 .section-title{
@@ -2828,29 +2403,30 @@ body { font-family:'Roboto','Segoe UI','Arial',sans-serif; }
 """
 
 def inject_global_css(css_text: str, style_id: str = "ap-global-css"):
-    # Wstrzykujemy CSS do <head> w nadrzędnym dokumencie (stały id -> idempotentne)
-    components.html(f"""
-    <script>
-    (function() {{
-      const css = {json.dumps(css_text)};
-      const id = "{style_id}";
-      const doc = window.parent.document;
-      let el = doc.getElementById(id);
-      if (!el) {{
-        el = doc.createElement('style');
-        el.id = id;
-        doc.head.appendChild(el);
-      }}
-      if (el.innerHTML !== css) {{
-        el.innerHTML = css;
-      }}
-    }})();
-    </script>
-    """, height=0)
+    # Bez iframa z height=0 (potrafi generować artefakty typu "0" w UI).
+    st.markdown(f"<style id='{style_id}'>{css_text}</style>", unsafe_allow_html=True)
 
 # 2) Wołaj na każdym rerunie – jest szybkie i bezpieczne
 inject_global_css(GLOBAL_CSS)
 # <<< END CSS INJECTOR <<<
+
+
+def ap_section_heading(
+    title: str,
+    center: bool = False,
+    margin_bottom_px: int = 8,
+    margin_top_px: int = 6,
+) -> str:
+    align_class = "ap-heading-center" if center else "ap-heading-left"
+    align = "center" if center else "left"
+    return (
+        f"<div class='ap-heading-force {align_class}' "
+        f"style='font-family:\"Segoe UI\",system-ui,-apple-system,Arial,sans-serif !important;"
+        f"font-weight:640 !important;font-size:1.34rem !important;line-height:1.27 !important;"
+        f"color:#1f2937 !important;letter-spacing:0 !important;"
+        f"text-align:{align} !important;margin:{int(margin_top_px)}px 0 {int(margin_bottom_px)}px 0 !important;'>"
+        f"{html.escape(str(title))}</div>"
+    )
 
 
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
@@ -2955,6 +2531,225 @@ def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None) -> Im
     _mask_pie_ring(img, idx(aux_name),  (255,210,47,110))
     _mask_pie_ring(img, idx(main_name), (255,0,0,110))
     return img
+
+
+SEGMENT_PROFILE_ITEMS = [
+    ("Buntownik", "Odnowa", "buntownik.png", "#c62828"),
+    ("Błazen", "Otwartość", "blazen.png", "#ef5350"),
+    ("Kochanek", "Relacje", "kochanek.png", "#90caf9"),
+    ("Opiekun", "Troska", "opiekun.png", "#42a5f5"),
+    ("Towarzysz", "Współpraca", "towarzysz.png", "#1565c0"),
+    ("Niewinny", "Przejrzystość", "niewinny.png", "#81c784"),
+    ("Władca", "Skuteczność", "wladca.png", "#43a047"),
+    ("Mędrzec", "Racjonalność", "medrzec.png", "#1b5e20"),
+    ("Czarodziej", "Wizja", "czarodziej.png", "#b39ddb"),
+    ("Bohater", "Odwaga", "bohater.png", "#7e57c2"),
+    ("Twórca", "Rozwój", "tworca.png", "#5e35b1"),
+    ("Odkrywca", "Wolność", "odkrywca.png", "#8e0000"),
+]
+
+
+def _plot_segment_profile_wheel_from_scores(outpath: Path, mean_scores: dict[str, float]) -> None:
+    from matplotlib.patches import Wedge, Circle
+    import math
+
+    values = np.asarray([float(mean_scores.get(name, 0.0)) for name, *_ in SEGMENT_PROFILE_ITEMS], dtype=float)
+    values = np.where(np.isfinite(values), np.clip(values, 0.0, 100.0), 0.0)
+
+    def _load_icon(path: Path):
+        img = Image.open(path).convert("RGBA")
+        alpha = img.getchannel("A")
+        bbox = alpha.getbbox()
+        if bbox:
+            img = img.crop(bbox)
+        return np.asarray(img)
+
+    def _draw_text_on_arc(ax, text: str, center_deg: float, radius: float) -> None:
+        text = str(text or "").upper()
+        if not text:
+            return
+        n = len(text)
+        span = min(24, max(11.5, 1.7 * n))
+        center_rad = math.radians(center_deg)
+        upper = math.sin(center_rad) >= 0
+        if n == 1:
+            angles = [center_deg]
+        else:
+            if upper:
+                start = center_deg + span / 2
+                end = center_deg - span / 2
+            else:
+                start = center_deg - span / 2
+                end = center_deg + span / 2
+            angles = np.linspace(start, end, n)
+        for ch, ang in zip(text, angles):
+            if ch == " ":
+                continue
+            ang_rad = math.radians(float(ang))
+            rot = (ang - 90) if upper else (ang + 90)
+            ax.text(
+                radius * math.cos(ang_rad),
+                radius * math.sin(ang_rad),
+                ch,
+                ha="center",
+                va="center",
+                rotation=rot,
+                rotation_mode="anchor",
+                fontsize=11.4,
+                fontweight="bold",
+                color="#363636",
+                zorder=4,
+            )
+
+    fig, ax = plt.subplots(figsize=(10.8, 10.8), dpi=220)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    bg = (1, 1, 1, 0)
+    fig.patch.set_alpha(0.0)
+    ax.set_facecolor("none")
+
+    r_hole = 0.115
+    r_data_outer = 0.78
+    n_cells = 10
+    dr = (r_data_outer - r_hole) / n_cells
+    r_label_inner = 0.80
+    r_label_outer = 0.92
+    r_accent_inner = 0.95
+    r_accent_outer = 0.99
+    edgecolor = "#d4d4d4"
+
+    icon_dir = Path(__file__).with_name("ikony")
+    icon_cache: dict[str, np.ndarray] = {}
+    for arch, _value, icon_file, _color in SEGMENT_PROFILE_ITEMS:
+        icon_path = icon_dir / icon_file
+        if icon_path.exists():
+            try:
+                icon_cache[arch] = _load_icon(icon_path)
+            except Exception:
+                pass
+
+    for k in range(n_cells + 1):
+        r = r_hole + k * dr
+        ax.add_patch(Circle((0, 0), r, facecolor="none", edgecolor="#dfdfdf", linewidth=0.7, zorder=0))
+
+    for i in range(12):
+        center = 75 - i * 30
+        edge_ang = math.radians(center - 15)
+        ax.plot(
+            [r_hole * math.cos(edge_ang), r_accent_outer * math.cos(edge_ang)],
+            [r_hole * math.sin(edge_ang), r_accent_outer * math.sin(edge_ang)],
+            color="#d7d7d7",
+            lw=0.7,
+            zorder=0,
+        )
+
+    for i, (arch, value_label, _icon_file, color) in enumerate(SEGMENT_PROFILE_ITEMS):
+        center = 75 - i * 30
+        theta1 = center - 15
+        theta2 = center + 15
+        p = float(values[i])
+        fill_outer = r_hole + (p / 100.0) * (r_data_outer - r_hole)
+
+        for k in range(n_cells):
+            r_outer = r_hole + (k + 1) * dr
+            ax.add_patch(
+                Wedge((0, 0), r_outer, theta1, theta2, width=dr, facecolor=bg, edgecolor=edgecolor, linewidth=0.8, zorder=1)
+            )
+        if fill_outer > r_hole + 1e-9:
+            ax.add_patch(
+                Wedge(
+                    (0, 0),
+                    fill_outer,
+                    theta1,
+                    theta2,
+                    width=(fill_outer - r_hole),
+                    facecolor=color,
+                    edgecolor="none",
+                    linewidth=0.0,
+                    alpha=0.90,
+                    zorder=2,
+                )
+            )
+        for k in range(n_cells):
+            r_outer = r_hole + (k + 1) * dr
+            ax.add_patch(
+                Wedge((0, 0), r_outer, theta1, theta2, width=dr, facecolor="none", edgecolor=edgecolor, linewidth=0.8, zorder=3)
+            )
+        ax.add_patch(
+            Wedge(
+                (0, 0),
+                r_label_outer,
+                theta1,
+                theta2,
+                width=(r_label_outer - r_label_inner),
+                facecolor=bg,
+                edgecolor=edgecolor,
+                linewidth=0.8,
+                zorder=3.2,
+            )
+        )
+        ax.add_patch(
+            Wedge(
+                (0, 0),
+                r_accent_outer,
+                theta1,
+                theta2,
+                width=(r_accent_outer - r_accent_inner),
+                facecolor=color,
+                edgecolor=bg,
+                linewidth=1.1,
+                zorder=3.4,
+            )
+        )
+
+        _draw_text_on_arc(ax=ax, text=arch, center_deg=center, radius=(r_label_inner + r_label_outer) / 2)
+
+        ang = math.radians(center)
+        if arch in icon_cache:
+            ax.add_artist(
+                AnnotationBbox(
+                    OffsetImage(icon_cache[arch], zoom=0.26),
+                    (1.14 * math.cos(ang), 1.14 * math.sin(ang)),
+                    frameon=False,
+                    zorder=5,
+                )
+            )
+
+        filled_span = max(0.0, fill_outer - r_hole)
+        label_r = (r_hole + filled_span * 0.52 + dr * 0.18) if p <= 25.0 else (r_hole + filled_span * 0.52)
+        if filled_span <= 1e-9:
+            label_r = r_hole + dr * 0.9
+        ax.text(
+            label_r * math.cos(ang),
+            label_r * math.sin(ang),
+            f"{p:.0f}",
+            ha="center",
+            va="center",
+            fontsize=12.2,
+            color="#2f2f2f",
+            fontweight="bold",
+            zorder=8,
+            bbox=dict(boxstyle="round,pad=0.24,rounding_size=0.10", fc="white", ec=color, lw=1.0, alpha=0.68),
+        )
+
+    ax.add_patch(Circle((0, 0), r_hole * 0.98, facecolor=bg, edgecolor="#d0d0d0", linewidth=1.2, zorder=10))
+    for angle_deg in [0, 90, 180, 270]:
+        ang = math.radians(angle_deg)
+        ax.plot([0, 1.02 * math.cos(ang)], [0, 1.02 * math.sin(ang)], color="#e1e1e1", lw=0.9, zorder=0)
+
+    ax.set_xlim(-1.22, 1.22)
+    ax.set_ylim(-1.22, 1.22)
+    outpath = Path(outpath)
+    outpath.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout(pad=0.06)
+    fig.savefig(outpath, dpi=220, bbox_inches="tight", pad_inches=0.10, transparent=True)
+    plt.close(fig)
+
+
+def make_segment_profile_wheel_png(mean_scores: dict[str, float], out_path: str = "segment_profile_wheel.png") -> str:
+    _plot_segment_profile_wheel_from_scores(Path(out_path), mean_scores or {})
+    return out_path
+
 
 @st.cache_data(ttl=30)
 def load(study_id=None):
@@ -3090,38 +2885,21 @@ def build_word_context(
         "CITY_NOM": "Kraków"   # (opcjonalnie)
     }
     """
-    COLOR_NAME_MAP = {
-        "#000000": "Czerń", "#FFD700": "Złoto", "#282C34": "Granat (antracyt)",
-        "#800020": "Burgund", "#E10600": "Czerwień", "#2E3141": "Grafitowy granat",
-        "#FFFFFF": "Biel", "#4682B4": "Stalowy błękit", "#B0C4DE": "Jasny niebieskoszary",
-        "#6C7A89": "Popielaty szary", "#B4D6B4": "Miętowa zieleń", "#A7C7E7": "Pastelowy błękit",
-        "#FFD580": "Pastelowy żółty / beżowy", "#FA709A": "Róż malinowy", "#FEE140": "Jasny żółty",
-        "#FFD6E0": "Bardzo jasny róż", "#FFB300": "Mocna żółć", "#FF8300": "Pomarańcz",
-        "#FFD93D": "Pastelowa żółć", "#7C53C3": "Fiolet", "#3BE8B0": "Miętowy cyjan",
-        "#87CEEB": "Błękit (Sky Blue)", "#43C6DB": "Turkusowy błękit", "#A0E8AF": "Seledyn",
-        "#F9D371": "Złocisty żółty", "#8F00FF": "Fiolet (intensywny)", "#181C3A": "Granat bardzo ciemny",
-        "#E0BBE4": "Pastelowy fiolet", "#F9F9F9": "Biel bardzo jasna", "#6CA0DC": "Pastelowy błękit",
-        "#A3C1AD": "Pastelowa zieleń", "#FFF6C3": "Jasny kremowy", "#AAC9CE": "Pastelowy niebieskoszary",
-        "#FFF200": "Żółty (cytrynowy)", "#FF0000": "Czerwień intensywna", "#FF6F61": "Łososiowy róż",
-        "#8C564B": "Ciemy brąz", "#D62728": "Czerwień karmazynowa", "#1F77B4": "Chabrowy",
-        "#9467BD": "Fiolet śliwkowy", "#F2A93B": "Miodowy żółty", "#17BECF": "Niebieski morski",
-        "#E377C2": "Pastelowy róż fioletowy", "#7C46C5": "Fiolet szafirowy", "#2CA02C": "Zieleń trawiasta",
-        "#9BD6F4": "Pastelowy błękit jasny", "#FF7F0E": "Jaskrawy pomarańcz",
-    }
-
     person = person or {}
     def p(key, fallback=""):
         return (person.get(key) or fallback).strip()
 
     def person_links_plain(person_list):
-        return person_list or []
+        cleaned = [canonical_person_name(name) for name in (person_list or []) if str(name or "").strip()]
+        # zachowaj kolejność i usuń duplikaty
+        return list(dict.fromkeys(cleaned))
 
     def kolor_label_list(palette):
         if not isinstance(palette, list):
             return ""
         out = []
         for code in palette:
-            name = COLOR_NAME_MAP.get(code.upper(), code)
+            name = COLOR_NAME_MAP.get(str(code).upper(), str(code).upper())
             out.append(f"{name} ({code})")
         return ', '.join(out)
 
@@ -3163,6 +2941,7 @@ def build_word_context(
 
         # ——— Główny / wspierający / poboczny (bez zmian merytorycznych)
         "ARCHETYPE_MAIN_NAME": main.get("name") or "",
+        "ARCHETYPE_MAIN_CORE_TRIPLET": main.get("core_triplet") or CORE_TRIPLET_MAP.get(main_type, ""),
         "ARCHETYPE_MAIN_TAGLINE": main.get("tagline") or "",
         "ARCHETYPE_MAIN_DESC": main.get("description") or "",
         "ARCHETYPE_MAIN_STORYLINE": main.get("storyline") or "",
@@ -3178,8 +2957,11 @@ def build_word_context(
         "ARCHETYPE_MAIN_KEYWORDS": main.get("keyword_messaging") or [],
         "ARCHETYPE_MAIN_SLOGANS": main.get("watchword") or [],
         "ARCHETYPE_MAIN_QUESTIONS": main.get("questions") or [],
+        "ARCHETYPE_MAIN_METRIC_TEXT": main.get("report_metric_text") or "",
+        "ARCHETYPE_MAIN_EXPANDED_TEXT": main.get("report_expanded_text") or "",
 
         "ARCHETYPE_AUX_NAME": second.get("name") or "",
+        "ARCHETYPE_AUX_CORE_TRIPLET": second.get("core_triplet") or CORE_TRIPLET_MAP.get(second_type, ""),
         "ARCHETYPE_AUX_TAGLINE": second.get("tagline") or "",
         "ARCHETYPE_AUX_DESC": second.get("description") or "",
         "ARCHETYPE_AUX_STORYLINE": second.get("storyline") or "",
@@ -3195,8 +2977,11 @@ def build_word_context(
         "ARCHETYPE_AUX_KEYWORDS": second.get("keyword_messaging") or [],
         "ARCHETYPE_AUX_SLOGANS": second.get("watchword") or [],
         "ARCHETYPE_AUX_QUESTIONS": second.get("questions") or [],
+        "ARCHETYPE_AUX_METRIC_TEXT": second.get("report_metric_text") or "",
+        "ARCHETYPE_AUX_EXPANDED_TEXT": second.get("report_expanded_text") or "",
 
         "ARCHETYPE_SUPPLEMENT_NAME": supplement.get("name") or "",
+        "ARCHETYPE_SUPPLEMENT_CORE_TRIPLET": supplement.get("core_triplet") or CORE_TRIPLET_MAP.get(supplement_type, ""),
         "ARCHETYPE_SUPPLEMENT_TAGLINE": supplement.get("tagline") or "",
         "ARCHETYPE_SUPPLEMENT_DESC": supplement.get("description") or "",
         "ARCHETYPE_SUPPLEMENT_STORYLINE": supplement.get("storyline") or "",
@@ -3212,8 +2997,183 @@ def build_word_context(
         "ARCHETYPE_SUPPLEMENT_KEYWORDS": supplement.get("keyword_messaging") or [],
         "ARCHETYPE_SUPPLEMENT_SLOGANS": supplement.get("watchword") or [],
         "ARCHETYPE_SUPPLEMENT_QUESTIONS": supplement.get("questions") or [],
+        "ARCHETYPE_SUPPLEMENT_METRIC_TEXT": supplement.get("report_metric_text") or "",
+        "ARCHETYPE_SUPPLEMENT_EXPANDED_TEXT": supplement.get("report_expanded_text") or "",
     }
     return context
+
+
+def _doc_has_style(doc_obj, style_name: str) -> bool:
+    try:
+        return any(style.name == style_name for style in doc_obj.styles)
+    except Exception:
+        return False
+
+
+def _doc_add_paragraph(doc_obj, text: str, style_name: str | None = None):
+    if style_name and _doc_has_style(doc_obj, style_name):
+        return doc_obj.add_paragraph(text, style=style_name)
+    return doc_obj.add_paragraph(text)
+
+
+def _append_archetype_appendix(doc_tpl, appendix_items: list[tuple[str, dict]]):
+    valid_items = []
+    for role_label, arche_data in appendix_items:
+        if not arche_data:
+            continue
+        if not (arche_data.get("metric_rows") or arche_data.get("expanded_sections")):
+            continue
+        valid_items.append((role_label, arche_data))
+
+    if not valid_items:
+        return
+
+    doc_obj = doc_tpl.docx
+    doc_obj.add_page_break()
+    _doc_add_paragraph(doc_obj, "Załącznik: Rozbudowane opisy archetypów", "Heading 1")
+
+    for role_label, arche_data in valid_items:
+        arche_name = arche_data.get("name") or "Archetyp"
+        _doc_add_paragraph(doc_obj, f"{role_label}: {arche_name}", "Heading 2")
+
+        metric_rows = arche_data.get("metric_rows") or []
+        if metric_rows:
+            _doc_add_paragraph(doc_obj, "Metryka archetypu", "Heading 3")
+            for row in metric_rows:
+                label = str(row.get("label", "")).strip()
+                kind = row.get("kind", "text")
+                value = row.get("value")
+                if not label:
+                    continue
+                if label.casefold() == "core triplet":
+                    continue
+
+                if kind == "examples":
+                    _doc_add_paragraph(doc_obj, f"{label}:", "Heading 4")
+                    examples_map = value or {}
+                    for group in ("Politycy", "Marki/organizacje", "Popkultura/postacie"):
+                        values = examples_map.get(group) or []
+                        if values:
+                            _doc_add_paragraph(doc_obj, f"- {group}: {', '.join(values)}")
+                    continue
+
+                if isinstance(value, list):
+                    if not value:
+                        continue
+                    _doc_add_paragraph(doc_obj, f"{label}:", "Heading 4")
+                    for item in value:
+                        if str(item).strip():
+                            _doc_add_paragraph(doc_obj, f"- {item}")
+                    continue
+
+                text_value = str(value or "").strip()
+                if text_value:
+                    _doc_add_paragraph(doc_obj, f"{label}: {text_value}")
+
+        expanded_sections = arche_data.get("expanded_sections") or []
+        if expanded_sections:
+            _doc_add_paragraph(doc_obj, "Rozbudowany opis", "Heading 3")
+            for section in expanded_sections:
+                title = str(section.get("title", "")).strip()
+                if title:
+                    _doc_add_paragraph(doc_obj, title, "Heading 3")
+                for subsection in section.get("subsections", []):
+                    subtitle = str(subsection.get("title", "")).strip()
+                    if subtitle:
+                        _doc_add_paragraph(doc_obj, subtitle, "Heading 4")
+                    for line in subsection.get("content", []):
+                        if str(line).strip():
+                            _doc_add_paragraph(doc_obj, str(line).strip())
+
+
+def _append_segment_profile_page(doc_tpl, segment_profile_img_path: str | None, subject_gen: str = ""):
+    if not segment_profile_img_path or not os.path.exists(segment_profile_img_path):
+        return
+    doc_obj = doc_tpl.docx
+    doc_obj.add_page_break()
+    title = re.sub(r"\s{2,}", " ", f"Profil archetypowy {subject_gen} (siła archetypu, skala: 0-100)").strip()
+    _doc_add_paragraph(doc_obj, title, "Heading 1")
+    p = doc_obj.add_paragraph()
+    add_image(p, segment_profile_img_path, width=Mm(170))
+
+
+def export_word_metrics_only(
+    main_type,
+    second_type,
+    supplement_type,
+    main,
+    second,
+    supplement,
+    person: dict | None = None,
+    show_supplement: bool = True,
+    segment_profile_img_path: str | None = None,
+):
+    person = person or {}
+    full_name = (person.get("GEN") or person.get("NOM") or "").strip()
+    doc = Document()
+    doc.add_heading(f"Raport skrócony – Metryka archetypów {full_name}".strip(), level=1)
+    doc.add_paragraph(f"Data wygenerowania: {datetime.now().strftime('%Y-%m-%d')}")
+
+    if segment_profile_img_path and os.path.exists(segment_profile_img_path):
+        doc.add_paragraph("")
+        prof_title = re.sub(r"\s{2,}", " ", f"Profil archetypowy {full_name} (siła archetypu, skala: 0-100)").strip()
+        doc.add_heading(prof_title, level=2)
+        p = doc.add_paragraph()
+        add_image(p, segment_profile_img_path, width=Mm(165))
+
+    roles = [
+        ("Archetyp główny", main),
+        ("Archetyp wspierający", second),
+    ]
+    if show_supplement:
+        roles.append(("Archetyp poboczny", supplement))
+
+    for role_label, arche_data in roles:
+        if not arche_data:
+            continue
+        metric_rows = arche_data.get("metric_rows") or []
+        if not metric_rows:
+            continue
+        doc.add_page_break()
+        doc.add_heading(f"{role_label}: {arche_data.get('name') or ''}".strip(), level=2)
+        doc.add_heading("Metryka archetypu", level=3)
+        for row in metric_rows:
+            label = str(row.get("label", "")).strip()
+            kind = row.get("kind", "text")
+            value = row.get("value")
+            if not label:
+                continue
+            if label.casefold() == "core triplet":
+                continue
+
+            if kind == "examples":
+                doc.add_heading(label, level=4)
+                examples_map = value or {}
+                for group in ("Politycy", "Marki/organizacje", "Popkultura/postacie"):
+                    vals = [str(v).strip() for v in (examples_map.get(group) or []) if str(v).strip()]
+                    if vals:
+                        doc.add_paragraph(f"- {group}: {', '.join(vals)}")
+                continue
+
+            if isinstance(value, list):
+                vals = [str(v).strip() for v in value if str(v).strip()]
+                if not vals:
+                    continue
+                doc.add_heading(label, level=4)
+                for item in vals:
+                    doc.add_paragraph(f"- {item}")
+                continue
+
+            txt = str(value or "").strip()
+            if txt:
+                doc.add_heading(label, level=4)
+                doc.add_paragraph(txt)
+
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
 
 def export_word_docxtpl(
     main_type,
@@ -3235,6 +3195,7 @@ def export_word_docxtpl(
     color_progress_img_path: str | None = None,
     archetype_stacked_img_path: str | None = None,
     capsule_columns_img_path: str | None = None,
+    segment_profile_img_path: str | None = None,
     show_supplement: bool = True,                       # ⬅️ NOWY ARGUMENT
     template_path: str | None = None,                   # ⬅️ (opcjonalny override)
 ):
@@ -3396,12 +3357,34 @@ def export_word_docxtpl(
 
     doc.render(context)
 
-    # (opcja) hiperłącza do osób – jak było
+    appendix_payload = [
+        ("Archetyp główny", main),
+        ("Archetyp wspierający", second),
+    ]
+    if show_supplement:
+        appendix_payload.append(("Archetyp poboczny", supplement))
+    _append_archetype_appendix(doc, appendix_payload)
+    subject_gen = (person or {}).get("GEN") or (person or {}).get("NOM") or ""
+    _append_segment_profile_page(doc, segment_profile_img_path, subject_gen=subject_gen)
+
+    # Hiperłącza do osób: tylko jeśli akapit zawiera wyłącznie nazwisko (z opcjonalnym prefiksem "- ").
     for para in doc.paragraphs:
-        for name, url in person_wikipedia_links.items():
-            if name in para.text:
-                para.clear()
-                add_hyperlink(para, name, url)
+        raw_text = (para.text or "").strip()
+        if not raw_text:
+            continue
+
+        bullet_prefix = ""
+        candidate = raw_text
+        if raw_text.startswith("- "):
+            bullet_prefix = "- "
+            candidate = raw_text[2:].strip()
+
+        candidate = canonical_person_name(candidate)
+        if candidate in person_wikipedia_links:
+            para.clear()
+            if bullet_prefix:
+                para.add_run(bullet_prefix)
+            add_hyperlink(para, candidate, person_wikipedia_links[candidate])
 
     buf = BytesIO()
     doc.save(buf)
@@ -3539,21 +3522,76 @@ def palette_boxes_html(palette, color_name_map=COLOR_NAME_MAP):
 
 import base64
 
-def build_brand_icons_html(brand_names, logos_dir):
+@lru_cache(maxsize=512)
+def _file_to_data_uri(path: str) -> str:
+    ext = Path(path).suffix.lower()
+    mime = {
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".tif": "image/tiff",
+        ".tiff": "image/tiff",
+    }.get(ext, "application/octet-stream")
+    blob = Path(path).read_bytes()
+    b64 = base64.b64encode(blob).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
+@lru_cache(maxsize=512)
+def _photo_to_data_uri(path: str, max_px: int = 220) -> str:
+    ext = Path(path).suffix.lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".tif", ".tiff"}:
+        return _file_to_data_uri(path)
+    try:
+        with Image.open(path) as im:
+            im = im.convert("RGB")
+            resample = getattr(Image, "Resampling", Image).LANCZOS
+            im.thumbnail((max_px, max_px), resample)
+            out = BytesIO()
+            im.save(out, format="JPEG", quality=82, optimize=True)
+            b64 = base64.b64encode(out.getvalue()).decode("ascii")
+            return f"data:image/jpeg;base64,{b64}"
+    except Exception:
+        return _file_to_data_uri(path)
+
+
+def build_brand_icons_html(brand_names, logos_dir, label_color: str = "#f3f6ff"):
     import os
-    html = '<div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;margin-top:6px;margin-bottom:8px;">'
+    out_html = (
+        '<div style="display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-start;'
+        'margin-top:6px;margin-bottom:8px;">'
+    )
     for brand in brand_names:
         path = get_logo_svg_path(brand, logos_dir)
         if path and os.path.exists(path):
-            with open(path, "rb") as f:
-                svg_code = f.read().decode("utf-8", errors="replace")
-            svg_b64 = base64.b64encode(svg_code.encode("utf-8")).decode("ascii")
-            svg_img_tag = f'<img src="data:image/svg+xml;base64,{svg_b64}" alt="{brand}" style="height:32px;vertical-align:middle;margin-right:5px;">'
-            html += f'<span title="{brand}" style="display:flex;flex-direction:column;align-items:center;min-width:55px;"><span>{svg_img_tag}</span><span style="font-size:0.93em; margin-top:1px;">{brand}</span></span>'
+            try:
+                data_uri = _file_to_data_uri(path)
+                img_tag = (
+                    f"<img src='{data_uri}' alt='{html.escape(str(brand))}' "
+                    "style='height:38px;max-width:96px;object-fit:contain;display:block;margin:0 auto 3px;'/>"
+                )
+                out_html += (
+                    f"<span title='{html.escape(str(brand))}' style='display:flex;flex-direction:column;"
+                    "align-items:center;min-width:56px;padding:2px 4px;'>"
+                    f"{img_tag}"
+                    f"<span style='font-size:0.86em;line-height:1.2;color:{label_color};'>{html.escape(str(brand))}</span>"
+                    "</span>"
+                )
+            except Exception:
+                out_html += (
+                    f"<span style='font-size:0.93em;color:{label_color};opacity:.95;padding:2px 4px;'>"
+                    f"{html.escape(str(brand))}</span>"
+                )
         else:
-            html += f'<span style="font-size:1.05em;color:#aaa;margin-right:15px;">{brand}</span>'
-    html += '</div>'
-    return html
+            out_html += (
+                f"<span style='font-size:0.93em;color:{label_color};opacity:.80;padding:2px 4px;'>"
+                f"{html.escape(str(brand))}</span>"
+            )
+    out_html += '</div>'
+    return out_html
 
 def person_links_html(person_list):
     if not person_list:
@@ -3561,179 +3599,938 @@ def person_links_html(person_list):
     return ', '.join(person_link(name) for name in person_list)
 
 
+PHOTO_DIR_PERSON = Path(__file__).with_name("assets") / "foto_person"
+PHOTO_DIR_POPCULTURE = Path(__file__).with_name("assets") / "foto_popculture"
+PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".tif", ".tiff"}
+
+POPCULTURE_IMAGE_ALIASES = {
+    "Jaś Fasola": "Mr. Bean",
+    "Morfeusz (z „Matrixa”)": "Morpheus (The Matrix)",
+    "Mistrz Yoda": "Yoda",
+    "Oprah": "Oprah Winfrey",
+    "księżna Diana": "Diana Princess of Wales",
+    "Matka Teresa": "Mother Teresa",
+    "Forest Gump": "Forrest Gump",
+    "Ojciec Chrzestny": "The Godfather",
+    "Indiana Jones": "Indiana Jones (character)",
+    "Rambo": "John Rambo",
+    "Banksy": "Girl with Balloon",
+    "Kuba Wojewódzki": "Kuba Wojewódzki",
+    "Marilyn Monroe": "Marilyn Monroe",
+    "Steven Spielberg": "Steven Spielberg",
+    "Samwise Gamgee": "Sean Astin",
+    'Samwise Gamgee ("Sam") towarzysz Frodo z Władcy Pierścieni': "Sean Astin",
+}
+
+
+def _photo_norm_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
+    normalized = normalized.lower()
+    normalized = normalized.replace("’", "").replace("'", "").replace('"', "")
+    normalized = re.sub(r"\(.*?\)", " ", normalized)
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _photo_variants(name: str, category: str) -> list[str]:
+    base = str(name or "").strip()
+    variants = [base]
+    stripped = re.sub(r"\(.*?\)", "", base).strip(" -")
+    if stripped:
+        variants.append(stripped)
+    short = re.split(r"\s+-\s+|\s+towarzysz\s+", stripped, maxsplit=1)[0].strip()
+    if short:
+        variants.append(short)
+    if category == "popculture":
+        alias = POPCULTURE_IMAGE_ALIASES.get(base) or POPCULTURE_IMAGE_ALIASES.get(stripped)
+        if alias:
+            variants.append(alias)
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in variants:
+        key = _photo_norm_key(item)
+        if key and key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
+
+
+@lru_cache(maxsize=12)
+def _photo_lookup_index(folder: str) -> dict[str, str]:
+    idx: dict[str, tuple[int, int, str]] = {}
+    folder_path = Path(folder)
+    if not folder_path.exists():
+        return {}
+    for p in folder_path.iterdir():
+        if p.suffix.lower() not in PHOTO_EXTS or not p.is_file():
+            continue
+        stem = p.stem
+        stem_base = re.sub(r"-\d+$", "", stem)
+        key = _photo_norm_key(stem_base.replace("_", " "))
+        if not key:
+            continue
+        rank = (0 if stem == stem_base else 1, len(stem))
+        current = idx.get(key)
+        if current is None or rank < (current[0], current[1]):
+            idx[key] = (rank[0], rank[1], str(p))
+    return {k: v[2] for k, v in idx.items()}
+
+
+def _find_local_photo(name: str, category: str) -> str | None:
+    folder = PHOTO_DIR_POPCULTURE if category == "popculture" else PHOTO_DIR_PERSON
+    index = _photo_lookup_index(str(folder))
+    for variant in _photo_variants(name, category):
+        key = _photo_norm_key(variant)
+        path = index.get(key)
+        if path:
+            return path
+    tokens = [t for t in _photo_norm_key(name).split(" ") if len(t) >= 4]
+    if len(tokens) >= 2:
+        for key, path in index.items():
+            if all(token in key for token in tokens[:2]):
+                return path
+    return None
+
+
+@lru_cache(maxsize=256)
+def _download_wikipedia_photo(name: str, category: str) -> str | None:
+    target_dir = PHOTO_DIR_POPCULTURE if category == "popculture" else PHOTO_DIR_PERSON
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    user_agent = {"User-Agent": "archetypy-admin/1.0 (image-fetch)"}
+    for variant in _photo_variants(name, category):
+        title = quote(variant.replace(" ", "_"))
+        for lang in ("pl", "en"):
+            summary_url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}"
+            try:
+                resp = requests.get(summary_url, headers=user_agent, timeout=3)
+                if resp.status_code != 200:
+                    continue
+                payload = resp.json()
+                thumb = (payload.get("thumbnail") or {}).get("source") or (payload.get("originalimage") or {}).get(
+                    "source"
+                )
+                if not thumb:
+                    continue
+                img_resp = requests.get(thumb, headers=user_agent, timeout=6)
+                if img_resp.status_code != 200 or not img_resp.content:
+                    continue
+                ext = Path(thumb.split("?")[0]).suffix.lower()
+                if ext not in PHOTO_EXTS:
+                    ext = ".jpg"
+                filename = f"{_logo_norm_key(variant) or 'photo'}{ext}"
+                out_path = target_dir / filename
+                out_path.write_bytes(img_resp.content)
+                _photo_lookup_index.cache_clear()
+                return str(out_path)
+            except Exception:
+                continue
+    return None
+
+
+def _resolve_photo_path(name: str, category: str) -> str | None:
+    local = _find_local_photo(name, category)
+    if local:
+        return local
+    return _download_wikipedia_photo(name, category)
+
+
+def _people_photo_grid_html(names: list[str], category: str = "person") -> str:
+    unique_names = list(dict.fromkeys([str(x).strip() for x in (names or []) if str(x).strip()]))
+    if not unique_names:
+        return ""
+
+    cards: list[str] = []
+    for raw_name in unique_names:
+        caption = canonical_person_name(raw_name) if category == "person" else raw_name
+        path = _resolve_photo_path(raw_name, category=category)
+
+        if path and Path(path).exists():
+            try:
+                data_uri = _photo_to_data_uri(path)
+                avatar = f"<img src='{data_uri}' alt='{html.escape(caption)}' />"
+            except Exception:
+                avatar = "<div class='ap-face-ph'>?</div>"
+        else:
+            initials = "".join(part[0] for part in caption.split()[:2]).upper() or "?"
+            avatar = f"<div class='ap-face-ph'>{html.escape(initials)}</div>"
+
+        name_html = html.escape(caption)
+        if category == "person":
+            link_url = person_wikipedia_links.get(canonical_person_name(raw_name))
+            if link_url:
+                name_html = f"<a href='{link_url}' target='_blank'>{name_html}</a>"
+
+        cards.append(
+            "<div class='ap-face-card'>"
+            f"<div class='ap-face-avatar'>{avatar}</div>"
+            f"<div class='ap-face-name'>{name_html}</div>"
+            "</div>"
+        )
+
+    if not cards:
+        return ""
+    return f"<div class='ap-face-grid'>{''.join(cards)}</div>"
+
+
+def _fallback_metric_rows(archetype_data: dict) -> list[dict]:
+    return [
+        {"label": "Esencja", "kind": "text", "value": archetype_data.get("description", "")},
+        {"label": "Rozbudowany opis", "kind": "text", "value": archetype_data.get("storyline", "")},
+        {"label": "Kluczowe atrybuty", "kind": "list", "value": archetype_data.get("core_traits", [])},
+        {"label": "Atuty", "kind": "list", "value": archetype_data.get("strengths", [])},
+        {"label": "Słabości", "kind": "list", "value": archetype_data.get("weaknesses", [])},
+        {
+            "label": "Słowa-klucze (Talking points)",
+            "kind": "list",
+            "value": archetype_data.get("keyword_messaging", []),
+        },
+        {"label": "Sygnatury wizualne", "kind": "list", "value": archetype_data.get("visual_elements", [])},
+        {
+            "label": "Przykłady archetypów",
+            "kind": "examples",
+            "value": {
+                "Politycy": archetype_data.get("examples_person", []),
+                "Marki/organizacje": archetype_data.get("example_brands", []),
+                "Popkultura/postacie": archetype_data.get("metric_examples", {}).get("Popkultura/postacie", []),
+            },
+        },
+        {"label": "Paleta kolorów (HEX)", "kind": "colors", "value": archetype_data.get("color_palette", [])},
+    ]
+
+
+def _split_metric_line_items(text: str) -> list[str]:
+    pieces: list[str] = []
+    for chunk in re.split(r"\n+|[;]", str(text or "")):
+        clean = re.sub(r"^[•\-\u2013\u2014]\s*", "", chunk.strip())
+        clean = clean.strip(" ,.")
+        if clean:
+            pieces.append(clean)
+    return pieces
+
+
+def _story_antagonist_html(value: str) -> str:
+    storyline: list[str] = []
+    antagonist: list[str] = []
+    mode = "storyline"
+    for line in _split_metric_line_items(value):
+        low = line.casefold()
+        if low.startswith("storyline"):
+            mode = "storyline"
+            rest = line.split(":", 1)[1].strip() if ":" in line else ""
+            if rest:
+                storyline.append(rest)
+            continue
+        if low.startswith("antagonista"):
+            mode = "antagonista"
+            rest = line.split(":", 1)[1].strip() if ":" in line else ""
+            if rest:
+                antagonist.append(rest)
+            continue
+        if mode == "antagonista":
+            antagonist.append(line)
+        else:
+            storyline.append(line)
+
+    if not storyline and value:
+        storyline = [str(value).strip()]
+
+    story_html = (
+        "<ul class='ap-simple-list'>"
+        + "".join(f"<li>{html.escape(item)}</li>" for item in storyline if item)
+        + "</ul>"
+        if storyline
+        else "<span style='color:#7c8799;'>—</span>"
+    )
+    ant_html = (
+        "<ul class='ap-simple-list'>"
+        + "".join(f"<li>{html.escape(item)}</li>" for item in antagonist if item)
+        + "</ul>"
+        if antagonist
+        else "<span style='color:#7c8799;'>—</span>"
+    )
+    return (
+        "<div class='ap-story-antag'>"
+        "<div class='ap-story-head'>Storyline:</div>"
+        f"{story_html}"
+        "<div class='ap-story-head'>Antagonista (z czym walczy?):</div>"
+        f"{ant_html}"
+        "</div>"
+    )
+
+
+COMPACT_METRIC_LABELS_CF = {
+    "grupa",
+    "podstawowe pragnienie",
+    "cel",
+    "największa obawa",
+    "strategia",
+    "pułapka",
+    "dar",
+    "cień",
+}
+
+
+def _metric_text_plain(value) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    parts = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+    return " ".join(parts).strip()
+
+
+def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
+    label_raw = str(row.get("label", "")).strip()
+    if label_raw.casefold() == "core triplet":
+        return ""
+    label = html.escape(label_raw)
+    kind = row.get("kind", "text")
+    value = row.get("value")
+
+    if kind == "examples":
+        examples = value or {}
+        politicians = [canonical_person_name(x) for x in (examples.get("Politycy") or [])]
+        brands = examples.get("Marki/organizacje") or []
+        popculture = examples.get("Popkultura/postacie") or []
+
+        pol_html = ", ".join(person_link(name) for name in politicians) if politicians else "—"
+        pol_faces_html = _people_photo_grid_html(politicians, category="person")
+        brands_html = (
+            build_brand_icons_html(brands, logos_dir, label_color=text_color)
+            if brands
+            else "<span style='color:#7c8799;font-size:.97em;'>—</span>"
+        )
+        pop_faces_html = _people_photo_grid_html(popculture, category="popculture")
+        pop_html = ", ".join(html.escape(x) for x in popculture) if popculture else "—"
+        return f"""
+        <div class="ap-metric-row">
+            <div class="ap-metric-label">{label}</div>
+            <div class="ap-metric-value">
+                <div class="ap-example-head ap-example-head-first"><b>Politycy:</b></div>
+                {pol_faces_html if pol_faces_html else f"<div>{pol_html}</div>"}
+                <div class="ap-example-head"><b>Marki/organizacje:</b></div>
+                {brands_html}
+                <div class="ap-example-head"><b>Popkultura/postacie:</b></div>
+                {pop_faces_html if pop_faces_html else f"<div>{pop_html}</div>"}
+            </div>
+        </div>
+        """
+
+    if kind == "colors":
+        colors = [str(c).upper() for c in (value or archetype_data.get("color_palette", [])) if str(c).strip()]
+        palette_html = palette_boxes_html(colors) if colors else "<span style='color:#7c8799;'>—</span>"
+        return f"""
+        <div class="ap-metric-row">
+            <div class="ap-metric-label">{label}</div>
+            <div class="ap-metric-value">
+                {palette_html}
+            </div>
+        </div>
+        """
+
+    if isinstance(value, list):
+        items = [str(item).strip() for item in value if str(item).strip()]
+        label_cf = label_raw.casefold()
+        row_extra_cls = ""
+
+        if not items:
+            value_html = "<span style='color:#7c8799;'>—</span>"
+        elif label_cf in {"kluczowe atrybuty", "słowa-klucze (talking points)"}:
+            row_extra_cls = " ap-metric-row-chips"
+            chips = "".join(f"<span class='ap-pill'>{html.escape(item)}</span>" for item in items)
+            value_html = f"<div class='ap-pill-wrap'>{chips}</div>"
+        elif label_cf == "slogany (taglines)":
+            value_html = "<p><i>" + html.escape(" | ".join(items)) + "</i></p>"
+        elif label_cf == "atuty":
+            value_html = (
+                "<ul class='ap-qual-list ap-qual-pos'>"
+                + "".join(
+                    f"<li><span class='ap-qual-ico'>✅</span><span>{html.escape(item)}</span></li>" for item in items
+                )
+                + "</ul>"
+            )
+        elif label_cf == "słabości":
+            value_html = (
+                "<ul class='ap-qual-list ap-qual-neg'>"
+                + "".join(
+                    f"<li><span class='ap-qual-ico'>❌</span><span>{html.escape(item)}</span></li>" for item in items
+                )
+                + "</ul>"
+            )
+        elif label_cf == "sygnatury wizualne":
+            value_html = "<p>" + html.escape(", ".join(items)) + "</p>"
+        else:
+            bullets = "".join(f"<li>{html.escape(item)}</li>" for item in items)
+            value_html = f"<ul class='ap-simple-list'>{bullets}</ul>"
+    else:
+        row_extra_cls = ""
+        text = str(value or "").strip()
+        if not text:
+            value_html = "<span style='color:#7c8799;'>—</span>"
+        elif label_raw.casefold() == "rozbudowany opis":
+            paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+            value_html = "".join(f"<p><i>{html.escape(p)}</i></p>" for p in paragraphs)
+        elif label_raw.casefold() == "slogany (taglines)":
+            paragraphs = [p.strip() for p in re.split(r"\n+", text) if p.strip()]
+            value_html = "".join(f"<p><i>{html.escape(p)}</i></p>" for p in paragraphs)
+        elif label_raw.casefold() == "oś narracyjna i antagonista":
+            value_html = _story_antagonist_html(text)
+        else:
+            paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+            value_html = "".join(f"<p>{html.escape(p)}</p>" for p in paragraphs)
+
+    return f"""
+    <div class="ap-metric-row{row_extra_cls}">
+        <div class="ap-metric-label">{label}</div>
+        <div class="ap-metric-value">{value_html}</div>
+    </div>
+    """
+
+
+def _expanded_subsection_content_html(content_lines: list[str]) -> str:
+    if not content_lines:
+        return ""
+
+    blocks: list[str] = []
+    root_bullets: list[str] = []
+    nested_bullets: list[str] = []
+    current_topic: str | None = None
+
+    def flush_root():
+        nonlocal root_bullets
+        if root_bullets:
+            blocks.append("<ul class='ap-ext-list'>" + "".join(f"<li>{b}</li>" for b in root_bullets) + "</ul>")
+            root_bullets = []
+
+    def flush_nested():
+        nonlocal nested_bullets, current_topic
+        if current_topic is not None:
+            if nested_bullets:
+                blocks.append(
+                    "<div class='ap-ext-topic'>"
+                    f"{current_topic}"
+                    "<ul class='ap-ext-list ap-ext-list-nested'>"
+                    + "".join(f"<li>{b}</li>" for b in nested_bullets)
+                    + "</ul></div>"
+                )
+            else:
+                blocks.append(f"<div class='ap-ext-topic'>{current_topic}</div>")
+        nested_bullets = []
+        current_topic = None
+
+    def split_listish_line(raw_line: str) -> list[str]:
+        if ";" in raw_line:
+            parts = [p.strip(" ,.;") for p in re.split(r"\s*;\s*", raw_line) if p.strip(" ,.;")]
+        else:
+            parts = [p.strip(" ,.;") for p in re.split(r"\s*,\s*", raw_line) if p.strip(" ,.;")]
+        if len(parts) < 3:
+            return []
+        if any(len(p) > 90 for p in parts):
+            return []
+        return parts
+
+    for raw in content_lines:
+        line = str(raw).strip()
+        if not line:
+            continue
+
+        bullet_match = re.match(r"^[•\-\u2013\u2014]\s*(.+)$", line)
+        if bullet_match:
+            bullet_txt = html.escape(bullet_match.group(1).strip())
+            if bullet_txt.endswith(":"):
+                flush_root()
+                flush_nested()
+                current_topic = bullet_txt
+            else:
+                if current_topic is not None:
+                    nested_bullets.append(bullet_txt)
+                else:
+                    root_bullets.append(bullet_txt)
+            continue
+
+        compact_list = split_listish_line(line)
+        if current_topic is not None and compact_list:
+            nested_bullets.extend(html.escape(item) for item in compact_list)
+            continue
+        if current_topic is None and compact_list:
+            root_bullets.extend(html.escape(item) for item in compact_list)
+            continue
+
+        flush_root()
+        if re.match(r"^\d+\)\s+", line):
+            flush_nested()
+            current_topic = html.escape(line)
+            continue
+        flush_nested()
+
+        safe_line = html.escape(line)
+        if safe_line.endswith(":"):
+            current_topic = safe_line
+        else:
+            blocks.append(f"<p>{safe_line}</p>")
+
+    flush_root()
+    flush_nested()
+    return "".join(blocks)
+
+
+def _expanded_sections_html(archetype_data: dict) -> str:
+    sections = archetype_data.get("expanded_sections") or []
+    if not sections:
+        return "<div class='ap-ext-empty'>Brak rozbudowanego opisu dla tego archetypu.</div>"
+
+    section_blocks: list[str] = []
+    for section in sections:
+        sec_title = html.escape(str(section.get("title", "")).strip())
+        subsection_blocks: list[str] = []
+        for subsection in section.get("subsections", []):
+            sub_title = html.escape(str(subsection.get("title", "")).strip())
+            content_lines = [str(line).strip() for line in subsection.get("content", []) if str(line).strip()]
+            if not content_lines and not sub_title:
+                continue
+            content_html = _expanded_subsection_content_html(content_lines)
+
+            subsection_blocks.append(
+                f"""
+                <div class="ap-ext-subsection">
+                    {f"<div class='ap-ext-subtitle'>{sub_title}</div>" if sub_title else ""}
+                    <div class="ap-ext-content">{content_html}</div>
+                </div>
+                """
+            )
+
+        section_blocks.append(
+            f"""
+            <section class="ap-ext-section">
+                <div class="ap-ext-title">{sec_title}</div>
+                <div class="ap-ext-body">{''.join(subsection_blocks)}</div>
+            </section>
+            """
+        )
+    return "".join(section_blocks)
+
+
 def render_archetype_card(archetype_data, main=True, supplement=False, gender_code="M"):
     if not archetype_data:
         st.warning("Brak danych o archetypie.")
         return
 
-    # Style zależne od typu archetypu
-
-    if supplement:
-        border_color = "#40b900"  # zielony, np. uzupełniający
-        bg_color = "#F6FFE6"  # jasny zielony tła uzupełniającego
-        tagline_color = "#40b900"
-        box_shadow = f"0 3px 14px 0 {border_color}44"
-
-    elif main:
-        border_color = archetype_data.get('color_palette', ['#E99836'])[0]
-        bg_color = archetype_data.get('color_palette', ['#FFF', '#FAFAFA'])[1] if len(
-            archetype_data.get('color_palette', [])) > 1 else "#FFF8F0"
-
-        def is_light(color):
-            # color jako hex string #RRGGBB
-            if color.startswith('#'):
-                color = color[1:]
-            if len(color) != 6:
-                return True  # domyślnie traktuj błędny hex jako jasny
-            r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
-            return (r * 299 + g * 587 + b * 114) / 1000 > 180
-
-        # Obsługa specjalnego koloru dla Opiekuna:
-        name = archetype_data.get('name', '').strip().lower()
-        if name == 'opiekun':
-            tagline_color = '#145A32'  # CIEMNOZIELONY tylko dla Opiekuna
-        elif not is_light(bg_color):
-            tagline_color = "#222222"  # mocny kontrast, jeżeli tło ciemne
-        else:
-            tagline_color = border_color
-
-        box_shadow = f"0 4px 14px 0 {border_color}44"
-
+    palette = [str(c).upper() for c in (archetype_data.get("color_palette", []) or []) if str(c).strip()]
+    if main:
+        bg_color = palette[0] if len(palette) >= 1 else "#2B2D41"
+        border_color = palette[1] if len(palette) >= 2 else (palette[0] if palette else "#E99836")
+        text_color = "#F8FAFC" if is_color_dark(bg_color) else "#1F2937"
+        tagline_color = "#FFE082" if is_color_dark(bg_color) else "#7A2037"
     else:
-        border_color = archetype_data.get('color_palette', ['#FFD22F'])[0]
-        bg_color = "#FAFAFA"
+        bg_color = "#F3F4F6"
+        border_color = palette[0] if palette else ("#40b900" if supplement else "#FFD22F")
+        text_color = "#1F2937"
         tagline_color = border_color
-        box_shadow = f"0 2px 6px 0 {border_color}22"
 
-    tagline = archetype_data.get('tagline', '')
-
-    if (archetype_data.get('name', '').strip().lower() == 'niewinny') and not main:
-        tagline = "Niesie nadzieję, inspiruje do współpracy, buduje zaufanie szczerością i apeluje o wspólne dobro, otwarcie komunikuje pozytywne wartości."
-
-    def normalize_symbol(name):
-        return str(name).strip().title() if isinstance(name, str) else name
-
-    icon_html = arche_icon_img_html(archetype_data.get('name', ''), height_px=56)
-
-    width_card = "70vw"
-    text_color = "#222"
-    if main and is_color_dark(bg_color):
-        text_color = "#fff"
-        tagline_color = "#FFD22F" if archetype_data.get('name', '').lower() == "bohater" else "#fffbea"
-
-    # --- paleta kolorów: kwadraty z nazwą w środku ---
-    color_palette = archetype_data.get('color_palette') or []
-    color_boxes_html = palette_boxes_html(color_palette) if color_palette else ""
-
-    questions = archetype_data.get('questions', [])
-    questions_html = ""
-    if questions and isinstance(questions, list):
-        questions_html = "<ul style='margin-left:20px;margin-top:5px;'>"
-        for q in questions:
-            questions_html += f"<li style='margin-bottom:3px; font-size:1.07em;'>{q}</li>"
-        questions_html += "</ul>"
-
-    strengths = archetype_data.get('strengths', [])
-    weaknesses = archetype_data.get('weaknesses', [])
-    strengths_html = "" if not strengths else (
-            "<div style='padding-left:24px;'>" +
-            ''.join(
-                "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
-                "<span style='color: green !important; font-size:1.14em; margin-right:9px; vertical-align:middle;'>✅</span>"
-                f"<span style='font-size:1.07em; color:{text_color}'>{s[0].lower() + s[1:]}</span>"
-                "</div>"
-                for s in strengths
-            ) + "</div>"
+    is_dark_card = is_color_dark(bg_color)
+    link_color = "#DDEAFF" if is_color_dark(bg_color) else "#144FA8"
+    details_border_color = "rgba(255,255,255,.30)" if is_dark_card else "rgba(17,24,39,.20)"
+    details_bg_color = "rgba(255,255,255,.07)" if is_dark_card else "rgba(255,255,255,.74)"
+    details_title_bg = (
+        "linear-gradient(90deg, rgba(255,210,47,.20), rgba(255,255,255,.03))"
+        if is_dark_card
+        else "linear-gradient(90deg, rgba(17,24,39,.08), rgba(17,24,39,.02))"
     )
-    weaknesses_html = "" if not weaknesses else (
-            "<div style='padding-left:24px;'>" +
-            ''.join(
-                "<div style='display:flex; align-items:center; margin-bottom:4px;'>"
-                "<span style='color:#d32f2f !important; font-size:1.02em; margin-right:9px; vertical-align:middle;'>❌</span>"
-                f"<span style='font-size:1.07em; color:{text_color}'>{w[0].lower() + w[1:]}</span>"
-                "</div>"
-                for w in weaknesses
-            ) + "</div>"
+    details_subtitle_color = "#FFE082" if is_dark_card else "#1F2937"
+    details_text_color = "#EDF2FF" if is_dark_card else "#1F2937"
+    pill_bg = "rgba(255,255,255,.12)" if is_dark_card else "#F8FAFF"
+    pill_border = "rgba(255,255,255,.35)" if is_dark_card else "#A4B4D4"
+    pill_text = "#F8FAFF" if is_dark_card else "#1F355E"
+    box_shadow = f"0 12px 28px 0 {border_color}33"
+
+    base_name = base_masc_from_any(str(archetype_data.get("name", "")).strip())
+    core_triplet = (
+        archetype_data.get("core_triplet")
+        or CORE_TRIPLET_MAP.get(base_name, "")
+        or archetype_data.get("tagline")
+        or ""
     )
 
-    watchword = archetype_data.get('watchword', [])
-    watchword_html = ""
-    if watchword and isinstance(watchword, list) and watchword[0].strip():
-        watchword_html = (
-            "<div style='margin-top:24px;font-weight:600;'>Slogan:</div>"
-            f"<div style='margin-bottom:8px; margin-top:4px;'>{watchword[0]}</div>"
+    width_card = "86vw"
+    min_h = "860px"
+
+    metric_rows_src = list(archetype_data.get("metric_rows") or _fallback_metric_rows(archetype_data))
+    metric_rows = [
+        row for row in metric_rows_src
+        if str((row or {}).get("label", "")).strip().casefold() != "core triplet"
+    ]
+    metric_blocks: list[str] = []
+    compact_buffer: list[tuple[str, str]] = []
+
+    def _flush_compact_metric_buffer() -> None:
+        nonlocal compact_buffer
+        if not compact_buffer:
+            return
+        tiles = "".join(
+            f"<div class='ap-metric-tile'><div class='ap-metric-tile-label'>{html.escape(lbl)}</div>"
+            f"<div class='ap-metric-tile-value'>{html.escape(val)}</div></div>"
+            for lbl, val in compact_buffer
         )
+        metric_blocks.append(f"<div class='ap-metric-grid'>{tiles}</div>")
+        compact_buffer = []
 
-    def smart_list(lst):
-        return ', '.join(
-            [lst[0][0].upper() + lst[0][1:]] +
-            [x[0].lower() + x[1:] if x else "" for x in lst[1:]]
-        ) if lst else ""
+    for row in metric_rows:
+        label_raw = str((row or {}).get("label", "")).strip()
+        label_cf = label_raw.casefold()
+        kind = (row or {}).get("kind", "text")
+        value = (row or {}).get("value")
 
-    traits_str = smart_list(archetype_data.get('core_traits', []))
-    keywords_str = smart_list(archetype_data.get('keyword_messaging', []))
-    visuals_str = smart_list(archetype_data.get('visual_elements', []))
+        is_compact = (
+            label_cf in COMPACT_METRIC_LABELS_CF
+            and kind not in {"examples", "colors"}
+            and not isinstance(value, list)
+        )
+        if is_compact:
+            plain_value = _metric_text_plain(value)
+            if plain_value:
+                compact_buffer.append((label_raw, plain_value))
+            continue
 
-    st.markdown(f"""
-        <div style="
-            max-width:{width_card};
-            border: 3px solid {border_color};
-            border-radius: 20px;
-            background: {bg_color};
-            box-shadow: {box_shadow};
-            padding: 2.1em 2.2em 1.3em 2.2em;
-            margin-bottom: 32px;
-            color: {text_color};
-            display: flex; align-items: flex-start;">
-            <div style="margin-right:23px; margin-top:1px; flex-shrink:0;">{arche_icon_img_html(archetype_data.get('name', '?'), height_px=130, gender_code=gender_code)}</div>
-            <div>
-                <div style="font-size:2.15em;font-weight:bold; line-height:1.08; margin-top:20px; margin-bottom:15px; color:{text_color};">
-                    {archetype_data.get('name', '?')}
+        _flush_compact_metric_buffer()
+        row_html = _metric_row_html(row, archetype_data, text_color)
+        if row_html.strip():
+            metric_blocks.append(row_html)
+
+    _flush_compact_metric_buffer()
+    metric_rows_html = "".join(metric_blocks)
+    expanded_html = _expanded_sections_html(archetype_data)
+    name_slug = re.sub(r"[^a-z0-9]+", "-", _logo_norm_key(archetype_data.get("name", "archetyp"))).strip("-")
+    role_slug = "main" if main else ("supp" if supplement else "aux")
+    card_dom_id = f"ap-arch-{name_slug}-{role_slug}"
+
+    card_html_raw = dedent(f"""
+        <style>
+            #{card_dom_id}.ap-card-wrap {{
+                max-width:{width_card};
+                border: 3px solid {border_color};
+                border-radius: 22px;
+                background: {bg_color};
+                box-shadow: {box_shadow};
+                min-height: {min_h};
+                padding: 2.8em 2.3em 2.2em 4.7em;
+                margin-bottom: 32px;
+                color: {text_color};
+            }}
+            #{card_dom_id} .ap-card-head {{
+                display:flex;
+                align-items:flex-start;
+                gap:24px;
+                margin-bottom:18px;
+            }}
+            #{card_dom_id} .ap-card-name {{
+                font-size:2.25em;
+                font-weight:700;
+                line-height:1.08;
+                margin-top:12px;
+                margin-bottom:7px;
+                color:{text_color};
+            }}
+            #{card_dom_id} .ap-card-tagline {{
+                font-size:1.32em;
+                font-style:italic;
+                color:{tagline_color};
+                margin-top:4px;
+                margin-bottom:8px;
+                font-weight:600;
+            }}
+            #{card_dom_id} .ap-metric-title {{
+                font-size:1.75em;
+                font-weight:700;
+                color:{text_color};
+                margin:22px 0 16px;
+                letter-spacing:.01em;
+            }}
+            #{card_dom_id} .ap-metric-row {{
+                border:none;
+                border-radius:0;
+                padding:0;
+                margin-top:34px;
+                margin-bottom:0;
+                background:transparent;
+            }}
+            #{card_dom_id} .ap-metric-row:first-child {{
+                margin-top:0;
+            }}
+            #{card_dom_id} .ap-metric-label {{
+                font-size:1.15em;
+                font-weight:700;
+                color:{text_color};
+                margin-top:2px;
+                margin-bottom:0;
+                letter-spacing:.02em;
+            }}
+            #{card_dom_id} .ap-example-head {{
+                margin-top:24px;
+                margin-bottom:12px;
+                font-weight:700;
+            }}
+            #{card_dom_id} .ap-example-head-first {{
+                margin-top:8px;
+            }}
+            #{card_dom_id} .ap-metric-value {{
+                font-size:1em;
+                line-height:1.56;
+                color:{text_color};
+            }}
+            #{card_dom_id} .ap-metric-value p {{
+                margin:0 0 6px 0;
+            }}
+            #{card_dom_id} .ap-simple-list {{
+                margin:2px 0 4px 0;
+                padding-left:21px;
+            }}
+            #{card_dom_id} .ap-story-antag {{
+                margin-top:2px;
+            }}
+            #{card_dom_id} .ap-story-head {{
+                font-weight:700;
+                margin-top:8px;
+                margin-bottom:2px;
+            }}
+            #{card_dom_id} .ap-simple-list li {{
+                margin-bottom:4px;
+            }}
+            #{card_dom_id} .ap-qual-list {{
+                margin:4px 0 6px 0;
+                padding:0;
+                list-style:none;
+            }}
+            #{card_dom_id} .ap-qual-list li {{
+                display:flex;
+                align-items:flex-start;
+                gap:8px;
+                margin-bottom:5px;
+                line-height:1.42;
+            }}
+            #{card_dom_id} .ap-qual-ico {{
+                display:inline-block;
+                width:20px;
+                text-align:center;
+            }}
+            #{card_dom_id} .ap-pill-wrap {{
+                display:flex;
+                flex-wrap:wrap;
+                gap:7px;
+            }}
+            #{card_dom_id} .ap-pill {{
+                display:inline-block;
+                border-radius:999px;
+                padding:6px 12px;
+                border:1px solid {pill_border};
+                background:{pill_bg};
+                color:{pill_text};
+                box-shadow:0 1px 0 rgba(0,0,0,.08);
+                font-size:.95em;
+                line-height:1.2;
+            }}
+            #{card_dom_id} .ap-metric-row-chips .ap-metric-label {{
+                margin-bottom:12px;
+            }}
+            #{card_dom_id} .ap-metric-grid {{
+                display:grid;
+                grid-template-columns:repeat(2,minmax(0,1fr));
+                gap:12px 12px;
+                margin-top:34px;
+            }}
+            #{card_dom_id} .ap-metric-tile {{
+                border:1px solid {details_border_color};
+                border-radius:12px;
+                background:{details_bg_color};
+                padding:12px 13px;
+            }}
+            #{card_dom_id} .ap-metric-tile-label {{
+                font-size:.99em;
+                font-weight:700;
+                margin-bottom:4px;
+                color:{text_color};
+            }}
+            #{card_dom_id} .ap-metric-tile-value {{
+                font-size:.96em;
+                line-height:1.42;
+                color:{text_color};
+            }}
+            #{card_dom_id} .ap-face-grid {{
+                display:flex;
+                flex-wrap:wrap;
+                gap:12px;
+                margin-top:8px;
+                align-items:flex-start;
+            }}
+            #{card_dom_id} .ap-face-card {{
+                width:114px;
+                text-align:center;
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:flex-start;
+            }}
+            #{card_dom_id} .ap-face-avatar img,
+            #{card_dom_id} .ap-face-avatar .ap-face-ph {{
+                width:94px;
+                height:94px;
+                border-radius:12px;
+                object-fit:cover;
+                object-position:center 0%;
+                border:1px solid rgba(0,0,0,.18);
+                background:rgba(255,255,255,.85);
+                margin:0 auto;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-weight:700;
+            }}
+            #{card_dom_id} .ap-face-name {{
+                margin-top:4px;
+                font-size:.80em;
+                line-height:1.25;
+            }}
+            #{card_dom_id} .ap-face-name a {{
+                color:{link_color};
+                text-decoration:underline;
+            }}
+            #{card_dom_id} .ap-details {{
+                margin-top:18px;
+                border:1px solid {details_border_color};
+                border-radius:14px;
+                background:{details_bg_color};
+                overflow:hidden;
+            }}
+            #{card_dom_id} .ap-details > summary {{
+                cursor:pointer;
+                list-style:none;
+                padding:13px 14px;
+                font-size:1em;
+                font-weight:700;
+                color:{text_color};
+                border-bottom:1px solid {details_border_color};
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+            }}
+            #{card_dom_id} .ap-details > summary::-webkit-details-marker {{ display:none; }}
+            #{card_dom_id} .ap-details .ap-summary-close {{ display:none; }}
+            #{card_dom_id} .ap-details[open] .ap-summary-open {{ display:none; }}
+            #{card_dom_id} .ap-details[open] .ap-summary-close {{ display:inline; }}
+            #{card_dom_id} .ap-expanded-wrap {{
+                padding:12px 12px 8px;
+            }}
+            #{card_dom_id} .ap-ext-section {{
+                border:1px solid {details_border_color};
+                border-radius:12px;
+                margin-bottom:10px;
+                background:{details_bg_color};
+                overflow:hidden;
+            }}
+            #{card_dom_id} .ap-ext-title {{
+                background:{details_title_bg};
+                border-left:4px solid {tagline_color};
+                padding:10px 12px;
+                font-size:1.03em;
+                font-weight:700;
+                color:{text_color};
+            }}
+            #{card_dom_id} .ap-ext-body {{
+                padding:10px 12px 6px;
+            }}
+            #{card_dom_id} .ap-ext-subsection {{
+                margin-bottom:8px;
+                padding-bottom:8px;
+                border-bottom:1px dashed {details_border_color};
+            }}
+            #{card_dom_id} .ap-ext-subsection:last-child {{
+                border-bottom:none;
+                margin-bottom:0;
+                padding-bottom:4px;
+            }}
+            #{card_dom_id} .ap-ext-subtitle {{
+                font-size:1.02em;
+                font-weight:700;
+                color:{details_subtitle_color};
+                margin-bottom:5px;
+            }}
+            #{card_dom_id} .ap-ext-content p {{
+                margin:0 0 6px 0;
+                font-size:.95em;
+                line-height:1.45;
+                color:{details_text_color};
+            }}
+            #{card_dom_id} .ap-ext-topic {{
+                margin:0 0 6px 0;
+                font-weight:600;
+                color:{details_text_color};
+            }}
+            #{card_dom_id} .ap-ext-list {{
+                margin:0 0 6px 0;
+                padding-left:20px;
+            }}
+            #{card_dom_id} .ap-ext-list-nested {{
+                margin-top:4px;
+            }}
+            #{card_dom_id} .ap-ext-list li {{
+                margin-bottom:3px;
+                font-size:.94em;
+                line-height:1.4;
+                color:{details_text_color};
+            }}
+            #{card_dom_id} .ap-ext-empty {{
+                color:{details_text_color};
+                font-size:.95em;
+                padding:8px 2px 12px;
+            }}
+            @media (max-width: 900px) {{
+                #{card_dom_id}.ap-card-wrap {{
+                    padding:1.35em 1.0em 1.05em 2.15em;
+                }}
+                #{card_dom_id} .ap-card-head {{
+                    flex-direction:column;
+                    gap:8px;
+                }}
+                #{card_dom_id} .ap-card-name {{
+                    margin-top:0;
+                    font-size:1.72em;
+                }}
+                #{card_dom_id} .ap-metric-grid {{
+                    grid-template-columns:1fr;
+                }}
+            }}
+        </style>
+        <div id="{card_dom_id}" class="ap-card-wrap">
+            <div class="ap-card-head">
+                <div style="flex-shrink:0;">
+                    {arche_icon_img_html(archetype_data.get('name', '?'), height_px=130, gender_code=gender_code)}
                 </div>
-                <div style="font-size:1.3em; font-style:italic; color:{tagline_color}; margin-bottom:38px; margin-top:4px;">
-                    {tagline}
+                <div>
+                    <div class="ap-card-name">{html.escape(str(archetype_data.get('name', '?')))}</div>
+                    <div class="ap-card-tagline">{html.escape(str(core_triplet))}</div>
                 </div>
-                <div style="margin-top:21px; font-size:1.07em;">
-                    <b>Opis:</b><br>
-                    <span style="font-weight:400 !important;">
-                        <i>{archetype_data.get('description', '')}</i>
-                    </span>
-                </div>
-                <div style="color:{text_color};font-size:1.07em; margin-top:21px;">
-                    <b>Cechy:</b> <span style="font-weight:400;">{traits_str}</span>
-                </div>
-                <div style="margin-top:24px;font-weight:600;">Storyline:</div>
-                <div style="margin-bottom:9px; margin-top:4px; font-size:1.07em;">{archetype_data.get('storyline', '')}</div>
-                <div style="margin-top:16px;font-weight:600;">Atuty:</div>
-                {strengths_html if strengths_html else '<div style="color:#888; padding-left:24px;">-</div>'}
-                <div style="margin-top:2px;font-weight:600;">Słabości:</div>
-                {weaknesses_html if weaknesses_html else '<div style="color:#888; padding-left:24px;">-</div>'}
-                <div style="margin-top:24px;font-weight:600;">Rekomendacje:</div>
-                <ul style="padding-left:24px; margin-bottom:9px;">
-                     {''.join(f'<li style="margin-bottom:2px; font-size:1.07em;">{r}</li>' for r in archetype_data.get('recommendations', []))}
-                </ul>
-                <div style="margin-top:29px;font-weight:600;">Słowa kluczowe:</div>
-                <div style="margin-bottom:8px;">{keywords_str}</div>
-                <div style="margin-top:24px;font-weight:600;">Elementy wizualne:</div>
-                <div style="margin-bottom:8px;">{visuals_str}</div>
-                {('<div style="margin-top:24px;font-weight:600;">Przykłady polityków:</div>'
-                  '<div style="margin-bottom:8px;">' +
-                  ', '.join(person_link(name) for name in archetype_data.get('examples_person', [])) +
-                  '</div>')}
-                <div style="margin-bottom:10px; margin-top:24px;font-weight:600;">Przykłady marek/organizacji:</div>
-                {build_brand_icons_html(archetype_data.get('example_brands', []), logos_dir)}
-                {watchword_html}
-                {"<div style='margin-top:32px;font-weight:600;'>Kolory:</div>" if color_palette else ""}
-                {color_boxes_html}
-                {"<div style='margin-top:22px;font-weight:600;'>Pytania archetypowe:</div>" if questions else ""}
-                {questions_html}
             </div>
+            <div class="ap-metric-title">Metryka archetypu</div>
+            {metric_rows_html}
+            <details class="ap-details">
+                <summary>
+                    <span class="ap-summary-open">Pokaż rozbudowany opis</span>
+                    <span class="ap-summary-close">Zwiń</span>
+                </summary>
+                <div class="ap-expanded-wrap">
+                    {expanded_html}
+                </div>
+            </details>
         </div>
-    """, unsafe_allow_html=True)
+    """)
+    # Usuń wcięcia na początku linii: inaczej markdown Streamlit traktuje HTML jak code block.
+    card_html = "\n".join(line.lstrip() for line in card_html_raw.splitlines()).strip()
+    st.markdown(card_html, unsafe_allow_html=True)
 
 # ============ RESZTA PANELU: nagłówki, kolumny, eksporty, wykres, tabele respondentów ============
 
-def show_report(sb, study: dict, wide: bool = True) -> None:
+def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -> None:
     # stan przełącznika eksportu (bezpieczeństwo przy pierwszym renderze)
     st.session_state.setdefault("prep_docs", False)
 
@@ -3792,27 +4589,28 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
     num_ankiet = len(data) if not data.empty else 0
 
-    header_col1, header_col2 = st.columns([0.77, 0.23])
-    with header_col1:
-        st.markdown(
-            f"""
-            <div style="font-size:2.3em; font-weight:bold; background:#1a93e3; color:#fff; 
-                padding:14px 32px 10px 24px; border-radius:2px; width:fit-content; display:inline-block;">
-                Archetypy {personGen} – panel administratora
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    with header_col2:
-        st.markdown(f"""
-        <div style="display:flex;align-items:center;justify-content:flex-end;height:100%;"><div style="font-size:1.23em;text-align:right;background:#f3f3fa;padding:12px 29px 8px 29px; border-radius:17px; border:2px solid #d1d9ed;color:#195299;font-weight:600;box-shadow:0 2px 10px 0 #b5c9e399;">
-            <span style="font-size:1.8em;font-weight:bold;">{num_ankiet}</span><br/>uczestników badania
-        </div></div>
-        """, unsafe_allow_html=True)
+    if not public_view:
+        header_col1, header_col2 = st.columns([0.77, 0.23])
+        with header_col1:
+            st.markdown(
+                f"""
+                <div style="font-size:2.3em; font-weight:bold; background:#1a93e3; color:#fff; 
+                    padding:14px 32px 10px 24px; border-radius:2px; width:fit-content; display:inline-block;">
+                    Archetypy {personGen} – panel administratora
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        with header_col2:
+            st.markdown(f"""
+            <div style="display:flex;align-items:center;justify-content:flex-end;height:100%;"><div style="font-size:1.23em;text-align:right;background:#f3f3fa;padding:12px 29px 8px 29px; border-radius:17px; border:2px solid #d1d9ed;color:#195299;font-weight:600;box-shadow:0 2px 10px 0 #b5c9e399;">
+                <span style="font-size:1.8em;font-weight:bold;">{num_ankiet}</span><br/>uczestników badania
+            </div></div>
+            """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <hr style="height:1.3px;background:#eaeaec; margin-top:1.8em; margin-bottom:3.8em; border:none;" />
-    """, unsafe_allow_html=True)
+        st.markdown("""
+        <hr style="height:1.3px;background:#eaeaec; margin-top:1.8em; margin-bottom:3.8em; border:none;" />
+        """, unsafe_allow_html=True)
 
     # --- Analiza respondentów i agregacja ---
 
@@ -3889,7 +4687,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             st.markdown(f'<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów {personGen}</div>', unsafe_allow_html=True)
 
             # --- ⬇️ RANKING I WYKRES NA BAZIE ŚREDNIEJ (0–20), NIE LICZEBNOŚCI! ---
-            archetype_names = ARCHE_NAMES_ORDER
+            # Kolejność zgodna z "Rozkład archetypów na osiach potrzeb"
+            # (od godz. 12, zgodnie z ruchem wskazówek zegara).
+            archetype_names = KOLO_NAMES_ORDER
 
             # 1) średnia suma punktów dla każdego archetypu (0–20)
             mean_archetype_scores = {
@@ -3923,17 +4723,24 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             supp_data = archetype_extended.get(supp_avg, {}) if supp_avg and supp_avg not in [
                 main_avg, aux_avg] else {}
 
+            def _with_core_triplet(payload: dict, arche_name: str | None) -> dict:
+                out = dict(payload or {})
+                if arche_name and not out.get("core_triplet"):
+                    out["core_triplet"] = CORE_TRIPLET_MAP.get(arche_name, "")
+                return out
+
             # wersje z żeńskimi nazwami, jeśli trzeba
-            main_disp = dict(main_data);
+            main_disp = _with_core_triplet(main_data, main_avg)
             main_disp["name"] = disp_name(main_avg or "")
-            second_disp = dict(second_data)
+            second_disp = _with_core_triplet(second_data, aux_avg)
             if second_data:
                 second_disp["name"] = disp_name(aux_avg or "")
-            supp_disp = dict(supp_data)
+            supp_disp = _with_core_triplet(supp_data, supp_avg)
             if supp_data:
                 supp_disp["name"] = disp_name(supp_avg or "")
 
             col1, col2, col3 = st.columns([0.28, 0.36, 0.36], gap="small")
+            means_pct = mean_pct_by_archetype_from_df(data)
 
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (
@@ -3964,12 +4771,9 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             with col1:
                 st.markdown(
-                    '<div class="ap-h2" style="margin-bottom:8px">Podsumowanie archetypów (liczebność i natężenie)</div>',
+                    ap_section_heading("Podsumowanie archetypów (liczebność i natężenie)", center=False, margin_bottom_px=8),
                     unsafe_allow_html=True
                 )
-
-                # 1) procent „natężenia” jak w raporcie Word (średnie % 0..100 na podstawie odpowiedzi)
-                means_pct = mean_pct_by_archetype_from_df(data)  # {archetyp: %}
 
                 # 2) kolejność wierszy – sortujemy malejąco po procencie
                 ordered_names = sorted(
@@ -4279,10 +5083,6 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 # ŚREDNIE (0–20) w KOLEJNOŚCI archetype_names
                 mean_vals_ordered = [mean_archetype_scores.get(n, 0.0) for n in archetype_names]
 
-                st.markdown(
-                    f'<div class="ap-h2" style="text-align:center">Profil archetypów {personGen}</div>',
-                    unsafe_allow_html=True)
-
                 fig = go.Figure(
                     data=[
                         go.Scatterpolar(
@@ -4310,8 +5110,13 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     layout=go.Layout(
                         polar=dict(
                             radialaxis=dict(visible=True, range=[0, 20]),
-                            angularaxis=dict(tickfont=dict(size=19), tickvals=archetype_names,
-                                             ticktext=theta_labels)
+                            angularaxis=dict(
+                                tickfont=dict(size=19),
+                                tickvals=archetype_names,
+                                ticktext=theta_labels,
+                                rotation=90,
+                                direction="clockwise",
+                            )
                         ),
                         width=400, height=400,
                         margin=dict(l=20, r=20, t=32, b=32),
@@ -4330,6 +5135,8 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                             tickfont=dict(size=17),
                             tickvals=archetype_names,
                             ticktext=theta_labels,
+                            rotation=90,
+                            direction="clockwise",
                         ),
                     ),
                     autosize=False,
@@ -4344,29 +5151,32 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 # węższe boczne „bufory” + środkowa kolumna z wykresem → centrowanie
                 padL, mid, padR = st.columns([0.05, 0.90, 0.05], gap="small")
                 with mid:
+                    st.markdown(
+                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
+                        unsafe_allow_html=True,
+                    )
                     st.plotly_chart(
                         fig,
                         use_container_width=True, #width="content",
                         config={"displaylogo": False},
                         key=f"radar-{study_id}",
                     )
-
-                st.markdown("""
-                <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
-                  <span style="display:flex;align-items:center;margin-right:34px;">
-                    <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                    <span style="font-size:0.85em;">Archetyp główny</span>
-                  </span>
-                  <span style="display:flex;align-items:center;margin-right:34px;">
-                    <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                    <span style="font-size:0.85em;">Archetyp wspierający</span>
-                  </span>
-                  <span style="display:flex;align-items:center;">
-                    <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                    <span style="font-size:0.85em;">Archetyp poboczny</span>
-                  </span>
-                </div>
-                """, unsafe_allow_html=True)
+                    st.markdown("""
+                    <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+                      <span style="display:flex;align-items:center;margin-right:34px;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp główny</span>
+                      </span>
+                      <span style="display:flex;align-items:center;margin-right:34px;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp wspierający</span>
+                      </span>
+                      <span style="display:flex;align-items:center;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp poboczny</span>
+                      </span>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 
             # --- Heurystyczna analiza koloru (bąbelki OUT; słupki po LEWEJ; prawa pusta) ---
@@ -4377,7 +5187,7 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             with left_col:
                 # tylko słupki
-                st.markdown("<div class='ap-h2'>Heurystyczna analiza koloru psychologicznego</div>",
+                st.markdown(ap_section_heading("Heurystyczna analiza koloru psychologicznego", center=False, margin_bottom_px=8),
                             unsafe_allow_html=True)
                 components.html(color_progress_bars_html(color_pcts, order="desc"),
                                 height=280, scrolling=False)  # niższy iframe
@@ -4396,21 +5206,29 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
             # prawa kolumna — wykres archetypów
             with right_col:
-                # spójny nagłówek jak w innych miejscach (bez .center)
-                st.markdown(
-                    f'<div class="ap-h2" style="text-align:center">Rozkład archetypów na osiach potrzeb</div>',
-                    unsafe_allow_html=True)
-
-                aux = aux_avg if aux_avg != main_avg else None
-                supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
-
-                kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
-
-                # bez deprecated ostrzeżenia i bez gigantycznego obrazu
-                # w bloku: with right_col:
-                indent, imgcol = st.columns([0.10, 0.90])  # ← 0.10–0.20 = delikatne przesunięcie
-                with imgcol:
-                    st.image(kolo_axes_img, width=650)
+                p_l, p_c, p_r = st.columns([0.06, 0.88, 0.06], gap="small")
+                with p_c:
+                    st.markdown(
+                        ap_section_heading("Koło archetypów (pragnienia i wartości)", center=True, margin_bottom_px=8),
+                        unsafe_allow_html=True,
+                    )
+                    if main_avg is not None:
+                        idx_main_wheel = archetype_name_to_img_idx(main_avg)
+                        idx_aux_wheel = archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None
+                        idx_supp_wheel = (
+                            archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None
+                        )
+                        try:
+                            kola_img = compose_archetype_highlight(idx_main_wheel, idx_aux_wheel, idx_supp_wheel)
+                            if not isinstance(kola_img, Image.Image):
+                                raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
+                        except Exception:
+                            kola_img = load_base_arche_img()
+                        st.image(
+                            kola_img,
+                            caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
+                            width=640
+                        )
 
             # tylko dominujący kolor
             dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
@@ -4433,20 +5251,45 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
 
 
             with col3:
-                st.markdown(
-                    f'<div class="ap-h2">Koło archetypów (pragnienia i wartości)</div>',
-                    unsafe_allow_html=True)
-
-                if main_avg is not None:
-                    kola_img = compose_archetype_highlight(
-                        archetype_name_to_img_idx(main_avg),
-                        archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None,
-                        archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None)
-                    st.image(
-                        kola_img,
-                        caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
-                        width=640
+                k_pad_l, k_mid, k_pad_r = st.columns([0.06, 0.88, 0.06], gap="small")
+                with k_mid:
+                    st.markdown(
+                        ap_section_heading("Rozkład archetypów na osiach potrzeb", center=True, margin_bottom_px=8),
+                        unsafe_allow_html=True,
                     )
+                    aux = aux_avg if aux_avg != main_avg else None
+                    supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
+                    kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
+                    st.image(kolo_axes_img, width=650)
+
+            segment_profile_png_path = make_segment_profile_wheel_png(
+                mean_scores=means_pct,
+                out_path=f"segment_profile_{study_id}.png",
+            )
+            st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+            st.markdown(
+                ap_section_heading(
+                    f"Profil archetypowy {personGen} (siła archetypu, skala: 0-100)",
+                    center=False,
+                    margin_bottom_px=12,
+                    margin_top_px=6,
+                ),
+                unsafe_allow_html=True,
+            )
+            sp_l, sp_c, sp_r = st.columns([0.16, 0.68, 0.16], gap="small")
+            with sp_c:
+                st.image(segment_profile_png_path, width=660)
+                st.markdown(
+                    """
+                    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#de4b43;border-radius:2px;display:inline-block;"></span>Zmiana</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2d5ad5;border-radius:2px;display:inline-block;"></span>Ludzie</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2f8a45;border-radius:2px;display:inline-block;"></span>Porządek</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#6f53d4;border-radius:2px;display:inline-block;"></span>Niezależność</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
@@ -4465,7 +5308,10 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny {personGen}</div>", unsafe_allow_html=True)
-                render_archetype_card(supp_disp, main=False, gender_code=("K" if IS_FEMALE else "M"))
+                render_archetype_card(supp_disp, main=False, supplement=True, gender_code=("K" if IS_FEMALE else "M"))
+
+            if public_view:
+                return
 
             st.markdown("<div id='raport'></div>", unsafe_allow_html=True)
 
@@ -4490,11 +5336,12 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             )
 
             # Ustal nazwy plików z góry (przydadzą się też przy cache)
-            DOCX_FILENAME, PDF_FILENAME = build_report_filenames(study)
+            DOCX_FILENAME_FULL, PDF_FILENAME_FULL = build_report_filenames(study)
+            DOCX_FILENAME_SHORT, PDF_FILENAME_SHORT = build_short_report_filenames(study)
             cache_key = f"exports_{study_id}"
 
-            def _build_exports() -> tuple[bytes, bytes]:
-                """Liczy wszystkie obrazy do Worda, buduje DOCX i PDF. Zwraca bajty."""
+            def _build_exports() -> dict[str, bytes]:
+                """Liczy wszystkie obrazy do Worda, buduje raport full + short (DOCX/PDF)."""
                 # 1) Zapisz PNG z radaru (do DOCX)
                 try:
                     fig.write_image("radar.png", scale=4)
@@ -4544,8 +5391,8 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                 panel_img_path = f"panel_{(main_avg or '').lower()}_{(aux_avg or '').lower()}_{(supp_avg or '').lower()}.png"
                 panel_img.save(panel_img_path)
 
-                # 8) DOCX
-                docx_io = export_word_docxtpl(
+                # 8) FULL DOCX
+                docx_full_io = export_word_docxtpl(
                     main_avg,
                     aux_avg,
                     supp_avg,
@@ -4565,31 +5412,53 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
                     color_progress_img_path=progress_png_path,
                     archetype_stacked_img_path=stacked_png_path,
                     capsule_columns_img_path=capsules_path,
+                    segment_profile_img_path=segment_profile_png_path,
                     show_supplement=SHOW_SUPP
                 )
 
-                # 9) PDF – platformowo:
+                # 9) SHORT DOCX (tylko metryka)
+                docx_short_io = export_word_metrics_only(
+                    main_avg,
+                    aux_avg,
+                    supp_avg,
+                    main_disp,
+                    second_disp,
+                    supp_disp,
+                    person=person,
+                    show_supplement=SHOW_SUPP,
+                    segment_profile_img_path=segment_profile_png_path,
+                )
+
+                # 10) PDF – platformowo:
                 import sys as _sys
                 if _sys.platform.startswith("win"):
-                    # Windows: używa MS Word/docx2pdf wewnątrz word_to_pdf
-                    pdf_io = word_to_pdf(docx_io)
+                    pdf_full_io = word_to_pdf(docx_full_io)
+                    pdf_short_io = word_to_pdf(docx_short_io)
                 else:
-                    # Linux: LibreOffice (soffice)
                     soffice_path = _find_soffice()
                     if not soffice_path:
                         raise RuntimeError("LibreOffice (soffice) nie jest dostępny w systemie.")
-                    pdf_io = word_to_pdf(docx_io, soffice_bin=soffice_path)
+                    pdf_full_io = word_to_pdf(docx_full_io, soffice_bin=soffice_path)
+                    pdf_short_io = word_to_pdf(docx_short_io, soffice_bin=soffice_path)
 
-                return docx_io.getvalue(), pdf_io.getvalue()
+                return {
+                    "docx_full": docx_full_io.getvalue(),
+                    "pdf_full": pdf_full_io.getvalue(),
+                    "docx_short": docx_short_io.getvalue(),
+                    "pdf_short": pdf_short_io.getvalue(),
+                }
 
             # — logika UI — generuj tylko na żądanie, ale pozwól pobrać poprzednie
             if prep:
                 with st.spinner("Przygotowuję raport Word/PDF…"):
                     try:
-                        docx_bytes, pdf_bytes = _build_exports()
+                        exports = _build_exports()
                         st.session_state[cache_key] = {
-                            "docx": docx_bytes, "pdf": pdf_bytes,
-                            "docx_name": DOCX_FILENAME, "pdf_name": PDF_FILENAME
+                            **exports,
+                            "docx_name_full": DOCX_FILENAME_FULL,
+                            "pdf_name_full": PDF_FILENAME_FULL,
+                            "docx_name_short": DOCX_FILENAME_SHORT,
+                            "pdf_name_short": PDF_FILENAME_SHORT,
                         }
                         st.success("Gotowe. Możesz pobrać pliki poniżej.")
                     except Exception as e:
@@ -4601,25 +5470,47 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             pdf_icon = "<svg width='21' height='21' viewBox='0 0 32 32' style='vertical-align:middle;margin-right:7px;margin-bottom:2px;'><rect width='32' height='32' rx='4' fill='#d32f2f'/><text x='16' y='22' text-anchor='middle' font-family='Segoe UI,Arial' font-size='16' fill='#fff' font-weight='bold'>PDF</text></svg>"
 
             st.markdown(
-                f"<div style='margin-bottom:11px;'>{word_icon}<b>Eksport do Word (.docx)</b></div>",
+                f"<div style='margin-bottom:11px;'>{word_icon}<b>Raport pełny (.docx)</b></div>",
                 unsafe_allow_html=True)
             st.download_button(
-                "Pobierz raport (Word)",
-                data=(cache["docx"] if cache else b""),
-                file_name=(cache["docx_name"] if cache else DOCX_FILENAME),
+                "Pobierz raport pełny (Word)",
+                data=(cache["docx_full"] if cache else b""),
+                file_name=(cache["docx_name_full"] if cache else DOCX_FILENAME_FULL),
                 disabled=not bool(cache),
-                key="word_button"
+                key="word_button_full"
             )
 
             st.markdown(
-                f"<div style='margin-top:21px; margin-bottom:11px;'>{pdf_icon}<b>Eksport do PDF (.pdf)</b></div>",
+                f"<div style='margin-top:21px; margin-bottom:11px;'>{pdf_icon}<b>Raport pełny (.pdf)</b></div>",
                 unsafe_allow_html=True)
             st.download_button(
-                "Pobierz raport (PDF)",
-                data=(cache["pdf"] if cache else b""),
-                file_name=(cache["pdf_name"] if cache else PDF_FILENAME),
+                "Pobierz raport pełny (PDF)",
+                data=(cache["pdf_full"] if cache else b""),
+                file_name=(cache["pdf_name_full"] if cache else PDF_FILENAME_FULL),
                 disabled=not bool(cache),
-                key="pdf_button"
+                key="pdf_button_full"
+            )
+
+            st.markdown(
+                f"<div style='margin-top:21px; margin-bottom:11px;'>{word_icon}<b>Raport skrócony (.docx)</b></div>",
+                unsafe_allow_html=True)
+            st.download_button(
+                "Pobierz raport skrócony (Word)",
+                data=(cache["docx_short"] if cache else b""),
+                file_name=(cache["docx_name_short"] if cache else DOCX_FILENAME_SHORT),
+                disabled=not bool(cache),
+                key="word_button_short"
+            )
+
+            st.markdown(
+                f"<div style='margin-top:21px; margin-bottom:11px;'>{pdf_icon}<b>Raport skrócony (.pdf)</b></div>",
+                unsafe_allow_html=True)
+            st.download_button(
+                "Pobierz raport skrócony (PDF)",
+                data=(cache["pdf_short"] if cache else b""),
+                file_name=(cache["pdf_name_short"] if cache else PDF_FILENAME_SHORT),
+                disabled=not bool(cache),
+                key="pdf_button_short"
             )
 
             if not cache and not prep:
@@ -4658,3 +5549,4 @@ def show_report(sb, study: dict, wide: bool = True) -> None:
             )
     else:
         st.info("Brak danych – nie ma żadnych odpowiedzi w tym badaniu.")
+
