@@ -25,6 +25,7 @@ import ast
 import plotly.graph_objects as go
 from fpdf import FPDF
 import unicodedata
+import colorsys
 import requests
 from PIL import Image, ImageDraw
 import io
@@ -3492,13 +3493,33 @@ def palette_boxes_html(palette, color_name_map=COLOR_NAME_MAP):
     if not isinstance(palette, list) or not palette:
         return ""
 
+    def _sort_palette_logical(values: list[str]) -> list[str]:
+        cleaned = _dedupe_hex_palette(values)
+        if not cleaned:
+            return []
+
+        def _key(hexcode: str):
+            h = hexcode.lstrip("#")
+            r = int(h[0:2], 16) / 255.0
+            g = int(h[2:4], 16) / 255.0
+            b = int(h[4:6], 16) / 255.0
+            hue, light, sat = colorsys.rgb_to_hls(r, g, b)
+            # Najpierw kolory (po kole barw), na końcu neutrals (szarości/czerń/biel)
+            if sat < 0.085:
+                return (2, light, hue)
+            hue_deg = (hue * 360.0) % 360.0
+            hue_bucket = int((hue_deg + 15.0) // 30.0) % 12
+            return (1, hue_bucket, -sat, light)
+
+        return sorted(cleaned, key=_key)
+
     def label_for(code):
         name = color_name_map.get(str(code).upper(), str(code))
         return f"{name} ({code})"
 
     boxes = []
-
-    for hexcode in palette:
+    logical_palette = _sort_palette_logical([str(c).upper() for c in palette])
+    for hexcode in logical_palette:
             txt = "#111111" if not is_color_dark(hexcode) else "#FFFFFF"
             shadow = ""  # ← zero cienia pod tekstem
             boxes.append(
@@ -3942,7 +3963,11 @@ def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
             chips = "".join(f"<span class='ap-pill'>{html.escape(item)}</span>" for item in items)
             value_html = f"<div class='ap-pill-wrap'>{chips}</div>"
         elif label_cf == "slogany (taglines)":
-            value_html = "<p><i>" + html.escape(" | ".join(items)) + "</i></p>"
+            value_html = (
+                "<ul class='ap-simple-list'>"
+                + "".join(f"<li><i>{html.escape(item)}</i></li>" for item in items)
+                + "</ul>"
+            )
         elif label_cf == "atuty":
             value_html = (
                 "<ul class='ap-qual-list ap-qual-pos'>"
@@ -3973,8 +3998,12 @@ def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
             paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
             value_html = "".join(f"<p><i>{html.escape(p)}</i></p>" for p in paragraphs)
         elif label_raw.casefold() == "slogany (taglines)":
-            paragraphs = [p.strip() for p in re.split(r"\n+", text) if p.strip()]
-            value_html = "".join(f"<p><i>{html.escape(p)}</i></p>" for p in paragraphs)
+            items = _split_metric_line_items(text) or [text]
+            value_html = (
+                "<ul class='ap-simple-list'>"
+                + "".join(f"<li><i>{html.escape(item)}</i></li>" for item in items if str(item).strip())
+                + "</ul>"
+            )
         elif label_raw.casefold() == "oś narracyjna i antagonista":
             value_html = _story_antagonist_html(text)
         else:

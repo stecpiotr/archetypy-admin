@@ -58,7 +58,15 @@ st.set_page_config(
 
 # ▼ dodaj po importach, PRZED pierwszym użyciem Plotly/kaleido
 import os
-os.environ.setdefault("PLOTLY_CHROME_PATH", "/usr/local/bin/google-chrome-headless")
+for _chrome_candidate in (
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/local/bin/google-chrome-headless",
+):
+    if os.path.exists(_chrome_candidate):
+        os.environ.setdefault("PLOTLY_CHROME_PATH", _chrome_candidate)
+        break
 
 # globalna kotwica na samym szczycie aplikacji
 st.markdown('<a id="__top__"></a>', unsafe_allow_html=True)
@@ -284,6 +292,46 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 #results-choose .stSelectbox{
   margin-bottom: 10px;   /* przerwa pod selectem – edytuj */
 }
+
+.share-manage-title{
+  font-weight:700;
+  font-size:16px;
+  margin:0 0 8px 0;
+  color:#1f2937;
+}
+.share-manage-meta{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin:0 0 8px 0;
+}
+.share-chip{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:12px;
+  font-weight:600;
+  border:1px solid #cbd5e1;
+  background:#f8fafc;
+  color:#334155;
+}
+.share-chip.active{
+  background:#ecfdf3;
+  border-color:#86efac;
+  color:#166534;
+}
+.share-chip.suspended{
+  background:#fff7ed;
+  border-color:#fed7aa;
+  color:#9a3412;
+}
+.share-chip.revoked{
+  background:#fef2f2;
+  border-color:#fecaca;
+  color:#991b1b;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -402,8 +450,11 @@ def _fmt_local_ts(ts) -> str:
 
 def _build_report_link(token: str) -> str:
     base = (st.secrets.get("REPORT_BASE_URL", "") or "").strip()
-    if not base:
-        return f"/?token={token}"
+    # Wymuszenie domeny raportowej, gdy w secrets jest pusty/stary adres streamlit.
+    if (not base) or ("streamlit.app" in base.lower()):
+        base = "https://raport.archetypy.badania.pro/"
+    if not base.startswith("http://") and not base.startswith("https://"):
+        base = "https://" + base.lstrip("/")
     joiner = "&" if "?" in base else "?"
     return f"{base}{joiner}token={token}"
 
@@ -1205,108 +1256,118 @@ def results_view() -> None:
             )
         st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
 
-        manage_options = {
-            f"{r.get('email','')} | {status_map.get(str(r.get('status') or '').lower(), str(r.get('status') or ''))} | {_fmt_local_ts(r.get('created_at'))}": r
-            for r in access_rows
-        }
-        selected_key = st.selectbox(
-            "Wybierz dostęp do zarządzania",
-            options=list(manage_options.keys()),
-            key=f"share_manage_{study['id']}",
-        )
-        selected = manage_options[selected_key]
-        selected_status = str(selected.get("status") or "").lower()
-
-        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-        b1, b2, b3, b4 = st.columns(4)
-        with b1:
-            if st.button("Zawieś", key=f"suspend_{selected['id']}", disabled=selected_status != "active"):
-                set_report_access_status(selected["id"], "suspended")
-                st.rerun()
-        with b2:
-            if st.button("Odwieś", key=f"unsuspend_{selected['id']}", disabled=selected_status != "suspended"):
-                set_report_access_status(selected["id"], "active")
-                st.rerun()
-        with b3:
-            if st.button("Odwołaj", key=f"revoke_{selected['id']}", disabled=selected_status == "revoked"):
-                set_report_access_status(selected["id"], "revoked")
-                st.rerun()
-        with b4:
-            pass
-
-        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-        regrant_mode = st.radio(
-            "Przyznaj ponownie — ważność",
-            ["Ważny przez liczbę godzin", "Ważny do odwołania"],
-            horizontal=True,
-            key=f"regrant_mode_{study['id']}",
-        )
-        regrant_hours = None
-        if regrant_mode == "Ważny przez liczbę godzin":
-            regrant_hours = st.number_input(
-                "Liczba godzin (przyznaj ponownie)",
-                min_value=1,
-                max_value=7200,
-                value=48,
-                key=f"regrant_hours_{study['id']}",
+        with st.container(border=True):
+            st.markdown("<div class='share-manage-title'>Wybierz dostęp do zarządzania</div>", unsafe_allow_html=True)
+            manage_options = {
+                f"{r.get('email','')} | {status_map.get(str(r.get('status') or '').lower(), str(r.get('status') or ''))} | {_fmt_local_ts(r.get('created_at'))}": r
+                for r in access_rows
+            }
+            selected_key = st.selectbox(
+                "Wybierz dostęp do zarządzania",
+                options=list(manage_options.keys()),
+                key=f"share_manage_{study['id']}",
+                label_visibility="collapsed",
             )
-        regrant_password = st.text_input(
-            "Hasło przy przyznaniu ponownie",
-            type="password",
-            key=f"regrant_password_{study['id']}",
-            help="To hasło zostanie wysłane ponownie e-mailem razem z nowym linkiem.",
-        )
-        if st.button("Przyznaj ponownie", key=f"regrant_btn_{selected['id']}"):
-            if len((regrant_password or "").strip()) < 4:
-                st.error("Przy przyznaniu ponownie podaj hasło (min. 4 znaki).")
-            else:
-                indefinite = regrant_mode == "Ważny do odwołania"
-                rec = regrant_report_access(
-                    selected["id"],
-                    hours_valid=(None if indefinite else int(regrant_hours or 48)),
-                    indefinite=indefinite,
+            selected = manage_options[selected_key]
+            selected_status = str(selected.get("status") or "").lower()
+            selected_expiry = "do odwołania" if selected.get("indefinite") else (_fmt_local_ts(selected.get("expires_at")) or "—")
+
+            st.markdown(
+                "<div class='share-manage-meta'>"
+                f"<span class='share-chip {selected_status}'>status: {status_map.get(selected_status, selected_status)}</span>"
+                f"<span class='share-chip'>e-mail: {selected.get('email','')}</span>"
+                f"<span class='share-chip'>ważny do: {selected_expiry}</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+            b1, b2, b3 = st.columns(3)
+            with b1:
+                if st.button("Zawieś", key=f"suspend_{selected['id']}", use_container_width=True, disabled=selected_status != "active"):
+                    set_report_access_status(selected["id"], "suspended")
+                    st.rerun()
+            with b2:
+                if st.button("Odwieś", key=f"unsuspend_{selected['id']}", use_container_width=True, disabled=selected_status != "suspended"):
+                    set_report_access_status(selected["id"], "active")
+                    st.rerun()
+            with b3:
+                if st.button("Odwołaj", key=f"revoke_{selected['id']}", use_container_width=True, disabled=selected_status == "revoked"):
+                    set_report_access_status(selected["id"], "revoked")
+                    st.rerun()
+
+            st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+            regrant_mode = st.radio(
+                "Przyznaj ponownie — ważność",
+                ["Ważny przez liczbę godzin", "Ważny do odwołania"],
+                horizontal=True,
+                key=f"regrant_mode_{study['id']}",
+            )
+            regrant_hours = None
+            if regrant_mode == "Ważny przez liczbę godzin":
+                regrant_hours = st.number_input(
+                    "Liczba godzin (przyznaj ponownie)",
+                    min_value=1,
+                    max_value=7200,
+                    value=48,
+                    key=f"regrant_hours_{study['id']}",
                 )
-                if not rec:
-                    st.error("Nie udało się przyznać dostępu ponownie.")
+            regrant_password = st.text_input(
+                "Hasło przy przyznaniu ponownie",
+                type="password",
+                key=f"regrant_password_{study['id']}",
+                help="To hasło zostanie wysłane ponownie e-mailem razem z nowym linkiem.",
+            )
+            if st.button("Przyznaj ponownie", key=f"regrant_btn_{selected['id']}", use_container_width=True):
+                if len((regrant_password or "").strip()) < 4:
+                    st.error("Przy przyznaniu ponownie podaj hasło (min. 4 znaki).")
                 else:
-                    set_report_access_password(rec["id"], regrant_password.strip())
-                    link = _build_report_link(rec["token"])
-                    person_gen = _person_genitive(study)
-                    validity_text = _access_validity_text(rec, hours_value=(None if indefinite else int(regrant_hours or 48)), indefinite=indefinite)
-                    msg = (
-                        f"Została udostępniona Ci możliwość podglądu raportu z badania archetypu {person_gen}.\n\n"
-                        f"Aby zobaczyć raport kliknij w link: {link}.\n\n"
-                        f"Link jest ważny: {validity_text}.\n\n"
-                        f"Hasło dostępowe umożliwiające dostęp do raportu: {regrant_password.strip()}. "
-                        f"Pamiętaj, aby nie udostępniać nikomu hasła!\n\n"
-                        "W przypadku pytań lub wątpliwości skontaktuj się z:\n"
-                        "Piotr Stec\n"
-                        "Badania.pro®\n"
-                        "e-mail: piotr.stec@badania.pro"
+                    indefinite = regrant_mode == "Ważny do odwołania"
+                    rec = regrant_report_access(
+                        selected["id"],
+                        hours_valid=(None if indefinite else int(regrant_hours or 48)),
+                        indefinite=indefinite,
                     )
-                    try:
-                        host, port, user, pwd, secure, from_email, from_name = _email_env()
-                        ok, _provider_id, err = send_email(
-                            host=host,
-                            port=port,
-                            username=user,
-                            password=pwd,
-                            secure=secure,
-                            from_email=from_email,
-                            from_name=from_name,
-                            to_email=rec["email"],
-                            subject=f"Dostęp do raportu archetypu {person_gen}",
-                            text=msg,
+                    if not rec:
+                        st.error("Nie udało się przyznać dostępu ponownie.")
+                    else:
+                        set_report_access_password(rec["id"], regrant_password.strip())
+                        link = _build_report_link(rec["token"])
+                        person_gen = _person_genitive(study)
+                        validity_text = _access_validity_text(rec, hours_value=(None if indefinite else int(regrant_hours or 48)), indefinite=indefinite)
+                        msg = (
+                            f"Została udostępniona Ci możliwość podglądu raportu z badania archetypu {person_gen}.\n\n"
+                            f"Aby zobaczyć raport kliknij w link: {link}.\n\n"
+                            f"Link jest ważny: {validity_text}.\n\n"
+                            f"Hasło dostępowe umożliwiające dostęp do raportu: {regrant_password.strip()}. "
+                            f"Pamiętaj, aby nie udostępniać nikomu hasła!\n\n"
+                            "W przypadku pytań lub wątpliwości skontaktuj się z:\n"
+                            "Piotr Stec\n"
+                            "Badania.pro®\n"
+                            "e-mail: piotr.stec@badania.pro"
                         )
-                        if ok:
-                            mark_report_access_sent(rec["id"])
-                            st.success("Dostęp przyznano ponownie i wysłano nowy link.")
-                            st.code(link)
-                            st.rerun()
-                        else:
-                            st.error(f"Dostęp przyznano, ale nie udało się wysłać e-maila: {err}")
-                    except Exception as e:
-                        st.error(f"Dostęp przyznano, ale wysyłka e-maila nie powiodła się: {e}")
+                        try:
+                            host, port, user, pwd, secure, from_email, from_name = _email_env()
+                            ok, _provider_id, err = send_email(
+                                host=host,
+                                port=port,
+                                username=user,
+                                password=pwd,
+                                secure=secure,
+                                from_email=from_email,
+                                from_name=from_name,
+                                to_email=rec["email"],
+                                subject=f"Dostęp do raportu archetypu {person_gen}",
+                                text=msg,
+                            )
+                            if ok:
+                                mark_report_access_sent(rec["id"])
+                                st.success("Dostęp przyznano ponownie i wysłano nowy link.")
+                                st.code(link)
+                                st.rerun()
+                            else:
+                                st.error(f"Dostęp przyznano, ale nie udało się wysłać e-maila: {err}")
+                        except Exception as e:
+                            st.error(f"Dostęp przyznano, ale wysyłka e-maila nie powiodła się: {e}")
 
 def send_link_view() -> None:
     require_auth()
