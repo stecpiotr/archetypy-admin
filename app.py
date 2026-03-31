@@ -1006,8 +1006,18 @@ def _render_public_gate(token: str) -> bool:
         st.markdown(
             """
             <style>
+            html, body{
+              background:#fafafa !important;
+              color:#0f172a !important;
+            }
+            [data-testid="stAppViewContainer"]{
+              background:#fafafa !important;
+            }
             .stApp, .stApp > header{
               background:#fafafa !important;
+            }
+            .stApp, .stApp *{
+              color:inherit;
             }
             </style>
             """,
