@@ -1047,8 +1047,14 @@ def _render_public_gate(token: str) -> bool:
         /* Wyłączenie starych warstw (legacy CSS) */
         .public-lock-overlay,
         .public-lock-card,
-        .public-form-wrap{
+        .public-form-wrap,
+        [class*="public-lock-overlay"],
+        [class*="public-lock-card"],
+        [class*="public-form-wrap"]{
           display:none !important;
+          visibility:hidden !important;
+          height:0 !important;
+          overflow:hidden !important;
         }
         .public-unlock-note{
           color:#334155;
@@ -1081,8 +1087,8 @@ def _render_public_gate(token: str) -> bool:
                 unsafe_allow_html=True,
             )
             with st.form(f"public_unlock_{token}", clear_on_submit=False):
-                email = st.text_input("E-mail", key=f"public_email_{token}")
-                password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}")
+                email = st.text_input("E-mail", key=f"public_email_{token}", autocomplete="off")
+                password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}", autocomplete="new-password")
                 unlock = st.form_submit_button("Odblokuj raport", type="primary")
 
     if unlock:
@@ -1201,6 +1207,34 @@ def results_view() -> None:
         : s for s in studies
     }
     choice = st.selectbox("Wybierz widok", options=list(options.keys()), label_visibility="collapsed")
+    st.markdown(
+        """
+        <script>
+        (function(){
+          const scope = document.getElementById('results-choose');
+          if(!scope) return;
+          const apply = () => {
+            const targets = scope.querySelectorAll('input,[role="combobox"],[contenteditable="true"]');
+            targets.forEach((el, idx) => {
+              try{
+                el.setAttribute('autocomplete','off');
+                el.setAttribute('autocorrect','off');
+                el.setAttribute('autocapitalize','off');
+                el.setAttribute('spellcheck','false');
+                el.setAttribute('data-lpignore','true');
+                el.setAttribute('data-1p-ignore','true');
+                el.setAttribute('name','results_selector_' + idx);
+              }catch(_e){}
+            });
+          };
+          apply();
+          setTimeout(apply, 120);
+          setTimeout(apply, 600);
+        })();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
     study = options[choice]
     render_titlebar([
         "Panel", "Wyniki",
@@ -1252,6 +1286,7 @@ def results_view() -> None:
         password = st.text_input(
             "Hasło dostępu",
             type="password",
+            autocomplete="new-password",
             help="To hasło będzie wymagane przy otwieraniu linku do raportu.",
         )
         validity_mode = st.radio(
@@ -1426,6 +1461,7 @@ def results_view() -> None:
                 regrant_password = st.text_input(
                     "Hasło przy przyznaniu ponownie",
                     type="password",
+                    autocomplete="new-password",
                     key=f"regrant_password_{study['id']}",
                     help="To hasło zostanie wysłane ponownie e-mailem razem z nowym linkiem.",
                 )

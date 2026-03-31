@@ -370,7 +370,7 @@ def _card_file_for(archetype_name: str):
     """
     try:
         base_masc = base_masc_from_any(str(archetype_name or "").strip())
-        if not base_masc or not ARCHETYPE_CARD_DIR.exists():
+        if not base_masc:
             return None
 
         slug = ARCHETYPE_BASE_SLUGS.get(base_masc, _slug_pl(base_masc))
@@ -383,11 +383,27 @@ def _card_file_for(archetype_name: str):
         if not target_keys:
             return None
 
-        for path in ARCHETYPE_CARD_DIR.iterdir():
-            if not path.is_file() or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
-                continue
-            if _norm(path.stem) in target_keys:
-                return path
+        if ARCHETYPE_CARD_DIR.exists():
+            for path in ARCHETYPE_CARD_DIR.iterdir():
+                if not path.is_file() or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+                    continue
+                stem_norm = _norm(path.stem)
+                if not stem_norm:
+                    continue
+                if stem_norm in target_keys:
+                    return path
+                if any(stem_norm.startswith(k) or k.startswith(stem_norm) for k in target_keys):
+                    return path
+
+        # Fallback: jeśli brak dedykowanej karty w assets/card, pokaż ikonę persony.
+        # Działa też gdy katalog assets/card nie istnieje na danym środowisku.
+        raw_name = str(archetype_name or "").strip()
+        raw_norm = _norm(raw_name)
+        fem_norms = {_norm(f): m for f, m in GENDER_MASC_FROM_FEM.items()}
+        guessed_gender = "K" if raw_norm and raw_norm in fem_norms else "M"
+        icon_fallback = _icon_file_for(base_masc, gender_code=guessed_gender) or _icon_file_for(base_masc, gender_code="M")
+        if icon_fallback and Path(icon_fallback).exists():
+            return Path(icon_fallback)
     except Exception:
         return None
     return None
@@ -2256,10 +2272,41 @@ def display_name_for_gender(base_masc_name: str, gender_code: str) -> str:
     return base_masc_name
 
 def base_masc_from_any(name: str) -> str:
-    """Jeśli dostaliśmy już żeńską formę – cofamy do męskiej; w innym wypadku zwracamy jak było."""
-    if name in GENDER_MASC_FROM_FEM:
-        return GENDER_MASC_FROM_FEM[name]
-    return name
+    """Normalizuje nazwę archetypu do formy męskiej bazowej (odporne na case/PL znaki/warianty)."""
+    raw = str(name or "").strip()
+    if not raw:
+        return ""
+    if raw in GENDER_MASC_FROM_FEM:
+        return GENDER_MASC_FROM_FEM[raw]
+
+    def _norm_token(v: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", _slug_pl(v or ""))
+
+    norm_raw = _norm_token(raw)
+    if not norm_raw:
+        return raw
+
+    masc_by_norm = {_norm_token(k): k for k in ARCHETYPE_BASE_SLUGS.keys()}
+    fem_by_norm = {_norm_token(f): m for f, m in GENDER_MASC_FROM_FEM.items()}
+    slug_by_norm = {_norm_token(v): k for k, v in ARCHETYPE_BASE_SLUGS.items()}
+
+    if norm_raw in masc_by_norm:
+        return masc_by_norm[norm_raw]
+    if norm_raw in fem_by_norm:
+        return fem_by_norm[norm_raw]
+    if norm_raw in slug_by_norm:
+        return slug_by_norm[norm_raw]
+
+    for token, masc in masc_by_norm.items():
+        if token and (norm_raw.startswith(token) or token.startswith(norm_raw)):
+            return masc
+    for token, masc in fem_by_norm.items():
+        if token and (norm_raw.startswith(token) or token.startswith(norm_raw)):
+            return masc
+    for token, masc in slug_by_norm.items():
+        if token and (norm_raw.startswith(token) or token.startswith(norm_raw)):
+            return masc
+    return raw
 
 
 def _dedupe_hex_palette(values) -> list[str]:
@@ -3554,6 +3601,55 @@ def is_color_dark(color_hex):
     lum = 0.2126*r + 0.7152*g + 0.0722*b
     return lum < 110
 
+def _hex_to_rgb01(color_hex: str) -> tuple[float, float, float]:
+    h = str(color_hex or "").strip().lstrip("#")
+    if len(h) == 3:
+        h = "".join([c * 2 for c in h])
+    if len(h) != 6:
+        return (0.0, 0.0, 0.0)
+    try:
+        r, g, b = tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+    except Exception:
+        return (0.0, 0.0, 0.0)
+    return (r, g, b)
+
+def _rgb01_to_hex(r: float, g: float, b: float) -> str:
+    rr = max(0, min(255, int(round(r * 255))))
+    gg = max(0, min(255, int(round(g * 255))))
+    bb = max(0, min(255, int(round(b * 255))))
+    return f"#{rr:02X}{gg:02X}{bb:02X}"
+
+def _blend_hex(color_a: str, color_b: str, mix_b: float) -> str:
+    mix = max(0.0, min(1.0, float(mix_b)))
+    ra, ga, ba = _hex_to_rgb01(color_a)
+    rb, gb, bb = _hex_to_rgb01(color_b)
+    r = (1.0 - mix) * ra + mix * rb
+    g = (1.0 - mix) * ga + mix * gb
+    b = (1.0 - mix) * ba + mix * bb
+    return _rgb01_to_hex(r, g, b)
+
+def _soften_aggressive_main_bg(primary_hex: str, secondary_hex: str | None = None) -> str:
+    """
+    Dla bardzo agresywnych czerwieni (jak #E10600) przyciemnia tło,
+    żeby karta pozostała czytelna i mniej męcząca wizualnie.
+    """
+    base = str(primary_hex or "").upper().strip()
+    if not base.startswith("#") or len(base) not in (4, 7):
+        return base or "#2B2D41"
+
+    r, g, b = _hex_to_rgb01(base)
+    hue, light, sat = colorsys.rgb_to_hls(r, g, b)
+    hue_deg = (hue * 360.0) % 360.0
+    is_red_zone = (hue_deg <= 24.0) or (hue_deg >= 346.0)
+    is_aggressive_red = is_red_zone and (r >= 0.78 and g <= 0.30 and b <= 0.30) and sat >= 0.72 and light >= 0.22
+    if not is_aggressive_red:
+        return base
+
+    target = str(secondary_hex or "").upper().strip()
+    if not (target.startswith("#") and len(target) in (4, 7)):
+        target = "#1F2937"
+    return _blend_hex(base, target, 0.58)
+
 def palette_boxes_html(palette, color_name_map=COLOR_NAME_MAP):
     if not isinstance(palette, list) or not palette:
         return ""
@@ -4447,8 +4543,9 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
 
     palette = [str(c).upper() for c in (archetype_data.get("color_palette", []) or []) if str(c).strip()]
     if main:
-        bg_color = palette[0] if len(palette) >= 1 else "#2B2D41"
+        bg_color_raw = palette[0] if len(palette) >= 1 else "#2B2D41"
         border_color = palette[1] if len(palette) >= 2 else (palette[0] if palette else "#E99836")
+        bg_color = _soften_aggressive_main_bg(bg_color_raw, border_color)
         text_color = "#F8FAFC" if is_color_dark(bg_color) else "#1F2937"
         tagline_color = "#FFE082" if is_color_dark(bg_color) else "#7A2037"
     else:
@@ -4750,11 +4847,45 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 display:flex;
                 align-items:center;
                 justify-content:space-between;
+                gap:10px;
+            }}
+            #{card_dom_id} .ap-summary-left {{
+                display:flex;
+                align-items:center;
+                gap:9px;
+                min-width:0;
+            }}
+            #{card_dom_id} .ap-summary-badge {{
+                display:inline-flex;
+                align-items:center;
+                gap:6px;
+                padding:3px 8px;
+                border-radius:999px;
+                font-size:.78em;
+                font-weight:760;
+                letter-spacing:.01em;
+                color:{text_color};
+                background:rgba(255,255,255,.16);
+                border:1px solid {details_border_color};
+                white-space:nowrap;
+            }}
+            #{card_dom_id} .ap-summary-text {{
+                display:inline-flex;
+                align-items:center;
+                min-width:0;
+            }}
+            #{card_dom_id} .ap-summary-arrow {{
+                font-size:1.06em;
+                opacity:.9;
+                transition:transform .17s ease;
             }}
             #{card_dom_id} .ap-details > summary::-webkit-details-marker {{ display:none; }}
             #{card_dom_id} .ap-details .ap-summary-close {{ display:none; }}
             #{card_dom_id} .ap-details[open] .ap-summary-open {{ display:none; }}
             #{card_dom_id} .ap-details[open] .ap-summary-close {{ display:inline; }}
+            #{card_dom_id} .ap-details[open] .ap-summary-arrow {{
+                transform:rotate(180deg);
+            }}
             #{card_dom_id} .ap-expanded-wrap {{
                 padding:12px 12px 8px;
             }}
@@ -5022,8 +5153,14 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
             {metric_rows_html}
             <details class="ap-details">
                 <summary>
-                    <span class="ap-summary-open">Pokaż rozbudowany opis</span>
-                    <span class="ap-summary-close">Zwiń</span>
+                    <span class="ap-summary-left">
+                        <span class="ap-summary-badge">🔎 Rozszerzona analiza</span>
+                        <span class="ap-summary-text">
+                            <span class="ap-summary-open">Pokaż rozbudowany opis</span>
+                            <span class="ap-summary-close">Zwiń rozbudowany opis</span>
+                        </span>
+                    </span>
+                    <span class="ap-summary-arrow">▾</span>
                 </summary>
                 <div class="ap-expanded-wrap">
                     {expanded_html}
