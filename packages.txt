@@ -25,7 +25,5 @@ libdrm2
 libatk1.0-0
 libgtk-3-0
 fonts-liberation
-libasound2
 libreoffice
 python3-uno
-chromium

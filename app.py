@@ -68,6 +68,21 @@ for _chrome_candidate in (
         os.environ.setdefault("PLOTLY_CHROME_PATH", _chrome_candidate)
         break
 
+def _app_build_signature() -> str:
+    """Krótki znacznik buildu do szybkiej weryfikacji, czy działa nowy deploy."""
+    commit = (
+        os.getenv("STREAMLIT_GIT_COMMIT_SHA")
+        or os.getenv("GITHUB_SHA")
+        or os.getenv("COMMIT_SHA")
+        or ""
+    ).strip()
+    commit_short = commit[:8] if commit else "local"
+    try:
+        src_mtime = datetime.fromtimestamp(os.path.getmtime(__file__)).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        src_mtime = "unknown-time"
+    return f"build: {src_mtime} | commit: {commit_short}"
+
 # globalna kotwica na samym szczycie aplikacji
 st.markdown('<a id="__top__"></a>', unsafe_allow_html=True)
 
@@ -714,6 +729,7 @@ def login_view() -> None:
 def home_view() -> None:
     require_auth()
     header("Archetypy – panel administratora")
+    st.caption(_app_build_signature())
     render_titlebar(["Panel", "Start"])
 
     # kafle
@@ -1059,6 +1075,7 @@ def public_report_view(token: str) -> None:
 def results_view() -> None:
     require_auth()
     header("📊 Sprawdź wyniki badania archetypu")
+    st.caption(_app_build_signature())
     render_titlebar(["Panel", "Wyniki"])
     back_button()
 
