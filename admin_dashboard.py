@@ -363,6 +363,35 @@ def _icon_file_for(archetype_name: str, gender_code: str = "M"):
             return Path(m[0])
     return None
 
+def _card_file_for(archetype_name: str):
+    """
+    Zwraca ścieżkę do karty archetypu w assets/card.
+    Dopasowanie jest odporne na wielkość liter, polskie znaki i warianty nazw.
+    """
+    try:
+        base_masc = base_masc_from_any(str(archetype_name or "").strip())
+        if not base_masc or not ARCHETYPE_CARD_DIR.exists():
+            return None
+
+        slug = ARCHETYPE_BASE_SLUGS.get(base_masc, _slug_pl(base_masc))
+
+        def _norm(v: str) -> str:
+            return re.sub(r"[^a-z0-9]+", "", _slug_pl(v or ""))
+
+        target_keys = {_norm(base_masc), _norm(slug)}
+        target_keys = {k for k in target_keys if k}
+        if not target_keys:
+            return None
+
+        for path in ARCHETYPE_CARD_DIR.iterdir():
+            if not path.is_file() or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+                continue
+            if _norm(path.stem) in target_keys:
+                return path
+    except Exception:
+        return None
+    return None
+
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
     """
     Zwraca InlineImage do docxtpl dla danego archetypu.
@@ -376,6 +405,15 @@ def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M",
         return InlineImage(doc, BytesIO(png_bytes), height=Mm(height_mm))
     else:
         return InlineImage(doc, str(path), height=Mm(height_mm))
+
+def arche_card_inline_for_word(doc, archetype_name: str, width_mm: float = 70):
+    """
+    Zwraca InlineImage karty archetypu (assets/card) do DOCX/PDF.
+    """
+    path = _card_file_for(archetype_name)
+    if not path:
+        return ""
+    return InlineImage(doc, str(path), width=Mm(width_mm))
 
 def _load_arche_icon_for_mpl(name: str, size_px: int = 160, tint: str = "#3B82F6", as_array: bool = True):
     """
@@ -905,6 +943,8 @@ import base64
 
 # --- IKONY ARCHETYPÓW (SVG) ---
 ARCHETYPE_ICON_DIR = Path(__file__).with_name("assets") / "person_icons"
+# Karty archetypów (PNG/JPG) pokazywane m.in. przy "5.1.2. Zestawy praktyczne"
+ARCHETYPE_CARD_DIR = Path(__file__).with_name("assets") / "card"
 # Ikony do etykiet wykresu skumulowanego (nie mylić z person_icons)
 ARCHE_STACKED_ICON_DIR = Path(__file__).with_name("assets") / "arche_icons"
 
@@ -2417,6 +2457,7 @@ def ap_section_heading(
     center: bool = False,
     margin_bottom_px: int = 8,
     margin_top_px: int = 6,
+    shift_x_px: int = 0,
 ) -> str:
     align_class = "ap-heading-center" if center else "ap-heading-left"
     align = "center" if center else "left"
@@ -2425,7 +2466,8 @@ def ap_section_heading(
         f"style='font-family:\"Segoe UI\",system-ui,-apple-system,Arial,sans-serif !important;"
         f"font-weight:640 !important;font-size:1.34rem !important;line-height:1.27 !important;"
         f"color:#1f2937 !important;letter-spacing:0 !important;"
-        f"text-align:{align} !important;margin:{int(margin_top_px)}px 0 {int(margin_bottom_px)}px 0 !important;'>"
+        f"text-align:{align} !important;transform:translateX({int(shift_x_px)}px) !important;"
+        f"margin:{int(margin_top_px)}px 0 {int(margin_bottom_px)}px 0 !important;'>"
         f"{html.escape(str(title))}</div>"
     )
 
@@ -3036,6 +3078,10 @@ def _append_archetype_appendix(doc_tpl, appendix_items: list[tuple[str, dict]]):
     for role_label, arche_data in valid_items:
         arche_name = arche_data.get("name") or "Archetyp"
         _doc_add_paragraph(doc_obj, f"{role_label}: {arche_name}", "Heading 2")
+        card_path = _card_file_for(arche_name)
+        if card_path and os.path.exists(card_path):
+            p_img = doc_obj.add_paragraph()
+            add_image(p_img, str(card_path), width=Mm(84))
 
         metric_rows = arche_data.get("metric_rows") or []
         if metric_rows:
@@ -3137,6 +3183,10 @@ def export_word_metrics_only(
             continue
         doc.add_page_break()
         doc.add_heading(f"{role_label}: {arche_data.get('name') or ''}".strip(), level=2)
+        card_path = _card_file_for(arche_data.get("name") or "")
+        if card_path and os.path.exists(card_path):
+            p_img = doc.add_paragraph()
+            add_image(p_img, str(card_path), width=Mm(84))
         doc.add_heading("Metryka archetypu", level=3)
         for row in metric_rows:
             label = str(row.get("label", "")).strip()
@@ -3237,6 +3287,9 @@ def export_word_docxtpl(
     ARCHETYPE_MAIN_ICON = arche_icon_inline_for_word(doc, main_type, gender_code, height_mm=26) if main_type else ""
     ARCHETYPE_AUX_ICON = arche_icon_inline_for_word(doc, second_type, gender_code, height_mm=26) if second_type else ""
     ARCHETYPE_SUPP_ICON = arche_icon_inline_for_word(doc, supplement_type, gender_code, height_mm=26) if supplement_type else ""
+    ARCHETYPE_MAIN_CARD = arche_card_inline_for_word(doc, main_type, width_mm=84) if main_type else ""
+    ARCHETYPE_AUX_CARD = arche_card_inline_for_word(doc, second_type, width_mm=84) if second_type else ""
+    ARCHETYPE_SUPP_CARD = arche_card_inline_for_word(doc, supplement_type, width_mm=84) if supplement_type else ""
 
     # Grafiki palet kolorów
     ARCHETYPE_MAIN_PALETTE_IMG = palette_inline_for_word(doc, main.get("color_palette", []))
@@ -3254,6 +3307,14 @@ def export_word_docxtpl(
     context["ARCHETYPE_MAIN_ICON"] = ARCHETYPE_MAIN_ICON
     context["ARCHETYPE_AUX_ICON"] = ARCHETYPE_AUX_ICON
     context["ARCHETYPE_SUPP_ICON"] = ARCHETYPE_SUPP_ICON
+    context["ARCHETYPE_MAIN_CARD"] = ARCHETYPE_MAIN_CARD
+    context["ARCHETYPE_AUX_CARD"] = ARCHETYPE_AUX_CARD
+    context["ARCHETYPE_SUPP_CARD"] = ARCHETYPE_SUPP_CARD
+    context["ARCHETYPE_MAIN_CARD_IMG"] = ARCHETYPE_MAIN_CARD
+    context["ARCHETYPE_AUX_CARD_IMG"] = ARCHETYPE_AUX_CARD
+    context["ARCHETYPE_SUPP_CARD_IMG"] = ARCHETYPE_SUPP_CARD
+    context["ARCHETYPE_SUPPLEMENT_CARD"] = ARCHETYPE_SUPP_CARD
+    context["ARCHETYPE_SUPPLEMENT_CARD_IMG"] = ARCHETYPE_SUPP_CARD
 
     context["ARCHETYPE_MAIN_PALETTE_IMG"] = ARCHETYPE_MAIN_PALETTE_IMG
     context["ARCHETYPE_AUX_PALETTE_IMG"] = ARCHETYPE_AUX_PALETTE_IMG
@@ -3265,6 +3326,10 @@ def export_word_docxtpl(
             if k.startswith("ARCHETYPE_SUPPLEMENT_"):
                 context[k] = "" if not isinstance(context[k], list) else []
         context["ARCHETYPE_SUPP_ICON"] = ""
+        context["ARCHETYPE_SUPP_CARD"] = ""
+        context["ARCHETYPE_SUPP_CARD_IMG"] = ""
+        context["ARCHETYPE_SUPPLEMENT_CARD"] = ""
+        context["ARCHETYPE_SUPPLEMENT_CARD_IMG"] = ""
         context["ARCHETYPE_SUPP_PALETTE_IMG"] = ""
 
     # Logotypy do Worda
@@ -3857,14 +3922,14 @@ def _story_antagonist_html(value: str) -> str:
         storyline = [str(value).strip()]
 
     story_html = (
-        "<ul class='ap-simple-list'>"
+        "<ul class='ap-simple-list ap-story-list'>"
         + "".join(f"<li>{html.escape(item)}</li>" for item in storyline if item)
         + "</ul>"
         if storyline
         else "<span style='color:#7c8799;'>—</span>"
     )
     ant_html = (
-        "<ul class='ap-simple-list'>"
+        "<ul class='ap-simple-list ap-story-list'>"
         + "".join(f"<li>{html.escape(item)}</li>" for item in antagonist if item)
         + "</ul>"
         if antagonist
@@ -4031,7 +4096,22 @@ SECTION_ICON_MAP = {
 }
 
 
-def _expanded_subsection_content_html(content_lines: list[str], subsection_title: str = "") -> str:
+def _norm_archetype_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", _slug_pl(value or ""))
+
+
+@lru_cache(maxsize=96)
+def _archetype_card_data_uri(archetype_name: str) -> str:
+    try:
+        path = _card_file_for(archetype_name)
+        if path and path.exists():
+            return _file_to_data_uri(str(path))
+    except Exception:
+        return ""
+    return ""
+
+
+def _expanded_subsection_content_html(content_lines: list[str], subsection_title: str = "", archetype_name: str = "") -> str:
     if not content_lines:
         return ""
 
@@ -4120,19 +4200,37 @@ def _expanded_subsection_content_html(content_lines: list[str], subsection_title
 
     if sub_prefix == "3.3.":
         blocks: list[str] = []
+        idx_recommended = None
         idx_limit = None
         for i, ln in enumerate(lines):
+            if idx_recommended is None and ln.casefold().startswith("zalecane zwroty"):
+                idx_recommended = i
             if ln.casefold().startswith("do ograniczenia"):
                 idx_limit = i
                 break
-        if idx_limit is None:
-            return "".join(p(x) for x in lines)
-        before = lines[:idx_limit]
-        after = lines[idx_limit + 1:]
-        if before:
-            blocks.extend(p(x) for x in before)
-        blocks.append("<div class='ap-ext-topic'><b>Do ograniczenia:</b></div>")
-        blocks.append(ul(split_semicolon_items(after)))
+
+        before_limit = lines if idx_limit is None else lines[:idx_limit]
+        after_limit = [] if idx_limit is None else lines[idx_limit + 1:]
+
+        if idx_recommended is not None:
+            lead = before_limit[:idx_recommended]
+            rec_src = before_limit[idx_recommended + 1:]
+            rec_inline = re.sub(r"^zalecane zwroty:\s*", "", before_limit[idx_recommended], flags=re.IGNORECASE).strip()
+            if rec_inline:
+                rec_src = [rec_inline] + rec_src
+            if lead:
+                blocks.extend(p(x) for x in lead)
+            blocks.append("<div class='ap-ext-topic ap-ext-topic-strong'><b>Zalecane zwroty:</b></div>")
+            rec_items = split_semicolon_items(rec_src)
+            if rec_items:
+                blocks.append(ul(rec_items, cls="ap-ext-list ap-ext-list-italic"))
+        else:
+            if before_limit:
+                blocks.extend(p(x) for x in before_limit)
+
+        if idx_limit is not None:
+            blocks.append("<div class='ap-ext-topic'><b>Do ograniczenia:</b></div>")
+            blocks.append(ul(split_semicolon_items(after_limit)))
         return "".join(blocks)
 
     if sub_prefix in numbered_prefixes:
@@ -4226,14 +4324,39 @@ def _expanded_subsection_content_html(content_lines: list[str], subsection_title
                 out.append(p(head, cls="ap-ext-step-head"))
             if items:
                 out.append(ul(items))
-        return "".join(out)
+        left_html = "".join(out)
+        card_uri = _archetype_card_data_uri(archetype_name) if archetype_name else ""
+        if not card_uri:
+            return left_html
+        modal_id = f"ap-card-modal-{_norm_archetype_key(archetype_name)}-{abs(hash('||'.join(lines))) % 1000000}"
+        alt_txt = html.escape(f"Karta archetypu {archetype_name}".strip())
+        right_html = (
+            "<div class='ap-ext-zestawy-card-wrap'>"
+            f"<a class='ap-ext-zestawy-card-link' href='#{modal_id}' title='Kliknij, aby powiększyć kartę'>"
+            f"<img class='ap-ext-zestawy-card' src='{card_uri}' alt='{alt_txt}'/>"
+            "</a>"
+            f"<div id='{modal_id}' class='ap-ext-card-modal'>"
+            f"<a href='#' class='ap-ext-card-modal-backdrop' aria-label='Zamknij podgląd'></a>"
+            "<div class='ap-ext-card-modal-content'>"
+            "<a href='#' class='ap-ext-card-modal-close' aria-label='Zamknij podgląd'>&times;</a>"
+            f"<img class='ap-ext-card-modal-img' src='{card_uri}' alt='{alt_txt}'/>"
+            "</div>"
+            "</div>"
+            "</div>"
+        )
+        return (
+            "<div class='ap-ext-zestawy-wrap'>"
+            f"<div class='ap-ext-zestawy-left'>{left_html}</div>"
+            f"{right_html}"
+            "</div>"
+        )
 
     if sub_prefix == "3.7.":
         blocks: list[str] = []
         prev_technika = False
         for ln in lines:
             if re.match(r"^\d+\)\s+", ln):
-                blocks.append(p(ln, cls="ap-ext-step-head"))
+                blocks.append(p(ln, cls="ap-ext-step-head ap-ext-tech-head"))
                 prev_technika = False
                 continue
             if ln.casefold().startswith("technika:"):
@@ -4284,12 +4407,23 @@ def _expanded_sections_html(archetype_data: dict) -> str:
             content_lines = [str(line).strip() for line in subsection.get("content", []) if str(line).strip()]
             if not content_lines and not sub_title:
                 continue
-            content_html = _expanded_subsection_content_html(content_lines, sub_title_raw)
+            content_html = _expanded_subsection_content_html(
+                content_lines,
+                sub_title_raw,
+                str(archetype_data.get("name", "")).strip(),
+            )
+            subtitle_cls = "ap-ext-subtitle ap-ext-subtitle-l2"
+            if sub_title_raw:
+                m_sub = re.match(r"^(\d+(?:\.\d+)*)\.\s+", sub_title_raw)
+                if m_sub:
+                    depth = len([p for p in m_sub.group(1).split(".") if p.strip()])
+                    if depth >= 3:
+                        subtitle_cls = "ap-ext-subtitle ap-ext-subtitle-l3"
 
             subsection_blocks.append(
                 f"""
                 <div class="ap-ext-subsection">
-                    {f"<div class='ap-ext-subtitle'>{sub_title}</div>" if sub_title else ""}
+                    {f"<div class='{subtitle_cls}'>{sub_title}</div>" if sub_title else ""}
                     <div class="ap-ext-content">{content_html}</div>
                 </div>
                 """
@@ -4435,11 +4569,14 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 font-weight:600;
             }}
             #{card_dom_id} .ap-metric-title {{
-                font-size:1.62em;
+                font-size:1.54em;
                 font-weight:700;
                 color:{text_color};
                 margin:22px 0 16px;
                 letter-spacing:.01em;
+            }}
+            #{card_dom_id} .ap-card-icon-wrap {{
+                margin-left:-14px;
             }}
             #{card_dom_id} .ap-metric-row {{
                 border:none;
@@ -4482,11 +4619,17 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
             }}
             #{card_dom_id} .ap-story-antag {{
                 margin-top:2px;
+                padding-left:4px;
             }}
             #{card_dom_id} .ap-story-head {{
                 font-weight:700;
-                margin-top:8px;
+                margin-top:10px;
                 margin-bottom:2px;
+                margin-left:10px;
+            }}
+            #{card_dom_id} .ap-story-list {{
+                margin:2px 0 8px 0;
+                padding-left:34px;
             }}
             #{card_dom_id} .ap-simple-list li {{
                 margin-bottom:4px;
@@ -4657,16 +4800,141 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 margin-top:12px;
                 margin-bottom:4px;
             }}
+            #{card_dom_id} .ap-ext-subtitle-l2 {{
+                font-size:1.02em;
+                font-weight:700;
+                margin-top:12px;
+                margin-bottom:4px;
+            }}
+            #{card_dom_id} .ap-ext-subtitle-l3 {{
+                font-size:.92em;
+                font-weight:700;
+                letter-spacing:.01em;
+                color:{details_text_color};
+                margin-top:9px;
+                margin-bottom:5px;
+                margin-left:14px;
+                padding:4px 9px;
+                border-left:3px solid {tagline_color};
+                background:rgba(255,255,255,.18);
+                border-radius:6px;
+            }}
+            #{card_dom_id} .ap-ext-subtitle-l3 + .ap-ext-content {{
+                margin-left:14px;
+                padding-left:8px;
+            }}
             #{card_dom_id} .ap-ext-content p {{
                 margin:0 0 6px 0;
                 font-size:.95em;
                 line-height:1.5;
                 color:{details_text_color};
             }}
+            #{card_dom_id} .ap-ext-zestawy-wrap {{
+                display:grid;
+                grid-template-columns:minmax(0,1fr) minmax(462px, 40%);
+                gap:20px;
+                align-items:start;
+                margin-top:2px;
+            }}
+            #{card_dom_id} .ap-ext-zestawy-left {{
+                min-width:0;
+            }}
+            #{card_dom_id} .ap-ext-zestawy-card-wrap {{
+                display:flex;
+                justify-content:flex-end;
+                position:relative;
+            }}
+            #{card_dom_id} .ap-ext-zestawy-card-link {{
+                display:block;
+                line-height:0;
+                cursor:zoom-in;
+            }}
+            #{card_dom_id} .ap-ext-zestawy-card {{
+                width:100%;
+                max-width:572px;
+                height:auto;
+                display:block;
+                border-radius:12px;
+                border:1px solid {details_border_color};
+                box-shadow:0 8px 18px rgba(0,0,0,.16);
+            }}
+            #{card_dom_id} .ap-ext-zestawy-card-link:hover .ap-ext-zestawy-card {{
+                transform:translateY(-1px);
+                box-shadow:0 14px 28px rgba(0,0,0,.24);
+                transition:transform .15s ease, box-shadow .15s ease;
+            }}
+            #{card_dom_id} .ap-ext-card-modal {{
+                position:fixed;
+                inset:0;
+                display:none;
+                z-index:99999;
+            }}
+            #{card_dom_id} .ap-ext-card-modal:target {{
+                display:block;
+            }}
+            #{card_dom_id} .ap-ext-card-modal-backdrop {{
+                position:absolute;
+                inset:0;
+                background:rgba(8,12,20,.74);
+                backdrop-filter: blur(2px);
+                cursor:zoom-out;
+            }}
+            #{card_dom_id} .ap-ext-card-modal-content {{
+                position:relative;
+                z-index:1;
+                max-width:min(94vw, 1260px);
+                max-height:90vh;
+                margin:4.5vh auto 0;
+                padding:10px;
+                border-radius:12px;
+                background:rgba(255,255,255,.08);
+                border:1px solid rgba(255,255,255,.24);
+                box-shadow:0 22px 60px rgba(0,0,0,.45);
+            }}
+            #{card_dom_id} .ap-ext-card-modal-img {{
+                width:100%;
+                height:auto;
+                max-height:84vh;
+                object-fit:contain;
+                display:block;
+                border-radius:10px;
+                background:#fff;
+            }}
+            #{card_dom_id} .ap-ext-card-modal-close {{
+                position:absolute;
+                top:-16px;
+                right:-14px;
+                width:34px;
+                height:34px;
+                border-radius:999px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                text-decoration:none;
+                font-size:26px;
+                line-height:1;
+                color:#fff;
+                background:rgba(11,18,32,.88);
+                border:1px solid rgba(255,255,255,.28);
+                box-shadow:0 4px 12px rgba(0,0,0,.32);
+            }}
+            @media (max-width: 1280px) {{
+                #{card_dom_id} .ap-ext-zestawy-wrap {{
+                    grid-template-columns:minmax(0,1fr) minmax(330px, 37%);
+                    gap:14px;
+                }}
+                #{card_dom_id} .ap-ext-zestawy-card {{
+                    max-width:396px;
+                }}
+            }}
             #{card_dom_id} .ap-ext-content .ap-ext-step-head {{
                 margin-top:13px;
                 margin-bottom:6px;
                 font-weight:700;
+            }}
+            #{card_dom_id} .ap-ext-content .ap-ext-tech-head {{
+                margin-top:20px;
+                margin-bottom:9px;
             }}
             #{card_dom_id} .ap-ext-content p:first-child.ap-ext-step-head {{
                 margin-top:2px;
@@ -4676,9 +4944,18 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 font-weight:600;
                 color:{details_text_color};
             }}
+            #{card_dom_id} .ap-ext-topic-strong {{
+                margin-top:10px;
+                font-weight:760;
+                font-size:1.01em;
+                color:{details_subtitle_color};
+            }}
             #{card_dom_id} .ap-ext-list {{
                 margin:1px 0 10px 0;
                 padding-left:20px;
+            }}
+            #{card_dom_id} .ap-ext-list-italic li {{
+                font-style:italic;
             }}
             #{card_dom_id} .ap-ext-ol {{
                 margin:1px 0 10px 0;
@@ -4714,11 +4991,26 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
                 #{card_dom_id} .ap-metric-grid {{
                     grid-template-columns:1fr;
                 }}
+                #{card_dom_id} .ap-ext-zestawy-wrap {{
+                    grid-template-columns:1fr;
+                    gap:10px;
+                }}
+                #{card_dom_id} .ap-ext-zestawy-card-wrap {{
+                    justify-content:flex-start;
+                }}
+                #{card_dom_id} .ap-ext-zestawy-card {{
+                    max-width:240px;
+                }}
+                #{card_dom_id} .ap-ext-card-modal-content {{
+                    max-width:95vw;
+                    margin-top:6vh;
+                    padding:8px;
+                }}
             }}
         </style>
         <div id="{card_dom_id}" class="ap-card-wrap">
             <div class="ap-card-head">
-                <div style="flex-shrink:0;">
+                <div class="ap-card-icon-wrap" style="flex-shrink:0;">
                     {arche_icon_img_html(archetype_data.get('name', '?'), height_px=146, gender_code=gender_code)}
                 </div>
                 <div>
@@ -5428,10 +5720,15 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             # prawa kolumna — wykres archetypów
             with right_col:
-                p_l, p_c, p_r = st.columns([0.06, 0.88, 0.06], gap="small")
+                p_l, p_c, p_r = st.columns([0.10, 0.84, 0.06], gap="small")
                 with p_c:
                     st.markdown(
-                        ap_section_heading("Koło archetypów (pragnienia i wartości)", center=True, margin_bottom_px=8),
+                        ap_section_heading(
+                            "Koło archetypów (pragnienia i wartości)",
+                            center=True,
+                            margin_bottom_px=8,
+                            shift_x_px=-32,
+                        ),
                         unsafe_allow_html=True,
                     )
                     if main_avg is not None:
@@ -5473,10 +5770,15 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
 
             with col3:
-                k_pad_l, k_mid, k_pad_r = st.columns([0.06, 0.88, 0.06], gap="small")
+                k_pad_l, k_mid, k_pad_r = st.columns([0.09, 0.88, 0.03], gap="small")
                 with k_mid:
                     st.markdown(
-                        ap_section_heading("Rozkład archetypów na osiach potrzeb", center=True, margin_bottom_px=8),
+                        ap_section_heading(
+                            "Rozkład archetypów na osiach potrzeb",
+                            center=True,
+                            margin_bottom_px=8,
+                            shift_x_px=-10,
+                        ),
                         unsafe_allow_html=True,
                     )
                     aux = aux_avg if aux_avg != main_avg else None

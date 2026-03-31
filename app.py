@@ -37,6 +37,7 @@ from report_share import (
     create_access as create_report_access,
     list_accesses as list_report_accesses,
     set_status as set_report_access_status,
+    delete_access as delete_report_access,
     regrant_access as regrant_report_access,
     set_password as set_report_access_password,
     verify_token_credentials as verify_report_token_credentials,
@@ -1043,67 +1044,46 @@ def _render_public_gate(token: str) -> bool:
     st.markdown(
         """
         <style>
-        .public-lock-overlay{
-          position:fixed;
-          inset:0;
-          z-index:9990;
-          background:rgba(2, 7, 16, .84);
-          backdrop-filter:blur(1.2px);
-          pointer-events:none;
-        }
+        /* Wyłączenie starych warstw (legacy CSS) */
+        .public-lock-overlay,
         .public-lock-card,
         .public-form-wrap{
-          width:min(560px, 94vw);
-          border:1px solid rgba(255,255,255,.20);
-          background:rgba(10,15,25,.92);
-          border-radius:16px;
-          position:relative;
-          z-index:9993;
-          box-shadow:0 20px 54px rgba(0,0,0,.45);
+          display:none !important;
         }
-        .public-lock-card{ padding:20px 22px 16px; }
-        .public-lock-title{
-          color:#f3f6ff;
-          font-size:1.38rem;
-          font-weight:700;
-          margin:0 0 4px 0;
-        }
-        .public-lock-sub{
-          color:#c7d2e9;
+        .public-unlock-note{
+          color:#334155;
           margin:0 0 10px 0;
           line-height:1.45;
           font-size:0.98rem;
         }
-        .public-form-wrap{ padding:14px 18px 16px; }
-        .public-form-wrap label,
-        .public-form-wrap p,
-        .public-form-wrap span{
-          color:#dbe6ff !important;
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"]{
+          background:#ff4d5b !important;
+          color:#ffffff !important;
+          border:1px solid #ff4d5b !important;
+          font-weight:700 !important;
+        }
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover{
+          background:#ff3b4c !important;
+          border-color:#ff3b4c !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown("<div class='public-lock-overlay'></div>", unsafe_allow_html=True)
-
-    lock_l, lock_c, lock_r = st.columns([0.30, 0.40, 0.30], gap="small")
+    lock_l, lock_c, lock_r = st.columns([0.31, 0.38, 0.31], gap="small")
     with lock_c:
-        st.markdown("<div style='height:16vh;'></div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='public-lock-card'>"
-            "<div class='public-lock-title'>Podgląd raportu jest zabezpieczony</div>"
-            "<div class='public-lock-sub'>Podaj e-mail, na który wysłano link, oraz hasło dostępu.</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-        st.markdown("<div class='public-form-wrap'>", unsafe_allow_html=True)
-        with st.form(f"public_unlock_{token}", clear_on_submit=False):
-            email = st.text_input("E-mail", key=f"public_email_{token}")
-            password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}")
-            unlock = st.form_submit_button("Odblokuj raport", type="primary")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:10vh;'></div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("### Podgląd raportu jest zabezpieczony")
+            st.markdown(
+                "<p class='public-unlock-note'>Podaj e-mail, na który wysłano link, oraz hasło dostępu.</p>",
+                unsafe_allow_html=True,
+            )
+            with st.form(f"public_unlock_{token}", clear_on_submit=False):
+                email = st.text_input("E-mail", key=f"public_email_{token}")
+                password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}")
+                unlock = st.form_submit_button("Odblokuj raport", type="primary")
 
     if unlock:
         res = verify_report_token_credentials(token, email, password)
@@ -1391,7 +1371,7 @@ def results_view() -> None:
                 unsafe_allow_html=True,
             )
 
-            b1, b2, b3, _btn_spacer = st.columns([0.16, 0.16, 0.16, 0.52], gap="small")
+            b1, b2, b3, b4, _btn_spacer = st.columns([0.14, 0.14, 0.14, 0.14, 0.44], gap="small")
             with b1:
                 if st.button("⏸️ Zawieś", key=f"suspend_{selected['id']}", use_container_width=True, disabled=selected_status != "active"):
                     set_report_access_status(selected["id"], "suspended")
@@ -1404,6 +1384,26 @@ def results_view() -> None:
                 if st.button("🛑 Odwołaj", key=f"revoke_{selected['id']}", use_container_width=True, disabled=selected_status == "revoked"):
                     set_report_access_status(selected["id"], "revoked")
                     st.rerun()
+            with b4:
+                if st.button("🗑️ Usuń", key=f"delete_{selected['id']}", use_container_width=True):
+                    st.session_state[f"share_delete_confirm_{selected['id']}"] = True
+                    st.rerun()
+
+            if st.session_state.get(f"share_delete_confirm_{selected['id']}", False):
+                st.warning("Czy na pewno trwale usunąć dostęp? Tej operacji nie można cofnąć.")
+                d1, d2, _dsp = st.columns([0.20, 0.16, 0.64], gap="small")
+                with d1:
+                    if st.button("✅ Tak, usuń trwale", key=f"delete_confirm_yes_{selected['id']}", use_container_width=True):
+                        ok = delete_report_access(selected["id"])
+                        st.session_state.pop(f"share_delete_confirm_{selected['id']}", None)
+                        if ok:
+                            st.success("Dostęp został trwale usunięty.")
+                            st.rerun()
+                        st.error("Nie udało się usunąć dostępu.")
+                with d2:
+                    if st.button("↩️ Anuluj", key=f"delete_confirm_no_{selected['id']}", use_container_width=True):
+                        st.session_state.pop(f"share_delete_confirm_{selected['id']}", None)
+                        st.rerun()
 
             st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
             regrant_mode = st.radio(

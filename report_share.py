@@ -243,6 +243,19 @@ def regrant_access(link_id: str, *, hours_valid: int | None, indefinite: bool) -
     return dict(row) if row else None
 
 
+def delete_access(link_id: str) -> bool:
+    sql = """
+    DELETE FROM public.report_share_links
+    WHERE id = %s;
+    """
+    with _db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (link_id,))
+            deleted = cur.rowcount > 0
+        conn.commit()
+    return bool(deleted)
+
+
 def mark_sent(link_id: str) -> None:
     sql = """
     UPDATE public.report_share_links
