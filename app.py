@@ -4,6 +4,7 @@ import contextlib
 from datetime import datetime, timedelta, timezone
 import warnings
 import re
+import html
 from urllib.parse import urlparse
 import pandas as pd
 import streamlit as st
@@ -84,6 +85,42 @@ def _app_build_signature() -> str:
     except Exception:
         src_mtime = "unknown-time"
     return f"build: {src_mtime} | commit: {commit_short}"
+
+
+def render_build_badge() -> None:
+    sig = html.escape(_app_build_signature())
+    st.markdown(
+        f"""
+        <style>
+        #ap-build-signature {{
+          position: fixed;
+          right: 12px;
+          bottom: 10px;
+          z-index: 99999;
+          padding: 5px 10px;
+          border-radius: 10px;
+          background: rgba(15, 23, 42, 0.80);
+          color: #e2e8f0;
+          font: 600 12px/1.2 "Segoe UI", Arial, sans-serif;
+          letter-spacing: .01em;
+          border: 1px solid rgba(255,255,255,.16);
+          backdrop-filter: blur(2px);
+          box-shadow: 0 4px 16px rgba(0,0,0,.18);
+          pointer-events: none;
+        }}
+        @media (max-width: 900px) {{
+          #ap-build-signature {{
+            right: 8px;
+            bottom: 8px;
+            font-size: 11px;
+            padding: 4px 8px;
+          }}
+        }}
+        </style>
+        <div id="ap-build-signature">{sig}</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # globalna kotwica na samym szczycie aplikacji
 st.markdown('<a id="__top__"></a>', unsafe_allow_html=True)
@@ -344,7 +381,17 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
   border-color:#fed7aa;
   color:#9a3412;
 }
+.share-chip.expired{
+  background:#f8fafc;
+  border-color:#cbd5e1;
+  color:#475569;
+}
 .share-chip.revoked{
+  background:#fef2f2;
+  border-color:#fecaca;
+  color:#991b1b;
+}
+.share-chip.deleted{
   background:#fef2f2;
   border-color:#fecaca;
   color:#991b1b;
@@ -562,6 +609,57 @@ def _access_validity_text(row: Dict, hours_value: Optional[int] = None, indefini
     if expires:
         return f"do {expires}"
     return "czasowo"
+
+
+_ACCESS_STATUS_LABELS = {
+    "active": "aktywne",
+    "expired": "wygasłe",
+    "suspended": "zawieszone",
+    "revoked": "usunięte",
+    "deleted": "usunięte",
+}
+
+_ACCESS_STATUS_ICONS = {
+    "active": "🟢",
+    "expired": "⌛",
+    "suspended": "⏸️",
+    "revoked": "🗑️",
+    "deleted": "🗑️",
+}
+
+
+def _is_access_expired(row: Dict, now_utc: Optional[datetime] = None) -> bool:
+    if bool(row.get("indefinite")):
+        return False
+    expires_at = row.get("expires_at")
+    if not expires_at:
+        return False
+    try:
+        exp_utc = pd.to_datetime(expires_at, utc=True, errors="coerce")
+        if pd.isna(exp_utc):
+            return False
+        current_utc = now_utc if now_utc is not None else datetime.now(timezone.utc)
+        return current_utc > exp_utc.to_pydatetime()
+    except Exception:
+        return False
+
+
+def _effective_access_status(row: Dict, now_utc: Optional[datetime] = None) -> str:
+    raw_status = str(row.get("status") or "").strip().lower()
+    if raw_status in {"revoked", "deleted", "suspended"}:
+        return raw_status
+    if raw_status == "active" and _is_access_expired(row, now_utc=now_utc):
+        return "expired"
+    return raw_status or "unknown"
+
+
+def _access_status_label(status_key: str, with_icon: bool = False) -> str:
+    normalized = str(status_key or "").strip().lower()
+    label = _ACCESS_STATUS_LABELS.get(normalized, normalized or "—")
+    if not with_icon:
+        return label
+    icon = _ACCESS_STATUS_ICONS.get(normalized, "•")
+    return f"{icon} {label}".strip()
 
 
 def _person_genitive(study: Dict) -> str:
@@ -804,7 +902,6 @@ def login_view() -> None:
 def home_view() -> None:
     require_auth()
     header("Archetypy – panel administratora")
-    st.caption(_app_build_signature())
     render_titlebar(["Panel", "Start"])
 
     # kafle
@@ -1154,7 +1251,6 @@ def public_report_view(token: str) -> None:
 def results_view() -> None:
     require_auth()
     header("📊 Sprawdź wyniki badania archetypu")
-    st.caption(_app_build_signature())
     render_titlebar(["Panel", "Wyniki"])
     back_button()
 
@@ -1388,14 +1484,15 @@ def results_view() -> None:
     if access_rows:
         st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
         st.markdown("**Aktywne i historyczne dostępy (e-mail):**")
-        status_map = {"active": "aktywne", "suspended": "zawieszone", "revoked": "odwołane"}
+        now_utc = datetime.now(timezone.utc)
         table_rows = []
         for row in access_rows:
+            effective_status = _effective_access_status(row, now_utc=now_utc)
             expiry = "do odwołania" if row.get("indefinite") else (_fmt_local_ts(row.get("expires_at")) or "—")
             table_rows.append(
                 {
                     "E-mail": row.get("email", ""),
-                    "Status": status_map.get(str(row.get("status") or "").lower(), str(row.get("status") or "")),
+                    "Status": _access_status_label(effective_status, with_icon=True),
                     "Ważny do": expiry,
                     "Utworzono": _fmt_local_ts(row.get("created_at")),
                     "Ostatnia wysyłka": _fmt_local_ts(row.get("last_sent_at")),
@@ -1406,7 +1503,7 @@ def results_view() -> None:
         with st.container(border=True):
             st.markdown("<div class='share-manage-title'>Wybierz dostęp do zarządzania</div>", unsafe_allow_html=True)
             manage_options = {
-                f"{r.get('email','')} | {status_map.get(str(r.get('status') or '').lower(), str(r.get('status') or ''))} | {_fmt_local_ts(r.get('created_at'))}": r
+                f"{r.get('email','')} | {_access_status_label(_effective_access_status(r, now_utc=now_utc), with_icon=True)} | {_fmt_local_ts(r.get('created_at'))}": r
                 for r in access_rows
             }
             selected_key = st.selectbox(
@@ -1416,12 +1513,14 @@ def results_view() -> None:
                 label_visibility="collapsed",
             )
             selected = manage_options[selected_key]
-            selected_status = str(selected.get("status") or "").lower()
+            selected_status_db = str(selected.get("status") or "").lower()
+            selected_status_effective = _effective_access_status(selected, now_utc=now_utc)
+            selected_status_chip_class = "revoked" if selected_status_effective in {"revoked", "deleted"} else selected_status_effective
             selected_expiry = "do odwołania" if selected.get("indefinite") else (_fmt_local_ts(selected.get("expires_at")) or "—")
 
             st.markdown(
                 "<div class='share-manage-meta'>"
-                f"<span class='share-chip {selected_status}'>status: {status_map.get(selected_status, selected_status)}</span>"
+                f"<span class='share-chip {selected_status_chip_class}'>status: {_access_status_label(selected_status_effective, with_icon=True)}</span>"
                 f"<span class='share-chip'>e-mail: {selected.get('email','')}</span>"
                 f"<span class='share-chip'>ważny do: {selected_expiry}</span>"
                 "</div>",
@@ -1430,15 +1529,15 @@ def results_view() -> None:
 
             b1, b2, b3, b4, _btn_spacer = st.columns([0.14, 0.14, 0.14, 0.14, 0.44], gap="small")
             with b1:
-                if st.button("⏸️ Zawieś", key=f"suspend_{selected['id']}", use_container_width=True, disabled=selected_status != "active"):
+                if st.button("⏸️ Zawieś", key=f"suspend_{selected['id']}", use_container_width=True, disabled=selected_status_db != "active"):
                     set_report_access_status(selected["id"], "suspended")
                     st.rerun()
             with b2:
-                if st.button("▶️ Odwieś", key=f"unsuspend_{selected['id']}", use_container_width=True, disabled=selected_status != "suspended"):
+                if st.button("▶️ Odwieś", key=f"unsuspend_{selected['id']}", use_container_width=True, disabled=selected_status_db != "suspended"):
                     set_report_access_status(selected["id"], "active")
                     st.rerun()
             with b3:
-                if st.button("🛑 Odwołaj", key=f"revoke_{selected['id']}", use_container_width=True, disabled=selected_status == "revoked"):
+                if st.button("🛑 Odwołaj", key=f"revoke_{selected['id']}", use_container_width=True, disabled=selected_status_db in {"revoked", "deleted"}):
                     set_report_access_status(selected["id"], "revoked")
                     st.rerun()
             with b4:
@@ -1556,6 +1655,7 @@ def send_link_view() -> None:
 
 # ───────────────────────── routing ─────────────────────────
 if "view" not in st.session_state: st.session_state["view"] = "login"
+render_build_badge()
 with st.sidebar:
     if logged_in():
         if st.button("Wyloguj"): st.session_state.clear(); st.rerun()

@@ -65,8 +65,12 @@ if sys.platform.startswith("linux"):
 else:
     from docx2pdf import convert
 
-TEMPLATE_PATH = "ap48_raport_template.docx"
-TEMPLATE_PATH_NOSUPP = "ap48_raport_template_nosupp.docx"  # szablon bez sekcji archetypu pobocznego
+_BASE_DIR = Path(__file__).resolve().parent
+
+TEMPLATE_PATH = str(_BASE_DIR / "ap48_raport_template.docx")
+TEMPLATE_PATH_NOSUPP = str(_BASE_DIR / "ap48_raport_template_nosupp.docx")  # szablon bez sekcji archetypu pobocznego
+TEMPLATE_PATH_SHORT = str(_BASE_DIR / "ap48_raport_template_short.docx")
+TEMPLATE_PATH_SHORT_NOSUPP = str(_BASE_DIR / "ap48_raport_template_short_nosupp.docx")
 logos_dir = str(Path(__file__).with_name("logos_local"))
 
 import plotly.io as pio
@@ -1276,8 +1280,11 @@ def interpret_archetype_intensity(pct: float) -> dict:
     except Exception:
         v = 0.0
     v = max(0.0, min(100.0, v))
+    # Przedziały bez „dziur” dla wartości dziesiętnych:
+    # 0-29.999..., 30-49.999..., 50-59.999..., ...
     for lo, hi, short, full, desc in AR_INTENSITY_SCHEME:
-        if lo <= v <= hi:
+        upper_exclusive = hi + 1.0
+        if lo <= v < upper_exclusive:
             return {"short": short, "full": full, "desc": desc}
     return {"short": "-", "full": "-", "desc": ""}
 
@@ -2942,16 +2949,63 @@ def should_show_supplement(third_name: str | None,
         return False
 
 def add_image(paragraph, img, width):
-    # img może być ścieżką lub BytesIO/file-like
+    """
+    Bezpieczne osadzanie obrazka do DOCX.
+    - 1) próba bezpośrednia (path / stream),
+    - 2) fallback: PIL -> PNG (dla plików błędnie oznaczonych jako .jpg/.png).
+    """
     if img is None:
         return
-    run = paragraph.add_run()
+
+    def _as_png_stream(source):
+        try:
+            if isinstance(source, (str, os.PathLike)) and os.path.exists(source):
+                with Image.open(source) as im:
+                    out = BytesIO()
+                    if im.mode not in {"RGB", "RGBA"}:
+                        im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
+                    im.save(out, format="PNG")
+                    out.seek(0)
+                    return out
+            if hasattr(source, "read"):
+                try:
+                    source.seek(0)
+                except Exception:
+                    pass
+                with Image.open(source) as im:
+                    out = BytesIO()
+                    if im.mode not in {"RGB", "RGBA"}:
+                        im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
+                    im.save(out, format="PNG")
+                    out.seek(0)
+                    return out
+        except Exception:
+            return None
+        return None
+
+    # 1) próba bezpośrednia
     try:
+        run = paragraph.add_run()
         if isinstance(img, (str, os.PathLike)) and os.path.exists(img):
             run.add_picture(img, width=width)
-        elif hasattr(img, "read"):
-            img.seek(0)
+            return
+        if hasattr(img, "read"):
+            try:
+                img.seek(0)
+            except Exception:
+                pass
             run.add_picture(img, width=width)
+            return
+    except Exception:
+        pass
+
+    # 2) fallback: transkodowanie do PNG
+    png_stream = _as_png_stream(img)
+    if png_stream is None:
+        return
+    try:
+        run = paragraph.add_run()
+        run.add_picture(png_stream, width=width)
     except Exception:
         pass
 
@@ -3108,6 +3162,299 @@ def _doc_add_paragraph(doc_obj, text: str, style_name: str | None = None):
     return doc_obj.add_paragraph(text)
 
 
+def _new_document_from_template(template_candidates: list[str] | tuple[str, ...]) -> Document:
+    """
+    Tworzy pusty dokument z zachowaniem stylów/sekcji z pierwszego istniejącego szablonu.
+    Jeśli żaden szablon nie istnieje, zwraca czysty Document().
+    """
+    chosen = None
+    for candidate in template_candidates:
+        if candidate and os.path.exists(candidate):
+            chosen = candidate
+            break
+    doc = Document(chosen) if chosen else Document()
+    try:
+        body = doc._element.body
+        for child in list(body):
+            # zachowaj ustawienia sekcji strony
+            if child.tag.endswith("sectPr"):
+                continue
+            body.remove(child)
+    except Exception:
+        pass
+    return doc
+
+
+def _doc_add_roman_item(doc_obj, text: str):
+    """
+    Dodaje wiersz z numeracją rzymską w stylu zbliżonym do list Word.
+    Treść powinna już zawierać prefiks np. 'I. ...'.
+    """
+    p = _doc_add_paragraph(doc_obj, text)
+    try:
+        pf = p.paragraph_format
+        pf.left_indent = Pt(20)
+        pf.first_line_indent = Pt(-10)
+        pf.space_after = Pt(3)
+    except Exception:
+        pass
+    return p
+
+
+def _doc_split_semicolon_items(src_lines: list[str]) -> list[str]:
+    out: list[str] = []
+    for ln in src_lines:
+        line = str(ln or "").strip()
+        if not line:
+            continue
+        if ";" in line:
+            parts = [x.strip(" ;") for x in re.split(r"\s*;\s*", line) if x.strip(" ;")]
+            out.extend(parts if parts else [line])
+        else:
+            out.append(line)
+    return [x for x in out if x]
+
+
+def _doc_add_list_items(doc_obj, items: list[str], numbered: bool = False, italic: bool = False):
+    style = "List Number" if numbered else "List Bullet"
+    for item in items:
+        txt = str(item or "").strip()
+        if not txt:
+            continue
+        p = _doc_add_paragraph(doc_obj, txt, style_name=style)
+        if italic:
+            for run in p.runs:
+                run.italic = True
+
+
+def _doc_add_bold_prefix_line(doc_obj, text: str, allowed_labels: set[str], italic_rest: bool = False):
+    raw = str(text or "").strip()
+    if not raw:
+        return
+    m_local = re.match(r"^([^:]{1,60}):\s*(.*)$", raw)
+    if not m_local:
+        _doc_add_paragraph(doc_obj, raw)
+        return
+    label = m_local.group(1).strip()
+    value = m_local.group(2).strip()
+    if label not in allowed_labels:
+        _doc_add_paragraph(doc_obj, raw)
+        return
+    p = doc_obj.add_paragraph()
+    run_label = p.add_run(f"{label}: ")
+    run_label.bold = True
+    run_value = p.add_run(value)
+    if italic_rest:
+        run_value.italic = True
+
+
+def _append_expanded_subsection_docx(doc_obj, subsection_title: str, content_lines: list[str], archetype_name: str = ""):
+    lines: list[str] = []
+    for raw in content_lines or []:
+        txt = str(raw or "").strip()
+        if not txt:
+            continue
+        txt = re.sub(r"^[•\-\u2013\u2014]\s*", "", txt).strip()
+        if txt:
+            lines.append(txt)
+    if not lines:
+        return
+
+    subtitle = str(subsection_title or "").strip()
+    m = re.match(r"^(\d+\.\d+(?:\.\d+)?)\.", subtitle)
+    sub_prefix = (m.group(1) + ".") if m else ""
+
+    bullet_only_prefixes = {
+        "1.6.", "2.1.", "2.3.", "2.4.", "2.5.",
+        "3.6.", "3.8.",
+        "4.1.", "4.2.", "4.3.",
+        "5.2.", "5.3.",
+        "6.1.", "6.2.",
+        "7.1.", "7.2.", "7.4.",
+        "8.2.",
+        "9.2.",
+    }
+    numbered_prefixes = {"3.4.", "3.5.5.", "9.3."}
+
+    if sub_prefix == "1.2.":
+        for line in lines:
+            _doc_add_paragraph(doc_obj, line)
+        return
+
+    if sub_prefix == "1.3.":
+        _doc_add_list_items(doc_obj, lines[:2], numbered=False)
+        for line in lines[2:]:
+            _doc_add_paragraph(doc_obj, line)
+        return
+
+    if sub_prefix in {"1.4.", "1.5.", "8.1."}:
+        _doc_add_paragraph(doc_obj, lines[0])
+        _doc_add_list_items(doc_obj, _doc_split_semicolon_items(lines[1:]), numbered=False)
+        return
+
+    if sub_prefix == "2.2.":
+        for line in lines:
+            _doc_add_bold_prefix_line(doc_obj, line, {"Decyzje", "Tempo", "Priorytety"})
+        return
+
+    if sub_prefix == "3.2.":
+        for line in lines:
+            _doc_add_bold_prefix_line(doc_obj, line, {"Ton", "Emocja po kontakcie"})
+        return
+
+    if sub_prefix == "3.3.":
+        idx_recommended = None
+        idx_limit = None
+        for i, ln in enumerate(lines):
+            if idx_recommended is None and ln.casefold().startswith("zalecane zwroty"):
+                idx_recommended = i
+            if ln.casefold().startswith("do ograniczenia"):
+                idx_limit = i
+                break
+
+        before_limit = lines if idx_limit is None else lines[:idx_limit]
+        after_limit = [] if idx_limit is None else lines[idx_limit + 1:]
+
+        if idx_recommended is not None:
+            lead = before_limit[:idx_recommended]
+            for x in lead:
+                _doc_add_paragraph(doc_obj, x)
+            p = doc_obj.add_paragraph()
+            r = p.add_run("Zalecane zwroty:")
+            r.bold = True
+            rec_src = before_limit[idx_recommended + 1:]
+            rec_inline = re.sub(r"^zalecane zwroty:\s*", "", before_limit[idx_recommended], flags=re.IGNORECASE).strip()
+            if rec_inline:
+                rec_src = [rec_inline] + rec_src
+            _doc_add_list_items(doc_obj, _doc_split_semicolon_items(rec_src), italic=True)
+        else:
+            for x in before_limit:
+                _doc_add_paragraph(doc_obj, x)
+
+        if idx_limit is not None:
+            p = doc_obj.add_paragraph()
+            r = p.add_run("Do ograniczenia:")
+            r.bold = True
+            _doc_add_list_items(doc_obj, _doc_split_semicolon_items(after_limit), numbered=False)
+        return
+
+    if sub_prefix in numbered_prefixes:
+        _doc_add_list_items(doc_obj, lines, numbered=True)
+        return
+
+    if sub_prefix == "7.3.":
+        numbered_items: list[str] = []
+        for line in lines:
+            if line.casefold().startswith("zakaz:"):
+                _doc_add_bold_prefix_line(doc_obj, line, {"Zakaz"})
+            else:
+                numbered_items.append(line)
+        _doc_add_list_items(doc_obj, numbered_items, numbered=True)
+        return
+
+    if sub_prefix == "9.1.":
+        do_items: list[str] = []
+        dont_items: list[str] = []
+        mode: str | None = None
+        for ln in lines:
+            low = ln.casefold()
+            if low.startswith("do:"):
+                mode = "do"
+                continue
+            if ("don't" in low) or ("don’t" in low) or ("dont" in low):
+                mode = "dont"
+                continue
+            if mode == "do":
+                do_items.extend(_doc_split_semicolon_items([ln]))
+            elif mode == "dont":
+                dont_items.extend(_doc_split_semicolon_items([ln]))
+        if do_items:
+            p = doc_obj.add_paragraph()
+            p.add_run("DO:").bold = True
+            _doc_add_list_items(doc_obj, do_items, numbered=False)
+        if dont_items:
+            p = doc_obj.add_paragraph()
+            p.add_run("DON'T:").bold = True
+            _doc_add_list_items(doc_obj, dont_items, numbered=False)
+        if not do_items and not dont_items:
+            for line in lines:
+                _doc_add_paragraph(doc_obj, line)
+        return
+
+    if sub_prefix == "9.4.":
+        diag_idx = None
+        for i, ln in enumerate(lines):
+            if ln.casefold().startswith("pytania diagnostyczne"):
+                diag_idx = i
+                break
+        if diag_idx is None:
+            _doc_add_list_items(doc_obj, _doc_split_semicolon_items(lines), numbered=False)
+            return
+        _doc_add_list_items(doc_obj, _doc_split_semicolon_items(lines[:diag_idx]), numbered=False)
+        p = doc_obj.add_paragraph()
+        p.add_run("Pytania diagnostyczne:").bold = True
+        _doc_add_list_items(doc_obj, _doc_split_semicolon_items(lines[diag_idx + 1:]), numbered=False)
+        return
+
+    if sub_prefix == "8.2.":
+        for item in _doc_split_semicolon_items(lines):
+            p = _doc_add_paragraph(doc_obj, "", style_name="List Bullet")
+            m_line = re.match(r"^([A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]+)\s+[–-]\s+(.+)$", item)
+            if m_line:
+                p.add_run(m_line.group(1)).bold = True
+                p.add_run(f" — {m_line.group(2)}")
+            else:
+                p.add_run(item)
+        return
+
+    if sub_prefix == "5.1.2.":
+        groups: list[tuple[str, list[str]]] = []
+        current_head = ""
+        current_items: list[str] = []
+        for ln in lines:
+            if re.match(r"^Zestaw\s+\d+", ln, flags=re.IGNORECASE):
+                if current_head or current_items:
+                    groups.append((current_head, current_items))
+                current_head = ln
+                current_items = []
+            else:
+                current_items.extend(_doc_split_semicolon_items([ln]))
+        if current_head or current_items:
+            groups.append((current_head, current_items))
+
+        for head, items in groups:
+            if head:
+                _doc_add_paragraph(doc_obj, head)
+            if items:
+                _doc_add_list_items(doc_obj, items, numbered=False)
+        return
+
+    if sub_prefix == "3.7.":
+        for ln in lines:
+            if re.match(r"^\d+\)\s+", ln):
+                p = _doc_add_paragraph(doc_obj, ln)
+                try:
+                    p.paragraph_format.space_before = Pt(6)
+                except Exception:
+                    pass
+            elif ln.casefold().startswith("technika:"):
+                _doc_add_bold_prefix_line(doc_obj, ln, {"Technika"})
+            elif ln.casefold().startswith("schemat:"):
+                _doc_add_bold_prefix_line(doc_obj, ln, {"Schemat"})
+            elif ln.casefold().startswith("po co?"):
+                _doc_add_bold_prefix_line(doc_obj, ln, {"Po co?"})
+            else:
+                _doc_add_paragraph(doc_obj, ln)
+        return
+
+    if sub_prefix in bullet_only_prefixes:
+        _doc_add_list_items(doc_obj, _doc_split_semicolon_items(lines), numbered=False)
+        return
+
+    for line in lines:
+        _doc_add_paragraph(doc_obj, line)
+
+
 def _remove_table_borders(table_obj):
     """Ukrywa obramowanie tabeli (dla siatek zdjęć w DOCX)."""
     try:
@@ -3171,7 +3518,11 @@ def _add_people_photo_grid_docx(
         p_img.text = ""
 
         if photo_path and os.path.exists(photo_path):
-            add_image(p_img, photo_path, width=Mm(image_width_mm))
+            square_stream = _photo_square_top_stream(photo_path)
+            if square_stream is not None:
+                add_image(p_img, square_stream, width=Mm(image_width_mm))
+            else:
+                add_image(p_img, photo_path, width=Mm(image_width_mm))
             rendered_any = True
 
         p_cap = cell.add_paragraph()
@@ -3267,7 +3618,7 @@ def _append_archetype_appendix(doc_tpl, appendix_items: list[tuple[str, dict]]):
                     _doc_add_paragraph(doc_obj, f"{label}:", "Heading 4")
                     for item in vals:
                         if label.casefold() == "4 filary wartości":
-                            _doc_add_paragraph(doc_obj, item)
+                            _doc_add_roman_item(doc_obj, item)
                         else:
                             _doc_add_paragraph(doc_obj, f"- {item}")
                     continue
@@ -3287,9 +3638,12 @@ def _append_archetype_appendix(doc_tpl, appendix_items: list[tuple[str, dict]]):
                     subtitle = str(subsection.get("title", "")).strip()
                     if subtitle:
                         _doc_add_paragraph(doc_obj, subtitle, "Heading 4")
-                    for line in subsection.get("content", []):
-                        if str(line).strip():
-                            _doc_add_paragraph(doc_obj, str(line).strip())
+                    _append_expanded_subsection_docx(
+                        doc_obj,
+                        subsection_title=subtitle,
+                        content_lines=subsection.get("content", []) or [],
+                        archetype_name=arche_name,
+                    )
 
 
 def _append_segment_profile_page(doc_tpl, segment_profile_img_path: str | None, subject_gen: str = ""):
@@ -3313,75 +3667,82 @@ def export_word_metrics_only(
     person: dict | None = None,
     show_supplement: bool = True,
     segment_profile_img_path: str | None = None,
+    template_path: str | None = None,
+    features: dict | None = None,
+    mean_scores=None,
+    radar_img_path=None,
+    archetype_table=None,
+    num_ankiet=None,
+    panel_img_path: str | None = None,
+    gender_code: str = "M",
+    axes_wheel_img_path: str | None = None,
+    dom_color: dict | None = None,
+    color_progress_img_path: str | None = None,
+    archetype_stacked_img_path: str | None = None,
+    capsule_columns_img_path: str | None = None,
 ):
-    person = person or {}
-    full_name = (person.get("GEN") or person.get("NOM") or "").strip()
-    doc = Document()
-    doc.add_heading(f"Raport skrócony – Metryka archetypów {full_name}".strip(), level=1)
-    doc.add_paragraph(f"Data wygenerowania: {datetime.now().strftime('%Y-%m-%d')}")
+    def _resolve_template(candidate: str | None) -> str | None:
+        if not candidate:
+            return None
+        p = Path(candidate)
+        if p.is_absolute():
+            return str(p)
+        return str((_BASE_DIR / p).resolve())
 
-    if segment_profile_img_path and os.path.exists(segment_profile_img_path):
-        doc.add_paragraph("")
-        prof_title = re.sub(r"\s{2,}", " ", f"Profil archetypowy {full_name} (siła archetypu, skala: 0-100)").strip()
-        doc.add_heading(prof_title, level=2)
-        p = doc.add_paragraph()
-        add_image(p, segment_profile_img_path, width=Mm(165))
+    preferred_templates: list[str] = []
+    if template_path:
+        resolved = _resolve_template(template_path)
+        if resolved:
+            preferred_templates.append(resolved)
 
-    roles = [
-        ("Archetyp główny", main),
-        ("Archetyp wspierający", second),
+    # Zawsze dołóż fallbacki (również gdy template_path wskazuje brakujący plik).
+    fallback_templates = [
+        TEMPLATE_PATH_SHORT if show_supplement else TEMPLATE_PATH_SHORT_NOSUPP,
+        TEMPLATE_PATH_SHORT_NOSUPP if show_supplement else TEMPLATE_PATH_SHORT,
+        TEMPLATE_PATH if show_supplement else TEMPLATE_PATH_NOSUPP,
+        TEMPLATE_PATH_NOSUPP if show_supplement else TEMPLATE_PATH,
     ]
-    if show_supplement:
-        roles.append(("Archetyp poboczny", supplement))
+    for cand in fallback_templates:
+        resolved = _resolve_template(cand)
+        if resolved and resolved not in preferred_templates:
+            preferred_templates.append(resolved)
 
-    for role_label, arche_data in roles:
-        if not arche_data:
-            continue
-        metric_rows = arche_data.get("metric_rows") or []
-        if not metric_rows:
-            continue
-        doc.add_page_break()
-        doc.add_heading(f"{role_label}: {arche_data.get('name') or ''}".strip(), level=2)
-        card_path = _card_file_for(arche_data.get("name") or "")
-        if card_path and os.path.exists(card_path):
-            p_img = doc.add_paragraph()
-            add_image(p_img, str(card_path), width=Mm(84))
-        doc.add_heading("Metryka archetypu", level=3)
-        for row in metric_rows:
-            label = str(row.get("label", "")).strip()
-            kind = row.get("kind", "text")
-            value = row.get("value")
-            if not label:
-                continue
-            if label.casefold() == "core triplet":
-                continue
+    chosen_short_template = next(
+        (cand for cand in preferred_templates if cand and os.path.exists(cand)),
+        None,
+    )
+    if not chosen_short_template:
+        raise FileNotFoundError(
+            "Brak szablonu raportu skróconego. "
+            f"Sprawdź pliki: {', '.join([x for x in preferred_templates if x])}"
+        )
 
-            if kind == "examples":
-                _append_examples_block_docx(doc, label, value or {})
-                continue
-
-            if isinstance(value, list):
-                vals = [str(v).strip() for v in value if str(v).strip()]
-                vals = _romanize_metric_items_if_needed(label, vals)
-                if not vals:
-                    continue
-                doc.add_heading(label, level=4)
-                for item in vals:
-                    if label.casefold() == "4 filary wartości":
-                        doc.add_paragraph(item)
-                    else:
-                        doc.add_paragraph(f"- {item}")
-                continue
-
-            txt = str(value or "").strip()
-            if txt:
-                doc.add_heading(label, level=4)
-                doc.add_paragraph(txt)
-
-    buf = BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return buf
+    # Raport skrócony renderujemy przez dedykowany szablon short,
+    # aby układ/formatowanie wynikały bezpośrednio z pliku .docx.
+    return export_word_docxtpl(
+        main_type,
+        second_type,
+        supplement_type,
+        features or {},
+        main,
+        second,
+        supplement,
+        mean_scores=mean_scores,
+        radar_img_path=radar_img_path,
+        archetype_table=archetype_table,
+        num_ankiet=num_ankiet,
+        panel_img_path=panel_img_path,
+        person=person,
+        gender_code=gender_code,
+        axes_wheel_img_path=axes_wheel_img_path,
+        dom_color=dom_color,
+        color_progress_img_path=color_progress_img_path,
+        archetype_stacked_img_path=archetype_stacked_img_path,
+        capsule_columns_img_path=capsule_columns_img_path,
+        segment_profile_img_path=segment_profile_img_path,
+        show_supplement=show_supplement,
+        template_path=chosen_short_template,
+    )
 
 
 def export_word_docxtpl(
@@ -3913,6 +4274,8 @@ POPCULTURE_IMAGE_ALIASES = {
     "Steven Spielberg": "Steven Spielberg",
     "Samwise Gamgee": "Sean Astin",
     'Samwise Gamgee ("Sam") towarzysz Frodo z Władcy Pierścieni': "Sean Astin",
+    "Dr Quinn": "Dr Quinn",
+    "Dr. Quinn": "Dr Quinn",
 }
 
 
@@ -3928,6 +4291,10 @@ def _photo_norm_key(value: str) -> str:
 def _photo_variants(name: str, category: str) -> list[str]:
     base = str(name or "").strip()
     variants = [base]
+    if category == "person":
+        canonical = canonical_person_name(base)
+        if canonical:
+            variants.append(canonical)
     stripped = re.sub(r"\(.*?\)", "", base).strip(" -")
     if stripped:
         variants.append(stripped)
@@ -3948,7 +4315,6 @@ def _photo_variants(name: str, category: str) -> list[str]:
     return out
 
 
-@lru_cache(maxsize=12)
 def _photo_lookup_index(folder: str) -> dict[str, str]:
     idx: dict[str, tuple[int, int, str]] = {}
     folder_path = Path(folder)
@@ -3959,13 +4325,17 @@ def _photo_lookup_index(folder: str) -> dict[str, str]:
             continue
         stem = p.stem
         stem_base = re.sub(r"-\d+$", "", stem)
-        key = _photo_norm_key(stem_base.replace("_", " "))
-        if not key:
+        base_key = _photo_norm_key(stem_base.replace("_", " "))
+        if not base_key:
             continue
+        compact_key = re.sub(r"[^a-z0-9]+", "", base_key)
         rank = (0 if stem == stem_base else 1, len(stem))
-        current = idx.get(key)
-        if current is None or rank < (current[0], current[1]):
-            idx[key] = (rank[0], rank[1], str(p))
+        for key in {base_key, compact_key}:
+            if not key:
+                continue
+            current = idx.get(key)
+            if current is None or rank < (current[0], current[1]):
+                idx[key] = (rank[0], rank[1], str(p))
     return {k: v[2] for k, v in idx.items()}
 
 
@@ -3974,7 +4344,8 @@ def _find_local_photo(name: str, category: str) -> str | None:
     index = _photo_lookup_index(str(folder))
     for variant in _photo_variants(name, category):
         key = _photo_norm_key(variant)
-        path = index.get(key)
+        compact_key = re.sub(r"[^a-z0-9]+", "", key)
+        path = index.get(key) or index.get(compact_key)
         if path:
             return path
     tokens = [t for t in _photo_norm_key(name).split(" ") if len(t) >= 4]
@@ -4014,7 +4385,6 @@ def _download_wikipedia_photo(name: str, category: str) -> str | None:
                 filename = f"{_logo_norm_key(variant) or 'photo'}{ext}"
                 out_path = target_dir / filename
                 out_path.write_bytes(img_resp.content)
-                _photo_lookup_index.cache_clear()
                 return str(out_path)
             except Exception:
                 continue
@@ -4026,6 +4396,37 @@ def _resolve_photo_path(name: str, category: str) -> str | None:
     if local:
         return local
     return _download_wikipedia_photo(name, category)
+
+
+def _photo_square_top_stream(path: str, size_px: int = 360) -> BytesIO | None:
+    """
+    Kadruje zdjęcie do 1:1 bez rozciągania.
+    - pionowe: obcina z dołu (priorytet góry),
+    - poziome: centralnie obcina boki.
+    """
+    try:
+        with Image.open(path) as im:
+            if im.mode not in {"RGB", "RGBA"}:
+                im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
+
+            w, h = im.size
+            side = min(w, h)
+            if w > h:
+                left = (w - side) // 2
+                box = (left, 0, left + side, side)
+            else:
+                box = (0, 0, side, side)
+
+            im = im.crop(box)
+            resample = getattr(Image, "Resampling", Image).LANCZOS
+            im = im.resize((size_px, size_px), resample)
+
+            out = BytesIO()
+            im.save(out, format="PNG")
+            out.seek(0)
+            return out
+    except Exception:
+        return None
 
 
 def _people_photo_grid_html(names: list[str], category: str = "person") -> str:
@@ -4266,10 +4667,15 @@ def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
         if not items:
             value_html = "<span style='color:#7c8799;'>—</span>"
         elif label_cf == "4 filary wartości":
+            clean_items = [
+                re.sub(r"^\s*(?:[IVXLCDM]+\.\s*|\d+\.\s*)", "", item, flags=re.IGNORECASE).strip()
+                for item in items
+            ]
+            clean_items = [x for x in clean_items if x]
             value_html = (
-                "<div class='ap-roman-list'>"
-                + "".join(f"<p>{html.escape(item)}</p>" for item in items)
-                + "</div>"
+                "<ol class='ap-roman-list'>"
+                + "".join(f"<li>{html.escape(item)}</li>" for item in clean_items)
+                + "</ol>"
             )
         elif label_cf in {"kluczowe atrybuty", "słowa-klucze (talking points)"}:
             row_extra_cls = " ap-metric-row-chips"
@@ -4323,10 +4729,15 @@ def _metric_row_html(row: dict, archetype_data: dict, text_color: str) -> str:
             items = _split_metric_line_items(text)
             items = _romanize_metric_items_if_needed(label_raw, items)
             if items:
+                clean_items = [
+                    re.sub(r"^\s*(?:[IVXLCDM]+\.\s*|\d+\.\s*)", "", item, flags=re.IGNORECASE).strip()
+                    for item in items
+                ]
+                clean_items = [x for x in clean_items if x]
                 value_html = (
-                    "<div class='ap-roman-list'>"
-                    + "".join(f"<p>{html.escape(item)}</p>" for item in items)
-                    + "</div>"
+                    "<ol class='ap-roman-list'>"
+                    + "".join(f"<li>{html.escape(item)}</li>" for item in clean_items)
+                    + "</ol>"
                 )
             else:
                 value_html = f"<p>{html.escape(text)}</p>"
@@ -4875,13 +5286,25 @@ def render_archetype_card(archetype_data, main=True, supplement=False, gender_co
             }}
             #{card_dom_id} .ap-roman-list {{
                 margin:6px 0 10px 0;
-                padding-left:24px;
+                padding-left:21px;
+                list-style:none;
+                counter-reset: ap-roman-counter;
             }}
-            #{card_dom_id} .ap-roman-list p {{
-                margin:0 0 9px 0;
-                text-indent:0;
+            #{card_dom_id} .ap-roman-list li {{
+                margin:0 0 8px 0;
+                padding-left:34px;
+                position:relative;
             }}
-            #{card_dom_id} .ap-roman-list p:last-child {{
+            #{card_dom_id} .ap-roman-list li::before {{
+                counter-increment: ap-roman-counter;
+                content: counter(ap-roman-counter, upper-roman) ".";
+                position:absolute;
+                left:0;
+                width:28px;
+                text-align:right;
+                font-weight:400;
+            }}
+            #{card_dom_id} .ap-roman-list li:last-child {{
                 margin-bottom:0;
             }}
             #{card_dom_id} .ap-simple-list {{
@@ -6298,6 +6721,18 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     person=person,
                     show_supplement=SHOW_SUPP,
                     segment_profile_img_path=segment_profile_png_path,
+                    features=archetype_features,
+                    mean_scores=means_pct,
+                    radar_img_path="radar.png",
+                    archetype_table=archetype_table,
+                    num_ankiet=num_ankiet,
+                    panel_img_path=panel_img_path,
+                    gender_code=("K" if IS_FEMALE else "M"),
+                    axes_wheel_img_path="axes_wheel.png",
+                    dom_color=dom_color,
+                    color_progress_img_path=progress_png_path,
+                    archetype_stacked_img_path=stacked_png_path,
+                    capsule_columns_img_path=capsules_path,
                 )
 
                 # 10) PDF – platformowo:
@@ -6409,15 +6844,28 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             except Exception as e:
                 pass
             st.dataframe(final_df, hide_index=True)
-            st.download_button("Pobierz wyniki archetypów (CSV)", final_df.to_csv(index=False), "ap48_archetypy.csv")
-            buffer = io.BytesIO()
-            final_df.to_excel(buffer, index=False)
-            st.download_button(
-                label="Pobierz wyniki archetypów (XLSX)",
-                data=buffer.getvalue(),
-                file_name="ap48_archetypy.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            st.caption("Eksport poniżej dotyczy tabeli odpowiedzi respondentów (CSV/XLSX), a nie raportów DOCX/PDF.")
+            export_col_csv, export_col_xlsx, _export_spacer = st.columns([1, 1, 4])
+            first_nom = (study.get("first_name_nom") or study.get("first_name") or "").strip()
+            last_nom = (study.get("last_name_nom") or study.get("last_name") or "").strip()
+            person_slug = _slug_pl(f"{first_nom} {last_nom}".strip() or "osoba")
+            csv_table_name = f"{person_slug}_baza-odpowiedzi.csv"
+            xlsx_table_name = f"{person_slug}_baza-odpowiedzi.xlsx"
+            with export_col_csv:
+                st.download_button(
+                    "Pobierz tabelę odpowiedzi (CSV)",
+                    final_df.to_csv(index=False),
+                    csv_table_name,
+                )
+            with export_col_xlsx:
+                buffer = io.BytesIO()
+                final_df.to_excel(buffer, index=False)
+                st.download_button(
+                    label="Pobierz tabelę odpowiedzi (XLSX)",
+                    data=buffer.getvalue(),
+                    file_name=xlsx_table_name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
     else:
         st.info("Brak danych – nie ma żadnych odpowiedzi w tym badaniu.")
 
