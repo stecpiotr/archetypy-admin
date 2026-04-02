@@ -5841,10 +5841,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    radar_plot_size = 360 if is_mobile else 550
-    radar_tick_size = 11 if is_mobile else 17
-    radar_hover_size = 13 if is_mobile else 17
-    radar_margins = dict(l=34, r=34, t=26, b=42) if is_mobile else dict(l=0, r=0, t=32, b=32)
+    radar_plot_size = 330 if is_mobile else 550
+    radar_tick_size = 10 if is_mobile else 17
+    radar_hover_size = 12 if is_mobile else 17
+    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=0, r=0, t=32, b=32)
     wheel_img_width = 360 if is_mobile else 640
     axes_img_width = 360 if is_mobile else 650
     segment_profile_width = 360 if is_mobile else 713
@@ -5863,6 +5863,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             min-width:0 !important;
             flex:1 1 100% !important;
           }
+          html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
+            overflow-x:hidden !important;
+            max-width:100% !important;
+          }
           .block-container [data-testid="stImage"]{
             width:100% !important;
             overflow:visible !important;
@@ -5874,7 +5878,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
           .block-container [data-testid="stImage"] img{
             display:block !important;
             width:auto !important;
-            max-width:96vw !important;
+            max-width:100% !important;
             height:auto !important;
             margin-left:auto !important;
             margin-right:auto !important;
@@ -5896,16 +5900,19 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             margin-left:0 !important;
             margin-right:0 !important;
           }
-          .ap-table{
-            min-width:760px !important;
-            width:760px !important;
-            table-layout:fixed !important;
-            background:#ffffff !important;
-          }
           .ap-table-wrap{
             width:100% !important;
+            max-width:100% !important;
+            display:block !important;
             overflow-x:auto !important;
+            overflow-y:hidden !important;
             -webkit-overflow-scrolling:touch !important;
+          }
+          .ap-table{
+            min-width:820px !important;
+            width:max-content !important;
+            table-layout:auto !important;
+            background:#ffffff !important;
           }
           .ap-table,
           .ap-table thead th,
@@ -5914,7 +5921,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             background:#ffffff !important;
           }
           .ap-table th, .ap-table td{
-            font-size:12.4px !important;
+            font-size:12.2px !important;
             padding:9px 7px !important;
             white-space:nowrap !important;
             word-break:normal !important;
@@ -6558,17 +6565,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 # 👇 większa czcionka w dymkach hover
                 fig.update_layout(hoverlabel=dict(font=dict(size=radar_hover_size)))
 
-                # węższe boczne „bufory” + środkowa kolumna z wykresem → centrowanie
-                padL, mid, padR = st.columns([0.05, 0.90, 0.05], gap="small")
-                with mid:
+                radar_config = {
+                    "displaylogo": False,
+                    "displayModeBar": (not is_mobile),
+                    "responsive": True,
+                }
+
+                if is_mobile:
                     st.markdown(
                         ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
                         fig,
-                        use_container_width=(not is_mobile),
-                        config={"displaylogo": False},
+                        use_container_width=True,
+                        config=radar_config,
                         key=f"radar-{study_id}",
                     )
                     st.markdown("""
@@ -6587,6 +6598,36 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       </span>
                     </div>
                     """, unsafe_allow_html=True)
+                else:
+                    # desktop: węższe boczne „bufory” + środkowa kolumna z wykresem
+                    padL, mid, padR = st.columns([0.05, 0.90, 0.05], gap="small")
+                    with mid:
+                        st.markdown(
+                            ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
+                            unsafe_allow_html=True,
+                        )
+                        st.plotly_chart(
+                            fig,
+                            use_container_width=True,
+                            config=radar_config,
+                            key=f"radar-{study_id}",
+                        )
+                        st.markdown("""
+                        <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+                          <span style="display:flex;align-items:center;margin-right:34px;">
+                            <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                            <span style="font-size:0.85em;">Archetyp główny</span>
+                          </span>
+                          <span style="display:flex;align-items:center;margin-right:34px;">
+                            <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                            <span style="font-size:0.85em;">Archetyp wspierający</span>
+                          </span>
+                          <span style="display:flex;align-items:center;">
+                            <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                            <span style="font-size:0.85em;">Archetyp poboczny</span>
+                          </span>
+                        </div>
+                        """, unsafe_allow_html=True)
 
 
             # --- Heurystyczna analiza koloru (bąbelki OUT; słupki po LEWEJ; prawa pusta) ---
@@ -6616,14 +6657,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             # prawa kolumna — wykres archetypów
             with right_col:
-                p_l, p_c, p_r = st.columns([0.10, 0.84, 0.06], gap="small")
-                with p_c:
+                if is_mobile:
                     st.markdown(
                         ap_section_heading(
                             "Koło archetypów (pragnienia i wartości)",
                             center=True,
                             margin_bottom_px=8,
-                            shift_x_px=-32,
+                            shift_x_px=0,
                         ),
                         unsafe_allow_html=True,
                     )
@@ -6642,8 +6682,37 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         st.image(
                             kola_img,
                             caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
-                            width=wheel_img_width
+                            use_column_width=True,
                         )
+                else:
+                    p_l, p_c, p_r = st.columns([0.10, 0.84, 0.06], gap="small")
+                    with p_c:
+                        st.markdown(
+                            ap_section_heading(
+                                "Koło archetypów (pragnienia i wartości)",
+                                center=True,
+                                margin_bottom_px=8,
+                                shift_x_px=-32,
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        if main_avg is not None:
+                            idx_main_wheel = archetype_name_to_img_idx(main_avg)
+                            idx_aux_wheel = archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None
+                            idx_supp_wheel = (
+                                archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None
+                            )
+                            try:
+                                kola_img = compose_archetype_highlight(idx_main_wheel, idx_aux_wheel, idx_supp_wheel)
+                                if not isinstance(kola_img, Image.Image):
+                                    raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
+                            except Exception:
+                                kola_img = load_base_arche_img()
+                            st.image(
+                                kola_img,
+                                caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
+                                width=wheel_img_width
+                            )
 
             # tylko dominujący kolor
             dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
@@ -6666,21 +6735,36 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
 
             with col3:
-                k_pad_l, k_mid, k_pad_r = st.columns([0.09, 0.88, 0.03], gap="small")
-                with k_mid:
+                if is_mobile:
                     st.markdown(
                         ap_section_heading(
                             "Rozkład archetypów na osiach potrzeb",
                             center=True,
                             margin_bottom_px=8,
-                            shift_x_px=-10,
+                            shift_x_px=0,
                         ),
                         unsafe_allow_html=True,
                     )
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
                     kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
-                    st.image(kolo_axes_img, width=axes_img_width)
+                    st.image(kolo_axes_img, use_column_width=True)
+                else:
+                    k_pad_l, k_mid, k_pad_r = st.columns([0.09, 0.88, 0.03], gap="small")
+                    with k_mid:
+                        st.markdown(
+                            ap_section_heading(
+                                "Rozkład archetypów na osiach potrzeb",
+                                center=True,
+                                margin_bottom_px=8,
+                                shift_x_px=-10,
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        aux = aux_avg if aux_avg != main_avg else None
+                        supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
+                        kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
+                        st.image(kolo_axes_img, width=axes_img_width)
 
             segment_profile_png_path = make_segment_profile_wheel_png(
                 mean_scores=means_pct,
@@ -6696,7 +6780,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 ),
                 unsafe_allow_html=True,
             )
-            st.image(segment_profile_png_path, width=segment_profile_width)
+            if is_mobile:
+                st.image(segment_profile_png_path, use_column_width=True)
+            else:
+                st.image(segment_profile_png_path, width=segment_profile_width)
             st.markdown(
                 """
                 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
