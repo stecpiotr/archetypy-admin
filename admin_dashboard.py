@@ -5819,6 +5819,68 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         f"<style>.block-container{{max-width:{'98vw' if wide else '1160px'} !important;}}</style>",
         unsafe_allow_html=True,
     )
+    # Mobile-only: poprawa responsywności wykresów/obrazów i czytelności tabeli
+    st.markdown(
+        """
+        <style>
+        @media (max-width: 900px){
+          .block-container [data-testid="stHorizontalBlock"]{
+            flex-direction:column !important;
+            align-items:stretch !important;
+            gap:.65rem !important;
+          }
+          .block-container [data-testid="column"]{
+            width:100% !important;
+            min-width:0 !important;
+            flex:1 1 100% !important;
+          }
+          .block-container [data-testid="stImage"]{
+            width:100% !important;
+          }
+          .block-container [data-testid="stImage"] img{
+            display:block !important;
+            width:100% !important;
+            max-width:min(92vw, 560px) !important;
+            height:auto !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+            object-fit:contain !important;
+          }
+          .block-container .js-plotly-plot,
+          .block-container .plotly,
+          .block-container .main-svg{
+            width:100% !important;
+            max-width:100% !important;
+          }
+          .block-container .ap-card-wrap{
+            width:100% !important;
+            max-width:100% !important;
+            margin-left:0 !important;
+            margin-right:0 !important;
+          }
+          .ap-table{
+            display:block !important;
+            width:100% !important;
+            overflow-x:auto !important;
+            white-space:nowrap !important;
+            -webkit-overflow-scrolling:touch !important;
+            background:#ffffff !important;
+          }
+          .ap-table,
+          .ap-table thead th,
+          .ap-table tbody td{
+            color:#0f172a !important;
+            background:#ffffff !important;
+          }
+          .ap-table th, .ap-table td{
+            font-size:12.4px !important;
+            padding:9px 7px !important;
+          }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # --- NOWE: płeć + mapowanie nazw do żeńskich ---
     gender_raw = (study.get("gender") or study.get("sex") or study.get("plec") or "").strip().lower()

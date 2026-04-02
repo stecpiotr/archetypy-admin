@@ -1159,6 +1159,27 @@ def _render_public_gate(token: str) -> bool:
           line-height:1.45;
           font-size:0.98rem;
         }
+        /* mobile-only: poprawa czytelności formularza odblokowania na iPhone */
+        @media (max-width: 900px){
+          div[data-testid="stForm"]{
+            background: transparent !important;
+          }
+          div[data-testid="stForm"] [data-baseweb="input"]{
+            background:#ffffff !important;
+            border:1px solid #cbd5e1 !important;
+          }
+          div[data-testid="stForm"] input{
+            background:#ffffff !important;
+            color:#0f172a !important;
+            -webkit-text-fill-color:#0f172a !important;
+            caret-color:#0f172a !important;
+            font-size:16px !important; /* zapobiega dziwnemu zoomowi iOS */
+          }
+          div[data-testid="stForm"] input::placeholder{
+            color:#64748b !important;
+            opacity:1 !important;
+          }
+        }
         div[data-testid="stForm"] button[kind="primaryFormSubmit"]{
           background:#ff4d5b !important;
           color:#ffffff !important;
@@ -1174,7 +1195,7 @@ def _render_public_gate(token: str) -> bool:
         unsafe_allow_html=True,
     )
 
-    lock_l, lock_c, lock_r = st.columns([0.31, 0.38, 0.31], gap="small")
+    lock_l, lock_c, lock_r = st.columns([0.08, 0.84, 0.08], gap="small")
     with lock_c:
         st.markdown("<div style='height:10vh;'></div>", unsafe_allow_html=True)
         with st.container(border=True):
