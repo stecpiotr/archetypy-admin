@@ -110,10 +110,7 @@ def render_build_badge() -> None:
         }}
         @media (max-width: 900px) {{
           #ap-build-signature {{
-            right: 8px;
-            bottom: 8px;
-            font-size: 11px;
-            padding: 4px 8px;
+            display: none !important;
           }}
         }}
         </style>

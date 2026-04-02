@@ -112,6 +112,27 @@ def _build_sha():
 st.sidebar.caption(f"Build: {_build_sha()}")
 
 
+def _is_probably_mobile_client() -> bool:
+    """Lekka heurystyka mobile po User-Agent (bez wpływu na desktop)."""
+    try:
+        ctx = getattr(st, "context", None)
+        headers = getattr(ctx, "headers", {}) if ctx else {}
+        ua = str(headers.get("user-agent") or headers.get("User-Agent") or "").lower()
+        if not ua:
+            return False
+        mobile_tokens = (
+            "mobile",
+            "android",
+            "iphone",
+            "ipod",
+            "ipad",
+            "miui",
+        )
+        return any(tok in ua for tok in mobile_tokens)
+    except Exception:
+        return False
+
+
 def _logo_norm_key(value: str) -> str:
     if value is None:
         return ""
@@ -5819,6 +5840,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         f"<style>.block-container{{max-width:{'98vw' if wide else '1160px'} !important;}}</style>",
         unsafe_allow_html=True,
     )
+    is_mobile = _is_probably_mobile_client()
+    radar_plot_size = 360 if is_mobile else 550
+    radar_tick_size = 11 if is_mobile else 17
+    radar_hover_size = 13 if is_mobile else 17
+    radar_margins = dict(l=34, r=34, t=26, b=42) if is_mobile else dict(l=0, r=0, t=32, b=32)
+    wheel_img_width = 360 if is_mobile else 640
+    axes_img_width = 360 if is_mobile else 650
+    segment_profile_width = 360 if is_mobile else 713
     # Mobile-only: poprawa responsywności wykresów/obrazów i czytelności tabeli
     st.markdown(
         """
@@ -5836,11 +5865,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
           }
           .block-container [data-testid="stImage"]{
             width:100% !important;
+            overflow:visible !important;
+          }
+          .block-container [data-testid="stImage"] > div{
+            width:100% !important;
+            max-width:100% !important;
           }
           .block-container [data-testid="stImage"] img{
             display:block !important;
-            width:100% !important;
-            max-width:min(92vw, 560px) !important;
+            width:auto !important;
+            max-width:96vw !important;
             height:auto !important;
             margin-left:auto !important;
             margin-right:auto !important;
@@ -5852,6 +5886,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             width:100% !important;
             max-width:100% !important;
           }
+          .block-container .plotly-graph-div{
+            margin-left:auto !important;
+            margin-right:auto !important;
+          }
           .block-container .ap-card-wrap{
             width:100% !important;
             max-width:100% !important;
@@ -5859,12 +5897,15 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             margin-right:0 !important;
           }
           .ap-table{
-            display:block !important;
+            min-width:760px !important;
+            width:760px !important;
+            table-layout:fixed !important;
+            background:#ffffff !important;
+          }
+          .ap-table-wrap{
             width:100% !important;
             overflow-x:auto !important;
-            white-space:nowrap !important;
             -webkit-overflow-scrolling:touch !important;
-            background:#ffffff !important;
           }
           .ap-table,
           .ap-table thead th,
@@ -5875,6 +5916,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
           .ap-table th, .ap-table td{
             font-size:12.4px !important;
             padding:9px 7px !important;
+            white-space:nowrap !important;
+            word-break:normal !important;
           }
         }
         </style>
@@ -6253,6 +6296,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 # --- NOWY FRAGMENT DO WSTAWIENIA ---
                 _html_block = f"""
                 <style>
+                  .ap-table-wrap {{
+                    width: 100%;
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                  }}
                   .ap-table {{
                     table-layout: fixed; width: 100%; border-collapse: collapse;
                     font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
@@ -6388,8 +6436,22 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       transform: translateY(2px);
                     }}
 
+                    @media (max-width: 900px){{
+                      .ap-table {{
+                        min-width: 760px !important;
+                        width: 760px !important;
+                        table-layout: fixed !important;
+                      }}
+                      .ap-table th, .ap-table td {{
+                        padding: 9px 7px !important;
+                        font-size: 12.4px !important;
+                        white-space: nowrap !important;
+                        word-break: normal !important;
+                      }}
+                    }}
+
                 </style>
-                """ + html_table + intensity_help_modal_html()
+                """ + f"<div class='ap-table-wrap'>{html_table}</div>" + intensity_help_modal_html()
 
                 # jeśli masz nowe Streamlit: prawdziwy, „wbudowany” HTML bez iframa
                 if hasattr(st, "html"):
@@ -6480,7 +6542,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         bgcolor="rgba(0,0,0,0)",
                         radialaxis=dict(visible=True, range=[0, 20]),
                         angularaxis=dict(
-                            tickfont=dict(size=17),
+                            tickfont=dict(size=radar_tick_size),
                             tickvals=archetype_names,
                             ticktext=theta_labels,
                             rotation=90,
@@ -6488,13 +6550,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         ),
                     ),
                     autosize=False,
-                    width=550, height=550,
-                    margin=dict(l=0, r=0, t=32, b=32),  # brak bocznych marginesów
+                    width=radar_plot_size, height=radar_plot_size,
+                    margin=radar_margins,
                     showlegend=False,
                 )
 
                 # 👇 większa czcionka w dymkach hover
-                fig.update_layout(hoverlabel=dict(font=dict(size=17)))
+                fig.update_layout(hoverlabel=dict(font=dict(size=radar_hover_size)))
 
                 # węższe boczne „bufory” + środkowa kolumna z wykresem → centrowanie
                 padL, mid, padR = st.columns([0.05, 0.90, 0.05], gap="small")
@@ -6505,7 +6567,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     )
                     st.plotly_chart(
                         fig,
-                        use_container_width=True, #width="content",
+                        use_container_width=(not is_mobile),
                         config={"displaylogo": False},
                         key=f"radar-{study_id}",
                     )
@@ -6580,7 +6642,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         st.image(
                             kola_img,
                             caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
-                            width=640
+                            width=wheel_img_width
                         )
 
             # tylko dominujący kolor
@@ -6618,7 +6680,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
                     kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
-                    st.image(kolo_axes_img, width=650)
+                    st.image(kolo_axes_img, width=axes_img_width)
 
             segment_profile_png_path = make_segment_profile_wheel_png(
                 mean_scores=means_pct,
@@ -6634,7 +6696,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 ),
                 unsafe_allow_html=True,
             )
-            st.image(segment_profile_png_path, width=713)
+            st.image(segment_profile_png_path, width=segment_profile_width)
             st.markdown(
                 """
                 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
