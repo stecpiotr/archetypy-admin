@@ -304,12 +304,12 @@ st.markdown(
   padding:18px 14px !important;
 }
 .tiles.tiles-root .stButton>button{
-  min-height:88px !important;
-  height:88px !important;
+  min-height:156px !important;
+  height:156px !important;
   font-size:1.02rem !important;
   line-height:1.25 !important;
   border-radius:14px !important;
-  padding:10px 12px !important;
+  padding:18px 14px !important;
 }
 .top-back-wrap{ margin:0 0 8px 0; }
 .top-back-wrap .stButton>button{
@@ -1750,6 +1750,18 @@ def _estimate_report_iframe_height(html_text: str, wide_mode: bool) -> int:
 def _prepare_report_html_for_iframe(html_text: str) -> str:
     if not html_text:
         return ""
+    iframe_fix_css = """
+<style>
+html, body {
+  overflow: visible !important;
+  height: auto !important;
+}
+</style>
+"""
+    if re.search(r"</head\s*>", html_text, flags=re.IGNORECASE):
+        html_text = re.sub(r"</head\s*>", iframe_fix_css + "</head>", html_text, flags=re.IGNORECASE, count=1)
+    else:
+        html_text = iframe_fix_css + html_text
     autosize_js = """
 <script>
 (function(){
@@ -1796,12 +1808,12 @@ def jst_analysis_view() -> None:
     wide_jst = st.toggle("🔎 Szeroki raport", key="wide_jst_report")
     if wide_jst:
         st.markdown(
-            "<style>.block-container{max-width:94vw !important; padding-left:0 !important; padding-right:0 !important;}</style>",
+            "<style>.block-container{max-width:100vw !important; padding-left:3vw !important; padding-right:3vw !important;}</style>",
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            "<style>.block-container{max-width:1160px !important;}</style>",
+            "<style>.block-container{max-width:1160px !important; padding-left:1rem !important; padding-right:1rem !important;}</style>",
             unsafe_allow_html=True,
         )
 
@@ -1809,17 +1821,13 @@ def jst_analysis_view() -> None:
     if not studies:
         st.info("Brak badań JST w bazie.")
         return
-    options = {_jst_option_label(s): s for s in studies}
+    options: Dict[str, Optional[Dict[str, Any]]] = {"-": None}
+    options.update({_jst_option_label(s): s for s in studies})
     chosen = st.selectbox("Wybierz badanie", list(options.keys()))
-    study = options[chosen]
-    sid = str(study.get("id") or "")
+    study = options.get(chosen)
+    has_study = isinstance(study, dict)
 
-    rows = list_jst_responses(sb, sid)
-    if not rows:
-        st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
-        return
-
-    out_df = jst_response_rows_to_dataframe(rows)
+    sid = str((study or {}).get("id") or "")
     template_root = Path(__file__).resolve().parent / "JST_Archetypy_Analiza"
     run_base = template_root / "_runs"
     cache_key = f"jst_report_html_{sid}"
@@ -1827,17 +1835,36 @@ def jst_analysis_view() -> None:
 
     c1, c2 = st.columns([0.35, 0.65], gap="small")
     with c1:
-        generate_now = st.button("Generuj raport", type="primary", use_container_width=True)
+        generate_now = st.button(
+            "Generuj raport",
+            type="primary",
+            use_container_width=True,
+            disabled=not has_study,
+        )
     with c2:
-        regenerate_now = st.button("Przelicz od nowa", type="secondary", use_container_width=True)
+        regenerate_now = st.button(
+            "Przelicz od nowa",
+            type="secondary",
+            use_container_width=True,
+            disabled=not has_study,
+        )
 
-    if generate_now or regenerate_now or cache_key not in st.session_state:
+    if not has_study:
+        st.info("Wybierz badanie z listy i kliknij „Generuj raport”.")
+        return
+
+    if generate_now or regenerate_now:
+        rows = list_jst_responses(sb, sid)
+        if not rows:
+            st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
+            return
+        out_df = jst_response_rows_to_dataframe(rows)
         with st.spinner("Generujemy raport dla tego badania. Prosimy o chwilę cierpliwości."):
             try:
                 report_path = generate_jst_report(
                     template_root=template_root,
                     run_base_dir=run_base,
-                    study=study,
+                    study=study or {},
                     data_df=out_df[JST_CANONICAL_COLUMNS].copy(),
                     force=bool(regenerate_now),
                 )
@@ -1860,11 +1887,19 @@ def jst_analysis_view() -> None:
 
     rendered = st.session_state.get(cache_key)
     meta = st.session_state.get(cache_meta_key) or {}
+    if not rendered:
+        rows = list_jst_responses(sb, sid)
+        if not rows:
+            st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
+        else:
+            st.caption("Kliknij „Generuj raport”, aby wyświetlić raport.")
+        return
+
     report_path_str = str(meta.get("report_path") or "")
     report_path = Path(report_path_str) if report_path_str else None
 
     if report_path and report_path.exists():
-        report_slug = slugify(str(study.get("jst_full_nom") or study.get("slug") or "raport-jst")) or "raport-jst"
+        report_slug = slugify(str((study or {}).get("jst_full_nom") or (study or {}).get("slug") or "raport-jst")) or "raport-jst"
         st.download_button(
             "📥 Pobierz raport HTML",
             data=report_path.read_text(encoding="utf-8", errors="ignore"),
@@ -2131,15 +2166,92 @@ def matching_view() -> None:
         st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
         cards = result.get("demo_cards") or []
         if cards:
-            cols = st.columns(len(cards))
-            for i, c in enumerate(cards):
-                with cols[i]:
-                    st.metric(c["label"], c["top"], c["pct"])
+            cards_html = "".join(
+                f"""
+                <div class="match-card">
+                  <div class="match-card-label">{html.escape(str(c.get("label") or ""))}</div>
+                  <div class="match-card-main">{html.escape(str(c.get("top") or ""))}</div>
+                  <div class="match-card-pct">↑ {html.escape(str(c.get("pct") or ""))}</div>
+                </div>
+                """
+                for c in cards
+            )
+            st.markdown(
+                f"""
+                <style>
+                  .match-cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:8px 0 14px;}}
+                  .match-card{{border:1px solid #dfe6ee;border-radius:10px;padding:10px 12px;background:#fff;}}
+                  .match-card-label{{font-size:12px;color:#5f6f80;font-weight:700;letter-spacing:.02em;text-transform:uppercase;}}
+                  .match-card-main{{font-size:18px;font-weight:700;color:#13263a;line-height:1.25;margin-top:2px;}}
+                  .match-card-pct{{font-size:18px;font-weight:700;color:#16a34a;margin-top:2px;}}
+                  .match-demo-wrap{{overflow:auto;border:1px solid #e1e8f0;border-radius:10px;background:#fff;}}
+                  .match-demo-table{{width:100%;border-collapse:separate;border-spacing:0;min-width:840px;}}
+                  .match-demo-table th,.match-demo-table td{{padding:8px 10px;border-bottom:1px solid #eef2f6;text-align:left;vertical-align:middle;}}
+                  .match-demo-table th{{background:#f7f9fc;color:#1f2f44;font-weight:700;position:sticky;top:0;z-index:1;}}
+                  .match-demo-table tr:last-child td{{border-bottom:none;}}
+                  .match-demo-bar-cell{{position:relative;min-width:220px;}}
+                  .match-demo-bar-bg{{height:14px;background:#edf2f7;border-radius:999px;overflow:hidden;}}
+                  .match-demo-bar-fill{{height:100%;background:#81c5df;}}
+                  .match-demo-pct{{margin-left:8px;font-weight:700;color:#1f2f44;white-space:nowrap;}}
+                  .match-demo-diff-pos{{color:#0f9d58;font-weight:700;}}
+                  .match-demo-diff-neg{{color:#d64545;font-weight:700;}}
+                </style>
+                <div class="match-cards">{cards_html}</div>
+                """,
+                unsafe_allow_html=True,
+            )
         ddf = pd.DataFrame(result.get("demo_rows") or [])
         if ddf.empty:
             st.caption("Brak danych demograficznych.")
         else:
-            st.dataframe(ddf, use_container_width=True, hide_index=True, height=620)
+            ddf = ddf.copy()
+            ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0)
+            ddf["% ogół mieszkańców"] = pd.to_numeric(ddf["% ogół mieszkańców"], errors="coerce").fillna(0.0)
+            ddf["Różnica pp"] = pd.to_numeric(ddf["Różnica pp"], errors="coerce").fillna(0.0)
+
+            body_rows: List[str] = []
+            for _, row in ddf.iterrows():
+                pct_seg = float(row["% grupa dopasowana"])
+                pct_all = float(row["% ogół mieszkańców"])
+                diff = float(row["Różnica pp"])
+                diff_cls = "match-demo-diff-pos" if diff >= 0 else "match-demo-diff-neg"
+                body_rows.append(
+                    f"""
+                    <tr>
+                      <td>{html.escape(str(row['Zmienna']))}</td>
+                      <td>{html.escape(str(row['Kategoria']))}</td>
+                      <td class="match-demo-bar-cell">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                          <div class="match-demo-bar-bg"><div class="match-demo-bar-fill" style="width:{max(0.0, min(100.0, pct_seg)):.1f}%;"></div></div>
+                          <span class="match-demo-pct">{pct_seg:.1f}%</span>
+                        </div>
+                      </td>
+                      <td>{pct_all:.1f}%</td>
+                      <td class="{diff_cls}">{diff:+.1f} pp</td>
+                    </tr>
+                    """
+                )
+            st.markdown(
+                f"""
+                <div class="match-demo-wrap">
+                  <table class="match-demo-table">
+                    <thead>
+                      <tr>
+                        <th>Zmienna</th>
+                        <th>Kategoria</th>
+                        <th>% grupa dopasowana</th>
+                        <th>% ogół mieszkańców</th>
+                        <th>Różnica pp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {''.join(body_rows)}
+                    </tbody>
+                  </table>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     with tab_strategy:
         st.markdown("**Rekomendacje komunikacyjne (automatyczne):**")
@@ -2377,7 +2489,13 @@ def jst_stats_panel(studies: List[Dict[str, Any]], rows: List[Dict[str, Any]], t
                 df = pd.DataFrame(rows, columns=["JST", "Link", "Data utworzenia", "Liczba odpowiedzi"])
                 sort_idx = pd.to_datetime(df["Data utworzenia"], errors="coerce", format="%Y-%m-%d %H:%M")
                 df = df.assign(_sort=sort_idx).sort_values("_sort", ascending=False).drop(columns="_sort")
-                st.table(df.reset_index(drop=True))
+                rows_count = len(df)
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=max(rows_count * 36 + 38, 140),
+                )
             else:
                 st.caption("Brak badań JST.")
 

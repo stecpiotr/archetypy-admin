@@ -167,28 +167,71 @@ def _targets_from_study(study: Dict[str, Any], present: Set[Tuple[int, int]]) ->
     if not raw:
         return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
 
+    def _to_float(value: Any) -> float:
+        txt = str(value or "").strip().replace(",", ".")
+        try:
+            return float(txt)
+        except Exception:
+            return 0.0
+
+    def _parse_key_pair(key: Any) -> Tuple[int, int]:
+        raw_key = str(key or "").strip()
+        if not raw_key:
+            return 0, 0
+        m = re.match(r"^\s*([12])\s*[_:x|;/\-]\s*([123])\s*$", raw_key)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+
+        nk = _norm_text(raw_key)
+        nk_sep = re.sub(r"[^a-z0-9]+", " ", nk).strip()
+        g = 0
+        a = 0
+        if "kobieta" in nk_sep or nk_sep in {"k", "female"}:
+            g = 1
+        elif "mezczyzna" in nk_sep or nk_sep in {"m", "male"}:
+            g = 2
+        else:
+            m_num = re.match(r"^\s*([12])\s+", nk_sep)
+            if m_num:
+                g = int(m_num.group(1))
+
+        if re.search(r"\b15\b.*\b39\b", nk_sep):
+            a = 1
+        elif re.search(r"\b40\b.*\b59\b", nk_sep):
+            a = 2
+        elif re.search(r"\b60\b", nk_sep):
+            a = 3
+        else:
+            m_num = re.search(r"\b([123])\b", nk_sep)
+            if m_num:
+                a = int(m_num.group(1))
+
+        return g, a
+
     rows: List[Tuple[int, int, float]] = []
     if isinstance(raw, dict):
         for k, v in raw.items():
-            m = re.match(r"^\s*([12])[_:x\-]([123])\s*$", str(k or ""))
-            if not m:
+            if isinstance(v, dict):
+                g = _to_gender_code(v.get("plec") or v.get("gender") or v.get("M_PLEC"))
+                a = _to_age_code(v.get("wiek") or v.get("age") or v.get("M_WIEK"))
+                s = _to_float(v.get("udzial_docelowy") or v.get("udzial") or v.get("share"))
+                rows.append((g, a, s))
                 continue
-            try:
-                rows.append((int(m.group(1)), int(m.group(2)), float(v)))
-            except Exception:
-                continue
+            g, a = _parse_key_pair(k)
+            s = _to_float(v)
+            rows.append((g, a, s))
     elif isinstance(raw, list):
         for item in raw:
             if not isinstance(item, dict):
                 continue
             g = _to_gender_code(item.get("plec") or item.get("gender") or item.get("M_PLEC"))
             a = _to_age_code(item.get("wiek") or item.get("age") or item.get("M_WIEK"))
-            try:
-                s = float(item.get("udzial_docelowy") or item.get("udzial") or item.get("share") or 0.0)
-            except Exception:
-                s = 0.0
+            s = _to_float(item.get("udzial_docelowy") or item.get("udzial") or item.get("share"))
             rows.append((g, a, s))
-    return _normalize_targets_rows(rows, present)
+    # Dla ręcznie zadanych targetów NIE wycinamy brakujących komórek.
+    # Dzięki temu narzędzie analityczne może precyzyjnie zastosować macierz
+    # lub zwrócić czytelny błąd, zamiast "cicho" renormalizować proporcje.
+    return _normalize_targets_rows(rows, present=set())
 
 
 def _targets_from_template(run_root: Path, present: Set[Tuple[int, int]]) -> pd.DataFrame:
@@ -224,7 +267,8 @@ def _targets_from_template(run_root: Path, present: Set[Tuple[int, int]]) -> pd.
         except Exception:
             s = 0.0
         rows.append((g, a, s))
-    return _normalize_targets_rows(rows, present)
+    # Dla pliku targetów z szablonu zachowujemy pełną macierz komórek.
+    return _normalize_targets_rows(rows, present=set())
 
 
 def _targets_from_sample(data_df: pd.DataFrame, present: Set[Tuple[int, int]]) -> pd.DataFrame:
@@ -320,43 +364,135 @@ def generate_jst_report(
     return out_report
 
 
-_ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"}
+_ASSET_EXT = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".ico",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".otf",
+    ".eot",
+}
 _SRC_HREF_RE = re.compile(r'(?P<attr>src|href)=["\'](?P<path>[^"\']+)["\']', re.IGNORECASE)
+_LINK_STYLESHEET_RE = re.compile(
+    r'<link(?P<attrs>[^>]*?)href=["\'](?P<href>[^"\']+)["\'](?P<tail>[^>]*)>',
+    re.IGNORECASE,
+)
+_SCRIPT_SRC_RE = re.compile(
+    r'<script(?P<attrs>[^>]*?)src=["\'](?P<src>[^"\']+)["\'](?P<tail>[^>]*)>\s*</script>',
+    re.IGNORECASE | re.DOTALL,
+)
+_CSS_URL_RE = re.compile(r"url\((?P<q>['\"]?)(?P<path>[^)\"']+)(?P=q)\)", re.IGNORECASE)
+
+
+def _is_external_ref(ref: str) -> bool:
+    low = (ref or "").strip().lower()
+    return (
+        not low
+        or low.startswith(("http://", "https://", "data:", "javascript:", "#", "mailto:"))
+        or "://" in low
+    )
+
+
+def _resolve_local_ref(ref: str, root: Path, base_dir: Optional[Path] = None) -> Optional[Path]:
+    ref_clean = (ref or "").strip()
+    if _is_external_ref(ref_clean):
+        return None
+    ref_clean = ref_clean.split("#", 1)[0].split("?", 1)[0].strip()
+    if not ref_clean:
+        return None
+    candidate_base = (base_dir or root)
+    candidate = (candidate_base / ref_clean).resolve()
+    if not str(candidate).startswith(str(root)):
+        return None
+    if not candidate.exists() or not candidate.is_file():
+        return None
+    return candidate
+
+
+def _to_data_uri(path: Path) -> Optional[str]:
+    mime, _ = mimetypes.guess_type(path.name)
+    if not mime:
+        mime = "application/octet-stream"
+    try:
+        blob = path.read_bytes()
+        b64 = base64.b64encode(blob).decode("ascii")
+        return f"data:{mime};base64,{b64}"
+    except Exception:
+        return None
+
+
+def _inline_css_urls(css_text: str, css_file: Path, root: Path) -> str:
+    def _replace_url(match: re.Match) -> str:
+        ref = (match.group("path") or "").strip()
+        if _is_external_ref(ref):
+            return match.group(0)
+        asset = _resolve_local_ref(ref, root=root, base_dir=css_file.parent)
+        if asset is None:
+            return match.group(0)
+        data_uri = _to_data_uri(asset)
+        if not data_uri:
+            return match.group(0)
+        return f"url('{data_uri}')"
+
+    return _CSS_URL_RE.sub(_replace_url, css_text or "")
 
 
 def inline_local_assets(html_text: str, base_dir: Path) -> str:
     root = base_dir.resolve()
 
+    def _replace_stylesheet(match: re.Match) -> str:
+        attrs = f"{match.group('attrs') or ''} {match.group('tail') or ''}".lower()
+        href = match.group("href") or ""
+        if "stylesheet" not in attrs:
+            return match.group(0)
+        css_path = _resolve_local_ref(href, root=root, base_dir=root)
+        if css_path is None or css_path.suffix.lower() != ".css":
+            return match.group(0)
+        try:
+            css_text = css_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return match.group(0)
+        css_text = _inline_css_urls(css_text, css_path, root=root)
+        return f"<style>\n{css_text}\n</style>"
+
+    def _replace_script(match: re.Match) -> str:
+        src = match.group("src") or ""
+        js_path = _resolve_local_ref(src, root=root, base_dir=root)
+        if js_path is None or js_path.suffix.lower() != ".js":
+            return match.group(0)
+        try:
+            js_text = js_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return match.group(0)
+        return f"<script>\n{js_text}\n</script>"
+
+    html_text = _LINK_STYLESHEET_RE.sub(_replace_stylesheet, html_text or "")
+    html_text = _SCRIPT_SRC_RE.sub(_replace_script, html_text or "")
+
     def _replace(match: re.Match) -> str:
         attr = match.group("attr")
         ref = match.group("path")
         ref_clean = (ref or "").strip()
-        low = ref_clean.lower()
-        if (
-            not ref_clean
-            or low.startswith(("http://", "https://", "data:", "javascript:", "#", "mailto:"))
-            or "://" in ref_clean
-        ):
+        if _is_external_ref(ref_clean):
             return match.group(0)
 
-        candidate = (root / ref_clean).resolve()
-        if not str(candidate).startswith(str(root)):
-            return match.group(0)
-        if not candidate.exists() or not candidate.is_file():
+        candidate = _resolve_local_ref(ref_clean, root=root, base_dir=root)
+        if candidate is None:
             return match.group(0)
 
         ext = candidate.suffix.lower()
         if ext not in _ASSET_EXT:
             return match.group(0)
 
-        mime, _ = mimetypes.guess_type(candidate.name)
-        if not mime:
-            mime = "application/octet-stream"
-        try:
-            blob = candidate.read_bytes()
-            b64 = base64.b64encode(blob).decode("ascii")
-            return f'{attr}="data:{mime};base64,{b64}"'
-        except Exception:
+        data_uri = _to_data_uri(candidate)
+        if not data_uri:
             return match.group(0)
+        return f'{attr}="{data_uri}"'
 
     return _SRC_HREF_RE.sub(_replace, html_text or "")

@@ -14,7 +14,25 @@ from db_jst_utils import fetch_jst_studies
 from smsapi_client import send_sms
 from email_client import send_email
 from utils import make_token
-from send_link import _df_to_xlsx_bytes, _df_to_pdf_bytes
+from send_link import (
+    _auto_col_widths,
+    _df_to_xlsx_bytes,
+    _df_to_pdf_bytes,
+    _load_mockup_prefs,
+    _mockup_css_bg,
+    _save_mockup_prefs,
+    _strip_pl_diacritics,
+    EMAIL_HEIGHT,
+    EMAIL_LEFT,
+    EMAIL_MOCKUP_PATH,
+    EMAIL_TOP,
+    EMAIL_WIDTH,
+    MOCKUP_HEIGHT,
+    MOCKUP_LEFT,
+    MOCKUP_PATH,
+    MOCKUP_TOP,
+    MOCKUP_WIDTH,
+)
 
 
 _EMAIL_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.I)
@@ -455,10 +473,269 @@ def render(back_btn: Callable[[], None]) -> None:
     with cols[1]:
         body_preview = str(st.session_state.get("jst_send_body") or "")
         if method == "SMS":
-            st.markdown(_fake_phone_mockup(body_preview), unsafe_allow_html=True)
+            msg_preview = _strip_pl_diacritics(body_preview)
+            msg_preview_html = msg_preview.replace("\n", "<br/>")
+            data_url = _mockup_css_bg(MOCKUP_PATH)
+            prefs = _load_mockup_prefs().get("sms", {})
+
+            with st.expander("Dopasuj mockup SMS (ręcznie)", expanded=False):
+                _sms_top = st.number_input(
+                    "Top (px)",
+                    value=int(st.session_state.get("_jst_sms_top", prefs.get("top", MOCKUP_TOP))),
+                    step=1,
+                    key="_jst_sms_top_input",
+                )
+                _sms_left = st.number_input(
+                    "Left (px)",
+                    value=int(st.session_state.get("_jst_sms_left", prefs.get("left", MOCKUP_LEFT))),
+                    step=1,
+                    key="_jst_sms_left_input",
+                )
+                _sms_w = st.number_input(
+                    "Szerokość (px)",
+                    value=int(st.session_state.get("_jst_sms_w", prefs.get("w", MOCKUP_WIDTH))),
+                    step=1,
+                    key="_jst_sms_w_input",
+                )
+                _sms_h = st.number_input(
+                    "Wysokość (px)",
+                    value=int(st.session_state.get("_jst_sms_h", prefs.get("h", MOCKUP_HEIGHT))),
+                    step=1,
+                    key="_jst_sms_h_input",
+                )
+                _sms_pad = st.number_input(
+                    "Padding wewnątrz (px)",
+                    value=int(st.session_state.get("_jst_sms_pad", prefs.get("pad", 50))),
+                    step=1,
+                    key="_jst_sms_pad_input",
+                )
+
+                st.session_state.update(
+                    _jst_sms_top=int(_sms_top),
+                    _jst_sms_left=int(_sms_left),
+                    _jst_sms_w=int(_sms_w),
+                    _jst_sms_h=int(_sms_h),
+                    _jst_sms_pad=int(_sms_pad),
+                )
+
+                c_save, c_restore, _ = st.columns([3, 3, 1])
+                if c_save.button("💾 Zapisz jako domyślne", key="jst_sms_mockup_save", use_container_width=True):
+                    prefs_all = _load_mockup_prefs()
+                    prefs_all.setdefault("sms", {})
+                    prefs_all["sms"] = {
+                        "top": int(st.session_state.get("_jst_sms_top", MOCKUP_TOP)),
+                        "left": int(st.session_state.get("_jst_sms_left", MOCKUP_LEFT)),
+                        "w": int(st.session_state.get("_jst_sms_w", MOCKUP_WIDTH)),
+                        "h": int(st.session_state.get("_jst_sms_h", MOCKUP_HEIGHT)),
+                        "pad": int(st.session_state.get("_jst_sms_pad", 50)),
+                    }
+                    _save_mockup_prefs(prefs_all)
+                    st.success("Zapisano jako domyślne.")
+                if c_restore.button("↩ Przywróć zapisane", key="jst_sms_mockup_restore", use_container_width=True):
+                    p = _load_mockup_prefs().get("sms", {})
+                    if p:
+                        st.session_state["_jst_sms_top"] = int(p.get("top", MOCKUP_TOP))
+                        st.session_state["_jst_sms_left"] = int(p.get("left", MOCKUP_LEFT))
+                        st.session_state["_jst_sms_w"] = int(p.get("w", MOCKUP_WIDTH))
+                        st.session_state["_jst_sms_h"] = int(p.get("h", MOCKUP_HEIGHT))
+                        st.session_state["_jst_sms_pad"] = int(p.get("pad", 50))
+                        st.rerun()
+                    else:
+                        st.info("Brak zapisanych ustawień – najpierw użyj „Zapisz jako domyślne”.")
+
+            if data_url:
+                st.markdown(
+                    f"""
+                    <div class="mock-wrap">
+                      <div class="mock-bg"></div>
+                      <div class="mock-screen v2">{msg_preview_html}</div>
+                    </div>
+                    <style>
+                      .mock-wrap {{
+                        position:relative; width:{int(st.session_state.get("_jst_sms_left", MOCKUP_LEFT)) + int(st.session_state.get("_jst_sms_w", MOCKUP_WIDTH)) + 40}px;
+                        height:{int(st.session_state.get("_jst_sms_top", MOCKUP_TOP)) + int(st.session_state.get("_jst_sms_h", MOCKUP_HEIGHT)) + 80}px;
+                      }}
+                      .mock-bg {{
+                        position:absolute; inset:0;
+                        background-image:url('{data_url}');
+                        background-size:contain; background-repeat:no-repeat; background-position:center top;
+                      }}
+                      .mock-screen.v2 {{
+                        position:absolute;
+                        top:{int(st.session_state.get("_jst_sms_top", MOCKUP_TOP))}px; left:{int(st.session_state.get("_jst_sms_left", MOCKUP_LEFT))}px;
+                        width:{int(st.session_state.get("_jst_sms_w", MOCKUP_WIDTH))}px; height:{int(st.session_state.get("_jst_sms_h", MOCKUP_HEIGHT))}px;
+                        background:transparent; border:none;
+                        padding:{int(st.session_state.get("_jst_sms_pad", 50))}px 25px; overflow:auto;
+                        font:13px/1.4 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111;
+                        white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; word-break:break-word; hyphens:auto; line-break:auto;
+                      }}
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"""<div style="border:1px solid #e5e7eb;border-radius:8px;padding:18px;font:13px/1.5 system-ui;">
+                           {msg_preview_html}
+                        </div>""",
+                    unsafe_allow_html=True,
+                )
         else:
             subj = str(st.session_state.get("jst_send_subject") or "")
-            st.markdown(_fake_email_mockup(subj, body_preview), unsafe_allow_html=True)
+            body_preview_html = body_preview.replace("\n", "<br/>")
+            data_url = _mockup_css_bg(EMAIL_MOCKUP_PATH)
+            prefs = _load_mockup_prefs().get("email", {})
+
+            with st.expander("Dopasuj mockup E-mail (ręcznie)", expanded=False):
+                _e_wrap_w = st.number_input(
+                    "Szerokość mockupu (px)",
+                    value=int(st.session_state.get("_jst_e_wrap_w", prefs.get("wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60))),
+                    step=10,
+                    key="_jst_e_wrap_w_input",
+                )
+                _e_wrap_h = st.number_input(
+                    "Wysokość mockupu (px)",
+                    value=int(st.session_state.get("_jst_e_wrap_h", prefs.get("wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100))),
+                    step=10,
+                    key="_jst_e_wrap_h_input",
+                )
+                _e_top = st.number_input(
+                    "Top (px)",
+                    value=int(st.session_state.get("_jst_e_top", prefs.get("top", EMAIL_TOP))),
+                    step=1,
+                    key="_jst_e_top_input",
+                )
+                _e_left = st.number_input(
+                    "Left (px)",
+                    value=int(st.session_state.get("_jst_e_left", prefs.get("left", EMAIL_LEFT))),
+                    step=1,
+                    key="_jst_e_left_input",
+                )
+                _e_w = st.number_input(
+                    "Szerokość ekranu (px)",
+                    value=int(st.session_state.get("_jst_e_w", prefs.get("w", EMAIL_WIDTH))),
+                    step=1,
+                    key="_jst_e_w_input",
+                )
+                _e_h = st.number_input(
+                    "Wysokość ekranu (px)",
+                    value=int(st.session_state.get("_jst_e_h", prefs.get("h", EMAIL_HEIGHT))),
+                    step=1,
+                    key="_jst_e_h_input",
+                )
+                _e_pad_top = st.number_input(
+                    "Padding góra (px)",
+                    value=int(st.session_state.get("_jst_e_pad_top", prefs.get("pad_top", 18))),
+                    step=1,
+                    key="_jst_e_pad_top_input",
+                )
+                _e_pad = st.number_input(
+                    "Padding wewnątrz (lewy/prawy/dolny) (px)",
+                    value=int(st.session_state.get("_jst_e_pad", prefs.get("pad", 18))),
+                    step=1,
+                    key="_jst_e_pad_input",
+                )
+                _e_subj_mt = st.number_input(
+                    "Offset tytułu (px; może być ujemny)",
+                    value=int(st.session_state.get("_jst_e_subj_mt", prefs.get("subj_mt", 0))),
+                    step=1,
+                    key="_jst_e_subj_mt_input",
+                )
+
+                st.session_state.update(
+                    _jst_e_wrap_w=int(_e_wrap_w),
+                    _jst_e_wrap_h=int(_e_wrap_h),
+                    _jst_e_top=int(_e_top),
+                    _jst_e_left=int(_e_left),
+                    _jst_e_w=int(_e_w),
+                    _jst_e_h=int(_e_h),
+                    _jst_e_pad=int(_e_pad),
+                    _jst_e_pad_top=int(_e_pad_top),
+                    _jst_e_subj_mt=int(_e_subj_mt),
+                )
+
+                c_save, c_restore, _ = st.columns([3, 3, 1])
+                if c_save.button("💾 Zapisz jako domyślne", key="jst_email_mockup_save", use_container_width=True):
+                    prefs_all = _load_mockup_prefs()
+                    prefs_all.setdefault("email", {})
+                    prefs_all["email"] = {
+                        "wrap_w": int(st.session_state.get("_jst_e_wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60)),
+                        "wrap_h": int(st.session_state.get("_jst_e_wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100)),
+                        "top": int(st.session_state.get("_jst_e_top", EMAIL_TOP)),
+                        "left": int(st.session_state.get("_jst_e_left", EMAIL_LEFT)),
+                        "w": int(st.session_state.get("_jst_e_w", EMAIL_WIDTH)),
+                        "h": int(st.session_state.get("_jst_e_h", EMAIL_HEIGHT)),
+                        "pad": int(st.session_state.get("_jst_e_pad", 18)),
+                        "pad_top": int(st.session_state.get("_jst_e_pad_top", 18)),
+                        "subj_mt": int(st.session_state.get("_jst_e_subj_mt", 0)),
+                    }
+                    _save_mockup_prefs(prefs_all)
+                    st.success("Zapisano jako domyślne.")
+                if c_restore.button("↩ Przywróć zapisane", key="jst_email_mockup_restore", use_container_width=True):
+                    p = _load_mockup_prefs().get("email", {})
+                    if p:
+                        st.session_state["_jst_e_wrap_w"] = int(p.get("wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60))
+                        st.session_state["_jst_e_wrap_h"] = int(p.get("wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100))
+                        st.session_state["_jst_e_top"] = int(p.get("top", EMAIL_TOP))
+                        st.session_state["_jst_e_left"] = int(p.get("left", EMAIL_LEFT))
+                        st.session_state["_jst_e_w"] = int(p.get("w", EMAIL_WIDTH))
+                        st.session_state["_jst_e_h"] = int(p.get("h", EMAIL_HEIGHT))
+                        st.session_state["_jst_e_pad"] = int(p.get("pad", 18))
+                        st.session_state["_jst_e_pad_top"] = int(p.get("pad_top", 18))
+                        st.session_state["_jst_e_subj_mt"] = int(p.get("subj_mt", 0))
+                        st.rerun()
+                    else:
+                        st.info("Brak zapisanych ustawień – najpierw użyj „Zapisz jako domyślne”.")
+
+            if data_url:
+                st.markdown(
+                    f"""
+                    <div class="mock-wrap">
+                      <div class="mock-bg-email"></div>
+                      <div class="mock-screen-email">
+                        <div class="mock-email-subj">{subj}</div>
+                        <div class="email-body">{body_preview_html}</div>
+                      </div>
+                    </div>
+                    <style>
+                      .mock-wrap{{
+                        position:relative;
+                        width:{int(st.session_state.get("_jst_e_wrap_w", EMAIL_LEFT + EMAIL_WIDTH + 60))}px;
+                        height:{int(st.session_state.get("_jst_e_wrap_h", EMAIL_TOP + EMAIL_HEIGHT + 100))}px;
+                      }}
+                      .mock-bg-email{{
+                        position:absolute; inset:0;
+                        background-image:url('{data_url}');
+                        background-size:contain; background-repeat:no-repeat; background-position:center top;
+                      }}
+                      .mock-screen-email{{
+                        position:absolute;
+                        top:{int(st.session_state.get("_jst_e_top", EMAIL_TOP))}px; left:{int(st.session_state.get("_jst_e_left", EMAIL_LEFT))}px;
+                        width:{int(st.session_state.get("_jst_e_w", EMAIL_WIDTH))}px; height:{int(st.session_state.get("_jst_e_h", EMAIL_HEIGHT))}px;
+                        background:#fff; border:1px solid #e5e7eb; border-radius:2px;
+                        padding:{int(st.session_state.get("_jst_e_pad_top", 18))}px {int(st.session_state.get("_jst_e_pad", 18))}px {int(st.session_state.get("_jst_e_pad", 18))}px {int(st.session_state.get("_jst_e_pad", 18))}px; overflow:auto;
+                        font:13.5px/1.5 system-ui,-apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111;
+                        white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; word-break:break-word; hyphens:auto; line-break:auto;
+                        text-indent:0;
+                      }}
+                      .mock-email-subj{{
+                        opacity:.7;
+                        margin-top:{int(st.session_state.get("_jst_e_subj_mt", 0))}px;
+                        margin-bottom:8px;
+                      }}
+                      .email-body{{text-indent:0;}}
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"""<div style="border:1px solid #e5e7eb;border-radius:8px;padding:18px;font:13px/1.5 system-ui;">
+                           <div style="opacity:.75;margin-bottom:8px;">{subj}</div>
+                           {body_preview_html}
+                        </div>""",
+                    unsafe_allow_html=True,
+                )
 
     if send_btn:
         mode = "sms" if method == "SMS" else "email"
@@ -559,8 +836,57 @@ def render(back_btn: Callable[[], None]) -> None:
     if df_logs.empty:
         st.caption("Brak statusów do wyświetlenia.")
     else:
-        col_cfg = {col: cc.Column(width="medium") for col in df_logs.columns}
-        st.dataframe(df_logs, use_container_width=True, hide_index=True, column_config=col_cfg)
+        wanted_cols = [
+            "Data",
+            ("Telefon" if mode == "sms" else "E-mail"),
+            "Status",
+            "Czas wyp.",
+            "Wysłano",
+            "Kliknięto",
+            "Rozpoczęto",
+            "Zakończono",
+            "Błąd",
+        ]
+        for col in wanted_cols:
+            if col not in df_logs.columns:
+                df_logs[col] = ""
+        df_logs = df_logs[wanted_cols].copy()
+
+        raw_rows = (_list_jst_sms_for_study if mode == "sms" else _list_jst_email_for_study)(sb, study["id"]) or []
+
+        def _status_icon_fixed(row: Dict[str, Any]) -> str:
+            status = str(row.get("status") or "").lower()
+            if status == "failed":
+                return "✖"
+            if row.get("completed_at"):
+                return "✅"
+            if row.get("started_at"):
+                return "🏁"
+            if row.get("clicked_at"):
+                return "🔗"
+            if status == "delivered":
+                return "📬"
+            if status == "sent":
+                return "📤"
+            if status == "queued":
+                return "⏳"
+            return "•"
+
+        icons = [_status_icon_fixed(r) for r in raw_rows]
+        if len(icons) == len(df_logs.index):
+            df_logs["Status"] = icons
+
+        st.markdown(
+            """
+            <style>.narrow-table { max-width: 1120px; margin: 0 auto; }</style>
+            """,
+            unsafe_allow_html=True,
+        )
+        widths = _auto_col_widths(df_logs)
+        col_cfg = {col: cc.Column(width=widths.get(col, 100)) for col in df_logs.columns}
+        st.markdown('<div class="narrow-table">', unsafe_allow_html=True)
+        st.dataframe(df_logs, hide_index=True, column_config=col_cfg)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         out_name = slug or "jst"
         xlsx_bytes = _df_to_xlsx_bytes(df_logs, sheet_name=("SMS" if mode == "sms" else "EMAIL"), borders="none")
