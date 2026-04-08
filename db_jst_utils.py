@@ -101,11 +101,15 @@ def ensure_jst_schema() -> None:
       jst_full_voc TEXT NOT NULL,
 
       slug TEXT NOT NULL UNIQUE,
+      poststrat_targets JSONB NULL,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at TIMESTAMPTZ NULL
     );
+
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS poststrat_targets JSONB NULL;
 
     CREATE INDEX IF NOT EXISTS idx_jst_studies_active ON public.jst_studies(is_active);
     CREATE INDEX IF NOT EXISTS idx_jst_studies_slug ON public.jst_studies(slug);
@@ -293,7 +297,7 @@ def _utc_now_iso() -> str:
 def fetch_jst_studies(sb: Client, include_inactive: bool = False) -> List[Dict[str, Any]]:
     q = sb.table("jst_studies").select("*").order("created_at", desc=True)
     if not include_inactive:
-        q = q.or_("is_active.is.true,is_active.is.null")
+        q = q.or_("is_active.is.true,is_active.is.null").is_("deleted_at", "null")
     res = q.execute()
     return res.data or []
 
@@ -327,16 +331,37 @@ def update_jst_study(sb: Client, study_id: str, payload: Dict[str, Any]) -> Dict
 
 
 def soft_delete_jst_study(sb: Client, study_id: str) -> None:
+    sid = str(study_id or "").strip()
+    if not sid:
+        return
+    rec = fetch_jst_study_by_id(sb, sid) or {}
+    old_slug = str(rec.get("slug") or "").strip()
+    suffix = re.sub(r"[^0-9]", "", _utc_now_iso())
+    archived_slug = f"__deleted__{sid[:8]}__{suffix}"
+    if old_slug:
+        archived_slug = f"{old_slug}--deleted--{sid[:8]}--{suffix}"
     sb.table("jst_studies").update(
-        {"is_active": False, "deleted_at": _utc_now_iso(), "updated_at": _utc_now_iso()}
-    ).eq("id", str(study_id)).execute()
+        {
+            "is_active": False,
+            "deleted_at": _utc_now_iso(),
+            "updated_at": _utc_now_iso(),
+            "slug": archived_slug,
+        }
+    ).eq("id", sid).execute()
 
 
 def check_jst_slug_availability(sb: Client, slug: str, exclude_id: Optional[str] = None) -> bool:
     s = (slug or "").strip()
     if not s:
         return False
-    q = sb.table("jst_studies").select("id").eq("slug", s).limit(1)
+    q = (
+        sb.table("jst_studies")
+        .select("id")
+        .eq("slug", s)
+        .or_("is_active.is.true,is_active.is.null")
+        .is_("deleted_at", "null")
+        .limit(1)
+    )
     if exclude_id:
         q = q.neq("id", str(exclude_id))
     res = q.execute()

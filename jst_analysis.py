@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 
@@ -87,6 +87,182 @@ def _python_exec(run_root: Path) -> str:
     return sys.executable
 
 
+def _norm_text(v: Any) -> str:
+    txt = str(v or "").strip().lower()
+    repl = (
+        ("ą", "a"),
+        ("ć", "c"),
+        ("ę", "e"),
+        ("ł", "l"),
+        ("ń", "n"),
+        ("ó", "o"),
+        ("ś", "s"),
+        ("ż", "z"),
+        ("ź", "z"),
+    )
+    for a, b in repl:
+        txt = txt.replace(a, b)
+    return re.sub(r"\s+", " ", txt)
+
+
+def _to_gender_code(v: Any) -> int:
+    n = _norm_text(v)
+    if n in {"1", "kobieta", "k"}:
+        return 1
+    if n in {"2", "mezczyzna", "m"}:
+        return 2
+    return 0
+
+
+def _to_age_code(v: Any) -> int:
+    n = _norm_text(v).replace(" ", "")
+    if n in {"1", "15-39", "15_39", "15–39"}:
+        return 1
+    if n in {"2", "40-59", "40_59", "40–59"}:
+        return 2
+    if n in {"3", "60iwiecej", "60+wiecej", "60+", "60iwiecejlat", "60iwiecej"}:
+        return 3
+    return 0
+
+
+def _present_cells_from_data(data_df: pd.DataFrame) -> Set[Tuple[int, int]]:
+    present: Set[Tuple[int, int]] = set()
+    if "M_PLEC" not in data_df.columns or "M_WIEK" not in data_df.columns:
+        return present
+    for _, row in data_df[["M_PLEC", "M_WIEK"]].iterrows():
+        g = _to_gender_code(row.get("M_PLEC"))
+        a = _to_age_code(row.get("M_WIEK"))
+        if g > 0 and a > 0:
+            present.add((g, a))
+    return present
+
+
+def _normalize_targets_rows(raw_rows: List[Tuple[int, int, float]], present: Set[Tuple[int, int]]) -> pd.DataFrame:
+    rows: List[Dict[str, Any]] = []
+    for g, a, share in raw_rows:
+        if g not in {1, 2} or a not in {1, 2, 3}:
+            continue
+        if present and (g, a) not in present:
+            continue
+        s = float(share or 0.0)
+        if s <= 0:
+            continue
+        rows.append({"plec": int(g), "wiek": int(a), "udzial_docelowy": s})
+
+    if not rows:
+        return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
+
+    df = pd.DataFrame(rows).groupby(["plec", "wiek"], as_index=False)["udzial_docelowy"].sum()
+    if df["udzial_docelowy"].max() > 1.0:
+        df["udzial_docelowy"] = df["udzial_docelowy"] / 100.0
+    total = float(df["udzial_docelowy"].sum())
+    if total <= 0:
+        return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
+    df["udzial_docelowy"] = df["udzial_docelowy"] / total
+    return df
+
+
+def _targets_from_study(study: Dict[str, Any], present: Set[Tuple[int, int]]) -> pd.DataFrame:
+    raw = study.get("poststrat_targets")
+    if not raw:
+        return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
+
+    rows: List[Tuple[int, int, float]] = []
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            m = re.match(r"^\s*([12])[_:x\-]([123])\s*$", str(k or ""))
+            if not m:
+                continue
+            try:
+                rows.append((int(m.group(1)), int(m.group(2)), float(v)))
+            except Exception:
+                continue
+    elif isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            g = _to_gender_code(item.get("plec") or item.get("gender") or item.get("M_PLEC"))
+            a = _to_age_code(item.get("wiek") or item.get("age") or item.get("M_WIEK"))
+            try:
+                s = float(item.get("udzial_docelowy") or item.get("udzial") or item.get("share") or 0.0)
+            except Exception:
+                s = 0.0
+            rows.append((g, a, s))
+    return _normalize_targets_rows(rows, present)
+
+
+def _targets_from_template(run_root: Path, present: Set[Tuple[int, int]]) -> pd.DataFrame:
+    path = run_root / "targets_poststrat.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
+    try:
+        src = pd.read_csv(path, encoding="utf-8-sig", sep=None, engine="python")
+    except Exception:
+        return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
+
+    src.columns = [str(c).replace("\ufeff", "").strip() for c in src.columns]
+    c_gender = None
+    c_age = None
+    c_share = None
+    for c in src.columns:
+        n = _norm_text(c)
+        if n in {"plec", "plec_", "płec", "gender", "m_plec"}:
+            c_gender = c
+        elif n in {"wiek", "age", "m_wiek"}:
+            c_age = c
+        elif n in {"udzial_docelowy", "udzial_docelowy", "udzial", "share", "target_share", "pct", "procent"}:
+            c_share = c
+    if not c_gender or not c_age or not c_share:
+        return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
+
+    rows: List[Tuple[int, int, float]] = []
+    for _, r in src.iterrows():
+        g = _to_gender_code(r.get(c_gender))
+        a = _to_age_code(r.get(c_age))
+        try:
+            s = float(r.get(c_share) or 0.0)
+        except Exception:
+            s = 0.0
+        rows.append((g, a, s))
+    return _normalize_targets_rows(rows, present)
+
+
+def _targets_from_sample(data_df: pd.DataFrame, present: Set[Tuple[int, int]]) -> pd.DataFrame:
+    rows: List[Tuple[int, int, float]] = []
+    if "M_PLEC" not in data_df.columns or "M_WIEK" not in data_df.columns:
+        return pd.DataFrame(columns=["plec", "wiek", "udzial_docelowy"])
+
+    counter: Dict[Tuple[int, int], int] = {}
+    for _, row in data_df[["M_PLEC", "M_WIEK"]].iterrows():
+        g = _to_gender_code(row.get("M_PLEC"))
+        a = _to_age_code(row.get("M_WIEK"))
+        if g > 0 and a > 0 and (not present or (g, a) in present):
+            key = (g, a)
+            counter[key] = int(counter.get(key, 0)) + 1
+    for (g, a), n in counter.items():
+        rows.append((g, a, float(n)))
+    return _normalize_targets_rows(rows, present)
+
+
+def _write_poststrat_targets(run_root: Path, study: Dict[str, Any], data_df: pd.DataFrame) -> None:
+    present = _present_cells_from_data(data_df)
+    if not present:
+        return
+
+    targets = _targets_from_study(study, present)
+    if targets.empty:
+        targets = _targets_from_template(run_root, present)
+    if targets.empty:
+        targets = _targets_from_sample(data_df, present)
+    if targets.empty:
+        return
+
+    (run_root / "targets_poststrat.csv").write_text(
+        targets.to_csv(index=False, encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+
 def _hash_payload(df: pd.DataFrame, study: Dict[str, Any]) -> str:
     raw = (
         f"{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}\n"
@@ -118,6 +294,7 @@ def generate_jst_report(
     if needs_run:
         data_df.to_csv(run_root / "data.csv", index=False, encoding="utf-8-sig")
         _write_settings(run_root / "settings.json", study)
+        _write_poststrat_targets(run_root, study, data_df)
 
         py_exec = _python_exec(run_root)
         cmd = [py_exec, str(run_root / "analyze_poznan_archetypes.py")]

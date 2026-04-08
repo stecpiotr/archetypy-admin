@@ -271,8 +271,46 @@ st.markdown(
 .tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:22px; margin:8px 0 18px 0; }
 @media (max-width:1100px){ .tiles{ grid-template-columns:repeat(2,1fr); } }
 @media (max-width:640px){ .tiles{ grid-template-columns:1fr; } }
-.tiles .stButton>button{ width:100%; height:140px; background:#fff !important; color:#1F2937 !important; font-weight:700 !important; border:1px solid var(--line) !important; border-radius:16px !important; padding:14px 16px !important; display:flex; align-items:center; justify-content:center; text-align:center; white-space:pre-line; }
-.tiles .stButton>button:hover{ border-color:#D1D9E4 !important; }
+.tiles .stButton>button{
+  width:100%;
+  height:148px;
+  background:#fff !important;
+  color:#1F2937 !important;
+  font-weight:700 !important;
+  border:1px solid var(--line) !important;
+  border-radius:16px !important;
+  padding:18px 16px !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  white-space:pre-line;
+  transition:transform .12s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.tiles .stButton>button:hover{
+  border-color:#D1D9E4 !important;
+  transform:translateY(-3px);
+  box-shadow:0 10px 28px rgba(15,23,42,.08);
+}
+.tiles.tiles-root .stButton>button,
+.tiles.tiles-home-personal .stButton>button,
+.tiles.tiles-home-jst .stButton>button{
+  min-height:172px !important;
+  font-size:1.08rem !important;
+  line-height:1.35 !important;
+  border-radius:18px !important;
+  padding:18px 14px !important;
+}
+.tiles.tiles-root .stButton>button{
+  min-height:186px !important;
+  font-size:1.14rem !important;
+}
+.top-back-wrap{ margin:0 0 8px 0; }
+.top-back-wrap .stButton>button{
+  border-radius:12px !important;
+  padding:7px 12px !important;
+  font-weight:600 !important;
+}
 .stButton>button[kind="primary"]{ background:var(--brand) !important; color:#fff !important; border:1px solid var(--brand) !important; border-radius:12px !important; }
 .stButton>button[kind="primary"]:hover{ background:var(--brand-hover) !important; border-color:var(--brand-hover) !important; }
 .stButton>button[kind="secondary"]{ background:#fff !important; color:#1F2937 !important; border:1px solid var(--line-2) !important; border-radius:12px !important; }
@@ -914,6 +952,8 @@ def _payload_only_changes(study: Dict, full_payload: Dict) -> Dict:
 
 
 JST_CASES = ["nom", "gen", "dat", "acc", "ins", "loc", "voc"]
+POSTSTRAT_GENDER = [(1, "kobieta"), (2, "mężczyzna")]
+POSTSTRAT_AGE = [(1, "15-39"), (2, "40-59"), (3, "60 i więcej")]
 
 
 def _jst_type_forms(jst_type: str) -> Dict[str, str]:
@@ -977,15 +1017,30 @@ def _guess_word_cases(word: str, is_secondary: bool) -> Dict[str, str]:
             "voc": w,
         }
 
+    # częste nazwy typu „Poznań”: Poznania, Poznaniowi, Poznaniem, Poznaniu
+    if low.endswith("ń"):
+        base = w[:-1]
+        return {
+            "nom": w,
+            "gen": base + "nia",
+            "dat": base + "niowi",
+            "acc": w,
+            "ins": base + "niem",
+            "loc": base + "niu",
+            "voc": base + "niu",
+        }
+
+    # uproszczone reguły dla nazw nieżywotnych (miast/gmin) kończących się spółgłoską
     ins_end = "iem" if low.endswith(("k", "g")) else "em"
+    loc_end = "u" if low.endswith(("k", "g", "ch", "sz", "cz", "rz", "ż", "ź", "ś")) else "ie"
     return {
         "nom": w,
         "gen": w + "a",
         "dat": w + "owi",
-        "acc": w + "a",
+        "acc": w,
         "ins": w + ins_end,
-        "loc": w + "ie",
-        "voc": w + "ie",
+        "loc": w + loc_end,
+        "voc": w + loc_end,
     }
 
 
@@ -1050,9 +1105,11 @@ def _next_jst_respondent_id(existing: set[str]) -> str:
         n += 1
 
 # ───────────────────────── wspólne UI ─────────────────────────
-def back_button(dest: str = "home_personal") -> None:
-    if st.button("← Cofnij", type="secondary"):
+def back_button(dest: str = "home_personal", label: str = "← Cofnij") -> None:
+    st.markdown('<div class="top-back-wrap">', unsafe_allow_html=True)
+    if st.button(label, type="secondary"):
         goto(dest)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def person_fields(prefix: str, data: Optional[Dict] = None) -> Tuple[str, str, str, str]:
     c1,c2 = st.columns(2)
@@ -1131,23 +1188,26 @@ def login_view() -> None:
 
 def home_personal_view() -> None:
     require_auth()
-    header("Archetypy – panel administratora")
+    back_button("home_root", "← Powrót do wyboru modułu")
+    header("Badania personalne - panel")
     render_titlebar(["Panel", "Badania personalne"])
-    if st.button("← Powrót do wyboru modułu", type="secondary"):
-        goto("home_root")
 
     # kafle
-    st.markdown('<div class="tiles">', unsafe_allow_html=True)
-    c1,c2,c3,c4 = st.columns(4)
+    st.markdown('<div class="tiles tiles-home-personal">', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
-        if st.button("➕\nDodaj badanie archetypu", type="secondary"): goto("add")
+        if st.button("➕\n\nDodaj badanie archetypu", type="secondary"):
+            goto("add")
     with c2:
-        if st.button("✏️\nEdytuj dane badania", type="secondary"): goto("edit")
+        if st.button("✏️\n\nEdytuj dane badania", type="secondary"):
+            goto("edit")
     with c3:
-        if st.button("✉️\nWyślij link do ankiety", type="secondary"): goto("send")
+        if st.button("✉️\n\nWyślij link do ankiety", type="secondary"):
+            goto("send")
     with c4:
-        if st.button("📊\nSprawdź wyniki badania archetypu", type="secondary"): goto("results")
-    st.markdown('</div>', unsafe_allow_html=True)
+        if st.button("📊\n\nSprawdź wyniki badania archetypu", type="secondary"):
+            goto("results")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # 🔽 linia oddzielająca kafle od statystyk
     st.markdown(
@@ -1163,16 +1223,16 @@ def home_root_view() -> None:
     header("Archetypy – panel administratora")
     render_titlebar(["Panel", "Start"])
 
-    st.markdown('<div class="tiles">', unsafe_allow_html=True)
+    st.markdown('<div class="tiles tiles-root">', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("🧑‍💼\nBadania personalne", type="secondary"):
+        if st.button("🧑‍💼\n\nBadania personalne", type="secondary"):
             goto("home_personal")
     with c2:
-        if st.button("🏘️\nBadania mieszkańców", type="secondary"):
+        if st.button("🏘️\n\nBadania mieszkańców", type="secondary"):
             goto("home_jst")
     with c3:
-        if st.button("🧭\nMatching", type="secondary"):
+        if st.button("🧭\n\nMatching", type="secondary"):
             goto("matching")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1181,27 +1241,26 @@ def home_jst_view() -> None:
     require_auth()
     if not _require_jst_ready():
         return
-    header("🏘️ Badania mieszkańców")
+    back_button("home_root", "← Powrót do wyboru modułu")
+    header("Badania mieszkańców - panel")
     render_titlebar(["Panel", "Badania mieszkańców"])
-    if st.button("← Powrót do wyboru modułu", type="secondary"):
-        goto("home_root")
 
-    st.markdown('<div class="tiles">', unsafe_allow_html=True)
+    st.markdown('<div class="tiles tiles-home-jst">', unsafe_allow_html=True)
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
-        if st.button("➕\nDodaj badanie\nmieszkańców", type="secondary"):
+        if st.button("➕\n\nDodaj badanie\nmieszkańców", type="secondary"):
             goto("jst_add")
     with c2:
-        if st.button("✏️\nEdytuj dane\nbadania", type="secondary"):
+        if st.button("✏️\n\nEdytuj dane\nbadania", type="secondary"):
             goto("jst_edit")
     with c3:
-        if st.button("✉️\nWyślij link\ndo ankiety", type="secondary"):
+        if st.button("✉️\n\nWyślij link\ndo ankiety", type="secondary"):
             goto("jst_send")
     with c4:
-        if st.button("💾\nImport i eksport\nbaz danych", type="secondary"):
+        if st.button("💾\n\nImport i eksport\nbaz danych", type="secondary"):
             goto("jst_io")
     with c5:
-        if st.button("📊\nAnaliza\nbadania", type="secondary"):
+        if st.button("📊\n\nAnaliza\nbadania", type="secondary"):
             goto("jst_analysis")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1219,14 +1278,7 @@ def home_jst_view() -> None:
                 "Data utworzenia": _fmt_local_ts(s.get("created_at")),
             }
         )
-    st.markdown("<hr class='hr-thin'>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        st.metric("Liczba badań JST", len(studies))
-    with c2:
-        st.metric("Łączna liczba odpowiedzi JST", total_resp)
-    if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=min(450, 80 + 36 * len(rows)))
+    jst_stats_panel(studies, rows, total_resp)
 
 
 _JST_CASE_LABELS = {
@@ -1323,6 +1375,63 @@ def _jst_payload_from_form(jst_type: str, jst_name: str, forms: Dict[str, str], 
     return payload
 
 
+def _load_poststrat_targets(study: Dict[str, Any]) -> Dict[str, float]:
+    raw = study.get("poststrat_targets")
+    if not isinstance(raw, dict):
+        return {}
+    out: Dict[str, float] = {}
+    for g, _ in POSTSTRAT_GENDER:
+        for a, _ in POSTSTRAT_AGE:
+            key = f"{g}_{a}"
+            try:
+                v = float(raw.get(key) or 0.0)
+            except Exception:
+                v = 0.0
+            out[key] = max(0.0, v)
+    return out
+
+
+def _render_poststrat_editor(prefix: str, current: Dict[str, float]) -> Dict[str, float]:
+    st.markdown("### Wagi poststratyfikacyjne (płeć × wiek) – opcjonalne")
+    st.caption("Podaj udziały docelowe (%) dla 6 komórek. System automatycznie znormalizuje sumę do 100%.")
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    hdr = st.columns([1.2, 1, 1, 1], gap="small")
+    with hdr[0]:
+        st.markdown("**Płeć \\ Wiek**")
+    for i, (_, age_lbl) in enumerate(POSTSTRAT_AGE):
+        with hdr[i + 1]:
+            st.markdown(f"**{age_lbl}**")
+
+    out: Dict[str, float] = {}
+    for g, g_lbl in POSTSTRAT_GENDER:
+        row = st.columns([1.2, 1, 1, 1], gap="small")
+        with row[0]:
+            st.markdown(f"**{g_lbl}**")
+        for i, (a, _) in enumerate(POSTSTRAT_AGE):
+            key = f"{prefix}_post_{g}_{a}"
+            if key not in st.session_state:
+                st.session_state[key] = float(current.get(f"{g}_{a}", 0.0))
+            with row[i + 1]:
+                out[f"{g}_{a}"] = float(
+                    st.number_input(
+                        f"{g_lbl}-{a}",
+                        min_value=0.0,
+                        max_value=100.0,
+                        step=0.1,
+                        key=key,
+                        label_visibility="collapsed",
+                    )
+                )
+
+    total = float(sum(out.values()))
+    if total > 0:
+        st.caption(f"Suma wprowadzonych udziałów: {total:.1f}% (zostanie znormalizowana do 100%).")
+    else:
+        st.caption("Brak wartości > 0: użyjemy domyślnych proporcji z narzędzia analitycznego.")
+    return out
+
+
 def _xlsx_bytes_from_df(df: pd.DataFrame, sheet_name: str = "Dane") -> bytes:
     out = BytesIO()
     with pd.ExcelWriter(out, engine="xlsxwriter") as writer:
@@ -1413,6 +1522,10 @@ def jst_edit_view() -> None:
             st.session_state[f"jst_edit_case_{c}"] = str(study.get(f"jst_name_{c}") or "")
         st.session_state["jst_edit_slug"] = str(study.get("slug") or "")
         st.session_state["jst_edit_allow_custom_slug"] = False
+        ps = _load_poststrat_targets(study)
+        for g, _ in POSTSTRAT_GENDER:
+            for a, _ in POSTSTRAT_AGE:
+                st.session_state[f"jst_edit_post_{g}_{a}"] = float(ps.get(f"{g}_{a}", 0.0))
 
     type_idx = 0 if str(study.get("jst_type") or "miasto").lower() == "miasto" else 1
     c1, c2 = st.columns(2)
@@ -1434,6 +1547,9 @@ def jst_edit_view() -> None:
 
     with st.expander("Odmiana nazwy JST", expanded=True):
         forms = _jst_cases_editor("jst_edit", defaults)
+
+    poststrat_current = _load_poststrat_targets(study)
+    poststrat_targets = _render_poststrat_editor("jst_edit", poststrat_current)
 
     slug, slug_free = _jst_url_editor(
         "jst_edit",
@@ -1459,6 +1575,10 @@ def jst_edit_view() -> None:
                 st.error("Uzupełnij odmiany nazwy JST (mianownik–wołacz).")
                 return
             payload = _jst_payload_from_form(jst_type, jst_name, forms, slug)
+            if any(float(v or 0.0) > 0 for v in poststrat_targets.values()):
+                payload["poststrat_targets"] = {k: float(v) for k, v in poststrat_targets.items() if float(v or 0.0) > 0}
+            else:
+                payload["poststrat_targets"] = None
             try:
                 update_jst_study(sb, str(study["id"]), payload)
                 st.success("✅ Zapisano zmiany.")
@@ -1727,10 +1847,9 @@ def matching_view() -> None:
     require_auth()
     if not _require_jst_ready():
         return
+    back_button("home_root", "← Powrót do wyboru modułu")
     header("🧭 Matching")
     render_titlebar(["Panel", "Matching"])
-    if st.button("← Powrót do wyboru modułu", type="secondary"):
-        goto("home_root")
 
     personal_studies = fetch_studies(sb)
     jst_studies = fetch_jst_studies(sb)
@@ -1785,20 +1904,52 @@ def matching_view() -> None:
             take_n = max(1, int(len(top_sim_rows) * 0.25))
             subset = top_sim_rows[:take_n]
 
-            def _dist(field: str) -> Dict[str, int]:
-                out: Dict[str, int] = {}
-                for r in subset:
-                    v = str((r.get("payload") or {}).get(field) or "brak")
-                    out[v] = int(out.get(v, 0)) + 1
-                return dict(sorted(out.items(), key=lambda kv: kv[1], reverse=True))
+            all_payloads = [r.get("payload") or {} for r in top_sim_rows]
+            subset_payloads = [r.get("payload") or {} for r in subset]
 
-            demo_dist = {
-                "Płeć": _dist("M_PLEC"),
-                "Wiek": _dist("M_WIEK"),
-                "Wykształcenie": _dist("M_WYKSZT"),
-                "Status zawodowy": _dist("M_ZAWOD"),
-                "Sytuacja materialna": _dist("M_MATERIAL"),
-            }
+            dim_map = [
+                ("Płeć", "M_PLEC"),
+                ("Wiek", "M_WIEK"),
+                ("Wykształcenie", "M_WYKSZT"),
+                ("Status zawodowy", "M_ZAWOD"),
+                ("Sytuacja materialna", "M_MATERIAL"),
+            ]
+
+            def _count(payloads: List[Dict[str, Any]], field: str) -> Dict[str, int]:
+                out: Dict[str, int] = {}
+                for p in payloads:
+                    val = str(p.get(field) or "brak danych").strip() or "brak danych"
+                    out[val] = int(out.get(val, 0)) + 1
+                return out
+
+            demo_rows: List[Dict[str, Any]] = []
+            demo_cards: List[Dict[str, str]] = []
+            for dim_label, field in dim_map:
+                dist_sub = _count(subset_payloads, field)
+                dist_all = _count(all_payloads, field)
+                cats = sorted(set(dist_sub.keys()) | set(dist_all.keys()))
+
+                top_cat = None
+                top_pct = -1.0
+                for cat in cats:
+                    c_sub = int(dist_sub.get(cat, 0))
+                    c_all = int(dist_all.get(cat, 0))
+                    pct_sub = (100.0 * c_sub / len(subset_payloads)) if subset_payloads else 0.0
+                    pct_all = (100.0 * c_all / len(all_payloads)) if all_payloads else 0.0
+                    if pct_sub > top_pct:
+                        top_pct = pct_sub
+                        top_cat = cat
+                    demo_rows.append(
+                        {
+                            "Zmienna": dim_label,
+                            "Kategoria": cat,
+                            "% grupa dopasowana": round(pct_sub, 1),
+                            "% ogół mieszkańców": round(pct_all, 1),
+                            "Różnica pp": round(pct_sub - pct_all, 1),
+                        }
+                    )
+                if top_cat is not None:
+                    demo_cards.append({"label": dim_label, "top": str(top_cat), "pct": f"{max(top_pct, 0.0):.1f}%"})
 
             st.session_state["matching_result"] = {
                 "person_label": pick_personal,
@@ -1810,7 +1961,9 @@ def matching_view() -> None:
                 "jst_profile": j_profile,
                 "strengths": strengths,
                 "gaps": gaps,
-                "demo_dist": demo_dist,
+                "demo_cards": demo_cards,
+                "demo_rows": demo_rows,
+                "match_formula": "match = max(0, 100 - MAE), gdzie MAE to średnia z |profil_polityka - profil_mieszkańców| dla 12 archetypów",
             }
             st.success("Wynik dopasowania został obliczony.")
 
@@ -1842,19 +1995,29 @@ def matching_view() -> None:
                 for a in JST_ARCHETYPES
             ]
         ).sort_values("Różnica |Δ|", ascending=True)
-        st.dataframe(df_cmp, use_container_width=True, hide_index=True)
+        st.dataframe(df_cmp, use_container_width=True, hide_index=True, height=520)
+        st.caption("„Oczekiwania mieszkańców (%)” liczymy z odpowiedzi: B2 = 50%, suma wskazań B1 = 30%, D13 = 20% (na respondenta).")
+        with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
+            st.markdown(result.get("match_formula", ""))
+            st.markdown(
+                "To wynik porównania 12 archetypów: im mniejsza średnia różnica profilu polityka i oczekiwań mieszkańców, tym wyższy wynik procentowy."
+            )
         st.markdown(f"**Najlepsze dopasowanie:** {', '.join(result['strengths'])}")
         st.markdown(f"**Największe luki:** {', '.join(result['gaps'])}")
 
     with tab_demo:
-        st.markdown("Demografia respondentów najbardziej zbliżonych profilem do wybranego polityka (górne 25% podobieństwa):")
-        for title, dist in result["demo_dist"].items():
-            st.markdown(f"**{title}**")
-            if not dist:
-                st.caption("Brak danych.")
-                continue
-            ddf = pd.DataFrame([{"Kategoria": k, "Liczba": v} for k, v in dist.items()])
-            st.dataframe(ddf, use_container_width=True, hide_index=True)
+        st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
+        cards = result.get("demo_cards") or []
+        if cards:
+            cols = st.columns(len(cards))
+            for i, c in enumerate(cards):
+                with cols[i]:
+                    st.metric(c["label"], c["top"], c["pct"])
+        ddf = pd.DataFrame(result.get("demo_rows") or [])
+        if ddf.empty:
+            st.caption("Brak danych demograficznych.")
+        else:
+            st.dataframe(ddf, use_container_width=True, hide_index=True, height=620)
 
     with tab_strategy:
         st.markdown("**Rekomendacje komunikacyjne (automatyczne):**")
@@ -2066,6 +2229,40 @@ def stats_panel() -> None:
                 height=max(rows * 36 + 15, 120),
                 hide_index=True
             )
+
+            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+
+
+def jst_stats_panel(studies: List[Dict[str, Any]], rows: List[Dict[str, Any]], total_resp: int) -> None:
+    st.markdown("<hr class='hr-thin'>", unsafe_allow_html=True)
+    st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+    L, C, R = st.columns([1, 8, 1], gap="small")
+    with C:
+        with st.container(border=True):
+            st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div style='font-weight:700; font-size:25px; margin:5px 0 40px 0; "
+                "padding-bottom:8px; border-bottom:1px solid #E6E9EE;'>Statystyki</div>",
+                unsafe_allow_html=True,
+            )
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("Łączna liczba uczestników badań", int(total_resp))
+            with c2:
+                st.metric("Liczba badań w bazie", len(studies))
+
+            if rows:
+                df = pd.DataFrame(rows, columns=["JST", "Link", "Data utworzenia", "Liczba odpowiedzi"])
+                sort_idx = pd.to_datetime(df["Data utworzenia"], errors="coerce", format="%Y-%m-%d %H:%M")
+                df = df.assign(_sort=sort_idx).sort_values("_sort", ascending=False).drop(columns="_sort")
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=max(len(df) * 36 + 15, 120),
+                )
+            else:
+                st.caption("Brak badań JST.")
 
             st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
 

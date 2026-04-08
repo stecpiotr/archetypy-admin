@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
 from io import BytesIO
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import re
-from typing import Dict, List, Optional, Tuple, Callable
+import time
 
 import pandas as pd
 import streamlit as st
+from streamlit import column_config as cc
 
 from db_utils import get_supabase
 from db_jst_utils import fetch_jst_studies
@@ -15,37 +16,26 @@ from db_email import create_email_record, mark_email_sent, list_email_for_study,
 from smsapi_client import send_sms
 from email_client import send_email
 from utils import make_token
+from send_link import _df_to_xlsx_bytes, _df_to_pdf_bytes
 
 
 _EMAIL_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.I)
 
 
-def _normalize_emails(raw: str) -> List[str]:
-    if not raw:
-        return []
-    src = raw.replace("\n", ",").replace(";", ",").replace(" ", ",")
+def _normalize_recipients(raw: str, mode: str) -> List[str]:
+    src = (raw or "").replace("\n", ",").replace(";", ",").replace(" ", ",")
     out: List[str] = []
     seen = set()
-    for part in src.split(","):
-        val = part.strip().lower()
-        if not val or val in seen:
-            continue
-        if not _EMAIL_RE.match(val):
-            continue
-        seen.add(val)
-        out.append(val)
-    return out
-
-
-def _normalize_phones(raw: str) -> List[str]:
-    if not raw:
-        return []
-    src = raw.replace("\n", ",").replace(";", ",").replace(" ", ",")
-    out: List[str] = []
-    seen = set()
-    for part in src.split(","):
-        val = re.sub(r"[^\d+]", "", part.strip())
-        if not val or val in seen:
+    for part in [x.strip() for x in src.split(",") if x.strip()]:
+        if mode == "sms":
+            val = re.sub(r"[^\d+]", "", part)
+            if not val:
+                continue
+        else:
+            val = part.lower()
+            if not _EMAIL_RE.match(val):
+                continue
+        if val in seen:
             continue
         seen.add(val)
         out.append(val)
@@ -98,7 +88,6 @@ def _email_env() -> Tuple[str, int, str, str, str, str, str, str]:
     )
     from_name = st.secrets.get("FROM_NAME", "") or st.secrets.get("SMTP_FROM_NAME", "")
     base_url = (st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
-
     missing = []
     if not host:
         missing.append("SMTP_HOST")
@@ -121,19 +110,7 @@ def _build_link(base_url: str, slug: str, token: str) -> str:
     return f"{(base_url or '').rstrip('/')}/{(slug or '').lstrip('/')}?t={token}"
 
 
-def _fmt_dt(val: Optional[str]) -> str:
-    if not val:
-        return ""
-    try:
-        ts = pd.to_datetime(val, errors="coerce", utc=True)
-        if pd.isna(ts):
-            return ""
-        return ts.tz_convert("Europe/Warsaw").strftime("%Y-%m-%d %H:%M:%S")
-    except Exception:
-        return str(val)
-
-
-def _status_icon(row: Dict) -> str:
+def _status_icon(row: Dict[str, Any]) -> str:
     status = str(row.get("status") or "").lower()
     if row.get("completed_at"):
         return "✅"
@@ -150,6 +127,18 @@ def _status_icon(row: Dict) -> str:
     if status == "queued":
         return "⏳"
     return "•"
+
+
+def _fmt_dt(val: Optional[str]) -> str:
+    if not val:
+        return ""
+    try:
+        ts = pd.to_datetime(val, errors="coerce", utc=True)
+        if pd.isna(ts):
+            return ""
+        return ts.tz_convert("Europe/Warsaw").strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(val)
 
 
 def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
@@ -175,13 +164,14 @@ def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
                 ("Telefon" if mode == "sms" else "E-mail"): r.get("phone", "") if mode == "sms" else r.get("email", ""),
                 "Status": _status_icon(r),
                 "Czas wyp.": _dur_str(r.get("clicked_at"), r.get("completed_at")),
-                "Wysłano": "✓" if (str(r.get("status") or "").lower() in ("sent", "delivered")) else "",
+                "Wysłano": "✓" if str(r.get("status") or "").lower() in ("sent", "delivered") else "",
                 "Kliknięto": _fmt_dt(r.get("clicked_at")),
                 "Rozpoczęto": _fmt_dt(r.get("started_at")),
                 "Zakończono": _fmt_dt(r.get("completed_at")),
                 "Błąd": "✖" if str(r.get("status") or "").lower() == "failed" else "",
             }
         )
+
     cols = [
         "Data",
         ("Telefon" if mode == "sms" else "E-mail"),
@@ -198,8 +188,8 @@ def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
 
 def _default_sms_text(jst_full_gen: str, link_preview: str) -> str:
     return (
-        f"Zwracamy sie z prosba o wypelnienie ankiety dla mieszkańców {jst_full_gen}.\n"
-        f"Link do ankiety: {link_preview}\n"
+        f"Zwracamy sie z prosba o wypelnienie ankiety dla mieszkańców {jst_full_gen}.\n\n"
+        f"Link do ankiety: {link_preview}\n\n"
         "Dziekujemy!"
     )
 
@@ -209,20 +199,69 @@ def _default_email_text(jst_type: str, jst_full_gen: str, jst_full_nom: str, lin
     verb = "powinno działać" if (jst_type or "").lower() == "miasto" else "powinna działać"
     return (
         "Zwracamy się z prośbą o wypełnienie ankiety w badaniu realizowanym "
-        f"wśród mieszkańców {jst_full_gen}. W tym badaniu chcemy przekonać się jakie jest "
-        f"Państwa podejście do spraw {type_gen} i oczekiwania dotyczące tego, jak {verb} {jst_full_nom}. \n"
+        f"wśród mieszkańców {jst_full_gen}. W tym badaniu chcemy przekonać się, jakie jest "
+        f"Państwa podejście do spraw {type_gen} i oczekiwania dotyczące tego, jak {verb} {jst_full_nom}.\n\n"
         "Wypełnienie ankiety nie powinno zająć więcej niż 5-7 minut.\n"
-        f"Link do ankiety: {link_preview}\n"
+        f"Link do ankiety: {link_preview}\n\n"
         "Dziękujemy,\n"
         "Zespół badawczy Badania.pro®"
     )
+
+
+def _fake_phone_mockup(text: str) -> str:
+    safe = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+    return f"""
+    <div style="width:220px;height:430px;border:2px solid #d7dee8;border-radius:30px;background:#f8fafc;position:relative;margin:0 auto;">
+      <div style="position:absolute;top:18px;left:50%;transform:translateX(-50%);width:64px;height:8px;border-radius:99px;background:#cbd5e1;"></div>
+      <div style="position:absolute;top:48px;left:16px;right:16px;bottom:16px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:14px;overflow:auto;font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
+        {safe}
+      </div>
+    </div>
+    """
+
+
+def _fake_email_mockup(subject: str, body: str) -> str:
+    subj = (subject or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    safe = (body or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+    return f"""
+    <div style="width:390px;height:250px;border:2px solid #d7dee8;border-radius:10px;background:#111827;position:relative;margin:0 auto;">
+      <div style="position:absolute;top:10px;left:10px;right:10px;bottom:10px;background:#fff;border-radius:4px;padding:10px 12px;overflow:auto;font:12.5px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">
+        <div style="opacity:.75;margin-bottom:8px;">{subj}</div>
+        {safe}
+      </div>
+    </div>
+    """
 
 
 def render(back_btn: Callable[[], None]) -> None:
     sb = get_supabase()
     back_btn()
 
-    st.markdown("### Wybierz badanie mieszkańców")
+    st.markdown(
+        """
+        <style>
+          :root{
+            --label-font-size: 16px;
+            --label-font-weight: 600;
+            --label-margin-top: 16px;
+            --label-margin-bottom: 9px;
+          }
+          .field-label{
+            font-weight: var(--label-font-weight);
+            font-size: var(--label-font-size);
+            margin: var(--label-margin-top) 0 var(--label-margin-bottom) 0;
+          }
+          .sms-counter{ text-align:right; color:#6b7280; font-size:13px; margin-top:4px; }
+          .btn-stack{ margin-top:26px; margin-bottom:24px; }
+          .btn-stack .btn-reset{ margin-bottom:10px; }
+          .btn-stack .btn-send{ margin-top:14px; margin-bottom:26px; }
+          .status-top-tight{ margin-top:0 !important; }
+          .status-bottom-gap{ height:60px; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     studies = fetch_jst_studies(sb)
     if not studies:
         st.info("Brak badań JST w bazie.")
@@ -232,13 +271,23 @@ def render(back_btn: Callable[[], None]) -> None:
         f"{(s.get('jst_full_nom') or (str(s.get('jst_type', '')).title() + ' ' + str(s.get('jst_name', '')))).strip()} – /{s.get('slug') or ''}": s
         for s in studies
     }
-    label = st.selectbox("Wybierz badanie", options=list(options.keys()), label_visibility="collapsed")
+
+    st.markdown(
+        '<div style="font-size:17.5px; font-weight:675; margin-top:20px; margin-bottom:0px;">Wybierz badanie mieszkańców:</div>',
+        unsafe_allow_html=True,
+    )
+    label = st.selectbox(
+        "Wybierz badanie",
+        options=list(options.keys()),
+        label_visibility="collapsed",
+        key="sendlink_jst_study",
+    )
     study = options[label]
 
-    st.markdown("### Metoda wysyłki")
-    method = st.radio("Metoda", ["SMS", "E-mail"], horizontal=True, label_visibility="collapsed")
+    st.markdown('<div style="font-size:16px; font-weight:600; margin-top:35px; margin-bottom:5px;">Metoda wysyłki</div>', unsafe_allow_html=True)
+    method = st.radio("Metoda wysyłki", ["SMS", "E-mail"], horizontal=True, index=0, label_visibility="collapsed")
 
-    st.markdown("### Odbiorcy")
+    st.markdown('<div class="field-label">Odbiorcy</div>', unsafe_allow_html=True)
     recipients = st.text_area(
         "Odbiorcy",
         placeholder=("48500123456, 48600111222" if method == "SMS" else "jan@firma.pl, ola@urzad.gov.pl"),
@@ -251,165 +300,201 @@ def render(back_btn: Callable[[], None]) -> None:
     jst_full_gen = str(study.get("jst_full_gen") or "").strip()
     jst_full_nom = str(study.get("jst_full_nom") or "").strip()
 
-    base_url = (st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
-    preview_key = "jst_link_preview"
-    preview_study_key = "jst_link_preview_study_id"
+    preview_key = "jst_send_preview_link"
+    preview_study_key = "jst_send_preview_study"
+    base_url_preview = (st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
     if st.session_state.get(preview_study_key) != str(study.get("id")) or preview_key not in st.session_state:
-        st.session_state[preview_key] = _build_link(base_url, slug, make_token(6))
+        st.session_state[preview_key] = _build_link(base_url_preview, slug, make_token(6))
         st.session_state[preview_study_key] = str(study.get("id"))
     link_preview = st.session_state[preview_key]
 
     default_sms = _default_sms_text(jst_full_gen, link_preview)
     default_email = _default_email_text(jst_type, jst_full_gen, jst_full_nom, link_preview)
-
-    if "jst_msg_method" not in st.session_state:
-        st.session_state["jst_msg_method"] = method
-    if "jst_msg_body" not in st.session_state:
-        st.session_state["jst_msg_body"] = default_sms if method == "SMS" else default_email
-    if st.session_state.get("jst_msg_method") != method:
-        st.session_state["jst_msg_method"] = method
-        st.session_state["jst_msg_body"] = default_sms if method == "SMS" else default_email
+    if "jst_send_method" not in st.session_state:
+        st.session_state["jst_send_method"] = method
+    if "jst_send_body" not in st.session_state:
+        st.session_state["jst_send_body"] = default_sms if method == "SMS" else default_email
+    if st.session_state.get("jst_send_method") != method:
+        st.session_state["jst_send_method"] = method
+        st.session_state["jst_send_body"] = default_sms if method == "SMS" else default_email
 
     if method == "E-mail":
-        st.text_input(
-            "Temat wiadomości",
-            key="jst_email_subject",
-            value=st.session_state.get("jst_email_subject") or "Prośba o wypełnienie ankiety dla mieszkańców",
-        )
+        subj_key = "jst_send_subject"
+        subj_study_key = "jst_send_subject_study"
+        if subj_key not in st.session_state or st.session_state.get(subj_study_key) != str(study.get("id")):
+            st.session_state[subj_key] = f"Prośba o wypełnienie ankiety dla mieszkańców {jst_full_gen}"
+            st.session_state[subj_study_key] = str(study.get("id"))
+        st.text_input("Temat (e-mail)", key=subj_key)
 
-    st.markdown("### Treść wiadomości")
-    st.text_area("Treść", key="jst_msg_body", height=220, label_visibility="collapsed")
+    cols = st.columns([3, 3], gap="medium")
+    with cols[0]:
+        st.markdown('<div class="field-label">Treść wiadomości:</div>', unsafe_allow_html=True)
+        st.text_area("Treść wiadomości", key="jst_send_body", height=240, label_visibility="collapsed")
 
-    c1, c2 = st.columns([0.3, 0.7], gap="small")
+        if method == "SMS":
+            msg_len = len(str(st.session_state.get("jst_send_body") or ""))
+            seg_len = 160
+            segments = (msg_len + seg_len - 1) // seg_len
+            remain = seg_len - (msg_len % seg_len or seg_len)
+            st.markdown(
+                f'<div class="sms-counter">Długość: {msg_len} znaków • Segmenty: {segments} • Pozostało w bieżącym: {remain}</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div class="btn-stack">', unsafe_allow_html=True)
+        st.markdown('<div class="btn-reset">', unsafe_allow_html=True)
+        if st.button("Przywróć domyślną treść", key="jst_send_reset"):
+            st.session_state["jst_send_body"] = default_sms if method == "SMS" else default_email
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="btn-send">', unsafe_allow_html=True)
+        send_btn = st.button("Wyślij", key="jst_send_btn", type="primary")
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with cols[1]:
+        body_preview = str(st.session_state.get("jst_send_body") or "")
+        if method == "SMS":
+            st.markdown(_fake_phone_mockup(body_preview), unsafe_allow_html=True)
+        else:
+            subj = str(st.session_state.get("jst_send_subject") or "")
+            st.markdown(_fake_email_mockup(subj, body_preview), unsafe_allow_html=True)
+
+    if send_btn:
+        mode = "sms" if method == "SMS" else "email"
+        recipients_list = _normalize_recipients(recipients, mode=mode)
+        if not recipients_list:
+            st.warning("Podaj co najmniej jednego poprawnego odbiorcę.")
+            st.stop()
+
+        body_tpl = str(st.session_state.get("jst_send_body") or "").strip()
+        if not body_tpl:
+            st.warning("Treść wiadomości jest pusta.")
+            st.stop()
+
+        if mode == "sms":
+            api_token, sender, base = _sms_env()
+            sent_ok = 0
+            for phone in recipients_list:
+                token = make_token(8)
+                final_link = _build_link(base, slug, token)
+                msg = body_tpl.replace(link_preview, final_link)
+                for _ in range(5):
+                    try:
+                        rec = create_sms_record(sb, study_id=study["id"], phone=phone, text=msg, token=token)
+                        break
+                    except DuplicateSmsTokenError:
+                        token = make_token(8)
+                        final_link = _build_link(base, slug, token)
+                        msg = body_tpl.replace(link_preview, final_link)
+                else:
+                    st.error(f"Nie udało się wygenerować unikalnego tokena dla {phone}.")
+                    continue
+                ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=msg, sender=sender)
+                if ok:
+                    mark_sms_sent(sb, sms_id=rec["id"], provider_message_id=provider_id or "")
+                    sent_ok += 1
+                else:
+                    st.error(f"Nie wysłano SMS do {phone}: {err or 'unknown error'}")
+            st.success(f"Wysłano {sent_ok} / {len(recipients_list)}.")
+        else:
+            host, port, user, pwd, secure, from_email, from_name, base = _email_env()
+            subject = str(st.session_state.get("jst_send_subject") or "").strip() or "Prośba o wypełnienie ankiety"
+            sent_ok = 0
+            for email in recipients_list:
+                token = make_token(8)
+                final_link = _build_link(base, slug, token)
+                msg = body_tpl.replace(link_preview, final_link)
+                for _ in range(5):
+                    try:
+                        rec = create_email_record(sb, study_id=study["id"], email=email, subject=subject, text=msg, token=token)
+                        break
+                    except DuplicateEmailTokenError:
+                        token = make_token(8)
+                        final_link = _build_link(base, slug, token)
+                        msg = body_tpl.replace(link_preview, final_link)
+                else:
+                    st.error(f"Nie udało się wygenerować unikalnego tokena dla {email}.")
+                    continue
+                ok, provider_mid, err = send_email(
+                    host=host,
+                    port=port,
+                    username=user,
+                    password=pwd,
+                    secure=secure,
+                    from_email=from_email,
+                    from_name=from_name,
+                    to_email=email,
+                    subject=subject,
+                    text=msg,
+                )
+                if ok:
+                    mark_email_sent(sb, email_id=rec["id"], provider_message_id=provider_mid or "")
+                    sent_ok += 1
+                else:
+                    st.error(f"Nie wysłano e-maila do {email}: {err or 'unknown error'}")
+            st.success(f"Wysłano {sent_ok} / {len(recipients_list)}.")
+
+    st.markdown('<hr class="hr-thin status-top-tight">', unsafe_allow_html=True)
+    mode = "sms" if method == "SMS" else "email"
+    status_label = "Statusy SMS" if mode == "sms" else "Statusy e-mail"
+    st.markdown(f'<div class="form-label-strong" style="font-size:18px;margin-bottom:16px;">{status_label}</div>', unsafe_allow_html=True)
+
+    c1, c2 = st.columns([1, 5])
     with c1:
-        if st.button("Przywróć domyślną treść", use_container_width=True):
-            st.session_state["jst_msg_body"] = default_sms if method == "SMS" else default_email
+        if st.button("⟳ Odśwież statusy", key=f"jst_refresh_{mode}"):
             st.rerun()
     with c2:
-        if st.button("Wyślij", type="primary", use_container_width=True):
-            try:
-                if method == "SMS":
-                    recipients_list = _normalize_phones(recipients)
-                    if not recipients_list:
-                        st.error("Podaj co najmniej jeden poprawny numer telefonu.")
-                        return
+        auto_key = f"jst_auto_refresh_{mode}"
+        auto_refresh = st.checkbox("Auto-odśwież co 15 sekund", value=st.session_state.get(auto_key, False), key=auto_key)
 
-                    token_api, sender, base = _sms_env()
-                    sent = 0
-                    for phone in recipients_list:
-                        body_tpl = str(st.session_state.get("jst_msg_body") or "").strip()
-                        if not body_tpl:
-                            continue
-                        for _ in range(4):
-                            token = make_token(8)
-                            link = _build_link(base, slug, token)
-                            body = body_tpl.replace(link_preview, link)
-                            try:
-                                rec = create_sms_record(sb, str(study["id"]), phone, body, token)
-                            except DuplicateSmsTokenError:
-                                continue
-                            ok, provider_mid, err = send_sms(token_api, phone, body, sender=sender)
-                            if ok:
-                                mark_sms_sent(sb, rec["id"], provider_mid or "")
-                                sent += 1
-                            else:
-                                sb.table("sms_messages").update({"status": "failed"}).eq("id", rec["id"]).execute()
-                                st.warning(f"SMS do {phone} nie został wysłany: {err}")
-                            break
-                    if sent:
-                        st.success(f"Wysłano {sent} wiadomości SMS.")
-                    else:
-                        st.warning("Nie wysłano żadnej wiadomości SMS.")
+    df_logs = _logs_dataframe(sb, study_id=study["id"], mode=mode)
+    if df_logs.empty:
+        st.caption("Brak statusów do wyświetlenia.")
+    else:
+        col_cfg = {col: cc.Column(width="medium") for col in df_logs.columns}
+        st.dataframe(df_logs, use_container_width=True, hide_index=True, column_config=col_cfg)
 
-                else:
-                    recipients_list = _normalize_emails(recipients)
-                    if not recipients_list:
-                        st.error("Podaj co najmniej jeden poprawny adres e-mail.")
-                        return
-                    subject = str(st.session_state.get("jst_email_subject") or "").strip() or "Prośba o wypełnienie ankiety"
-                    body_tpl = str(st.session_state.get("jst_msg_body") or "").strip()
-                    if not body_tpl:
-                        st.error("Treść wiadomości jest pusta.")
-                        return
-
-                    host, port, user, pwd, secure, from_email, from_name, base = _email_env()
-                    sent = 0
-                    for email in recipients_list:
-                        for _ in range(4):
-                            token = make_token(8)
-                            link = _build_link(base, slug, token)
-                            body = body_tpl.replace(link_preview, link)
-                            try:
-                                rec = create_email_record(sb, str(study["id"]), email, subject, body, token)
-                            except DuplicateEmailTokenError:
-                                continue
-                            ok, provider_mid, err = send_email(
-                                host=host,
-                                port=port,
-                                username=user,
-                                password=pwd,
-                                secure=secure,
-                                from_email=from_email,
-                                from_name=from_name,
-                                to_email=email,
-                                subject=subject,
-                                text=body,
-                            )
-                            if ok:
-                                mark_email_sent(sb, rec["id"], provider_mid or "")
-                                sent += 1
-                            else:
-                                sb.table("email_logs").update({"status": "failed"}).eq("id", rec["id"]).execute()
-                                st.warning(f"E-mail do {email} nie został wysłany: {err}")
-                            break
-                    if sent:
-                        st.success(f"Wysłano {sent} wiadomości e-mail.")
-                    else:
-                        st.warning("Nie wysłano żadnej wiadomości e-mail.")
-            except Exception as e:
-                st.error(f"Błąd wysyłki: {e}")
-
-    st.markdown("---")
-    st.markdown("### Statusy wysyłek")
-    sms_df = _logs_dataframe(sb, str(study["id"]), "sms")
-    email_df = _logs_dataframe(sb, str(study["id"]), "email")
-
-    tab_sms, tab_email = st.tabs(["SMS", "E-mail"])
-    with tab_sms:
-        if sms_df.empty:
-            st.caption("Brak wpisów SMS.")
-        else:
-            st.dataframe(sms_df, use_container_width=True, hide_index=True)
+        out_name = slug or "jst"
+        xlsx_bytes = _df_to_xlsx_bytes(df_logs, sheet_name=("SMS" if mode == "sms" else "EMAIL"), borders="none")
+        cxl, cpdf = st.columns(2)
+        with cxl:
             st.download_button(
-                "Pobierz statusy SMS (xlsx)",
-                data=_df_to_xlsx_bytes(sms_df),
-                file_name=f"statusy-sms-{slug}.xlsx",
+                "📊 Eksport XLSX",
+                data=xlsx_bytes,
+                file_name=f"statusy-{mode}-{out_name}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
-    with tab_email:
-        if email_df.empty:
-            st.caption("Brak wpisów e-mail.")
-        else:
-            st.dataframe(email_df, use_container_width=True, hide_index=True)
-            st.download_button(
-                "Pobierz statusy e-mail (xlsx)",
-                data=_df_to_xlsx_bytes(email_df),
-                file_name=f"statusy-email-{slug}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
+        with cpdf:
+            pdf_bytes = _df_to_pdf_bytes(df_logs, title=f"Statusy {mode.upper()} – {jst_full_nom}")
+            if pdf_bytes:
+                st.download_button(
+                    "📄 Eksport PDF",
+                    data=pdf_bytes,
+                    file_name=f"statusy-{mode}-{out_name}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            else:
+                st.caption("PDF: zainstaluj pakiet `reportlab` na serwerze, aby włączyć eksport.")
 
+    legend = """
+      📤 – wiadomość wysłana<br>
+      📬 – wiadomość doręczona (jeśli provider zwróci potwierdzenie)<br>
+      🔗 – odbiorca kliknął w link<br>
+      🏁 – ankieta rozpoczęta<br>
+      ✅ – ankieta zakończona<br>
+      ✖ – błąd wysyłki<br>
+      ⏳ – oczekuje w kolejce<br>
+      • – inny / nieznany status
+    """
+    st.markdown(
+        f"""<div style="margin-top:18px;font-size:14px;line-height:1.6;"><b>Legenda statusów:</b><br>{legend}</div><div style="margin-bottom:60px"></div>""",
+        unsafe_allow_html=True,
+    )
 
-def _df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "Statusy") -> bytes:
-    out = BytesIO()
-    with pd.ExcelWriter(out, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name=sheet_name)
-        ws = writer.sheets[sheet_name]
-        book = writer.book
-        header_fmt = book.add_format({"bold": True, "bg_color": "#f3f4f6", "border": 0})
-        for c, title in enumerate(df.columns):
-            ws.write(0, c, title, header_fmt)
-            col_len = max(10, min(44, int(max(len(str(title)), df.iloc[:, c].astype(str).str.len().max() if len(df) else 0) + 2)))
-            ws.set_column(c, c, col_len)
-    return out.getvalue()
+    if auto_refresh:
+        st.caption("Auto-odświeżanie aktywne (co 15 s)")
+        time.sleep(15)
+        st.rerun()
