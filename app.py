@@ -294,7 +294,6 @@ st.markdown(
   transform:translateY(-3px);
   box-shadow:0 10px 28px rgba(15,23,42,.08);
 }
-.tiles.tiles-root .stButton>button,
 .tiles.tiles-home-personal .stButton>button,
 .tiles.tiles-home-jst .stButton>button,
 .stButton>button.tile-btn{
@@ -305,8 +304,12 @@ st.markdown(
   padding:18px 14px !important;
 }
 .tiles.tiles-root .stButton>button{
-  min-height:186px !important;
-  font-size:1.14rem !important;
+  min-height:88px !important;
+  height:88px !important;
+  font-size:1.02rem !important;
+  line-height:1.25 !important;
+  border-radius:14px !important;
+  padding:10px 12px !important;
 }
 .top-back-wrap{ margin:0 0 8px 0; }
 .top-back-wrap .stButton>button{
@@ -480,23 +483,6 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
   border-color:#b8c4d6 !important;
 }
 </style>
-""",
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    """
-<script>
-setTimeout(() => {
-  const buttons = window.parent.document.querySelectorAll('.stButton > button');
-  buttons.forEach((btn) => {
-    const txt = (btn.innerText || '').trim();
-    const lineCount = txt ? txt.split('\\n').filter(Boolean).length : 0;
-    if (lineCount >= 2) btn.classList.add('tile-btn');
-    else btn.classList.remove('tile-btn');
-  });
-}, 0);
-</script>
 """,
     unsafe_allow_html=True,
 )
@@ -1246,13 +1232,13 @@ def home_root_view() -> None:
     st.markdown('<div class="tiles tiles-root">', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("🧑‍💼\n\nBadania personalne\nProfil, wysyłka i raporty.", type="secondary"):
+        if st.button("🧑‍💼\n\nBadania personalne", type="secondary"):
             goto("home_personal")
     with c2:
-        if st.button("🏘️\n\nBadania mieszkańców\nBazy, ankieta i analiza.", type="secondary"):
+        if st.button("🏘️\n\nBadania mieszkańców", type="secondary"):
             goto("home_jst")
     with c3:
-        if st.button("🧭\n\nMatching\nPorównanie profili.", type="secondary"):
+        if st.button("🧭\n\nMatching", type="secondary"):
             goto("matching")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1661,46 +1647,61 @@ def jst_io_view() -> None:
             st.error("Wybierz plik do importu.")
         else:
             try:
-                if uploaded.name.lower().endswith(".xlsx"):
-                    src_df = pd.read_excel(uploaded)
-                else:
-                    src_df = pd.read_csv(uploaded, encoding="utf-8-sig")
-                if src_df.empty:
-                    st.warning("Plik nie zawiera rekordów.")
-                    return
-
-                existing_rows = list_jst_responses(sb, study_id)
-                existing_ids = {str(r.get("respondent_id") or "").strip() for r in existing_rows if str(r.get("respondent_id") or "").strip()}
-                next_id = _next_jst_respondent_id(existing_ids)
-                next_n = int(next_id[1:]) if len(next_id) > 1 and next_id[1:].isdigit() else (len(existing_ids) + 1)
-
-                inserted = 0
-                skipped = 0
-                for _, row in src_df.iterrows():
-                    raw = {k: row.get(k) for k in src_df.columns}
-                    rid = str(raw.get("respondent_id") or "").strip()
-                    if not rid:
-                        rid = f"R{next_n:04d}"
-                        next_n += 1
-                    norm = jst_normalize_response_row(raw, respondent_id_fallback=rid)
-                    if not norm.get("respondent_id"):
-                        norm["respondent_id"] = rid
-                    if norm["respondent_id"] in existing_ids:
-                        skipped += 1
-                        continue
-                    ok = insert_jst_response(
-                        sb,
-                        study_id=study_id,
-                        respondent_id=str(norm["respondent_id"]),
-                        payload=jst_make_payload_from_row(norm),
-                        source="import",
-                        skip_if_exists=True,
-                    )
-                    if ok:
-                        inserted += 1
-                        existing_ids.add(str(norm["respondent_id"]))
+                with st.spinner("Import trwa. Prosimy o chwilę cierpliwości..."):
+                    if uploaded.name.lower().endswith(".xlsx"):
+                        src_df = pd.read_excel(uploaded)
                     else:
-                        skipped += 1
+                        src_df = pd.read_csv(uploaded, encoding="utf-8-sig")
+                    if src_df.empty:
+                        st.warning("Plik nie zawiera rekordów.")
+                        return
+
+                    total_rows = int(len(src_df.index))
+                    progress = st.progress(0.0, text=f"Przygotowanie importu ({total_rows} wierszy)...")
+
+                    existing_rows = list_jst_responses(sb, study_id)
+                    existing_ids = {str(r.get("respondent_id") or "").strip() for r in existing_rows if str(r.get("respondent_id") or "").strip()}
+                    next_id = _next_jst_respondent_id(existing_ids)
+                    next_n = int(next_id[1:]) if len(next_id) > 1 and next_id[1:].isdigit() else (len(existing_ids) + 1)
+
+                    inserted = 0
+                    skipped = 0
+                    progress_every = max(1, total_rows // 120)
+                    for idx, (_, row) in enumerate(src_df.iterrows(), start=1):
+                        raw = {k: row.get(k) for k in src_df.columns}
+                        rid = str(raw.get("respondent_id") or "").strip()
+                        if not rid:
+                            rid = f"R{next_n:04d}"
+                            next_n += 1
+                        norm = jst_normalize_response_row(raw, respondent_id_fallback=rid)
+                        if not norm.get("respondent_id"):
+                            norm["respondent_id"] = rid
+
+                        if norm["respondent_id"] in existing_ids:
+                            skipped += 1
+                        else:
+                            ok = insert_jst_response(
+                                sb,
+                                study_id=study_id,
+                                respondent_id=str(norm["respondent_id"]),
+                                payload=jst_make_payload_from_row(norm),
+                                source="import",
+                                skip_if_exists=True,
+                            )
+                            if ok:
+                                inserted += 1
+                                existing_ids.add(str(norm["respondent_id"]))
+                            else:
+                                skipped += 1
+
+                        if idx == 1 or idx % progress_every == 0 or idx == total_rows:
+                            progress.progress(
+                                min(1.0, idx / max(total_rows, 1)),
+                                text=f"Importowanie rekordów: {idx}/{total_rows}",
+                            )
+
+                    progress.progress(1.0, text="Finalizacja importu...")
+                    progress.empty()
 
                 st.success(f"Import zakończony. Dodano: {inserted}, pominięto: {skipped}.")
             except Exception as e:
@@ -1737,6 +1738,52 @@ def jst_io_view() -> None:
     st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
 
 
+def _estimate_report_iframe_height(html_text: str, wide_mode: bool) -> int:
+    img_count = (html_text or "").lower().count("<img")
+    base = 2200 if wide_mode else 1800
+    # Duże raporty mają bardzo dużo sekcji i wykresów, więc dajemy zapas wysokości,
+    # aby uniknąć dodatkowego scrolla wewnątrz iframe.
+    estimated = base + img_count * 320 + int(len(html_text or "") / 3500)
+    return max(2200, min(52000, estimated))
+
+
+def _prepare_report_html_for_iframe(html_text: str) -> str:
+    if not html_text:
+        return ""
+    autosize_js = """
+<script>
+(function(){
+  function resizeNow(){
+    try{
+      const h = Math.max(
+        document.body ? document.body.scrollHeight : 0,
+        document.documentElement ? document.documentElement.scrollHeight : 0
+      );
+      if (window.frameElement && h > 0){
+        window.frameElement.style.height = (h + 32) + 'px';
+      }
+    }catch(e){}
+  }
+  window.addEventListener('load', function(){
+    resizeNow();
+    setTimeout(resizeNow, 120);
+    setTimeout(resizeNow, 450);
+  });
+  if (typeof ResizeObserver !== 'undefined' && document.body){
+    try{
+      const ro = new ResizeObserver(function(){ resizeNow(); });
+      ro.observe(document.body);
+    }catch(e){}
+  }
+  setTimeout(resizeNow, 30);
+})();
+</script>
+"""
+    if re.search(r"</body\s*>", html_text, flags=re.IGNORECASE):
+        return re.sub(r"</body\s*>", autosize_js + "</body>", html_text, flags=re.IGNORECASE, count=1)
+    return html_text + autosize_js
+
+
 def jst_analysis_view() -> None:
     require_auth()
     if not _require_jst_ready():
@@ -1747,10 +1794,16 @@ def jst_analysis_view() -> None:
     if "wide_jst_report" not in st.session_state:
         st.session_state["wide_jst_report"] = True
     wide_jst = st.toggle("🔎 Szeroki raport", key="wide_jst_report")
-    st.markdown(
-        f"<style>.block-container{{max-width:{'100vw' if wide_jst else '1160px'} !important}}</style>",
-        unsafe_allow_html=True,
-    )
+    if wide_jst:
+        st.markdown(
+            "<style>.block-container{max-width:94vw !important; padding-left:0 !important; padding-right:0 !important;}</style>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            "<style>.block-container{max-width:1160px !important;}</style>",
+            unsafe_allow_html=True,
+        )
 
     studies = fetch_jst_studies(sb)
     if not studies:
@@ -1790,15 +1843,15 @@ def jst_analysis_view() -> None:
                 )
                 raw_html = report_path.read_text(encoding="utf-8", errors="ignore")
                 inlined = inline_local_assets(raw_html, report_path.parent)
-                inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 10_000_000) or 10_000_000)
+                inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 45_000_000) or 45_000_000)
                 inlined_bytes = len(inlined.encode("utf-8", errors="ignore"))
-                use_inlined = inlined_bytes <= inline_limit
-                st.session_state[cache_key] = inlined if use_inlined else raw_html
+                st.session_state[cache_key] = inlined
                 st.session_state[cache_meta_key] = {
                     "report_path": str(report_path),
                     "raw_bytes": len(raw_html.encode("utf-8", errors="ignore")),
                     "inlined_bytes": inlined_bytes,
-                    "inlined_used": use_inlined,
+                    "inlined_used": True,
+                    "inline_limit": inline_limit,
                 }
                 st.success("Raport gotowy.")
             except Exception as e:
@@ -1820,10 +1873,26 @@ def jst_analysis_view() -> None:
             use_container_width=False,
         )
 
-    if rendered and not bool(meta.get("inlined_used", True)):
-        st.info("Raport jest bardzo duży, dlatego użyliśmy lekkiego trybu renderowania, aby uniknąć zawieszeń widoku.")
+    if rendered and int(meta.get("inlined_bytes") or 0) > int(meta.get("inline_limit") or 0):
+        st.warning(
+            "Raport jest bardzo duży. Ładujemy pełny widok z wykresami, co może chwilę potrwać na słabszych urządzeniach."
+        )
+    light_mode = st.toggle(
+        "Tryb lekki renderowania (szybciej, bez osadzonych wykresów)",
+        value=False,
+        key=f"jst_light_mode_{sid}",
+    )
     if rendered:
-        html_component(rendered, height=2200 if wide_jst else 1800, scrolling=True)
+        to_render = rendered
+        if light_mode and report_path and report_path.exists():
+            to_render = report_path.read_text(encoding="utf-8", errors="ignore")
+            st.info("Tryb lekki jest włączony. Wykresy osadzone mogą być ograniczone, ale raport renderuje się szybciej.")
+        prepared = _prepare_report_html_for_iframe(to_render)
+        html_component(
+            prepared,
+            height=_estimate_report_iframe_height(prepared, wide_mode=wide_jst),
+            scrolling=False,
+        )
 
 
 def _load_personal_profile_pct(study_id: str) -> Tuple[Dict[str, float], int]:
@@ -2308,12 +2377,7 @@ def jst_stats_panel(studies: List[Dict[str, Any]], rows: List[Dict[str, Any]], t
                 df = pd.DataFrame(rows, columns=["JST", "Link", "Data utworzenia", "Liczba odpowiedzi"])
                 sort_idx = pd.to_datetime(df["Data utworzenia"], errors="coerce", format="%Y-%m-%d %H:%M")
                 df = df.assign(_sort=sort_idx).sort_values("_sort", ascending=False).drop(columns="_sort")
-                st.dataframe(
-                    df,
-                    use_container_width=True,
-                    hide_index=True,
-                    height=max(len(df) * 36 + 15, 120),
-                )
+                st.table(df.reset_index(drop=True))
             else:
                 st.caption("Brak badań JST.")
 
