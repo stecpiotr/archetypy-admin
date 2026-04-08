@@ -1,0 +1,24 @@
+MACIERZ X (A + C) – definicja
+============================
+
+Wiersze odpowiadają kolejnym pytaniom A1..A18 oraz C1..C6.
+Kolumny odpowiadają 12 archetypom w stałej kolejności:
+
+1 Władca
+2 Bohater
+3 Mędrzec
+4 Opiekun
+5 Kochanek
+6 Błazen
+7 Twórca
+8 Odkrywca
+9 Czarodziej
+10 Towarzysz
+11 Niewinny
+12 Buntownik
+
+W każdym wierszu są dokładnie DWIE niezerowe wartości:
+• -1 przy archetypie po stronie lewej / opcji A
+• +1 przy archetypie po stronie prawej / opcji B
+
+Plik: macierz_X_AplusC.csv zawiera pełną macierz 24×12.

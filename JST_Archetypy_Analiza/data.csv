@@ -1,0 +1,1051 @@
+﻿respondent_id,M_PLEC,M_WIEK,M_WYKSZT,M_ZAWOD,M_MATERIAL,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,B1_Władca,B1_Bohater,B1_Mędrzec,B1_Opiekun,B1_Kochanek,B1_Błazen,B1_Twórca,B1_Odkrywca,B1_Czarodziej,B1_Towarzysz,B1_Niewinny,B1_Buntownik,B2,D1,D2,D3,D4,D5,D6,D7,D8,D9,D10,D11,D12,D13
+R0001,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej źle,3,2,3,2,2,3,1,3,3,2,3,5,6,5,4,6,2,5,1,0,1,1,0,0,0,0,0,0,0,0,Opiekun,B,B,A,B,B,B,A,A,B,B,B,A,Bohater
+R0002,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,5,2,2,6,6,2,1,3,2,3,2,2,2,3,2,3,0,1,0,0,0,0,1,0,1,0,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0003,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,2,6,2,5,3,6,2,2,2,6,6,7,5,6,3,3,3,1,0,1,0,0,0,1,0,0,0,0,0,Władca,A,B,B,A,A,A,A,A,A,A,A,A,Czarodziej
+R0004,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,2,1,1,5,1,1,7,1,1,1,7,7,7,7,1,7,1,1,0,0,1,0,0,1,1,0,0,0,0,0,Błazen,B,B,B,B,B,A,B,B,B,A,A,B,Opiekun
+R0005,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej źle,7,7,7,6,6,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,1,0,1,1,0,0,0,0,0,0,Mędrzec,B,A,B,B,A,B,B,B,B,B,B,B,Błazen
+R0006,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,1,6,2,6,6,1,3,2,3,6,6,6,5,2,3,2,3,0,1,1,0,0,0,0,0,0,0,0,0,Bohater,A,B,A,A,A,A,A,A,A,B,A,A,Czarodziej
+R0007,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,6,5,5,5,5,2,2,3,5,6,6,5,1,2,5,1,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,A,B,B,B,A,A,A,A,A,B,B,A,Błazen
+R0008,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,6,5,7,6,6,5,3,5,3,5,3,3,5,3,3,5,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,B,A,B,A,B,A,B,B,A,B,A,A,Towarzysz
+R0009,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej źle,5,3,3,3,3,3,3,3,3,2,3,5,5,3,5,5,3,2,0,0,0,1,0,0,1,0,0,1,0,0,Twórca,B,B,B,A,A,A,B,B,A,B,B,A,Błazen
+R0010,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,3,5,6,3,6,5,3,6,3,6,6,3,3,5,3,6,5,0,0,0,0,1,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,A,B,A,B,B,B,Czarodziej
+R0011,kobieta,15-39,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,4,5,5,5,5,1,1,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0012,kobieta,40-59,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",2,3,3,3,3,3,3,3,3,4,4,5,4,4,4,4,4,3,0,0,0,1,0,0,0,0,1,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0013,mężczyzna,40-59,wyższe,bezrobotny,odmawiam udzielenia odpowiedzi,3,3,5,5,5,5,6,5,5,5,5,5,5,5,5,5,3,3,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,A,A,B,B,B,B,B,Twórca
+R0014,mężczyzna,60 i więcej,wyższe,bezrobotny,"powodzi mi się przeciętnie, średnio",3,5,5,5,5,5,6,6,6,5,5,5,3,4,5,5,5,5,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,B,A,A,B,B,B,A,B,B,A,B,A,Mędrzec
+R0015,kobieta,40-59,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,1,4,2,2,5,4,1,1,1,6,7,3,5,3,2,1,1,1,1,0,0,0,0,0,0,0,1,0,0,Bohater,A,B,A,A,B,A,A,A,A,B,B,B,Buntownik
+R0016,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,3,5,6,5,5,3,6,5,6,3,6,5,5,6,5,3,0,0,0,0,0,1,0,1,1,0,0,0,Błazen,B,A,B,A,A,B,B,B,B,A,A,A,Bohater
+R0017,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,3,5,6,5,5,3,6,5,6,3,5,6,5,3,5,5,0,0,0,0,0,1,0,0,0,0,1,1,Błazen,A,B,B,A,A,B,B,B,B,A,A,B,Odkrywca
+R0018,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,6,3,4,6,5,3,5,5,5,6,3,3,5,6,6,5,3,0,1,0,1,0,0,0,1,0,0,0,0,Bohater,A,A,B,A,A,A,B,A,B,B,B,B,Towarzysz
+R0019,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,4,4,4,5,4,1,2,6,6,6,2,6,6,2,6,0,1,1,0,0,0,0,0,0,0,1,0,Mędrzec,B,B,B,B,B,A,B,A,A,B,B,B,Buntownik
+R0020,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",1,1,7,7,1,1,7,1,1,1,7,1,7,1,7,7,1,1,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,A,B,B,B,B,A,B,Błazen
+R0021,mężczyzna,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,2,5,3,3,3,1,5,3,3,7,7,3,6,5,1,3,6,0,0,1,0,0,0,0,0,0,1,0,1,Mędrzec,B,B,A,B,B,A,B,B,B,B,B,B,Towarzysz
+R0022,mężczyzna,40-59,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,3,5,2,5,2,4,4,3,4,5,6,2,4,3,3,4,3,1,0,0,0,0,1,0,0,0,0,0,1,Błazen,B,B,B,B,B,A,B,A,B,B,B,B,Buntownik
+R0023,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,0,0,1,0,1,0,1,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,A,Kochanek
+R0024,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,1,4,1,4,2,1,2,3,4,5,7,4,4,3,6,2,3,0,1,1,1,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0025,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,5,5,6,6,6,7,4,3,3,2,2,7,2,6,6,6,7,0,0,1,0,0,0,0,0,1,0,0,1,Buntownik,B,B,B,B,B,B,A,B,B,B,B,A,Towarzysz
+R0026,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,5,5,3,5,3,3,5,5,5,5,3,5,3,5,5,5,5,0,0,0,1,0,0,0,1,0,1,0,0,Opiekun,B,B,B,B,A,A,B,B,B,B,B,B,Opiekun
+R0027,mężczyzna,15-39,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,7,2,2,5,3,6,2,2,1,2,6,6,3,3,5,5,2,3,0,0,1,0,1,0,0,0,0,1,0,0,Mędrzec,B,B,B,A,A,B,B,A,A,B,B,A,Towarzysz
+R0028,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,3,2,3,5,2,2,5,3,2,3,3,2,5,3,5,3,5,0,0,0,0,0,0,1,0,0,0,0,1,Twórca,A,A,B,A,B,B,B,A,A,A,B,B,Czarodziej
+R0029,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,3,3,3,3,3,2,4,3,3,3,3,3,3,3,3,1,3,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0030,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,3,3,3,2,2,3,3,3,5,6,2,6,5,6,5,6,0,1,0,1,0,0,0,0,0,0,1,0,Bohater,B,A,B,A,A,A,A,B,A,B,A,A,Bohater
+R0031,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,5,3,3,5,6,3,6,6,3,5,3,6,2,6,2,3,3,6,0,1,0,1,0,1,0,0,0,0,0,0,Bohater,A,A,A,A,A,B,A,A,B,A,A,A,Kochanek
+R0032,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,6,6,2,6,7,5,7,7,7,3,6,5,6,2,6,7,2,5,1,0,1,0,0,0,0,0,0,0,0,1,Władca,B,B,B,B,B,B,B,B,A,A,B,B,Kochanek
+R0033,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,7,7,7,7,5,7,7,7,3,2,3,3,3,3,1,3,4,1,0,0,0,0,0,0,0,0,1,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Kochanek
+R0034,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,5,3,5,3,5,3,5,5,5,3,5,3,5,3,5,3,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,A,A,A,A,B,A,A,A,B,Bohater
+R0035,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,3,3,5,3,3,5,3,5,3,5,4,4,3,5,3,5,3,0,1,0,0,0,0,0,0,0,1,1,0,Bohater,A,B,A,A,A,A,B,B,A,B,B,B,Błazen
+R0036,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,3,4,3,3,2,2,1,3,5,2,6,6,2,2,5,2,2,3,0,0,0,0,0,0,1,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,A,A,Towarzysz
+R0037,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,3,5,3,5,2,6,1,3,3,2,6,6,2,5,6,3,3,0,0,0,0,1,0,1,0,0,0,1,0,Kochanek,B,B,B,B,B,B,B,B,B,B,A,B,Towarzysz
+R0038,kobieta,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",5,3,3,5,2,2,2,3,3,3,5,5,5,5,5,5,5,5,0,0,0,0,0,0,1,1,0,1,0,0,Towarzysz,A,B,B,A,A,B,A,B,A,A,B,A,Bohater
+R0039,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,6,6,5,5,4,5,5,5,2,2,6,6,6,2,5,2,7,0,0,0,0,0,1,1,0,0,1,0,0,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0040,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0,1,0,0,1,0,1,0,0,Kochanek,B,A,B,A,B,A,B,B,B,A,A,A,Władca
+R0041,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,4,3,4,5,3,4,4,4,4,5,4,4,4,4,4,4,1,0,1,1,0,0,0,0,0,0,0,0,Władca,B,B,A,A,B,B,B,B,B,B,B,B,Kochanek
+R0042,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,powodzi mi się raczej dobrze,5,6,5,5,6,6,6,3,3,3,3,3,6,3,6,3,6,3,1,0,0,1,0,0,0,0,1,0,0,0,Władca,A,B,B,B,A,A,B,B,A,A,A,B,Opiekun
+R0043,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,4,2,4,2,4,2,3,7,4,5,5,3,3,2,2,1,0,0,0,1,0,0,0,0,0,0,1,Kochanek,B,A,B,A,B,A,B,B,B,B,B,B,Błazen
+R0044,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,4,5,4,3,2,4,4,3,3,4,5,5,4,4,5,3,4,0,1,0,1,0,0,0,0,0,0,0,1,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0045,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik umysłowy,powodzi mi się raczej źle,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0046,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej źle,6,2,2,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,1,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0047,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej źle,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,0,0,0,1,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0048,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,2,2,2,2,3,3,3,6,6,5,5,5,5,3,3,0,0,0,0,0,1,0,1,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0049,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",7,1,7,1,7,1,7,1,7,7,1,7,1,7,7,7,1,7,0,0,0,0,0,1,0,1,0,1,0,0,Towarzysz,B,A,A,A,B,A,B,A,A,B,B,B,Towarzysz
+R0050,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,1,1,1,7,7,7,7,7,7,7,7,1,1,7,7,1,1,7,0,0,0,0,0,1,0,0,1,1,0,0,Czarodziej,A,A,A,B,B,B,A,B,A,A,B,A,Czarodziej
+R0051,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,2,2,2,2,2,1,2,2,3,3,3,3,3,3,5,3,2,0,0,0,1,1,1,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R0052,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,2,2,2,2,2,2,2,2,2,2,2,2,2,5,5,2,2,0,0,0,1,1,0,0,0,0,1,0,0,Kochanek,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R0053,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,5,5,5,6,3,3,3,5,3,5,6,3,5,3,3,0,0,0,1,1,0,0,0,0,0,1,0,Kochanek,A,B,A,A,A,A,A,B,A,A,A,A,Opiekun
+R0054,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,3,3,5,5,2,2,2,3,5,5,3,5,3,5,2,3,0,1,0,1,1,0,0,0,0,0,0,0,Bohater,A,A,A,B,A,A,A,B,A,A,A,A,Buntownik
+R0055,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,2,1,3,5,2,2,2,3,6,5,3,3,2,3,2,1,0,0,1,0,1,0,0,0,0,1,0,0,Towarzysz,B,B,B,A,A,A,A,A,A,B,A,B,Mędrzec
+R0056,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,1,0,0,0,0,0,0,0,0,1,0,1,Towarzysz,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0057,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,1,1,0,0,0,1,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0058,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,3,5,2,4,3,2,4,4,3,4,5,3,4,5,5,3,4,0,0,0,0,0,0,0,0,0,1,1,1,Niewinny,A,A,A,B,B,B,B,B,B,B,B,B,Bohater
+R0059,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,3,2,2,3,2,3,3,2,5,5,2,3,5,3,3,3,0,0,0,0,0,0,0,1,1,1,0,0,Czarodziej,B,B,B,A,B,A,B,A,B,B,B,B,Mędrzec
+R0060,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,3,5,2,2,2,1,4,3,4,5,5,3,4,5,4,3,4,1,1,0,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,A,B,A,B,A,B,B,B,B,Mędrzec
+R0061,kobieta,60 i więcej,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",6,5,6,6,5,6,5,5,6,5,6,6,5,5,6,5,6,5,0,1,0,1,0,1,0,0,0,0,0,0,Błazen,B,A,B,B,B,B,B,A,B,B,A,A,Błazen
+R0062,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,5,3,5,3,5,3,5,5,5,3,5,3,5,3,5,0,1,0,0,1,0,0,0,0,0,1,0,Bohater,B,B,B,A,A,B,A,A,A,B,B,A,Opiekun
+R0063,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,1,1,1,Towarzysz,B,B,B,B,A,B,A,B,A,A,A,A,Opiekun
+R0064,kobieta,40-59,średnie,rencista/emeryt,powodzi mi się raczej źle,3,1,2,5,6,6,1,1,1,2,5,4,1,1,1,6,1,2,0,1,0,1,0,1,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0065,kobieta,40-59,średnie,rencista/emeryt,powodzi mi się raczej źle,4,1,1,4,5,3,1,1,1,4,5,2,3,1,2,6,1,2,0,1,0,0,0,1,0,1,0,0,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0066,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej źle,5,1,1,6,6,6,1,1,1,1,6,2,1,1,1,4,1,2,0,1,0,1,0,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0067,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,5,5,5,5,5,2,5,5,5,5,5,5,2,5,5,5,5,0,1,0,0,0,0,0,1,0,0,0,0,Bohater,B,B,B,A,A,A,A,A,B,A,B,A,Błazen
+R0068,mężczyzna,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,5,3,5,5,5,5,5,5,5,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,A,A,B,A,B,A,B,B,B,B,A,A,Kochanek
+R0069,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,3,4,5,4,4,4,4,4,4,4,4,5,4,4,3,4,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,B,B,A,A,B,A,A,A,B,A,A,Opiekun
+R0070,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,3,3,2,3,2,2,3,3,2,6,3,6,2,2,2,2,0,0,0,0,0,1,0,0,1,0,1,0,Czarodziej,B,B,A,A,A,B,B,A,B,B,A,B,Czarodziej
+R0071,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,1,1,4,5,7,1,1,1,2,7,7,1,1,1,1,1,1,0,0,1,1,0,0,0,1,0,0,0,0,Odkrywca,B,B,B,A,B,B,B,B,B,B,B,B,Niewinny
+R0072,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,7,5,6,5,6,2,7,3,6,7,5,5,2,2,6,6,6,0,1,0,0,1,0,0,0,1,0,0,0,Czarodziej,B,A,A,A,B,A,B,B,B,B,B,B,Towarzysz
+R0073,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,7,6,7,5,5,3,3,2,7,7,5,6,6,1,7,2,7,7,0,0,0,0,1,1,0,0,1,0,0,0,Czarodziej,B,A,B,A,A,B,A,B,B,A,A,A,Błazen
+R0074,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,3,3,2,3,6,7,3,3,3,3,6,3,6,5,3,2,1,0,0,1,0,0,0,0,0,1,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0075,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",3,3,3,2,6,5,3,3,5,2,7,3,7,6,2,6,2,6,1,0,0,0,0,0,0,0,0,1,0,1,Buntownik,B,B,A,B,B,A,B,A,B,A,A,A,Kochanek
+R0076,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,4,4,4,3,6,3,3,4,4,4,4,4,7,2,2,7,5,2,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,A,A,B,B,B,B,B,A,A,A,A,A,Bohater
+R0077,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,4,4,5,5,4,6,7,4,7,4,7,7,4,3,4,4,4,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,A,B,B,B,A,A,A,A,A,B,B,B,Błazen
+R0078,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,odmawiam udzielenia odpowiedzi,7,1,1,1,7,1,1,1,6,7,7,1,1,1,1,7,1,7,0,0,0,0,1,0,0,0,0,1,0,1,Towarzysz,A,A,A,B,B,B,B,A,B,A,A,B,Towarzysz
+R0079,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej źle,7,6,1,7,7,2,2,7,7,1,1,1,7,1,1,7,1,7,0,0,0,0,0,0,0,1,0,0,1,1,Niewinny,B,A,A,B,A,A,B,B,B,A,B,A,Czarodziej
+R0080,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,7,7,1,1,1,7,7,1,7,1,1,7,1,1,7,1,7,1,0,0,1,0,1,0,1,0,0,0,0,0,Kochanek,B,B,B,A,B,B,A,B,A,B,B,B,Mędrzec
+R0081,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,6,6,6,7,3,6,6,5,6,2,6,6,6,3,6,6,1,0,0,0,0,0,0,0,0,0,0,1,Władca,B,B,A,B,B,B,A,B,B,B,B,B,Mędrzec
+R0082,kobieta,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,6,6,5,6,6,6,5,6,6,6,6,6,6,2,6,6,6,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,B,B,B,B,A,B,B,B,A,B,A,B,Opiekun
+R0083,mężczyzna,40-59,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",6,6,6,6,6,7,7,7,6,6,6,6,6,6,6,6,6,6,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0084,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,6,6,6,6,6,6,6,6,6,6,6,7,7,7,7,7,6,1,0,0,0,0,0,0,0,0,0,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0085,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,5,3,5,5,3,3,3,5,5,5,5,5,5,5,5,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,A,A,B,A,B,B,B,B,A,B,Buntownik
+R0086,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,6,5,6,5,7,7,5,6,5,5,5,6,6,6,6,5,6,5,1,0,0,0,0,1,0,0,0,0,0,1,Błazen,A,A,A,B,B,A,A,B,B,B,A,B,Kochanek
+R0087,kobieta,40-59,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",3,4,1,1,1,7,7,1,1,4,4,4,7,1,4,7,1,4,0,0,0,1,0,0,0,0,0,0,1,1,Opiekun,B,B,B,B,B,B,B,B,A,B,B,B,Władca
+R0088,kobieta,40-59,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",4,1,1,4,1,1,7,1,1,1,4,1,4,1,4,7,1,1,0,0,0,1,1,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0089,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,1,4,7,7,7,1,4,4,4,1,7,7,1,1,7,7,4,1,0,0,1,0,0,1,0,0,0,0,0,Opiekun,B,B,B,B,A,B,B,B,B,B,B,B,Opiekun
+R0090,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,5,2,2,6,6,6,6,3,2,2,2,2,2,2,2,6,2,2,0,0,0,0,1,1,0,1,0,0,0,0,Błazen,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0091,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,2,5,6,6,6,2,2,2,6,3,6,2,2,6,2,2,0,0,0,0,1,0,0,1,1,0,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0092,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,2,2,2,3,7,7,7,7,7,1,7,5,5,5,5,5,5,5,0,1,0,1,1,0,0,0,0,0,0,0,Bohater,A,A,A,B,A,B,A,A,A,A,A,B,Władca
+R0093,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,3,2,2,2,2,2,2,2,3,2,3,2,2,3,6,5,3,3,0,1,0,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0094,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,6,7,6,5,6,5,6,5,5,5,3,5,5,7,6,5,5,2,0,1,0,1,0,0,0,0,0,0,1,0,Bohater,A,B,A,B,B,B,B,A,B,A,A,B,Kochanek
+R0095,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,4,6,6,6,5,7,6,5,6,5,6,5,6,5,6,6,2,5,1,1,0,0,0,0,0,0,0,0,0,1,Władca,B,B,A,A,A,A,A,B,A,A,A,A,Niewinny
+R0096,kobieta,40-59,średnie,pracownik fizyczny,odmawiam udzielenia odpowiedzi,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Błazen
+R0097,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,5,5,5,5,5,5,6,5,5,5,5,5,5,5,5,5,5,0,0,1,0,1,0,0,1,0,0,0,0,Kochanek,A,B,A,A,B,A,A,B,B,A,A,B,Buntownik
+R0098,mężczyzna,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,0,0,0,0,1,0,0,0,0,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0099,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,odmawiam udzielenia odpowiedzi,5,5,5,5,5,5,5,5,5,3,3,3,3,3,3,3,3,3,0,1,0,0,0,0,1,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Odkrywca
+R0100,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,5,6,7,7,7,6,6,6,7,4,4,6,6,7,7,7,7,7,0,0,0,0,0,0,0,1,1,0,0,0,Odkrywca,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0101,kobieta,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,2,7,1,2,4,7,5,2,1,6,7,5,7,2,5,2,5,1,0,0,0,0,1,0,0,0,0,0,1,Błazen,B,A,A,A,B,A,A,B,B,A,A,A,Błazen
+R0102,kobieta,15-39,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,6,6,6,6,6,6,4,6,6,6,6,6,6,6,6,6,6,6,0,0,1,0,1,0,0,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0103,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",1,1,1,1,1,1,1,1,1,1,1,1,7,1,7,7,1,1,0,0,1,1,0,0,0,0,0,0,1,0,Opiekun,A,A,A,A,A,B,A,B,A,A,A,A,Opiekun
+R0104,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,1,1,1,1,1,1,1,1,1,1,1,1,7,1,1,7,1,1,0,0,0,1,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0105,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej źle,1,1,1,1,1,1,1,1,1,1,7,1,7,7,7,7,1,1,0,0,0,0,1,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,A,B,B,B,B,A,B,Twórca
+R0106,kobieta,40-59,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,6,3,3,3,5,3,3,3,3,3,3,3,5,5,5,5,5,5,1,0,0,1,0,0,0,0,0,1,0,0,Opiekun,B,A,B,B,A,A,A,B,A,B,A,B,Opiekun
+R0107,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej źle,6,5,6,5,6,6,5,6,6,5,5,5,6,6,7,5,5,5,0,1,1,1,0,0,0,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Buntownik
+R0108,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,4,3,3,3,4,4,4,3,3,4,3,4,4,5,4,4,1,0,0,0,0,0,1,0,0,0,1,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Władca
+R0109,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,3,6,5,6,5,5,5,3,6,5,5,5,5,0,0,0,1,0,0,0,1,0,0,1,0,Odkrywca,B,B,B,B,A,A,B,A,B,B,B,B,Władca
+R0110,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,3,5,5,5,5,5,5,5,5,5,5,5,4,0,1,0,1,0,0,0,0,0,0,0,1,Opiekun,A,B,A,A,B,A,A,A,B,A,A,B,Bohater
+R0111,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,"powodzi mi się przeciętnie, średnio",6,6,6,4,4,5,3,4,3,5,3,5,4,5,5,5,3,6,1,0,0,1,0,0,0,0,0,0,1,0,Opiekun,A,B,A,A,A,A,A,A,A,A,A,B,Władca
+R0112,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej źle,6,6,6,6,6,6,6,7,6,6,6,6,7,7,6,7,7,6,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Władca
+R0113,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,2,2,2,2,3,3,3,5,6,6,6,5,5,3,3,0,0,1,0,0,0,1,0,0,1,0,0,Mędrzec,A,B,B,A,B,B,A,B,A,A,B,B,Niewinny
+R0114,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,6,3,3,6,5,6,3,6,5,3,5,5,5,5,5,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,A,A,B,A,B,B,A,A,Towarzysz
+R0115,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,6,5,6,7,2,5,3,6,2,6,7,6,1,5,6,1,5,6,0,0,1,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,B,B,A,B,A,A,B,A,A,Bohater
+R0116,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,4,3,3,2,2,3,1,2,3,2,2,1,4,3,5,5,3,2,0,1,0,1,0,0,0,0,0,1,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0117,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,2,6,3,2,6,6,2,2,3,6,6,2,6,6,6,2,6,1,0,0,0,0,0,0,0,0,0,1,1,Buntownik,A,A,A,A,B,A,A,A,A,A,A,A,Opiekun
+R0118,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,7,7,7,2,5,6,6,6,3,5,5,4,6,3,5,6,3,0,0,0,0,1,0,0,1,0,1,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0119,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,5,3,5,2,1,3,3,5,5,3,3,5,3,5,5,5,0,0,1,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0120,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,2,4,4,3,4,2,4,4,5,6,2,4,3,1,6,1,0,0,0,0,0,0,0,0,0,1,1,Niewinny,B,B,B,A,A,A,B,A,A,A,B,B,Mędrzec
+R0121,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,5,2,2,5,3,3,6,3,3,3,6,4,3,3,7,1,6,1,0,0,0,0,1,0,0,0,0,1,0,Władca,A,A,A,B,A,B,B,A,B,A,B,B,Niewinny
+R0122,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,4,3,5,3,3,5,3,3,5,4,5,5,3,5,3,4,0,0,0,1,1,0,0,0,0,0,0,1,Opiekun,B,A,A,A,B,A,B,B,A,A,B,A,Odkrywca
+R0123,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,3,5,6,3,5,5,2,3,6,2,3,2,6,3,2,5,5,1,0,0,0,0,0,0,1,0,0,1,0,Władca,B,A,A,A,A,A,A,B,A,B,A,B,Odkrywca
+R0124,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,2,5,5,2,1,5,3,5,2,3,5,3,6,6,3,3,0,0,0,0,0,0,0,1,1,1,0,0,Czarodziej,A,B,B,B,A,B,B,A,B,A,A,A,Błazen
+R0125,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,5,2,2,5,5,1,5,5,5,6,5,5,6,6,6,3,5,1,1,0,0,0,1,0,0,0,0,0,0,Bohater,B,B,A,B,A,A,A,A,A,A,A,B,Opiekun
+R0126,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,6,7,5,5,5,6,7,7,5,6,6,5,6,6,6,5,5,5,0,1,1,1,0,0,0,0,0,0,0,0,Mędrzec,A,A,B,A,A,A,A,B,A,A,B,A,Czarodziej
+R0127,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,3,5,4,3,4,5,5,5,3,4,4,5,4,4,4,4,1,0,1,0,0,1,0,0,0,0,0,0,Władca,B,B,B,A,B,A,A,A,B,A,A,B,Mędrzec
+R0128,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,4,4,5,5,4,4,4,5,5,3,5,3,4,4,4,4,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,B,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0129,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,3,4,5,3,5,4,4,5,4,3,4,4,4,4,3,4,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,A,B,A,B,B,B,A,A,A,B,A,A,Buntownik
+R0130,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,5,2,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,0,0,1,1,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0131,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,B,A,A,A,A,B,B,A,B,B,B,A,Towarzysz
+R0132,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,1,0,0,0,1,0,0,1,0,0,Mędrzec,A,B,B,B,A,A,A,A,A,A,A,B,Odkrywca
+R0133,kobieta,15-39,wyższe,bezrobotny,powodzi mi się bardzo dobrze,5,5,4,6,3,4,2,2,3,4,4,4,4,4,4,4,3,3,0,0,0,0,1,0,0,0,0,0,1,1,Niewinny,B,B,B,B,B,A,B,B,B,A,B,B,Opiekun
+R0134,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",2,1,3,2,1,5,2,3,2,3,4,2,3,5,3,6,2,3,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,A,B,A,A,B,B,B,B,A,A,A,A,Bohater
+R0135,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",2,2,2,2,1,1,1,2,2,2,2,1,2,2,7,6,3,2,1,0,1,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0136,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",2,2,2,2,1,2,1,1,1,2,2,2,2,2,6,6,2,1,0,0,1,1,1,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0137,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,1,1,2,1,1,1,1,1,6,4,4,3,3,7,6,2,2,0,0,1,1,0,0,0,0,0,1,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Władca
+R0138,kobieta,15-39,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,3,3,5,5,5,3,3,3,5,5,3,3,3,5,3,3,3,0,0,0,1,0,0,0,1,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0139,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,3,3,3,3,5,5,3,3,3,3,3,3,3,5,5,3,3,0,1,0,1,0,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0140,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej źle,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,1,1,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0141,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,7,1,7,1,1,1,7,1,1,1,7,7,7,1,1,7,1,1,1,0,0,1,0,0,0,0,0,0,1,0,Niewinny,A,A,B,A,A,A,A,A,A,A,A,A,Błazen
+R0142,mężczyzna,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",1,1,1,1,1,1,1,1,1,3,1,1,1,1,5,6,1,1,0,0,1,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0143,mężczyzna,40-59,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,2,1,2,2,1,1,1,2,1,2,2,2,2,2,6,5,1,1,0,1,0,1,0,0,0,1,0,0,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0144,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,5,2,3,3,3,2,2,2,6,6,3,3,5,2,2,3,1,1,0,0,0,0,0,1,0,0,0,0,Władca,B,B,A,B,A,A,B,A,A,B,B,A,Towarzysz
+R0145,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,3,2,2,3,3,2,2,2,6,6,5,7,5,3,2,2,0,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,B,B,B,B,A,A,B,A,A,A,B,B,Niewinny
+R0146,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,5,1,2,4,5,2,2,2,6,4,3,3,3,3,2,3,1,0,0,1,0,0,1,0,0,0,0,0,Opiekun,B,A,A,B,A,A,B,A,A,B,A,B,Buntownik
+R0147,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,5,3,5,2,6,5,5,4,5,6,7,6,5,5,3,5,1,0,0,1,1,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0148,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,5,3,4,2,2,3,5,2,5,6,6,5,4,5,3,3,1,0,1,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0149,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej źle,5,5,6,3,5,5,6,5,3,5,5,6,3,5,3,3,5,6,1,1,0,0,0,0,0,0,0,0,0,0,Władca,A,B,A,A,B,A,B,B,B,A,A,B,Twórca
+R0150,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej źle,5,3,5,5,6,5,3,4,3,5,3,5,5,6,3,5,5,3,0,1,0,0,0,1,0,0,0,0,1,0,Niewinny,B,A,A,B,A,B,A,B,B,B,A,B,Czarodziej
+R0151,mężczyzna,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,6,2,6,2,6,6,6,6,6,6,5,3,2,2,6,6,6,0,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,B,B,A,B,A,A,B,A,A,B,B,B,Czarodziej
+R0152,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,3,2,3,3,2,2,2,2,3,5,5,3,3,5,2,2,0,0,0,1,1,1,0,0,0,0,0,0,Kochanek,B,B,B,B,B,A,B,B,B,B,B,B,Buntownik
+R0153,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,2,2,2,2,2,2,2,2,2,2,2,5,2,5,5,2,2,0,0,1,1,1,0,0,0,0,0,0,0,Kochanek,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R0154,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",1,1,1,1,2,1,2,1,1,2,1,1,1,1,1,1,1,1,0,1,0,0,0,0,1,0,0,0,1,0,Bohater,A,A,A,A,B,A,A,A,A,A,A,A,Mędrzec
+R0155,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,1,0,0,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0156,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,1,2,2,2,2,1,2,1,1,1,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0157,kobieta,15-39,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",5,2,2,2,3,3,2,1,1,2,5,6,3,3,3,3,2,2,0,0,1,1,0,0,1,0,0,0,0,0,Opiekun,B,B,B,B,B,A,B,A,B,B,B,B,Towarzysz
+R0158,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,2,5,4,3,6,2,3,3,5,5,3,3,3,5,2,3,0,0,0,0,0,1,0,1,0,1,0,0,Towarzysz,A,A,A,B,B,A,B,B,B,B,B,A,Twórca
+R0159,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,5,2,4,3,3,4,6,2,2,2,5,4,3,3,4,5,1,2,0,0,0,1,0,1,0,0,1,0,0,0,Opiekun,B,A,B,B,B,A,B,B,B,B,A,A,Czarodziej
+R0160,kobieta,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,6,5,2,2,6,2,2,2,2,2,6,6,5,2,1,3,3,0,0,0,0,0,0,1,1,0,0,1,0,Niewinny,B,B,A,A,B,A,A,A,A,B,A,A,Opiekun
+R0161,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,7,3,6,2,2,3,6,2,2,6,6,6,2,2,6,2,2,2,0,0,0,1,0,0,0,0,1,1,0,0,Opiekun,A,A,B,B,A,B,A,A,B,A,A,A,Opiekun
+R0162,kobieta,40-59,średnie,pracownik fizyczny,powodzi mi się raczej źle,4,4,3,4,3,6,6,4,6,5,5,5,6,5,5,7,5,2,0,0,0,0,0,1,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0163,kobieta,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej źle,6,5,6,6,6,6,6,6,6,6,6,5,6,6,5,7,6,5,0,0,0,0,1,1,0,0,0,0,0,0,Błazen,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0164,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej źle,6,6,6,6,6,6,6,6,6,3,5,6,6,6,5,7,6,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0165,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,5,4,5,5,6,5,5,5,6,3,5,5,4,6,5,5,0,0,0,0,0,0,0,1,0,1,0,1,Odkrywca,B,B,B,B,B,A,A,B,A,A,A,A,Kochanek
+R0166,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,4,5,2,2,3,3,5,3,3,6,6,3,6,2,1,2,5,0,0,1,0,1,0,0,0,1,0,0,0,Kochanek,B,B,A,B,A,A,B,A,A,A,A,A,Niewinny
+R0167,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,powodzi mi się raczej dobrze,6,2,2,5,1,1,7,7,1,5,7,1,7,7,7,7,1,7,0,0,1,0,0,0,0,0,0,1,1,0,Niewinny,B,A,B,A,B,A,B,B,A,B,B,B,Bohater
+R0168,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,5,1,4,5,2,4,3,2,4,5,4,3,3,2,2,3,0,0,0,1,1,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,A,B,B,B,B,B,B,Towarzysz
+R0169,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,6,5,5,7,6,6,6,6,5,3,2,3,6,3,3,6,6,1,0,1,1,0,0,0,0,0,0,0,0,Władca,B,A,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0170,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",7,1,7,7,1,1,1,1,1,1,7,1,1,1,1,7,1,7,1,1,0,0,0,1,0,0,0,0,0,0,Błazen,B,B,A,B,B,A,B,A,A,B,B,A,Kochanek
+R0171,kobieta,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,1,1,1,1,7,7,1,1,1,7,1,1,5,1,7,1,3,0,0,1,0,1,0,0,0,0,0,1,0,Mędrzec,B,B,A,B,B,A,A,B,A,A,B,A,Bohater
+R0172,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,1,1,1,1,1,1,1,1,1,1,7,7,7,1,1,7,2,2,0,0,0,0,0,0,0,1,0,1,0,1,Odkrywca,B,B,B,B,A,A,A,A,A,B,A,A,Bohater
+R0173,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,2,2,2,2,2,4,2,3,2,5,5,7,4,4,4,2,4,0,0,0,1,0,0,0,0,0,1,0,1,Opiekun,B,B,B,A,B,A,B,B,B,B,B,B,Czarodziej
+R0174,kobieta,60 i więcej,średnie,rencista/emeryt,odmawiam udzielenia odpowiedzi,5,5,6,6,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,0,1,0,0,0,0,0,0,0,0,1,Buntownik,B,B,A,A,B,A,B,B,A,B,B,A,Mędrzec
+R0175,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się bardzo dobrze,7,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0176,kobieta,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,7,1,1,7,1,1,1,1,1,7,1,7,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,B,A,B,A,A,B,B,A,A,B,A,Twórca
+R0177,kobieta,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0178,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,odmawiam udzielenia odpowiedzi,6,6,7,7,7,7,3,7,5,5,3,5,5,5,5,5,2,3,0,0,0,0,0,0,1,1,1,0,0,0,Twórca,A,A,A,A,A,A,B,A,B,B,A,A,Opiekun
+R0179,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,2,3,2,6,6,6,6,2,2,2,6,7,6,6,2,2,2,2,0,0,0,0,1,0,0,0,1,1,0,0,Czarodziej,B,A,A,B,A,A,B,A,A,A,B,A,Błazen
+R0180,kobieta,15-39,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",5,3,6,2,5,3,5,3,6,6,2,6,3,6,3,5,3,5,0,0,0,1,0,0,0,0,0,0,0,1,Opiekun,B,A,B,A,B,A,B,A,A,B,B,A,Niewinny
+R0181,kobieta,60 i więcej,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",6,3,6,2,6,2,5,3,6,5,2,6,3,5,3,6,3,6,0,0,0,1,0,0,0,1,0,0,0,0,Opiekun,A,B,B,A,B,A,A,A,B,A,B,B,Odkrywca
+R0182,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej źle,6,6,6,5,6,7,5,6,6,5,7,6,6,3,6,6,5,5,0,1,0,0,1,0,0,0,0,0,1,0,Kochanek,A,B,A,A,B,B,A,B,B,A,B,A,Mędrzec
+R0183,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej źle,6,6,7,5,6,7,6,6,6,6,5,5,5,3,6,6,6,6,0,0,0,1,0,0,0,0,1,0,1,0,Opiekun,B,B,B,A,B,B,B,A,A,B,B,B,Odkrywca
+R0184,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,6,6,5,3,5,6,5,6,5,3,6,5,3,5,5,3,5,0,0,0,0,0,0,1,0,1,0,0,1,Czarodziej,A,B,B,A,B,B,B,B,A,A,A,A,Odkrywca
+R0185,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,5,5,3,5,5,3,5,5,3,5,5,3,5,6,3,6,0,0,1,0,0,0,1,0,0,1,0,0,Mędrzec,B,A,A,B,A,A,A,B,B,B,B,B,Niewinny
+R0186,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,5,5,6,3,5,3,5,5,5,3,5,6,3,6,3,6,0,0,0,0,1,0,0,0,0,1,0,1,Kochanek,A,A,B,B,A,B,B,B,A,A,A,A,Towarzysz
+R0187,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,2,2,5,2,4,2,5,4,2,2,5,5,5,2,5,6,2,4,0,0,1,1,0,0,0,0,0,0,0,1,Mędrzec,B,B,B,B,B,B,B,B,A,B,B,B,Władca
+R0188,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,1,4,2,1,2,4,3,5,4,3,3,2,5,3,5,6,4,5,0,1,1,0,0,0,0,0,0,0,1,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0189,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,3,5,5,2,2,2,6,2,2,5,2,6,2,6,7,2,3,1,0,0,0,0,0,1,0,0,0,0,1,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0190,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,5,2,5,3,4,3,5,5,5,5,5,3,3,3,4,0,0,0,1,1,0,0,0,0,0,0,0,Kochanek,B,A,B,B,A,B,B,A,A,B,B,A,Towarzysz
+R0191,mężczyzna,15-39,wyższe,student/uczeń,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,3,3,3,3,3,5,5,3,3,3,5,5,3,5,3,5,5,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,A,B,B,A,B,A,B,B,A,Kochanek
+R0192,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,5,6,3,5,5,6,3,3,5,3,3,6,5,5,5,5,5,6,1,0,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,A,B,B,A,B,B,B,Błazen
+R0193,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",4,1,2,2,6,4,7,1,1,1,4,5,3,3,3,3,1,1,0,0,0,1,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0194,kobieta,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",5,3,3,5,3,5,5,3,3,2,6,6,3,5,3,3,3,3,0,0,0,1,1,0,0,0,0,0,0,1,Opiekun,B,A,B,A,B,A,A,A,B,A,B,B,Opiekun
+R0195,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,3,3,3,5,3,3,3,3,3,5,3,5,5,2,2,1,1,0,0,0,0,0,0,0,1,0,0,Władca,B,A,A,A,B,A,A,A,B,B,B,B,Kochanek
+R0196,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Opiekun
+R0197,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,3,3,3,3,2,3,3,3,2,2,2,2,2,6,3,3,0,0,0,0,0,0,1,0,0,0,1,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Błazen
+R0198,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",1,1,1,1,1,1,1,1,1,1,7,1,7,1,4,7,1,1,1,0,0,1,0,0,0,0,0,1,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0199,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",1,1,7,1,1,1,1,1,1,1,1,1,7,1,7,7,1,4,0,1,1,0,1,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Władca
+R0200,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,1,6,1,1,2,1,6,1,4,7,3,7,1,4,7,1,4,1,0,0,0,0,0,0,0,0,1,0,1,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0201,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,6,6,3,5,5,5,5,3,5,5,5,5,5,5,3,5,0,1,0,0,1,0,0,0,0,0,1,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Niewinny
+R0202,mężczyzna,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,6,6,4,4,5,1,3,6,1,3,5,6,2,3,5,2,4,0,1,0,1,0,0,0,0,0,0,0,1,Opiekun,A,A,A,A,A,A,A,A,A,A,A,A,Buntownik
+R0203,mężczyzna,15-39,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,4,5,4,4,4,3,3,5,5,5,5,5,5,5,5,5,3,3,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,A,A,B,B,A,B,Twórca
+R0204,mężczyzna,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,6,6,5,5,5,3,5,6,3,5,5,6,5,5,5,6,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,B,A,A,B,B,A,B,A,A,B,A,A,Kochanek
+R0205,mężczyzna,60 i więcej,średnie,pracownik fizyczny,odmawiam udzielenia odpowiedzi,5,6,3,7,6,3,6,6,3,7,6,5,5,6,3,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,A,B,B,B,A,A,B,A,A,A,B,Twórca
+R0206,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,2,1,1,2,5,2,3,3,3,7,3,5,7,3,6,1,1,0,0,0,0,0,0,0,0,1,0,Niewinny,A,B,A,A,B,A,B,A,B,B,A,B,Czarodziej
+R0207,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,3,3,3,3,5,3,3,3,5,5,5,5,5,3,5,1,1,0,0,0,0,0,0,0,0,1,0,Władca,A,A,A,A,B,A,A,A,A,B,A,B,Bohater
+R0208,mężczyzna,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,3,3,3,3,3,3,3,3,3,5,3,5,6,3,5,1,1,0,0,0,0,0,0,0,0,1,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0209,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,4,3,5,3,5,3,5,5,5,5,5,5,7,6,5,7,5,0,0,1,1,0,0,1,0,0,0,0,0,Opiekun,B,A,A,B,A,A,B,B,A,B,B,B,Twórca
+R0210,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,2,4,4,4,4,4,4,4,4,4,4,4,6,6,4,5,2,4,1,1,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,B,B,A,B,B,A,B,B,B,Błazen
+R0211,kobieta,40-59,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",6,5,5,5,5,5,4,3,5,4,5,5,3,3,5,3,3,5,0,0,0,1,0,0,0,1,1,0,0,0,Czarodziej,B,A,A,B,B,A,B,A,B,B,A,B,Kochanek
+R0212,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,4,4,4,3,4,5,4,3,5,3,3,5,3,5,5,5,5,1,0,1,0,0,0,0,0,0,0,1,0,Władca,A,A,B,A,A,A,A,A,A,A,A,A,Opiekun
+R0213,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,3,3,5,3,5,3,5,3,5,3,3,5,5,3,5,3,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,B,B,A,A,B,B,A,B,A,A,B,Towarzysz
+R0214,kobieta,15-39,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",3,2,5,3,5,5,3,3,5,3,5,3,3,5,6,5,3,3,0,0,0,0,0,0,0,1,0,1,0,0,Odkrywca,B,B,B,A,A,B,A,A,A,B,A,A,Władca
+R0215,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",2,1,1,1,3,1,6,1,1,1,2,3,6,3,2,6,1,1,0,0,0,1,1,0,0,0,0,1,0,0,Towarzysz,B,B,A,B,A,A,A,B,A,B,B,B,Opiekun
+R0216,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,3,4,4,2,1,2,5,4,3,3,3,5,4,5,5,3,5,5,0,0,0,0,0,0,1,1,0,1,0,0,Twórca,A,B,A,B,B,B,B,A,A,B,A,A,Twórca
+R0217,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",2,3,3,4,4,5,3,4,5,5,4,5,6,6,4,3,5,2,0,1,0,0,1,0,1,0,0,0,0,0,Bohater,B,B,A,A,B,B,B,B,A,B,A,A,Kochanek
+R0218,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,2,3,2,2,5,3,5,3,5,3,5,3,3,5,3,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,A,B,A,A,A,A,B,A,A,B,Twórca
+R0219,kobieta,60 i więcej,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,5,1,2,1,1,4,4,1,1,1,5,7,6,4,3,4,1,1,1,0,1,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,A,B,A,B,B,B,B,Bohater
+R0220,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,5,2,6,3,2,3,6,6,5,5,7,6,5,6,6,6,6,6,0,0,1,0,0,0,0,0,1,0,0,1,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0221,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,5,5,5,3,5,2,6,3,2,7,5,2,5,3,3,5,3,0,0,1,0,1,0,0,0,1,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Towarzysz
+R0222,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,3,3,5,3,2,3,6,5,5,3,6,3,5,3,5,5,3,3,0,0,0,0,0,1,1,0,0,1,0,0,Błazen,A,A,A,A,A,A,A,A,A,A,A,A,Błazen
+R0223,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej źle,6,2,2,6,6,1,1,1,1,2,2,2,2,2,2,2,2,2,0,0,0,0,0,1,0,1,0,0,0,0,Błazen,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0224,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,5,5,6,5,5,6,5,5,6,5,5,6,5,5,6,5,0,1,0,0,0,0,0,1,0,1,0,0,Odkrywca,B,B,B,A,A,A,B,B,A,B,A,B,Buntownik
+R0225,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,5,5,6,6,6,5,5,5,6,6,5,5,5,6,6,6,0,0,0,0,0,0,1,1,0,0,0,1,Buntownik,B,A,A,A,B,A,B,A,B,B,B,B,Towarzysz
+R0226,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,6,5,6,5,5,6,5,5,6,5,5,6,5,5,6,4,0,0,0,0,1,0,0,1,0,1,0,0,Towarzysz,A,B,B,A,B,A,A,B,A,A,B,B,Odkrywca
+R0227,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,5,2,3,5,6,3,3,2,5,6,6,5,3,3,2,6,0,0,1,0,1,0,0,0,0,1,0,0,Mędrzec,B,B,A,B,B,B,B,B,B,B,B,A,Czarodziej
+R0228,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,6,1,3,3,5,5,3,2,3,5,6,6,5,6,3,6,0,1,1,0,0,0,1,0,0,0,0,0,Twórca,A,B,A,B,B,A,B,A,B,B,A,B,Bohater
+R0229,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,6,1,3,3,6,5,5,3,4,5,6,4,4,3,2,6,0,1,1,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,A,B,B,B,B,A,B,B,B,A,Twórca
+R0230,kobieta,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,1,5,1,5,5,3,3,3,2,3,5,6,3,3,3,1,5,1,0,1,1,0,0,0,0,0,0,0,0,Mędrzec,B,B,A,B,B,A,B,A,B,B,B,A,Bohater
+R0231,kobieta,40-59,wyższe,bezrobotny,"powodzi mi się przeciętnie, średnio",4,1,4,2,4,4,5,2,4,2,6,6,4,4,4,4,2,4,0,0,1,0,1,0,0,0,0,0,0,1,Kochanek,A,A,B,A,A,A,A,A,A,B,A,A,Błazen
+R0232,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,4,5,3,3,3,4,5,4,3,5,4,5,5,5,5,2,5,1,0,1,0,0,0,0,0,0,0,0,1,Mędrzec,A,A,B,A,A,A,B,A,A,B,A,A,Czarodziej
+R0233,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,2,2,1,1,1,5,1,1,1,1,5,1,5,6,5,1,2,0,0,0,1,0,0,0,0,0,0,1,1,Opiekun,B,B,A,B,B,A,B,A,B,B,A,B,Błazen
+R0234,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,5,5,3,3,4,3,3,4,4,5,5,6,5,3,5,3,5,0,0,1,1,0,0,0,0,0,1,0,0,Mędrzec,B,B,B,B,B,B,B,B,A,B,B,B,Kochanek
+R0235,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,4,5,4,5,3,2,4,4,3,3,6,4,5,5,3,3,4,0,0,0,1,0,0,0,1,0,0,1,0,Niewinny,B,B,B,A,B,A,B,B,B,B,B,B,Mędrzec
+R0236,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,5,5,5,5,4,3,5,4,4,5,5,5,5,6,4,4,5,0,0,0,0,1,1,0,0,0,0,1,0,Niewinny,B,B,B,A,A,A,A,B,A,A,B,B,Kochanek
+R0237,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,4,3,2,1,2,3,2,2,3,5,4,5,5,5,4,3,4,1,0,0,0,0,0,0,0,0,0,1,1,Władca,A,B,A,A,A,B,B,B,B,A,A,A,Mędrzec
+R0238,kobieta,40-59,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",7,1,1,2,1,1,2,1,1,2,7,5,6,5,6,1,2,2,0,0,0,0,0,1,0,1,0,0,1,0,Błazen,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0239,kobieta,40-59,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",7,2,1,2,1,2,3,2,2,2,5,7,7,2,6,7,3,3,0,0,1,0,0,0,0,0,1,0,1,0,Niewinny,B,B,B,A,B,B,B,B,B,B,B,B,Czarodziej
+R0240,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,1,1,2,1,3,2,2,2,3,6,7,7,1,5,1,3,3,0,0,1,0,0,0,0,0,1,0,1,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0241,kobieta,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,3,4,5,5,2,5,2,3,5,5,5,5,6,5,5,5,4,0,0,0,0,0,0,1,0,1,0,0,0,Czarodziej,A,A,A,A,B,B,A,A,A,A,A,B,Towarzysz
+R0242,kobieta,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,4,5,5,5,2,2,5,3,3,5,6,6,5,5,3,4,0,0,0,0,1,0,0,0,0,0,1,0,Kochanek,A,A,B,A,A,A,A,A,A,A,A,A,Czarodziej
+R0243,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,4,2,3,3,2,3,2,3,7,3,7,3,6,3,5,5,6,3,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0244,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,5,3,5,5,6,1,3,2,5,5,3,2,2,3,1,1,0,0,1,0,0,1,0,0,1,0,0,0,Błazen,A,A,A,A,A,A,A,A,A,A,A,A,Odkrywca
+R0245,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,6,2,6,6,5,1,2,1,6,6,2,1,1,2,2,2,0,1,0,0,0,0,1,0,0,1,0,0,Twórca,A,A,A,B,B,A,A,B,A,A,A,A,Towarzysz
+R0246,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,1,3,2,2,1,2,2,2,2,2,2,4,3,2,3,1,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,A,A,A,A,B,A,B,B,A,B,Błazen
+R0247,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,2,3,1,5,3,1,3,3,3,3,3,3,3,2,3,2,3,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,B,B,B,B,B,A,B,A,B,B,B,B,Władca
+R0248,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,3,2,2,3,3,3,2,2,3,2,3,2,3,2,3,3,3,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,B,B,A,A,B,A,A,A,B,B,Towarzysz
+R0249,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,2,5,5,5,2,2,3,5,6,5,5,3,4,3,5,0,0,0,0,1,1,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0250,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,1,4,1,4,4,6,3,3,4,1,5,7,3,2,6,1,4,0,0,1,1,0,0,0,0,0,0,0,1,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0251,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,2,2,2,4,4,6,2,3,2,1,4,6,3,3,5,2,4,0,0,1,1,0,0,0,0,0,0,0,1,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0252,mężczyzna,15-39,wyższe,student/uczeń,odmawiam udzielenia odpowiedzi,4,4,4,5,3,2,5,3,3,5,5,3,6,5,3,5,2,5,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,B,A,B,B,A,A,B,B,A,A,A,B,Niewinny
+R0253,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,1,1,1,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0254,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,5,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,A,A,B,B,A,A,A,A,B,A,B,Czarodziej
+R0255,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,1,1,0,0,0,1,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0256,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,4,1,0,1,1,0,0,0,0,0,0,0,0,Opiekun,A,A,A,A,A,A,B,A,A,B,A,A,Kochanek
+R0257,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,5,5,6,6,5,5,5,5,5,6,6,6,7,5,6,6,0,0,0,0,0,1,1,0,0,1,0,0,Towarzysz,B,B,A,A,A,B,A,A,B,B,A,A,Kochanek
+R0258,mężczyzna,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,6,6,5,6,6,6,5,6,5,6,5,6,6,6,6,5,6,0,0,1,1,0,0,0,0,0,0,1,0,Mędrzec,B,B,A,B,B,A,A,B,B,B,B,B,Mędrzec
+R0259,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,5,5,6,6,6,6,5,5,5,5,6,6,5,5,6,5,5,0,0,0,1,0,0,0,0,0,1,0,0,Towarzysz,B,A,B,B,B,A,B,B,A,B,B,B,Towarzysz
+R0260,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,5,6,5,6,6,5,3,5,5,6,6,6,6,5,3,5,5,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,B,B,B,B,B,A,B,A,B,A,A,B,Odkrywca
+R0261,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej źle,4,4,4,4,4,4,4,4,4,2,2,5,6,3,5,6,3,3,1,1,0,1,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,A,B,B,B,B,B,B,Towarzysz
+R0262,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej źle,5,3,5,5,6,5,5,6,3,5,5,6,5,3,3,5,3,5,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,A,A,B,B,A,B,B,A,A,B,B,Odkrywca
+R0263,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,3,2,5,5,3,5,5,6,5,5,3,5,3,5,5,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,A,A,A,B,A,A,B,B,B,B,B,Niewinny
+R0264,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,1,1,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0265,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,5,5,5,5,5,5,5,3,3,3,3,3,3,3,3,3,0,1,1,0,0,0,0,1,0,0,0,0,Bohater,B,A,B,B,B,A,A,B,A,B,B,B,Błazen
+R0266,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,2,6,4,1,4,1,6,3,4,6,6,5,4,5,5,3,5,0,1,0,0,0,0,0,0,1,0,1,0,Niewinny,B,B,B,A,B,B,B,B,B,B,B,B,Towarzysz
+R0267,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",5,3,3,3,3,3,5,3,2,3,7,6,7,6,2,2,5,3,1,1,0,0,0,0,1,0,0,0,0,0,Twórca,B,B,A,B,B,A,A,A,B,B,B,B,Opiekun
+R0268,kobieta,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,4,3,1,1,2,6,3,2,1,5,5,6,3,5,3,1,7,0,0,1,0,0,0,0,0,0,1,0,1,Mędrzec,B,A,A,B,B,A,A,A,A,B,B,B,Błazen
+R0269,kobieta,15-39,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,4,2,3,2,6,2,4,2,2,2,5,6,2,2,2,6,3,2,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Opiekun
+R0270,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,5,2,2,2,2,6,2,2,6,6,6,2,6,7,2,6,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,A,B,B,B,B,Bohater
+R0271,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,1,1,1,1,5,7,1,1,1,7,7,1,4,2,7,1,2,0,0,1,1,0,0,0,0,0,1,0,0,Opiekun,B,A,A,A,B,A,B,A,B,A,B,A,Bohater
+R0272,mężczyzna,15-39,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,4,5,5,5,3,4,4,4,4,5,3,5,5,6,5,5,4,5,0,1,0,0,0,0,1,0,0,0,1,0,Twórca,B,B,B,B,B,A,B,B,B,B,B,B,Czarodziej
+R0273,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,2,3,3,2,1,3,2,6,4,5,4,4,4,2,4,1,0,0,1,0,0,0,0,0,1,0,0,Opiekun,B,B,A,B,B,A,B,B,B,B,B,A,Bohater
+R0274,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,2,1,2,4,7,5,5,1,2,1,6,2,3,3,3,3,2,3,0,0,0,1,0,1,0,1,0,0,0,0,Odkrywca,A,B,A,A,A,A,B,A,B,A,A,A,Opiekun
+R0275,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,odmawiam udzielenia odpowiedzi,5,4,4,4,2,5,4,4,4,4,4,4,5,4,5,4,3,4,0,1,0,1,1,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,B,A,A,B,B,A,B,Buntownik
+R0276,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej źle,6,1,1,6,1,1,2,2,2,2,5,5,7,3,7,5,2,2,0,0,0,0,0,0,1,0,0,0,1,1,Niewinny,A,B,B,A,B,A,B,B,A,B,A,B,Kochanek
+R0277,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",7,3,3,2,2,3,1,6,2,3,3,7,6,5,6,6,3,6,0,0,0,0,0,0,1,0,0,1,0,1,Twórca,B,B,B,B,B,A,B,B,B,B,B,B,Niewinny
+R0278,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,7,6,2,6,3,2,2,1,5,7,6,6,6,2,1,6,7,0,0,0,0,0,0,0,1,1,1,0,0,Towarzysz,B,B,A,A,B,B,A,B,A,A,A,B,Mędrzec
+R0279,mężczyzna,15-39,średnie,prowadzę własną firmę,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,5,3,2,1,2,1,1,2,6,6,3,6,3,2,1,6,7,0,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0280,mężczyzna,40-59,średnie,prowadzę własną firmę,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,3,3,3,6,2,2,3,7,6,7,6,7,6,2,2,7,6,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0281,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,6,2,2,6,3,6,2,5,1,5,7,5,5,3,3,6,1,0,1,0,0,0,0,0,0,0,1,0,Mędrzec,B,B,B,B,B,A,B,A,B,B,B,B,Niewinny
+R0282,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,4,4,4,5,3,4,2,2,3,5,2,2,2,2,4,2,3,0,1,1,0,0,0,0,0,0,0,1,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0283,kobieta,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,6,2,6,6,3,6,2,2,6,6,2,7,2,5,5,3,6,2,1,0,0,0,1,0,0,0,0,0,1,0,Władca,B,B,A,B,B,A,A,B,A,A,B,B,Twórca
+R0284,mężczyzna,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,6,7,7,2,2,2,7,2,6,3,6,2,7,6,7,6,3,0,1,0,0,0,1,1,0,0,0,0,0,Bohater,A,A,B,A,B,A,A,B,A,B,B,B,Mędrzec
+R0285,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,6,3,6,3,6,3,3,7,3,5,7,6,3,5,3,7,5,3,1,0,0,1,0,0,0,0,0,1,0,0,Władca,B,B,A,B,B,A,B,B,B,A,B,B,Twórca
+R0286,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,3,2,3,5,3,3,3,2,6,6,6,5,6,6,2,2,0,0,0,1,1,0,0,0,0,0,1,0,Kochanek,B,A,A,A,B,A,A,A,A,B,B,A,Mędrzec
+R0287,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,3,5,6,5,6,5,6,5,6,5,5,5,5,5,2,5,6,0,0,0,1,0,1,0,0,0,0,1,0,Opiekun,B,A,B,A,B,A,B,A,B,A,B,A,Błazen
+R0288,mężczyzna,40-59,wyższe,pracownik fizyczny,powodzi mi się bardzo dobrze,6,6,6,6,6,6,6,6,6,5,5,6,6,6,5,6,6,5,0,0,0,1,0,0,1,0,0,1,0,0,Towarzysz,A,B,A,A,B,A,B,B,A,A,A,A,Buntownik
+R0289,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,5,5,3,4,4,6,3,5,5,6,6,3,7,3,2,3,5,0,0,0,1,1,0,0,0,0,0,1,0,Niewinny,A,A,B,A,A,A,A,A,A,A,A,B,Opiekun
+R0290,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,3,3,3,4,3,3,3,4,4,3,4,3,5,3,3,0,0,1,1,0,0,0,0,0,0,1,0,Niewinny,B,B,A,A,B,A,B,A,A,B,B,B,Twórca
+R0291,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,5,3,5,3,5,2,5,2,3,3,3,3,3,3,2,6,3,1,0,0,0,0,0,0,0,0,0,0,0,Władca,A,A,A,A,B,A,A,A,A,A,A,A,Kochanek
+R0292,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,1,1,7,4,1,1,5,7,3,1,1,5,7,1,3,7,2,3,1,0,0,0,0,0,0,0,0,0,0,0,Władca,A,A,A,A,B,A,A,A,A,B,A,B,Kochanek
+R0293,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,6,5,5,5,5,5,5,5,5,0,0,0,0,1,0,0,0,0,0,0,1,Kochanek,B,B,B,B,B,B,B,B,B,B,B,B,Władca
+R0294,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,3,6,3,5,3,5,5,3,5,5,3,5,3,5,3,5,3,5,1,0,0,0,0,0,0,0,0,1,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0295,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",2,2,4,4,2,2,7,1,7,2,7,4,4,4,4,5,2,7,0,1,0,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,A,A,B,A,B,B,B,Towarzysz
+R0296,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,4,3,4,4,4,5,5,4,4,5,5,5,3,3,4,3,6,0,0,1,0,0,0,0,1,0,1,0,0,Towarzysz,B,B,A,B,B,B,B,B,B,B,B,B,Odkrywca
+R0297,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,3,4,1,4,7,5,4,1,7,5,2,4,4,6,1,6,0,1,0,1,0,0,0,1,0,0,0,0,Odkrywca,B,B,B,B,B,B,B,B,A,B,A,B,Twórca
+R0298,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,3,3,3,3,3,3,5,3,5,5,5,3,3,5,3,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0299,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,2,2,3,1,1,2,3,1,3,2,3,2,1,1,1,1,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0300,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,3,3,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0301,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0302,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,3,3,3,2,7,5,3,3,4,5,3,5,5,6,2,5,0,0,1,1,0,0,0,0,0,0,1,0,Mędrzec,A,A,B,B,B,A,A,B,A,B,B,B,Błazen
+R0303,mężczyzna,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,2,4,1,1,1,6,2,2,2,6,7,4,4,4,4,2,3,0,0,1,1,1,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0304,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,6,3,2,5,6,5,5,3,6,6,2,3,7,7,7,3,0,0,0,1,1,1,0,0,0,0,0,0,Kochanek,B,B,B,A,B,A,B,B,B,B,B,B,Kochanek
+R0305,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,4,3,4,4,4,3,3,4,3,4,4,4,4,4,4,4,4,1,0,0,0,0,0,0,1,0,1,0,0,Towarzysz,A,A,B,A,A,A,A,A,A,A,A,B,Twórca
+R0306,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,5,5,5,5,4,4,4,4,3,4,4,4,4,3,5,5,5,1,1,0,0,1,0,0,0,0,0,0,0,Kochanek,A,A,A,A,A,A,B,A,B,B,A,B,Odkrywca
+R0307,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,4,3,4,4,4,4,4,4,5,4,4,4,4,4,3,4,0,0,1,0,0,0,1,0,0,1,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0308,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,2,4,1,4,4,4,3,4,3,4,4,4,4,4,4,3,4,0,0,1,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,A,B,B,B,B,B,B,Kochanek
+R0309,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",1,5,7,2,1,2,6,7,4,3,3,3,7,4,7,7,4,6,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,A,B,A,B,B,A,B,A,B,A,B,B,Czarodziej
+R0310,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",3,3,5,1,3,4,5,5,4,3,3,3,7,5,5,7,1,5,1,0,1,0,0,0,0,0,0,0,1,0,Mędrzec,A,B,A,B,A,A,B,A,B,B,A,B,Mędrzec
+R0311,kobieta,40-59,średnie,inna (jaka?),powodzi mi się raczej dobrze,6,3,6,3,6,5,5,5,5,3,5,5,3,5,3,3,3,5,1,0,0,0,0,0,0,0,0,1,1,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0312,mężczyzna,40-59,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,6,3,6,2,5,5,6,5,5,3,5,6,5,5,4,5,3,5,1,0,0,0,0,0,0,0,0,1,1,0,Niewinny,A,A,A,A,B,A,A,A,A,A,A,A,Bohater
+R0313,kobieta,60 i więcej,średnie,inna (jaka?),powodzi mi się raczej dobrze,5,5,5,3,5,5,5,3,3,3,3,5,5,5,3,5,3,5,0,1,0,0,0,0,0,0,1,0,0,1,Buntownik,A,A,A,A,A,A,A,A,A,A,A,A,Władca
+R0314,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,6,3,6,6,3,3,3,3,6,7,6,7,2,3,3,2,0,0,0,0,0,0,0,1,1,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,A,Opiekun
+R0315,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,6,2,6,6,2,2,2,2,6,6,6,2,2,2,2,3,0,0,1,0,0,0,0,0,0,1,1,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R0316,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,1,3,1,5,5,6,1,1,5,5,7,6,3,3,7,1,2,0,1,0,1,0,0,1,0,0,0,0,0,Bohater,B,B,B,B,B,A,B,B,B,B,B,B,Opiekun
+R0317,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,2,5,5,3,3,2,7,3,3,6,2,5,5,3,5,6,5,7,1,1,0,0,0,0,0,0,0,0,1,0,Władca,A,B,A,A,A,A,B,A,A,A,A,A,Towarzysz
+R0318,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",7,2,2,1,7,7,7,4,1,2,7,7,7,6,1,4,4,1,0,0,0,0,1,0,0,0,0,1,0,1,Kochanek,B,B,A,A,B,B,A,B,B,B,B,B,Błazen
+R0319,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",5,2,4,1,6,6,1,3,2,2,5,3,7,4,4,6,2,4,0,0,0,0,1,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0320,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,3,3,3,3,3,5,5,5,5,5,5,5,5,5,6,6,0,0,0,0,0,1,0,0,0,0,1,1,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0321,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się bardzo dobrze,6,4,3,5,2,3,2,3,5,2,5,6,5,5,6,5,6,5,0,1,0,0,0,0,0,1,0,0,1,0,Odkrywca,B,B,A,B,B,B,B,B,B,B,B,B,Towarzysz
+R0322,mężczyzna,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,3,5,3,3,3,5,5,3,5,3,3,5,3,5,5,3,3,1,0,1,0,1,0,0,0,0,0,0,0,Władca,B,B,A,B,A,B,B,A,A,A,A,B,Bohater
+R0323,mężczyzna,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,5,5,5,5,3,3,5,3,5,5,5,5,0,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,A,B,A,A,B,A,A,A,B,B,B,A,Odkrywca
+R0324,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej źle,5,3,5,3,5,5,2,7,3,5,3,6,6,3,3,5,1,7,0,0,0,1,0,0,1,0,0,0,0,0,Opiekun,B,B,A,B,A,A,A,A,A,B,A,B,Władca
+R0325,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,3,7,5,3,2,5,5,3,6,1,3,6,5,3,3,5,2,1,0,0,0,1,0,0,0,1,0,0,0,Władca,B,B,B,A,A,A,B,B,A,A,A,A,Twórca
+R0326,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej źle,5,2,5,3,5,5,3,5,3,5,6,3,5,3,2,4,5,5,1,0,0,1,0,0,1,0,0,0,0,0,Władca,A,B,B,A,B,B,B,A,B,B,A,B,Kochanek
+R0327,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej źle,2,2,1,2,1,7,1,6,3,7,7,3,6,3,3,1,3,5,1,0,0,0,0,0,1,0,0,0,1,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0328,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,1,7,1,1,3,7,7,7,1,7,7,7,1,2,7,1,1,7,0,1,0,0,0,0,1,0,0,0,0,1,Twórca,A,B,A,B,B,B,B,B,A,B,B,B,Towarzysz
+R0329,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",6,3,6,5,3,5,5,6,3,5,3,5,6,3,6,2,6,3,0,0,0,0,0,0,0,0,0,1,1,0,Niewinny,B,A,A,B,A,B,B,B,A,A,B,A,Towarzysz
+R0330,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,3,5,5,6,2,3,3,6,5,2,5,6,3,3,6,6,5,0,0,0,0,0,0,0,0,1,0,0,1,Buntownik,A,B,A,B,B,B,B,A,A,B,B,A,Buntownik
+R0331,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,2,4,1,4,2,6,2,3,1,6,7,6,6,5,3,1,5,0,1,1,1,0,0,0,0,0,0,0,0,Bohater,A,B,A,A,B,A,B,B,A,B,A,A,Błazen
+R0332,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,2,3,4,2,4,1,6,3,2,2,1,7,7,2,5,3,2,2,1,1,1,0,0,0,0,0,0,0,0,0,Bohater,A,B,A,A,B,A,B,B,A,B,A,A,Bohater
+R0333,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,3,3,3,3,3,3,3,5,5,5,5,5,5,3,3,0,0,1,0,0,1,0,0,0,0,0,1,Mędrzec,B,B,A,A,B,A,A,B,A,B,A,B,Kochanek
+R0334,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,3,3,3,3,3,3,3,3,5,5,3,3,5,3,3,0,0,0,0,1,0,0,0,1,0,1,0,Czarodziej,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0335,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,6,6,6,6,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,0,0,0,0,0,1,0,0,0,0,0,Twórca,A,A,A,A,A,A,B,A,A,A,A,A,Buntownik
+R0336,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,powodzi mi się bardzo dobrze,7,7,6,7,6,6,7,3,7,5,6,6,7,7,7,7,6,6,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,A,A,A,B,B,A,A,B,A,B,B,A,Niewinny
+R0337,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,6,7,6,7,1,7,7,6,7,6,6,6,6,7,6,7,6,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,B,A,B,B,B,B,A,Opiekun
+R0338,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",2,5,3,6,6,2,6,3,3,3,3,3,3,3,2,3,2,2,0,0,0,1,0,0,0,0,0,0,0,1,Opiekun,B,B,B,A,B,B,B,B,B,A,B,A,Towarzysz
+R0339,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej źle,3,3,3,3,3,2,3,3,3,5,6,3,3,2,3,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0340,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,6,6,6,6,5,6,6,5,6,6,5,5,4,5,6,5,5,0,1,0,0,0,0,1,0,0,1,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0341,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,6,5,5,5,5,5,6,6,5,6,5,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0342,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,6,5,6,6,6,6,7,6,6,0,1,0,0,0,0,0,1,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,A,Opiekun
+R0343,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,3,6,6,6,3,3,6,6,3,3,5,3,4,5,3,6,5,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,A,B,A,A,B,A,B,B,A,A,B,A,Mędrzec
+R0344,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,6,6,2,2,6,5,2,3,6,3,3,5,6,2,5,2,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,B,A,A,B,B,B,A,A,A,B,B,A,Bohater
+R0345,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej źle,5,5,6,5,3,5,5,6,5,5,6,6,5,3,5,6,5,3,0,0,0,0,1,0,0,1,0,0,1,0,Odkrywca,A,B,B,B,B,B,B,B,A,A,B,A,Odkrywca
+R0346,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej źle,5,5,3,5,6,5,5,3,3,5,3,3,5,6,5,5,3,5,0,0,1,0,0,0,0,1,0,1,0,0,Mędrzec,A,B,B,A,B,B,A,A,A,B,B,B,Czarodziej
+R0347,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,7,2,2,2,2,1,1,1,1,2,7,7,2,7,2,1,1,1,0,0,0,0,1,1,1,0,0,0,0,0,Błazen,A,B,B,A,B,B,B,B,B,B,A,A,Kochanek
+R0348,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,1,4,3,3,3,3,5,1,3,3,5,6,6,2,2,2,2,2,0,1,1,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0349,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej źle,5,5,6,5,5,6,6,6,5,7,6,6,6,6,6,7,6,5,0,0,1,1,0,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0350,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,7,3,5,3,5,3,5,3,6,2,5,5,2,5,5,3,5,3,0,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,A,B,B,B,B,A,B,B,A,A,B,B,Towarzysz
+R0351,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,7,6,3,1,7,6,3,3,6,7,7,3,7,3,3,6,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,B,B,A,B,A,A,A,B,B,B,B,B,Niewinny
+R0352,kobieta,15-39,wyższe,bezrobotny,powodzi mi się raczej dobrze,3,3,2,6,3,3,3,5,3,5,5,3,6,3,3,2,5,5,0,1,0,0,1,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,B,A,A,A,A,A,B,Towarzysz
+R0353,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej źle,6,3,5,5,5,3,5,6,3,6,3,5,5,5,3,3,6,5,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,B,A,A,B,B,A,B,B,B,A,A,B,Twórca
+R0354,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej źle,5,5,6,6,6,3,3,5,5,5,3,5,3,5,3,3,5,3,0,0,1,0,0,1,0,0,0,0,1,0,Mędrzec,B,B,B,A,B,A,A,A,B,A,A,A,Mędrzec
+R0355,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej źle,5,3,3,3,3,3,3,3,3,3,2,3,6,5,5,7,2,3,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,A,B,B,Buntownik
+R0356,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,3,3,3,3,5,3,3,3,3,2,5,5,5,6,3,2,0,0,0,1,0,0,0,0,0,0,1,0,Opiekun,B,A,A,B,B,A,B,B,B,B,B,B,Buntownik
+R0357,kobieta,15-39,wyższe,inna (jaka?),powodzi mi się raczej dobrze,7,7,7,7,7,7,1,7,7,7,7,7,7,7,7,7,7,7,0,0,1,1,1,0,0,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Opiekun
+R0358,kobieta,40-59,wyższe,pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,7,7,7,1,7,7,7,7,7,7,6,5,7,7,7,6,7,0,0,1,1,0,0,0,0,0,1,0,0,Opiekun,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0359,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,3,3,3,3,2,3,3,3,3,3,5,3,3,5,5,3,5,0,0,1,0,1,0,0,0,0,0,1,0,Mędrzec,B,B,B,B,B,A,B,A,B,B,B,B,Towarzysz
+R0360,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,3,3,2,2,2,2,3,2,3,3,4,5,4,5,5,3,5,0,0,1,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,A,B,A,B,B,B,B,B,B,Towarzysz
+R0361,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,5,2,5,3,5,3,6,2,4,4,4,6,5,6,2,3,1,0,0,0,0,0,1,0,1,0,0,0,Czarodziej,B,B,A,B,A,B,A,A,B,B,B,A,Twórca
+R0362,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,6,5,6,2,5,3,2,5,5,3,5,3,5,5,3,3,3,3,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0363,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,4,5,4,3,3,3,1,4,3,6,4,3,2,4,5,2,5,1,0,0,0,0,0,0,0,1,1,0,0,Władca,B,B,B,B,B,A,A,B,B,B,A,B,Błazen
+R0364,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,0,0,0,0,1,1,0,0,1,0,0,0,Kochanek,A,B,A,A,A,A,B,A,A,B,B,A,Odkrywca
+R0365,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,3,3,5,3,3,3,3,3,3,3,3,3,3,3,3,3,3,5,0,1,0,0,0,1,0,0,0,0,0,1,Bohater,B,B,B,A,A,B,A,A,A,B,A,A,Mędrzec
+R0366,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,5,2,2,1,6,3,2,3,5,5,7,2,5,6,2,3,1,1,0,0,0,0,0,0,0,1,0,0,Władca,B,B,A,B,A,B,B,A,A,B,B,B,Towarzysz
+R0367,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,5,3,3,5,2,3,3,5,2,3,5,2,5,3,6,6,2,6,1,0,0,1,0,0,0,0,0,0,1,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0368,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",3,3,5,5,3,5,6,6,5,5,6,6,5,5,5,5,5,6,1,1,0,0,1,0,0,0,0,0,0,0,Bohater,B,B,B,B,A,B,B,B,B,B,A,B,Bohater
+R0369,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,3,5,5,3,3,3,7,5,2,5,2,5,6,3,5,2,3,5,0,1,0,0,0,1,0,0,0,0,0,1,Buntownik,B,B,B,B,B,A,B,B,B,B,B,B,Kochanek
+R0370,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,3,2,3,3,5,5,3,3,3,6,5,6,5,6,3,3,3,3,1,0,0,1,0,0,0,0,1,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0371,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,6,3,5,3,5,6,5,3,3,2,5,5,6,2,5,6,2,5,0,1,0,0,1,0,0,0,0,0,1,0,Kochanek,A,A,A,A,A,A,A,A,A,B,A,A,Buntownik
+R0372,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,3,2,6,3,6,6,6,2,3,2,2,6,6,2,6,6,2,6,0,1,0,0,1,0,0,0,0,0,1,0,Kochanek,B,A,A,B,A,A,B,A,B,B,B,A,Błazen
+R0373,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,powodzi mi się raczej dobrze,6,2,2,6,2,6,6,5,2,6,6,2,6,6,5,1,2,2,0,1,0,1,0,0,0,0,0,0,1,0,Bohater,A,A,B,B,A,A,A,A,A,B,B,B,Towarzysz
+R0374,mężczyzna,15-39,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,3,5,5,3,2,2,2,5,3,5,5,3,5,3,5,3,3,5,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,A,B,B,B,B,B,B,B,Buntownik
+R0375,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,3,7,3,7,7,3,6,3,5,3,6,7,2,3,3,6,6,0,0,1,0,0,0,0,0,0,0,1,1,Mędrzec,B,A,B,A,B,B,B,B,A,B,B,B,Mędrzec
+R0376,mężczyzna,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,1,0,0,0,0,0,1,0,1,Towarzysz,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0377,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,A,B,B,B,B,A,A,B,B,A,A,A,Buntownik
+R0378,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,4,5,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Towarzysz
+R0379,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,5,5,2,3,4,4,4,5,3,5,5,5,3,4,4,4,5,0,1,0,0,0,0,0,0,0,1,1,0,Bohater,B,B,A,A,A,A,A,A,B,A,A,A,Władca
+R0380,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się bardzo dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,A,B,B,A,A,A,A,A,B,B,Buntownik
+R0381,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,4,3,4,5,4,2,4,4,3,5,5,5,3,5,5,3,3,0,1,0,0,0,0,0,0,0,1,0,1,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0382,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,6,2,3,3,6,3,3,2,6,2,2,6,6,5,3,3,0,1,0,1,0,0,0,0,0,1,0,0,Opiekun,A,B,B,B,A,A,A,A,A,B,A,B,Buntownik
+R0383,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,5,6,2,2,2,3,3,3,3,5,6,6,5,5,6,6,5,1,0,1,0,0,0,0,0,0,0,0,1,Mędrzec,B,B,A,A,B,A,B,B,A,A,B,B,Odkrywca
+R0384,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,5,2,3,1,1,1,1,2,1,2,4,5,6,4,4,4,2,2,0,0,0,1,0,0,0,0,0,0,1,1,Opiekun,A,A,B,B,A,A,A,A,A,A,B,B,Bohater
+R0385,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",5,5,5,6,6,5,5,6,6,5,3,6,3,6,6,6,6,6,1,0,0,0,0,0,1,1,0,0,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0386,kobieta,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej źle,2,1,1,1,1,1,1,2,1,3,3,2,2,2,2,5,5,5,1,0,0,0,0,0,1,0,0,1,0,0,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0387,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,2,2,2,6,2,2,2,2,1,2,2,5,4,5,2,0,0,1,1,1,0,0,0,0,0,0,0,Opiekun,B,A,A,A,B,A,A,A,A,A,A,A,Czarodziej
+R0388,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,5,3,2,3,3,5,3,5,3,5,6,3,5,6,3,5,0,1,0,0,0,0,0,0,0,0,1,1,Bohater,B,B,B,B,B,B,B,B,B,B,A,A,Towarzysz
+R0389,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,5,2,2,3,1,3,2,3,2,3,6,3,6,6,2,5,1,0,1,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0390,kobieta,15-39,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,1,0,0,1,1,0,0,0,0,0,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Buntownik
+R0391,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,1,0,0,0,0,0,0,1,0,1,Towarzysz,A,A,A,A,A,A,A,A,A,A,A,A,Błazen
+R0392,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,1,0,0,1,0,1,0,0,Towarzysz,A,A,A,A,A,A,A,A,A,A,A,A,Władca
+R0393,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,1,2,1,4,5,6,1,1,1,6,6,4,4,3,4,1,5,0,0,1,0,0,0,0,0,0,1,1,0,Mędrzec,A,B,A,B,B,A,B,A,A,B,A,B,Mędrzec
+R0394,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,5,2,3,3,5,2,1,2,4,6,4,5,4,3,3,3,0,0,1,0,0,0,0,0,0,1,0,1,Towarzysz,B,B,A,B,B,A,B,B,B,B,B,A,Kochanek
+R0395,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,4,4,3,4,4,4,4,4,3,3,5,4,4,4,5,5,5,0,0,1,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0396,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,4,5,5,2,5,2,5,5,3,5,5,5,5,5,5,5,5,0,0,0,1,0,0,1,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0397,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej źle,3,3,3,2,3,3,3,2,3,3,3,3,2,2,3,3,2,2,0,0,0,1,0,0,0,0,0,0,1,1,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0398,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,powodzi mi się raczej źle,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,1,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Opiekun
+R0399,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,6,5,6,5,6,6,6,6,6,5,6,6,6,5,5,6,1,0,0,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,A,B,A,A,B,A,B,A,A,Władca
+R0400,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,5,5,3,3,5,5,5,5,3,5,6,5,3,3,5,5,0,1,0,0,1,1,0,0,0,0,0,0,Kochanek,B,A,B,B,A,A,A,B,B,A,B,B,Opiekun
+R0401,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",7,7,6,2,1,2,2,2,7,2,2,7,1,6,2,7,2,3,1,0,0,0,1,0,0,0,0,0,1,0,Kochanek,B,B,B,B,A,B,B,B,A,A,A,B,Twórca
+R0402,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,7,2,5,3,1,3,3,4,6,3,3,7,3,6,2,1,3,2,0,0,0,1,0,0,0,0,0,1,0,1,Opiekun,A,B,A,A,A,A,B,B,B,B,A,B,Błazen
+R0403,mężczyzna,60 i więcej,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,5,3,5,5,7,6,5,5,6,5,5,6,5,5,6,5,5,0,0,1,1,0,1,0,0,0,0,0,0,Błazen,A,B,B,A,B,A,B,B,A,A,B,A,Czarodziej
+R0404,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,6,2,2,5,6,3,5,6,2,7,6,2,6,6,5,3,1,0,1,0,0,0,0,0,0,0,0,1,Buntownik,A,A,B,A,B,B,B,B,A,A,A,A,Odkrywca
+R0405,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,5,6,6,6,5,5,5,5,4,5,3,5,4,4,3,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0406,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się bardzo dobrze,5,3,5,2,2,5,5,3,3,5,5,5,5,5,5,5,5,5,0,1,0,0,0,0,1,0,0,0,0,1,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Towarzysz
+R0407,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,3,2,3,2,7,2,4,4,2,2,3,7,5,3,6,6,2,2,0,0,1,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,A,B,A,B,B,B,B,Towarzysz
+R0408,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,7,4,4,3,4,4,6,4,4,4,2,4,4,4,4,7,4,4,0,1,1,0,0,0,0,0,0,1,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0409,mężczyzna,15-39,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",1,1,1,3,1,1,7,1,1,1,7,7,7,1,7,7,1,1,0,0,0,0,1,0,0,0,1,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0410,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,2,6,1,2,7,1,3,2,7,5,1,3,6,6,1,6,1,1,0,1,0,0,0,0,0,0,0,0,Władca,B,B,B,A,B,A,B,A,A,B,B,B,Błazen
+R0411,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,2,2,3,5,1,3,2,3,5,5,6,2,5,5,3,3,0,0,0,0,0,0,0,1,0,1,0,1,Odkrywca,B,B,B,B,A,B,B,A,B,B,B,B,Czarodziej
+R0412,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,3,6,2,6,2,6,5,6,6,2,6,2,5,3,6,2,6,0,0,1,0,0,1,0,0,1,0,0,0,Czarodziej,B,B,A,A,B,A,A,A,B,A,B,A,Błazen
+R0413,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,3,6,6,2,1,5,7,6,2,5,7,3,5,1,2,1,0,0,1,0,0,0,1,1,0,0,0,0,Twórca,A,B,B,A,A,B,B,A,B,B,A,B,Bohater
+R0414,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,3,6,5,2,3,6,2,6,2,5,7,5,2,1,3,3,0,1,0,0,0,1,0,0,0,1,0,0,Bohater,A,A,B,A,A,B,B,A,A,B,A,A,Władca
+R0415,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,powodzi mi się raczej źle,5,5,5,5,5,5,5,5,5,3,5,5,5,5,3,5,3,3,1,1,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0416,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,powodzi mi się raczej źle,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,1,0,0,0,0,0,0,0,0,1,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Niewinny
+R0417,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,1,0,0,1,0,0,0,0,1,0,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Niewinny
+R0418,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,1,0,1,0,0,0,0,0,1,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0419,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,2,6,1,2,1,2,5,2,5,2,3,6,5,5,6,2,5,0,0,1,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0420,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,4,3,3,3,2,2,1,3,6,5,3,4,5,5,6,3,3,1,0,0,0,0,0,0,0,0,0,1,1,Niewinny,A,B,A,A,B,B,B,B,B,B,A,A,Twórca
+R0421,mężczyzna,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,3,5,3,3,3,5,4,4,4,5,4,6,3,5,6,3,4,1,0,1,0,0,0,0,0,0,1,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0422,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,2,6,2,3,3,3,3,3,4,4,4,6,3,5,5,3,4,1,0,1,0,0,0,0,0,0,0,0,1,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0423,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",3,2,4,2,1,2,4,4,3,4,5,4,5,3,6,4,3,4,1,1,1,0,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0424,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się bardzo dobrze,7,1,1,7,1,1,7,1,1,1,1,7,1,2,2,1,3,1,0,0,0,0,1,0,1,0,1,0,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Kochanek
+R0425,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,7,1,1,1,1,1,7,1,1,1,1,1,2,1,2,7,1,1,0,1,0,0,0,0,1,0,1,0,0,0,Bohater,A,A,B,A,A,A,B,A,A,B,A,A,Buntownik
+R0426,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,7,7,1,1,7,7,1,1,7,1,7,1,7,7,1,1,0,1,0,0,0,0,1,0,0,1,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0427,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",7,7,6,6,6,6,6,6,6,7,7,6,6,6,6,7,6,6,0,0,1,0,0,0,0,1,0,0,0,0,Odkrywca,A,A,A,A,A,A,A,A,A,A,A,A,Kochanek
+R0428,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,7,6,7,6,7,6,7,7,7,6,6,6,6,6,6,6,7,7,1,0,0,0,1,0,0,0,1,0,0,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Buntownik
+R0429,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,powodzi mi się raczej dobrze,7,6,6,6,6,6,7,7,7,6,6,7,7,6,6,1,6,7,0,0,0,1,0,0,0,1,0,0,0,0,Odkrywca,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0430,mężczyzna,40-59,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,6,5,3,6,6,5,7,7,3,3,3,3,3,4,3,2,3,3,1,0,0,1,0,0,0,1,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0431,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,4,5,3,6,5,3,3,6,6,3,3,6,3,2,5,5,3,3,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,A,B,B,A,A,B,B,A,A,B,B,Kochanek
+R0432,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,3,3,3,3,2,2,2,3,2,2,6,5,6,5,5,7,5,5,1,0,1,0,0,0,0,1,0,0,0,0,Władca,A,A,A,B,B,A,A,B,A,A,A,B,Mędrzec
+R0433,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,3,6,6,6,6,6,6,6,7,6,6,5,5,6,7,5,6,0,0,0,0,0,0,1,0,0,0,1,1,Niewinny,B,B,A,A,B,B,B,A,B,B,B,A,Bohater
+R0434,mężczyzna,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,3,5,3,5,2,3,5,5,5,2,3,5,5,2,4,4,0,0,1,0,0,0,1,0,0,0,0,1,Twórca,B,B,B,A,B,B,A,A,B,B,A,B,Kochanek
+R0435,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,1,0,0,1,1,0,0,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0436,kobieta,15-39,średnie,inna (jaka?),powodzi mi się raczej źle,4,3,5,3,3,5,5,3,3,5,3,5,5,4,3,5,3,4,0,1,0,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,A,B,B,A,B,B,A,B,A,B,Kochanek
+R0437,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,0,0,1,0,0,1,0,0,1,0,0,0,Mędrzec,A,B,B,A,A,B,B,A,A,B,A,B,Odkrywca
+R0438,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,4,3,3,2,3,3,2,5,5,3,4,5,5,2,3,0,0,0,0,1,0,0,0,1,1,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0439,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,3,3,2,3,2,6,2,3,3,5,5,3,5,6,2,3,1,1,0,0,0,1,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0440,kobieta,40-59,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",5,5,5,6,5,4,5,5,5,5,6,6,5,7,6,3,5,5,0,0,0,0,1,0,0,0,0,1,0,0,Towarzysz,A,A,A,B,A,B,A,A,B,B,B,B,Bohater
+R0441,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,2,3,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,2,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0442,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej źle,5,6,6,6,5,6,5,5,6,3,2,3,3,2,3,2,3,3,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0443,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,1,7,1,1,1,1,7,7,1,7,7,7,7,7,7,7,7,1,0,1,0,0,0,0,0,0,0,0,1,Mędrzec,B,B,B,B,B,A,B,A,A,B,B,B,Buntownik
+R0444,kobieta,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej źle,5,3,3,5,4,4,3,3,3,4,4,5,5,3,3,5,3,3,0,1,0,0,0,0,0,0,0,1,0,1,Bohater,B,B,B,B,B,A,B,B,B,A,B,B,Bohater
+R0445,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",6,2,4,3,2,3,5,4,4,3,5,5,4,5,4,4,2,5,0,0,0,0,1,0,0,0,0,1,1,0,Towarzysz,A,A,A,B,A,A,A,A,A,B,B,A,Czarodziej
+R0446,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik umysłowy,powodzi mi się raczej źle,6,3,6,1,1,4,1,3,3,5,3,6,6,3,5,5,2,4,0,0,1,0,0,0,1,0,0,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0447,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej źle,4,2,4,3,2,3,1,3,2,3,4,6,6,4,5,4,3,5,0,0,1,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0448,kobieta,15-39,średnie,student/uczeń,odmawiam udzielenia odpowiedzi,6,1,4,1,4,3,4,1,2,2,6,6,5,4,3,3,2,2,0,0,0,1,0,0,0,0,0,1,1,0,Opiekun,A,A,A,A,A,A,A,A,A,B,A,A,Opiekun
+R0449,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",5,1,4,1,4,3,4,1,2,2,5,5,5,4,3,4,3,4,0,0,0,0,1,0,0,0,0,1,1,0,Niewinny,B,A,A,A,A,A,A,A,A,A,A,A,Opiekun
+R0450,kobieta,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",5,5,5,5,6,6,5,5,5,6,5,5,5,6,6,6,5,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,A,A,B,B,A,B,B,A,A,B,B,B,Błazen
+R0451,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,6,5,6,6,6,6,6,5,5,6,6,6,6,6,6,6,1,0,0,1,0,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,A,B,B,A,A,A,B,Kochanek
+R0452,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,2,3,5,6,1,3,1,2,2,2,1,2,2,2,1,1,2,0,0,0,1,0,1,0,0,0,0,1,0,Opiekun,A,A,A,A,A,A,A,A,A,A,B,A,Błazen
+R0453,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,5,5,3,5,5,5,5,3,5,5,0,0,0,0,0,1,0,1,0,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0454,mężczyzna,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,5,3,4,5,3,4,5,3,3,5,5,3,5,2,5,5,0,0,0,0,0,0,0,1,1,0,1,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0455,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,6,6,5,6,6,6,6,5,5,5,5,5,5,5,5,5,0,0,0,1,1,0,0,0,1,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0456,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej źle,6,6,6,6,6,7,6,6,6,5,6,6,6,7,6,6,6,6,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0457,kobieta,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,5,2,7,2,6,2,6,2,5,6,6,2,2,2,6,6,7,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,B,A,A,B,A,B,B,A,A,B,A,B,Towarzysz
+R0458,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,5,6,6,5,3,6,7,7,2,3,5,2,2,2,7,1,2,0,0,0,1,0,0,0,0,0,0,1,1,Opiekun,A,A,A,A,A,A,A,A,A,A,A,A,Władca
+R0459,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,2,6,2,2,1,6,1,1,2,1,7,6,7,6,6,6,1,6,1,0,0,1,0,0,0,0,0,0,0,1,Opiekun,A,A,A,B,A,A,A,A,A,B,A,A,Twórca
+R0460,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,7,6,6,2,5,7,7,3,2,2,7,6,7,2,7,7,1,6,0,0,0,1,0,0,1,0,0,1,0,0,Opiekun,A,A,A,B,B,A,B,B,A,A,A,A,Czarodziej
+R0461,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,1,2,2,6,5,1,5,1,3,6,6,7,1,6,7,3,2,0,0,0,1,0,0,0,0,0,1,0,1,Opiekun,B,B,B,B,A,B,B,A,B,B,B,B,Opiekun
+R0462,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,2,3,2,2,3,6,2,1,2,6,5,7,1,2,7,1,3,0,0,0,0,1,0,0,0,0,0,1,1,Niewinny,B,B,B,B,A,B,B,B,A,B,B,B,Opiekun
+R0463,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",5,3,3,3,5,3,3,5,5,3,3,3,3,3,3,3,4,5,1,0,0,0,0,0,0,1,0,0,0,0,Władca,B,B,B,A,B,B,B,A,B,A,B,A,Bohater
+R0464,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,6,3,3,5,5,3,4,4,5,5,5,3,3,3,5,5,3,0,0,0,1,0,0,0,0,1,0,0,1,Buntownik,B,B,B,A,A,B,B,B,B,B,B,B,Towarzysz
+R0465,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,6,2,2,2,3,4,1,2,3,6,6,4,6,6,2,4,0,0,1,0,0,0,0,0,0,1,1,0,Mędrzec,B,B,B,B,A,A,A,B,A,B,B,B,Odkrywca
+R0466,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,3,3,3,2,2,5,2,3,5,5,5,4,6,3,3,6,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0467,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,3,5,3,2,3,7,3,3,3,5,3,5,5,5,6,5,5,0,1,1,0,0,0,0,0,0,0,1,0,Mędrzec,A,A,A,A,B,A,B,A,A,A,A,A,Mędrzec
+R0468,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,2,6,1,3,3,5,3,5,3,5,5,5,3,6,7,3,5,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0469,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,2,3,3,5,4,2,2,5,5,6,7,2,3,6,1,3,1,0,1,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,A,A,B,A,A,B,B,B,Towarzysz
+R0470,mężczyzna,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,2,2,6,6,2,6,5,4,2,6,6,2,2,4,4,6,3,0,0,0,1,0,0,0,0,0,0,1,1,Opiekun,A,B,A,A,B,B,B,B,B,A,A,B,Opiekun
+R0471,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,6,2,6,6,5,5,2,3,4,5,3,5,6,7,7,6,3,4,1,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,A,B,B,B,B,B,A,A,A,B,B,A,Opiekun
+R0472,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,2,3,6,3,4,2,3,6,2,3,3,3,6,4,6,6,3,3,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,A,B,B,B,A,B,B,B,A,Mędrzec
+R0473,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się bardzo dobrze,6,6,2,5,6,1,5,1,7,5,5,5,6,5,6,6,5,5,0,1,0,0,0,0,1,1,0,0,0,0,Odkrywca,A,B,A,A,A,A,A,A,A,B,A,A,Władca
+R0474,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,6,5,5,5,6,6,5,6,5,6,6,7,6,6,6,6,6,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,B,Twórca
+R0475,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej źle,6,6,5,6,3,6,7,7,7,5,6,5,5,6,6,5,6,6,1,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,A,A,A,A,A,A,A,A,A,A,A,A,Opiekun
+R0476,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,odmawiam udzielenia odpowiedzi,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0477,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0478,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",6,6,6,7,7,5,6,7,6,6,5,7,5,5,5,6,5,6,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0479,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,3,3,4,4,4,5,5,3,1,0,1,0,0,0,0,0,0,0,1,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0480,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,7,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0481,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,1,0,1,1,0,0,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0482,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,3,4,5,3,2,2,1,3,2,3,5,5,3,3,3,3,2,2,1,0,0,0,0,0,0,0,1,0,1,0,Niewinny,B,B,B,A,B,A,B,B,B,B,A,B,Buntownik
+R0483,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,2,2,6,6,2,6,1,1,1,6,3,6,2,6,2,2,2,0,0,0,1,1,0,0,0,1,0,0,0,Kochanek,B,A,A,A,B,A,B,A,A,B,B,B,Opiekun
+R0484,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",5,6,5,5,6,5,3,5,3,6,3,5,3,6,3,6,3,6,0,0,0,1,0,0,0,0,0,1,1,0,Niewinny,A,A,B,B,A,A,A,B,B,A,B,A,Buntownik
+R0485,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,3,5,5,6,6,3,5,6,3,6,6,5,6,4,6,6,0,1,0,0,0,0,0,0,1,0,0,1,Buntownik,B,A,B,B,A,B,A,B,B,B,A,A,Niewinny
+R0486,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,3,3,2,2,2,6,1,6,1,1,6,2,7,6,6,6,3,2,0,0,0,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0487,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,5,5,2,3,3,2,5,3,5,5,3,3,5,5,3,5,5,0,0,1,0,0,0,0,0,1,0,0,1,Buntownik,B,A,B,B,B,A,B,A,B,A,B,A,Buntownik
+R0488,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się bardzo dobrze,3,6,4,5,3,3,2,5,6,3,3,3,3,2,3,5,3,5,1,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,A,A,B,B,B,A,B,B,A,A,A,B,Twórca
+R0489,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,6,5,5,7,5,5,3,5,5,7,5,5,3,3,5,6,0,0,0,1,0,0,0,0,0,0,0,1,Opiekun,A,B,A,A,B,A,A,B,A,A,A,B,Władca
+R0490,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,5,7,5,5,5,6,5,5,5,6,6,7,6,6,6,5,1,0,0,0,0,0,1,0,0,1,0,0,Władca,A,B,B,B,A,B,A,B,B,B,B,A,Buntownik
+R0491,mężczyzna,40-59,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,5,6,3,5,6,5,5,6,7,6,5,3,5,6,6,5,3,3,0,0,1,0,1,0,0,1,0,0,0,0,Odkrywca,B,A,A,B,B,A,A,A,A,B,B,B,Niewinny
+R0492,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,3,4,4,0,0,0,0,1,0,0,0,0,1,0,1,Towarzysz,B,A,B,B,B,B,A,B,A,A,A,B,Czarodziej
+R0493,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,7,1,7,7,7,1,7,7,7,1,7,7,1,7,7,1,7,0,1,0,0,1,0,0,0,0,0,1,0,Bohater,A,B,B,A,A,B,A,A,B,A,B,B,Kochanek
+R0494,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,2,1,5,1,1,6,1,1,1,1,1,7,1,1,7,1,1,0,1,0,0,0,0,0,1,0,0,1,0,Niewinny,A,A,A,A,A,A,A,B,B,B,B,A,Kochanek
+R0495,kobieta,15-39,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",5,4,6,6,5,5,6,6,6,5,3,5,3,3,5,5,3,5,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,B,A,B,A,B,A,B,A,B,B,Kochanek
+R0496,kobieta,15-39,średnie,bezrobotny,powodzi mi się raczej źle,3,6,6,5,2,2,3,6,1,6,3,6,2,6,2,1,2,6,0,0,0,1,0,0,0,0,0,0,0,1,Opiekun,B,B,B,A,A,A,B,B,A,A,A,B,Władca
+R0497,kobieta,15-39,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",2,4,3,4,4,7,7,2,3,5,3,6,2,5,3,2,3,5,0,0,0,1,0,0,0,1,0,0,1,0,Opiekun,B,B,B,B,B,B,B,A,B,B,B,B,Kochanek
+R0498,kobieta,15-39,wyższe,student/uczeń,powodzi mi się raczej dobrze,5,6,5,5,3,5,5,5,3,5,5,6,6,5,5,5,5,5,0,1,0,0,0,0,1,0,0,0,0,0,Twórca,B,B,B,B,B,A,B,B,B,B,B,B,Odkrywca
+R0499,kobieta,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,1,0,0,1,0,0,Twórca,B,B,B,B,B,B,A,B,B,B,B,B,Niewinny
+R0500,kobieta,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,4,3,5,2,6,6,2,2,5,3,7,4,5,4,7,1,3,1,1,0,0,0,0,0,0,1,0,0,0,Bohater,A,A,A,B,B,A,A,A,B,A,A,B,Kochanek
+R0501,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,5,5,3,5,5,6,5,5,5,6,6,3,3,5,5,5,0,0,1,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,B,A,B,A,B,B,A,B,B,B,Buntownik
+R0502,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,3,3,3,3,2,2,6,2,6,6,6,3,5,5,2,3,1,0,0,1,0,0,0,0,0,1,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Towarzysz
+R0503,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,7,5,1,5,2,6,2,6,6,2,5,2,3,7,3,6,3,0,0,1,0,0,0,0,0,0,0,1,1,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0504,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,6,1,5,2,5,2,6,2,5,3,6,2,7,2,6,2,6,0,0,1,1,1,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0505,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,A,A,B,B,B,B,A,A,A,A,B,B,Mędrzec
+R0506,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,6,6,5,6,7,5,6,5,6,0,1,0,0,0,0,0,0,1,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0507,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,3,3,3,2,4,6,6,6,5,5,4,3,3,3,5,3,6,5,1,0,1,0,0,0,0,0,0,0,0,1,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0508,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,3,6,4,4,5,3,5,3,6,6,6,6,6,6,6,0,0,1,0,0,0,0,0,0,0,1,1,Niewinny,B,B,B,B,B,B,B,B,B,B,A,B,Towarzysz
+R0509,mężczyzna,60 i więcej,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,4,5,4,1,1,1,1,3,3,5,5,6,6,6,6,5,5,5,0,1,1,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0510,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,6,3,4,4,3,3,2,2,5,6,2,5,2,2,2,2,0,0,0,1,0,0,1,0,0,1,0,0,Towarzysz,B,B,B,B,A,A,B,B,B,B,B,B,Błazen
+R0511,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,6,5,6,3,2,6,5,6,3,6,5,3,6,6,6,6,6,0,0,0,0,0,0,0,0,1,1,0,0,Czarodziej,B,B,A,B,B,B,B,A,B,B,A,A,Czarodziej
+R0512,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,7,1,4,1,7,7,2,2,3,2,5,7,3,5,3,3,2,2,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Niewinny
+R0513,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,7,1,5,1,6,7,5,2,5,3,5,3,5,3,5,5,3,5,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Władca
+R0514,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,5,2,2,2,4,6,2,2,1,2,2,6,5,2,6,2,2,1,0,0,0,1,0,0,0,0,1,0,0,Władca,A,A,A,A,A,A,A,B,A,A,A,A,Bohater
+R0515,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,4,3,2,5,3,4,5,3,2,4,5,4,4,4,3,4,2,4,0,0,0,1,1,0,0,0,0,1,0,0,Towarzysz,A,A,A,A,A,A,B,B,A,B,B,B,Mędrzec
+R0516,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,2,4,4,2,3,6,3,3,2,5,4,3,4,4,4,3,3,0,0,0,0,0,0,0,0,0,1,1,1,Buntownik,A,A,A,A,A,A,B,B,A,B,B,B,Niewinny
+R0517,kobieta,40-59,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,2,3,2,4,5,7,3,1,2,4,4,5,4,4,4,3,3,0,0,0,1,1,0,0,0,0,0,1,0,Niewinny,A,B,A,A,A,A,B,A,A,A,B,B,Czarodziej
+R0518,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,6,5,5,6,5,5,6,5,5,5,5,6,5,5,5,6,5,0,0,0,0,0,1,0,0,0,1,0,0,Towarzysz,B,A,B,A,B,B,A,B,A,A,B,B,Mędrzec
+R0519,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,6,5,5,5,5,6,5,5,6,5,6,5,5,6,5,5,0,0,0,0,0,0,1,0,0,0,0,1,Twórca,B,A,B,B,B,B,A,B,A,A,B,A,Kochanek
+R0520,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,1,0,1,0,1,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0521,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,7,5,6,6,7,7,7,1,1,1,7,7,6,7,2,7,7,7,1,0,0,0,1,0,0,0,0,0,1,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0522,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,6,7,6,5,1,7,5,7,7,5,2,6,2,6,5,2,6,7,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,A,B,B,A,B,B,A,B,B,A,B,Niewinny
+R0523,mężczyzna,15-39,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,6,5,5,7,5,5,6,6,6,5,5,6,6,6,5,5,5,5,0,0,0,0,0,0,0,0,1,0,0,1,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0524,kobieta,15-39,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,6,5,5,6,5,3,5,5,3,5,5,5,5,7,6,5,5,6,1,0,0,0,0,0,0,1,0,1,0,0,Odkrywca,A,B,A,B,B,B,A,B,B,B,A,B,Opiekun
+R0525,kobieta,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,3,4,3,3,3,5,3,3,1,0,1,0,0,0,0,1,0,0,0,0,Władca,A,B,B,B,B,B,B,A,A,A,A,A,Opiekun
+R0526,kobieta,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,5,6,6,5,5,5,5,6,5,5,5,6,6,5,5,6,0,1,0,0,0,1,0,0,0,1,0,0,Towarzysz,A,B,B,A,B,A,A,B,B,A,A,B,Bohater
+R0527,kobieta,15-39,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",5,2,5,2,6,6,2,6,6,6,2,6,3,6,3,6,6,6,0,1,0,0,0,0,0,0,1,1,0,0,Bohater,B,A,A,B,A,B,A,B,A,A,B,B,Czarodziej
+R0528,mężczyzna,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,3,3,3,5,5,5,5,5,5,5,5,5,0,0,0,1,1,0,0,0,0,1,0,0,Towarzysz,B,A,B,B,B,A,A,A,A,A,B,B,Twórca
+R0529,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,2,6,5,5,2,6,6,5,5,3,5,6,3,6,6,3,0,0,0,1,1,0,1,0,0,0,0,0,Twórca,B,B,A,A,A,B,B,A,A,A,A,B,Władca
+R0530,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,3,6,3,6,2,5,2,6,2,5,3,6,3,6,6,3,0,0,0,1,0,0,0,0,0,1,1,0,Opiekun,B,B,A,B,A,B,B,A,B,A,B,A,Towarzysz
+R0531,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,6,2,7,5,5,3,5,6,2,6,3,6,3,6,3,5,0,1,1,0,0,1,0,0,0,0,0,0,Bohater,A,A,A,B,B,B,A,A,B,B,B,A,Bohater
+R0532,mężczyzna,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,3,5,3,5,3,5,5,5,3,6,5,3,5,3,5,0,1,1,0,0,0,0,0,0,0,1,0,Niewinny,B,A,A,B,B,A,B,B,A,B,A,A,Odkrywca
+R0533,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej źle,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,1,0,1,0,0,0,0,0,0,0,0,1,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0534,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,7,1,7,4,7,7,7,1,1,7,7,7,7,7,7,7,2,7,1,1,0,1,0,0,0,0,0,0,0,0,Opiekun,A,B,A,B,B,B,A,A,A,B,B,B,Władca
+R0535,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,6,5,5,5,6,5,4,4,4,5,5,5,5,5,5,0,1,0,0,0,0,1,0,0,0,0,1,Bohater,B,B,B,B,B,B,A,A,B,B,B,B,Kochanek
+R0536,kobieta,40-59,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",2,1,1,1,5,3,1,1,1,1,1,1,2,1,1,1,1,1,0,0,0,1,1,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,A,B,B,Kochanek
+R0537,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,1,1,1,1,1,1,1,7,7,3,7,1,6,5,6,7,6,5,0,0,0,0,0,0,0,0,0,0,1,1,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0538,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,5,6,5,2,5,5,3,5,3,6,6,7,5,6,6,7,7,7,0,1,0,0,0,0,0,0,1,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0539,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,1,0,0,0,0,0,1,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0540,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Władca
+R0541,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,5,5,5,5,5,5,5,5,4,4,4,4,4,4,4,4,4,1,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0542,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",6,6,6,5,6,6,3,5,5,5,6,5,5,5,5,5,6,5,0,0,0,0,0,0,1,0,0,0,1,0,Twórca,B,A,B,B,B,B,B,B,B,B,A,B,Mędrzec
+R0543,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,7,5,5,6,5,5,5,5,4,6,7,5,6,5,7,6,0,1,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,A,B,A,B,B,B,B,B,A,Niewinny
+R0544,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,3,6,5,5,5,5,3,5,3,5,3,5,5,5,5,3,5,0,0,0,0,1,0,1,0,0,0,1,0,Niewinny,A,B,B,B,B,B,A,B,B,A,B,A,Niewinny
+R0545,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,2,2,3,3,2,3,2,5,3,4,6,5,5,5,3,3,0,1,0,1,0,0,0,0,0,0,1,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0546,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,4,2,3,2,3,3,4,2,2,4,5,5,6,3,3,5,3,3,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,A,B,A,B,B,A,B,B,A,Mędrzec
+R0547,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,2,2,3,6,6,2,5,3,5,2,3,5,5,6,1,1,6,2,0,1,0,0,1,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0548,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,7,6,2,7,3,6,3,3,2,1,1,7,1,3,5,5,2,5,0,0,0,0,0,1,0,1,0,0,0,1,Buntownik,B,B,A,B,B,B,B,B,A,A,A,A,Odkrywca
+R0549,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,6,2,5,3,7,2,1,3,5,2,6,2,5,3,7,1,0,1,0,0,0,1,0,0,0,0,0,Mędrzec,A,B,A,A,A,B,A,A,A,A,B,B,Mędrzec
+R0550,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,5,6,5,6,3,6,6,4,6,7,6,6,5,5,5,6,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,B,B,B,A,B,A,A,A,B,B,A,Bohater
+R0551,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,6,7,5,2,6,2,2,6,6,7,2,2,2,2,6,7,1,0,1,0,0,0,0,0,0,0,1,0,Władca,B,B,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0552,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,3,3,3,3,5,3,5,5,5,5,5,4,5,5,5,5,5,4,1,0,1,0,0,0,0,0,0,0,1,0,Mędrzec,B,A,B,B,B,A,B,B,A,B,B,B,Twórca
+R0553,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,4,5,5,4,3,4,5,4,4,5,4,4,5,5,5,4,4,5,1,0,0,0,0,0,0,0,0,0,1,1,Władca,B,A,B,B,B,A,B,B,A,B,A,B,Czarodziej
+R0554,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,5,2,3,5,2,2,5,3,3,3,5,3,6,2,5,6,3,3,1,0,1,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,A,A,A,A,A,B,B,B,B,B,Czarodziej
+R0555,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,6,3,6,4,2,2,4,3,3,2,3,5,6,5,4,5,5,3,1,0,0,1,1,0,0,0,0,0,0,0,Władca,B,B,A,A,A,A,B,B,B,A,A,B,Błazen
+R0556,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,odmawiam udzielenia odpowiedzi,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Władca
+R0557,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",5,2,2,3,2,2,2,2,2,3,5,3,5,3,5,5,2,3,1,0,0,1,0,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,A,A,A,A,B,A,B,Błazen
+R0558,kobieta,40-59,wyższe,bezrobotny,"powodzi mi się przeciętnie, średnio",5,2,2,5,2,2,6,5,2,2,5,5,6,3,5,4,2,3,0,0,0,1,1,0,0,0,0,1,0,0,Opiekun,B,B,A,B,B,A,A,A,A,B,A,B,Błazen
+R0559,mężczyzna,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",6,3,3,2,5,6,2,3,5,5,6,6,6,3,3,3,3,5,0,0,1,0,0,0,0,0,1,0,0,1,Czarodziej,B,B,B,B,A,A,B,A,B,B,B,A,Czarodziej
+R0560,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,3,5,1,6,3,1,3,6,6,7,7,6,5,3,2,3,6,0,0,0,0,0,1,1,0,1,0,0,0,Twórca,B,A,B,B,B,A,B,B,B,B,B,A,Czarodziej
+R0561,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,3,2,2,3,7,3,2,1,5,5,3,5,3,7,2,4,0,0,0,1,0,1,0,0,0,1,0,0,Opiekun,B,B,B,B,A,A,B,A,A,B,A,B,Kochanek
+R0562,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,1,3,5,3,1,5,2,3,2,6,3,5,3,3,2,3,3,0,0,0,0,1,0,0,0,0,1,1,0,Towarzysz,B,A,B,A,A,B,A,A,B,B,A,A,Kochanek
+R0563,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,2,5,1,2,2,1,5,5,6,6,7,6,5,5,5,3,5,0,0,1,0,0,1,1,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0564,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,1,1,3,1,1,1,1,2,3,2,5,6,7,2,6,6,2,2,0,1,1,0,0,0,0,0,0,0,1,0,Bohater,A,B,A,B,B,B,B,A,A,B,B,B,Mędrzec
+R0565,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej źle,7,7,7,7,7,7,7,7,7,1,1,1,1,7,1,1,1,1,0,0,0,1,0,0,0,1,0,0,0,1,Opiekun,B,B,B,B,B,A,A,A,B,B,B,B,Bohater
+R0566,mężczyzna,15-39,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,3,6,3,2,2,6,2,2,2,6,6,2,6,2,6,2,6,0,1,0,0,0,1,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,A,B,Twórca
+R0567,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,5,3,3,3,5,3,5,2,5,5,5,5,3,5,3,3,0,0,0,0,1,0,1,0,0,1,0,0,Towarzysz,B,B,A,B,B,A,B,B,B,B,A,B,Czarodziej
+R0568,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,6,7,7,6,7,2,6,7,7,2,7,7,1,7,1,6,6,1,0,0,0,0,1,0,0,0,0,0,0,Błazen,A,B,B,B,B,B,A,B,A,B,A,A,Opiekun
+R0569,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,3,3,7,2,3,2,4,5,5,3,5,5,5,5,5,3,3,0,0,0,1,1,0,0,0,0,0,1,0,Opiekun,B,A,B,A,B,A,B,A,A,A,A,A,Niewinny
+R0570,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,3,6,2,6,3,6,3,3,2,3,2,6,5,3,3,6,3,2,1,0,0,0,0,1,0,1,0,0,0,0,Błazen,A,A,B,A,A,B,B,A,A,B,B,A,Czarodziej
+R0571,kobieta,40-59,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,6,6,6,2,1,5,7,1,1,2,3,6,3,3,2,7,2,2,0,0,0,1,1,0,0,0,0,1,0,0,Opiekun,B,B,A,B,B,A,B,B,B,B,A,A,Odkrywca
+R0572,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,1,2,3,4,5,6,7,6,5,2,3,2,5,4,6,7,5,3,0,0,0,1,1,0,0,0,0,1,0,0,Opiekun,A,B,A,B,B,A,B,A,B,A,B,A,Opiekun
+R0573,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,7,6,5,4,3,2,1,2,3,6,5,3,2,1,4,5,6,7,0,1,0,1,0,0,0,0,0,0,1,0,Niewinny,B,A,B,B,B,A,A,A,A,B,B,B,Opiekun
+R0574,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,3,5,2,5,7,3,7,2,5,5,5,5,5,5,6,6,5,6,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,A,B,B,A,A,B,A,A,B,A,A,Niewinny
+R0575,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,5,2,2,4,4,4,3,5,3,6,6,5,6,7,3,6,0,0,1,0,0,0,1,0,0,0,0,1,Mędrzec,A,B,B,B,B,A,B,A,A,A,B,B,Mędrzec
+R0576,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,6,5,6,5,6,5,6,5,5,6,5,6,6,5,5,5,5,0,0,0,1,0,0,0,1,0,0,0,0,Opiekun,B,A,B,B,B,B,B,A,A,A,A,B,Czarodziej
+R0577,mężczyzna,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,6,6,5,5,5,6,5,5,5,6,5,5,6,6,5,5,5,1,0,0,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,A,B,B,A,B,B,B,A,Kochanek
+R0578,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,5,5,6,5,5,3,3,5,5,5,5,3,5,5,6,6,6,6,1,0,0,1,0,0,0,0,0,0,1,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0579,mężczyzna,15-39,średnie,prowadzę własną firmę,powodzi mi się bardzo dobrze,5,5,6,5,5,5,5,5,5,5,3,3,5,5,3,5,5,5,0,0,0,1,1,0,0,0,0,0,0,1,Opiekun,A,A,A,A,B,A,A,A,A,A,B,A,Bohater
+R0580,mężczyzna,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,5,5,5,5,5,3,3,6,5,3,5,6,6,7,6,5,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,B,A,A,A,A,A,B,A,A,A,B,A,Mędrzec
+R0581,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,1,1,1,1,1,1,1,1,1,1,1,1,7,1,7,7,1,4,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,A,B,B,A,B,B,B,A,Kochanek
+R0582,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",1,1,1,1,3,3,1,1,1,1,1,2,7,1,7,7,1,1,0,1,0,1,0,0,0,0,0,1,0,0,Bohater,B,B,B,B,A,B,B,B,B,B,B,B,Błazen
+R0583,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,4,3,4,5,3,5,3,4,4,4,4,4,5,3,5,2,4,5,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,A,A,A,A,B,A,B,A,A,A,B,A,Kochanek
+R0584,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,4,3,3,3,4,4,4,5,5,3,3,3,4,4,3,0,0,0,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0585,kobieta,15-39,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",3,5,3,5,5,5,3,3,5,5,5,3,3,5,5,5,6,3,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,A,A,B,B,B,A,A,A,A,B,B,A,Towarzysz
+R0586,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",2,2,2,5,4,2,5,3,4,3,5,3,3,5,5,3,5,5,0,1,0,0,1,0,0,0,0,0,1,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0587,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,5,3,6,5,3,5,5,3,6,5,3,7,3,6,5,5,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,A,B,A,A,B,A,B,B,A,B,A,Buntownik
+R0588,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,6,6,5,5,6,5,5,5,6,5,6,5,5,5,6,5,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,A,A,B,A,A,B,B,B,A,A,Bohater
+R0589,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,6,6,5,5,5,5,6,5,6,5,5,5,6,6,5,5,1,0,0,0,0,0,0,1,0,0,0,0,Władca,A,B,A,B,A,A,B,B,A,A,A,A,Władca
+R0590,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,3,1,5,2,3,4,5,2,3,1,5,7,6,3,3,5,1,1,0,0,0,0,1,1,0,0,0,1,0,0,Kochanek,A,B,B,B,B,B,B,B,B,A,B,A,Towarzysz
+R0591,kobieta,15-39,średnie,bezrobotny,powodzi mi się raczej dobrze,5,3,6,7,6,6,2,5,5,5,6,2,6,6,3,6,5,5,1,0,0,0,1,0,1,0,0,0,0,0,Twórca,B,B,B,B,B,B,A,B,B,B,B,B,Czarodziej
+R0592,mężczyzna,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",4,2,7,1,5,3,4,2,1,3,7,4,5,6,3,3,1,5,1,0,1,1,0,0,0,0,0,0,0,0,Mędrzec,A,B,A,A,A,A,A,A,A,A,A,B,Mędrzec
+R0593,kobieta,15-39,średnie,inna (jaka?),"powodzi mi się przeciętnie, średnio",5,2,5,4,2,3,2,3,2,2,6,5,5,3,6,4,1,5,0,1,1,0,0,0,0,0,0,0,1,0,Mędrzec,A,B,B,A,B,A,B,B,B,B,B,B,Kochanek
+R0594,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,6,5,7,2,2,2,2,7,1,7,5,7,6,1,3,2,7,1,1,0,1,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,A,B,A,B,B,B,B,Bohater
+R0595,kobieta,40-59,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",5,6,6,5,5,5,6,6,6,6,5,6,5,6,6,6,6,6,1,0,0,0,0,1,0,0,1,0,0,0,Władca,B,A,B,B,B,B,A,A,B,B,B,A,Czarodziej
+R0596,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,6,6,6,6,6,6,6,6,5,5,6,5,5,5,6,5,5,1,0,0,0,0,0,1,0,0,0,0,1,Buntownik,B,B,A,A,B,A,B,B,B,A,A,A,Buntownik
+R0597,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,5,2,2,3,3,2,2,3,6,6,3,6,5,7,1,3,0,0,1,0,0,0,0,0,1,0,0,1,Buntownik,B,B,B,A,A,A,B,B,B,B,B,B,Władca
+R0598,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0,1,0,0,0,0,0,1,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0599,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,1,0,0,0,1,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Niewinny
+R0600,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,4,3,3,3,1,3,2,2,4,4,4,4,4,4,2,3,0,0,0,1,0,0,0,0,1,1,0,0,Towarzysz,B,B,B,B,B,A,B,B,B,B,B,B,Towarzysz
+R0601,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,3,2,3,3,1,2,2,2,4,5,4,4,4,5,2,4,1,0,0,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,A,B,B,B,B,B,B,Towarzysz
+R0602,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,5,5,2,2,3,1,2,3,5,5,6,6,3,3,6,3,1,0,0,0,1,0,0,0,1,0,0,0,1,Odkrywca,B,B,B,B,B,A,B,B,A,B,A,B,Opiekun
+R0603,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,3,6,3,3,4,4,3,3,2,5,5,5,4,4,4,4,4,0,0,0,1,0,0,1,0,0,0,1,0,Twórca,B,B,B,B,A,A,B,B,B,B,B,B,Kochanek
+R0604,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,1,6,1,1,1,1,4,1,1,1,5,7,1,7,4,1,7,0,1,1,0,0,0,0,0,0,0,0,1,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0605,kobieta,60 i więcej,średnie,rencista/emeryt,odmawiam udzielenia odpowiedzi,1,1,1,1,1,1,1,1,1,4,2,2,7,2,7,7,2,6,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0606,kobieta,60 i więcej,średnie,rencista/emeryt,odmawiam udzielenia odpowiedzi,1,1,1,1,1,1,1,1,1,7,1,1,7,4,7,7,1,1,1,1,1,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0607,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0608,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0609,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,3,3,5,7,5,6,2,3,5,3,5,6,5,5,3,6,5,0,1,0,0,1,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,A,A,A,Władca
+R0610,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",5,3,6,2,3,3,6,4,6,4,6,5,5,5,4,5,2,5,0,0,1,0,0,1,0,0,0,0,1,0,Niewinny,B,B,A,B,B,A,B,B,B,B,B,B,Kochanek
+R0611,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,5,3,6,2,1,1,1,3,5,3,5,3,6,5,6,5,3,3,1,0,0,0,0,0,0,0,0,0,1,1,Niewinny,A,B,A,A,B,A,B,B,B,B,B,B,Niewinny
+R0612,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,6,2,7,2,2,6,1,2,5,3,5,5,5,5,5,7,4,5,0,1,1,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0613,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,4,4,2,2,2,6,2,2,2,4,4,5,3,6,5,4,2,0,0,0,1,0,0,1,0,0,1,0,0,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0614,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",5,2,2,2,3,2,5,3,3,2,3,5,6,2,3,6,4,3,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,A,A,B,A,B,A,B,B,A,A,Kochanek
+R0615,mężczyzna,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",6,4,5,3,4,2,5,4,2,3,5,5,4,4,3,6,3,4,0,0,1,0,0,0,0,0,0,1,1,0,Mędrzec,A,B,A,A,B,A,B,A,B,B,A,B,Towarzysz
+R0616,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,powodzi mi się raczej dobrze,7,7,6,6,5,5,6,5,5,5,6,5,6,5,5,6,7,6,0,0,0,1,0,1,0,1,0,0,0,0,Opiekun,A,B,A,A,A,A,A,A,A,B,A,B,Niewinny
+R0617,kobieta,15-39,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,5,2,7,2,6,6,7,3,2,3,6,6,3,2,2,6,2,3,0,1,0,0,0,0,0,0,0,0,1,1,Bohater,B,A,A,A,B,A,B,B,B,B,B,B,Odkrywca
+R0618,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,odmawiam udzielenia odpowiedzi,5,6,7,3,5,3,5,3,6,6,5,6,6,6,5,6,7,7,0,0,1,1,0,0,0,0,0,0,1,0,Opiekun,B,A,B,B,A,A,A,B,B,B,B,B,Twórca
+R0619,kobieta,15-39,średnie,bezrobotny,odmawiam udzielenia odpowiedzi,7,5,5,6,6,5,7,6,7,7,7,3,7,7,7,7,7,7,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,A,B,B,B,B,B,A,A,B,A,A,A,Opiekun
+R0620,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,3,5,5,5,5,5,3,3,5,0,1,0,0,0,0,1,1,0,0,0,0,Odkrywca,B,B,B,A,B,B,B,B,A,A,A,B,Mędrzec
+R0621,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,7,2,2,4,2,2,5,2,2,3,6,6,5,3,5,5,2,5,1,0,0,0,0,0,0,1,1,0,0,0,Czarodziej,B,A,A,A,A,A,B,B,B,A,B,B,Czarodziej
+R0622,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,2,1,4,5,1,4,6,5,5,2,2,2,4,7,2,6,0,1,1,0,0,0,0,0,0,0,0,1,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0623,mężczyzna,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",1,4,4,2,4,3,1,3,4,1,1,1,1,4,5,3,3,6,0,1,0,1,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0624,mężczyzna,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,3,3,1,4,3,1,3,3,5,4,3,3,3,4,6,2,5,0,1,1,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0625,kobieta,15-39,średnie,student/uczeń,powodzi mi się bardzo dobrze,6,5,7,2,6,3,3,3,5,6,7,7,5,6,1,2,6,5,0,0,1,0,0,0,1,0,0,0,0,1,Mędrzec,B,B,B,B,A,A,A,A,A,B,A,B,Odkrywca
+R0626,kobieta,15-39,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,7,6,7,1,3,3,5,2,6,3,7,6,5,6,2,1,3,7,1,1,1,0,0,0,0,0,0,0,0,0,Bohater,A,B,B,A,A,A,A,A,A,B,B,B,Odkrywca
+R0627,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,6,6,3,6,2,4,7,4,4,4,5,5,5,6,6,4,0,0,0,1,0,0,1,0,0,0,1,0,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0628,mężczyzna,60 i więcej,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,5,5,5,4,4,2,5,5,5,4,4,4,3,4,4,5,4,0,0,1,0,0,1,1,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0629,kobieta,15-39,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",3,3,5,3,2,3,3,3,4,3,3,3,3,3,5,5,3,5,0,0,1,0,1,0,1,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R0630,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,2,5,3,5,2,2,2,2,3,3,3,6,5,4,4,3,4,0,0,1,0,0,0,1,0,1,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0631,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,5,3,4,3,2,3,2,5,4,4,5,5,4,5,2,3,0,0,1,0,0,0,1,0,0,1,0,0,Twórca,B,B,B,B,B,B,B,B,B,B,A,B,Czarodziej
+R0632,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,3,2,2,2,3,2,2,2,2,2,5,3,5,4,5,6,2,2,0,0,1,0,0,0,1,0,0,0,1,0,Mędrzec,B,B,B,B,B,A,B,B,B,B,B,B,Czarodziej
+R0633,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,1,1,1,3,3,3,1,1,1,4,6,7,4,4,4,4,2,1,0,0,1,0,0,0,0,0,0,1,0,Władca,B,B,B,B,B,A,B,B,A,B,B,B,Buntownik
+R0634,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,1,1,1,1,1,1,1,1,1,4,4,7,4,4,4,4,4,1,0,0,1,0,0,0,0,0,1,0,0,Władca,B,A,B,A,B,A,A,A,A,A,B,A,Błazen
+R0635,kobieta,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,5,5,5,5,3,5,5,5,5,5,5,5,5,4,5,5,0,1,1,1,0,0,0,0,0,0,0,0,Bohater,A,A,B,B,A,B,B,B,B,B,A,B,Twórca
+R0636,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,5,2,3,4,2,5,3,5,3,5,5,3,5,5,3,3,0,0,0,1,0,1,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R0637,kobieta,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,4,3,3,3,5,5,5,5,3,3,5,3,5,5,5,3,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,A,B,B,B,B,B,B,B,B,B,Buntownik
+R0638,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,2,6,3,6,6,2,6,5,3,6,5,3,5,6,6,6,0,1,0,0,0,0,0,0,0,1,1,0,Bohater,B,A,A,B,B,B,A,A,B,B,A,A,Odkrywca
+R0639,kobieta,40-59,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,5,3,5,3,5,5,3,3,3,5,5,5,3,5,5,5,5,5,0,0,0,1,0,0,1,0,0,1,0,0,Opiekun,B,A,B,B,B,A,B,A,B,B,B,B,Mędrzec
+R0640,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,3,2,1,1,2,3,2,5,5,3,6,3,3,1,2,1,0,1,0,0,1,0,0,0,0,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0641,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,7,3,3,3,1,1,1,3,1,1,5,5,5,6,5,3,2,3,1,0,0,0,1,0,0,0,1,0,0,0,Czarodziej,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0642,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",6,6,6,5,1,1,1,1,2,3,1,1,1,5,7,7,3,2,0,1,0,1,0,0,1,0,0,0,0,0,Bohater,B,B,B,A,B,B,A,B,A,A,A,B,Twórca
+R0643,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,7,1,1,1,1,7,1,7,7,1,7,7,1,7,7,3,2,7,1,0,0,0,0,0,1,0,1,0,0,0,Czarodziej,A,A,B,B,A,A,A,B,A,B,A,B,Opiekun
+R0644,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",6,5,5,5,3,3,3,5,5,3,5,3,3,5,5,5,3,5,1,0,0,0,0,0,0,0,0,1,0,0,Władca,A,B,A,A,B,A,A,A,A,A,A,A,Władca
+R0645,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,3,3,5,3,3,3,5,5,5,5,5,5,3,3,3,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,A,A,A,B,B,A,A,A,A,A,B,A,Błazen
+R0646,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,6,6,7,7,6,6,6,6,6,6,6,7,6,6,7,5,6,1,0,0,0,0,0,0,0,0,1,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Odkrywca
+R0647,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,6,6,6,6,7,6,6,6,6,6,6,7,6,6,6,6,7,1,0,0,0,0,0,0,0,0,0,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Błazen
+R0648,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,2,6,5,5,5,2,3,3,6,5,2,5,5,5,5,5,6,0,0,1,0,0,1,0,0,0,0,0,1,Błazen,A,A,A,A,B,A,A,B,A,A,B,A,Mędrzec
+R0649,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,3,6,5,6,2,5,3,5,6,7,5,5,5,5,3,6,0,0,1,1,0,0,0,0,0,1,0,0,Mędrzec,B,A,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0650,kobieta,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,0,1,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,A,B,A,A,A,A,A,A,A,A,Kochanek
+R0651,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,7,6,7,6,6,6,6,7,7,6,6,6,6,6,6,6,6,1,0,0,0,1,0,1,0,0,0,0,0,Władca,A,B,A,A,A,A,A,A,A,A,A,A,Odkrywca
+R0652,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,6,5,5,5,5,5,5,5,5,5,6,6,5,3,6,6,6,6,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,A,A,A,B,A,B,B,B,A,B,B,Kochanek
+R0653,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,3,5,5,5,5,5,5,5,5,5,5,6,5,5,5,5,0,0,0,0,0,0,0,0,0,1,1,0,Niewinny,A,A,A,A,A,A,B,B,A,A,A,B,Niewinny
+R0654,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,5,5,7,3,6,3,5,6,2,5,3,7,5,3,5,2,6,6,0,1,0,0,0,0,0,1,0,0,1,0,Niewinny,A,A,A,A,B,B,A,A,B,B,B,A,Władca
+R0655,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,2,3,3,2,2,5,2,3,3,3,6,2,6,6,2,2,1,0,1,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0656,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,3,3,3,3,3,3,3,3,3,2,3,2,3,2,2,3,3,1,1,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R0657,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,3,3,3,3,3,3,3,3,3,3,3,3,3,5,6,2,3,1,0,0,1,1,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0658,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,3,3,5,3,2,2,2,3,5,6,5,6,2,3,3,3,0,0,0,0,1,1,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0659,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej źle,6,3,7,7,3,6,6,6,2,6,2,7,7,6,2,6,6,6,0,0,1,0,1,0,0,0,0,0,0,1,Buntownik,B,A,B,B,A,A,B,A,B,B,A,A,Kochanek
+R0660,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,7,3,7,2,2,6,2,5,2,6,2,2,7,6,2,7,6,0,0,1,1,0,0,0,0,0,0,0,0,Mędrzec,B,A,A,A,B,A,B,A,A,B,B,A,Bohater
+R0661,mężczyzna,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej dobrze,3,6,6,2,2,3,2,3,3,3,5,3,6,4,7,6,2,5,0,1,1,1,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0662,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",1,1,1,1,1,1,1,4,1,2,3,4,7,1,7,7,1,4,1,0,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0663,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",1,1,1,1,1,1,1,1,1,1,1,4,7,1,7,7,1,4,0,0,1,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0664,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,0,1,1,1,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0665,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się bardzo dobrze,6,6,6,6,6,5,6,6,5,6,6,5,6,6,6,5,6,6,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,A,B,B,B,A,A,A,B,B,A,A,Twórca
+R0666,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,6,6,6,4,5,5,5,6,5,5,6,6,6,6,7,6,5,0,0,0,0,0,1,1,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0667,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,6,6,5,5,5,6,6,7,7,6,5,5,6,6,6,5,6,5,0,0,1,0,1,0,0,0,0,0,1,0,Niewinny,A,A,A,B,A,B,A,B,A,A,B,B,Kochanek
+R0668,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,5,6,6,6,5,6,5,5,6,6,6,5,5,6,5,5,6,6,0,0,1,1,0,0,0,0,0,0,0,0,Mędrzec,A,B,A,A,A,A,A,A,A,A,A,B,Buntownik
+R0669,mężczyzna,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,6,5,5,6,7,7,6,5,7,7,6,6,6,5,6,7,7,6,0,0,0,0,0,0,1,0,1,1,0,0,Twórca,B,A,A,A,A,A,A,A,B,A,B,A,Towarzysz
+R0670,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,5,5,2,5,5,2,5,2,5,3,3,2,3,6,6,3,5,1,1,0,0,0,0,1,0,0,0,0,0,Bohater,B,B,B,B,B,A,B,A,A,B,B,A,Towarzysz
+R0671,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,6,1,5,2,2,5,6,2,2,5,6,2,5,3,5,2,0,0,1,0,0,0,1,0,0,1,0,0,Twórca,B,B,B,B,B,A,B,A,A,B,B,B,Bohater
+R0672,kobieta,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,5,2,5,6,7,6,3,6,5,5,3,6,2,6,5,3,6,5,0,0,0,0,0,1,0,1,0,0,0,0,Odkrywca,B,B,B,A,A,A,A,A,B,B,B,A,Władca
+R0673,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,6,5,7,6,5,3,5,3,5,5,2,6,5,7,3,5,3,6,0,1,0,0,0,0,0,0,0,0,0,1,Buntownik,B,B,A,B,B,A,B,A,A,B,A,A,Błazen
+R0674,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",5,3,6,2,5,5,5,3,6,6,6,6,6,2,2,2,2,6,0,0,1,0,0,0,0,0,0,1,1,0,Towarzysz,A,B,B,B,A,A,B,B,A,B,B,B,Błazen
+R0675,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,3,5,3,6,6,6,2,2,6,2,6,3,6,5,2,6,1,0,1,0,0,0,0,0,0,0,0,1,1,Niewinny,A,B,A,A,B,B,B,A,B,B,B,B,Czarodziej
+R0676,kobieta,40-59,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",5,3,5,6,3,6,6,7,7,5,3,6,6,6,3,5,6,3,0,0,0,0,0,0,0,1,0,0,0,0,Odkrywca,B,A,A,A,B,A,A,B,A,A,A,B,Czarodziej
+R0677,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,6,2,5,3,7,6,5,6,3,3,5,7,6,3,6,5,3,6,0,1,0,0,0,0,0,1,0,0,0,1,Buntownik,B,A,A,B,A,B,B,B,A,A,B,A,Błazen
+R0678,mężczyzna,40-59,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,3,3,5,1,4,2,3,3,5,5,5,5,5,3,3,3,5,5,1,0,1,0,1,0,0,0,0,0,0,0,Mędrzec,B,B,A,A,A,A,B,A,A,B,A,B,Błazen
+R0679,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,3,3,3,3,3,3,3,3,5,3,3,3,3,3,3,0,0,0,0,1,0,0,1,0,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0680,mężczyzna,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,1,0,0,1,1,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0681,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,5,3,3,3,3,3,3,3,3,3,5,3,5,5,3,3,1,1,1,0,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0682,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,5,3,5,3,3,3,5,5,5,3,3,5,5,3,5,5,3,5,1,1,0,0,0,0,0,0,0,0,1,0,Władca,B,B,A,B,B,A,B,B,B,B,B,B,Twórca
+R0683,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się bardzo dobrze,7,1,5,1,1,1,1,5,1,6,5,5,2,5,5,5,5,5,0,0,1,0,0,0,0,0,1,1,0,0,Mędrzec,B,A,B,A,B,B,B,B,B,B,B,B,Mędrzec
+R0684,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,5,3,3,5,3,5,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,B,A,B,A,A,A,A,A,B,B,A,Towarzysz
+R0685,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",6,2,2,2,2,2,1,1,1,3,5,5,3,2,2,2,1,2,0,0,1,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0686,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,3,3,3,3,3,2,5,5,3,5,6,2,3,3,5,5,1,0,0,0,0,0,1,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0687,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,7,6,6,7,6,6,6,7,6,6,7,6,7,6,6,6,6,6,0,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0688,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,6,7,7,7,5,6,6,6,6,6,6,6,7,6,6,6,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Odkrywca
+R0689,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,6,5,6,5,6,5,5,5,6,5,5,6,6,5,6,5,5,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,B,A,A,A,A,A,A,Twórca
+R0690,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",6,5,6,6,5,5,6,6,7,6,6,5,5,6,7,7,6,5,0,0,0,0,1,0,0,0,0,0,1,0,Niewinny,B,A,B,A,B,B,A,A,B,A,A,A,Kochanek
+R0691,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się bardzo dobrze,6,5,5,6,6,5,6,6,5,5,6,6,5,6,6,5,5,6,0,0,0,0,0,0,0,0,0,1,0,1,Buntownik,B,B,B,B,A,A,B,B,B,B,B,A,Odkrywca
+R0692,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",2,3,2,3,2,2,4,3,2,2,4,4,5,4,5,5,2,4,0,0,0,1,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0693,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,4,2,4,1,3,4,2,2,3,4,4,5,3,4,5,2,3,0,0,0,1,0,0,0,0,0,1,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0694,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,2,3,2,3,5,3,3,3,3,5,7,5,4,7,2,4,0,0,1,1,0,0,0,0,0,1,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,A,B,Towarzysz
+R0695,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,4,4,3,4,2,4,4,4,4,4,4,4,4,5,4,5,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,A,A,A,B,B,B,B,Kochanek
+R0696,kobieta,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,5,2,2,2,2,4,2,4,4,4,4,4,5,4,4,4,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,A,B,B,B,B,B,B,Władca
+R0697,kobieta,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,4,3,4,4,5,4,4,3,4,4,4,3,3,5,4,3,3,0,0,0,0,0,0,1,1,0,0,0,1,Odkrywca,B,B,A,B,A,A,B,A,A,B,A,A,Towarzysz
+R0698,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,4,3,5,3,5,5,5,3,3,3,3,3,3,7,3,3,0,0,0,0,1,0,1,0,0,0,0,1,Twórca,B,B,A,A,A,A,A,A,A,A,A,A,Błazen
+R0699,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,5,3,7,6,3,6,3,6,5,3,7,6,5,3,5,2,3,5,0,0,0,1,0,0,0,0,1,1,0,0,Opiekun,A,B,A,A,B,A,B,A,A,B,A,A,Bohater
+R0700,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,6,5,3,7,6,3,5,3,6,6,3,5,6,3,6,5,7,5,0,1,0,0,0,1,0,0,0,0,0,1,Błazen,B,B,A,B,A,A,A,B,B,A,A,A,Towarzysz
+R0701,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,5,2,6,1,5,6,6,2,1,2,4,5,2,1,3,2,2,4,1,0,0,0,0,0,0,0,1,0,0,0,Władca,B,B,B,B,A,B,B,A,B,B,B,A,Towarzysz
+R0702,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,odmawiam udzielenia odpowiedzi,5,5,5,5,6,6,5,5,5,5,5,5,6,5,5,5,5,5,0,0,0,0,0,0,1,0,1,1,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0703,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,5,7,7,7,6,5,5,5,7,5,5,5,5,5,5,5,5,0,0,0,0,1,1,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0704,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej źle,5,2,6,2,3,3,2,2,2,2,7,6,6,6,2,2,2,1,0,0,1,0,0,1,1,0,0,0,0,0,Mędrzec,A,B,B,B,B,A,B,B,A,B,B,A,Odkrywca
+R0705,mężczyzna,15-39,wyższe,bezrobotny,"powodzi mi się przeciętnie, średnio",5,3,5,2,6,5,2,2,2,1,5,6,6,2,3,4,2,5,1,0,0,0,0,0,0,0,0,0,1,1,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0706,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",4,2,4,1,2,2,2,2,1,2,3,6,7,3,6,7,2,3,0,0,0,0,0,0,0,0,0,1,1,1,Niewinny,B,B,B,B,B,A,B,B,B,B,B,B,Buntownik
+R0707,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,6,2,3,2,1,7,2,3,3,2,7,5,6,6,3,7,0,1,1,0,0,0,0,0,0,0,1,0,Mędrzec,A,B,A,B,B,A,B,B,B,B,B,B,Twórca
+R0708,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,7,2,3,1,1,7,1,1,6,7,6,7,7,6,1,5,0,1,1,0,0,0,1,0,0,0,0,0,Bohater,B,B,A,B,B,B,B,B,B,B,B,B,Bohater
+R0709,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,2,2,3,4,4,4,3,4,2,6,5,5,3,3,3,2,3,0,0,0,1,0,1,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0710,mężczyzna,15-39,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,6,3,2,5,3,5,5,5,5,3,3,6,6,2,3,3,3,6,0,0,0,1,0,0,0,1,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0711,mężczyzna,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",4,2,5,2,4,4,7,2,4,4,7,7,5,2,4,6,1,5,0,1,0,1,0,1,0,0,0,0,0,0,Bohater,B,B,B,A,A,A,A,B,A,B,A,A,Twórca
+R0712,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,6,5,5,6,7,7,7,5,5,6,6,3,7,6,7,7,0,0,0,1,0,0,1,0,0,0,1,0,Niewinny,B,B,B,A,A,A,B,B,B,A,B,B,Opiekun
+R0713,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,5,6,5,5,5,6,6,5,6,5,5,6,5,5,5,5,5,5,1,0,0,0,1,0,0,0,0,0,0,0,Kochanek,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0714,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,5,5,5,6,5,5,5,5,5,5,6,5,5,5,5,5,5,5,0,0,1,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0715,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej źle,4,7,4,6,2,1,3,2,7,1,1,3,6,3,7,6,2,7,0,0,0,0,1,0,0,0,1,0,0,1,Kochanek,B,B,A,B,B,B,B,A,A,A,B,B,Bohater
+R0716,kobieta,15-39,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,5,3,2,5,3,5,3,5,3,2,5,6,5,3,5,5,3,3,1,0,1,0,0,0,0,0,0,0,0,1,Władca,B,B,B,A,B,A,B,B,A,B,B,A,Towarzysz
+R0717,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej źle,5,5,5,5,2,6,5,3,6,2,3,3,3,5,5,3,1,2,0,1,0,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,A,A,B,A,A,B,A,B,A,A,Opiekun
+R0718,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,5,2,6,2,2,2,6,7,2,6,5,7,7,1,1,2,5,0,1,0,0,0,0,1,0,0,1,0,0,Twórca,A,B,B,A,A,A,A,B,B,B,A,B,Opiekun
+R0719,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,6,4,6,2,6,2,6,3,7,5,3,6,2,7,2,7,5,7,1,0,1,0,0,0,0,1,0,0,0,0,Odkrywca,B,A,A,A,B,B,A,B,A,B,B,A,Czarodziej
+R0720,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej źle,3,3,3,2,3,5,3,3,2,3,3,2,3,2,3,1,1,2,0,0,1,0,0,0,1,0,1,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,A,B,Mędrzec
+R0721,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,5,2,2,2,4,3,4,3,4,5,4,4,5,4,2,4,1,0,1,1,0,0,0,0,0,0,0,0,Władca,B,A,A,B,B,A,A,A,B,B,B,A,Kochanek
+R0722,kobieta,60 i więcej,wyższe,inna (jaka?),"powodzi mi się przeciętnie, średnio",6,6,6,6,2,6,2,6,6,6,6,6,6,6,2,2,6,6,1,0,1,0,0,0,0,1,0,0,0,0,Władca,B,B,B,B,B,A,B,A,B,B,B,B,Opiekun
+R0723,kobieta,60 i więcej,wyższe,inna (jaka?),powodzi mi się raczej dobrze,5,7,7,3,6,5,5,3,7,7,5,7,3,7,3,2,6,7,0,0,1,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,A,B,A,B,B,B,A,Towarzysz
+R0724,kobieta,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,3,7,7,3,6,2,6,3,5,2,7,6,3,6,2,6,7,0,0,0,0,0,0,0,0,1,0,0,1,Buntownik,B,B,B,B,A,A,B,A,A,A,B,A,Władca
+R0725,mężczyzna,40-59,wyższe,prowadzę własną firmę,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,2,7,6,5,3,5,3,7,6,3,5,6,3,7,6,3,3,0,0,0,0,0,0,1,0,1,0,0,1,Twórca,A,B,A,A,B,B,B,B,A,A,A,A,Kochanek
+R0726,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,5,2,6,6,2,6,3,6,6,5,6,6,2,5,6,5,6,0,0,1,0,0,0,0,1,1,0,0,0,Czarodziej,A,A,B,B,B,B,B,A,A,A,A,A,Błazen
+R0727,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,5,2,5,2,5,5,3,3,5,6,5,5,3,6,3,5,0,0,0,0,0,1,0,1,1,0,0,0,Czarodziej,A,B,B,A,B,B,A,A,A,B,A,A,Opiekun
+R0728,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,5,3,5,3,5,5,3,5,6,3,3,5,5,3,5,5,0,0,0,0,0,1,0,0,0,0,1,1,Buntownik,B,A,A,B,A,A,A,A,B,B,B,B,Bohater
+R0729,kobieta,15-39,średnie,prowadzę własną firmę,powodzi mi się raczej źle,5,6,6,2,6,7,3,5,5,2,6,2,7,2,3,2,5,2,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,A,A,B,A,A,B,B,Czarodziej
+R0730,mężczyzna,60 i więcej,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,3,3,3,2,2,2,2,2,2,3,5,5,5,5,5,5,3,5,0,0,1,0,0,0,1,0,0,0,1,0,Niewinny,A,B,B,B,B,A,A,B,A,B,B,B,Buntownik
+R0731,kobieta,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,6,3,5,6,7,7,3,5,7,5,3,6,3,6,3,3,6,6,0,1,1,0,0,0,1,0,0,0,0,0,Bohater,A,B,A,B,A,A,A,A,B,A,A,B,Kochanek
+R0732,kobieta,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,5,2,7,6,3,5,3,6,6,3,6,3,6,6,3,6,3,6,0,0,0,0,0,0,1,1,1,0,0,0,Twórca,B,A,A,A,B,A,A,B,A,B,A,B,Niewinny
+R0733,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,A,B,A,B,A,B,B,A,B,Mędrzec
+R0734,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,7,2,2,2,2,3,2,3,7,5,6,6,2,2,2,5,6,0,1,0,0,0,0,0,0,0,1,0,1,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0735,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",2,6,2,5,1,5,6,3,5,3,6,6,2,5,6,2,6,2,0,0,0,1,0,0,0,1,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0736,mężczyzna,60 i więcej,średnie,rencista/emeryt,"powodzi mi się przeciętnie, średnio",7,1,5,2,5,2,7,3,5,6,2,6,2,7,2,5,3,5,0,0,0,0,1,1,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0737,mężczyzna,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,2,3,5,2,2,2,2,2,3,3,3,5,3,6,6,2,2,0,1,0,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,A,A,B,B,B,A,A,B,B,B,Kochanek
+R0738,mężczyzna,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,2,2,2,1,1,1,2,1,1,1,2,6,2,2,6,1,1,0,1,0,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,A,B,A,B,B,B,B,B,B,Błazen
+R0739,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",7,7,5,6,5,5,5,6,6,6,7,7,7,5,5,3,6,5,0,0,1,0,0,0,0,0,1,1,0,0,Towarzysz,A,B,A,B,B,B,A,B,A,A,B,B,Mędrzec
+R0740,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,2,7,2,2,2,7,2,2,2,7,7,2,7,6,7,2,1,0,0,0,0,0,1,1,1,0,0,0,0,Twórca,B,B,A,B,B,A,A,B,A,B,A,B,Buntownik
+R0741,mężczyzna,15-39,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,2,4,1,3,6,2,7,2,7,5,6,7,2,7,7,5,6,1,1,0,0,0,0,1,0,0,0,0,0,Władca,B,B,B,B,B,A,B,B,B,B,B,B,Odkrywca
+R0742,mężczyzna,15-39,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,6,2,6,1,2,2,1,6,1,2,2,4,7,2,6,6,2,6,1,0,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,A,B,B,B,Mędrzec
+R0743,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,3,3,5,3,4,6,4,2,3,6,6,6,2,6,6,2,3,0,0,0,1,0,0,1,0,0,0,1,0,Opiekun,B,B,B,B,B,A,B,A,A,B,B,B,Bohater
+R0744,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,2,2,3,3,2,2,2,3,5,2,2,3,3,6,2,2,0,0,0,0,0,0,1,0,0,1,0,1,Towarzysz,B,B,B,B,B,B,A,A,B,B,B,A,Kochanek
+R0745,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,7,3,2,1,1,1,1,2,1,3,2,5,6,6,5,2,2,3,0,0,1,0,0,1,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0746,kobieta,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",6,2,5,2,2,3,6,4,5,3,2,3,6,2,3,5,3,6,0,1,1,0,0,0,1,0,0,0,0,0,Mędrzec,B,B,B,A,B,A,B,B,B,B,B,B,Buntownik
+R0747,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,5,3,5,3,2,2,7,1,3,2,3,2,2,5,6,2,2,2,0,1,1,1,0,0,0,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Towarzysz
+R0748,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,3,5,4,5,4,5,5,5,4,5,5,4,5,4,5,5,0,0,1,0,0,1,0,0,0,0,0,1,Buntownik,A,A,A,B,A,A,B,B,B,A,B,B,Władca
+R0749,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,5,2,2,2,2,3,3,3,3,3,5,3,5,4,3,3,3,0,0,1,0,0,0,0,0,0,0,1,1,Buntownik,A,B,A,A,A,A,B,A,A,A,A,A,Buntownik
+R0750,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,7,1,1,1,1,1,1,1,3,1,2,7,2,2,6,2,3,3,0,1,0,0,0,1,1,0,0,0,0,0,Bohater,B,A,B,A,A,A,A,A,A,B,A,A,Mędrzec
+R0751,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,6,7,6,5,3,3,5,5,5,3,3,5,5,3,2,5,0,0,0,0,0,0,0,0,0,0,1,1,Buntownik,B,B,B,B,B,A,B,B,A,B,A,B,Opiekun
+R0752,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,7,2,2,5,1,3,5,2,5,5,3,5,3,3,5,3,1,0,1,0,0,0,1,0,0,0,0,0,Mędrzec,B,B,B,B,B,A,A,B,B,B,B,B,Towarzysz
+R0753,mężczyzna,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,3,1,2,2,3,1,4,2,3,6,6,3,5,5,6,2,5,0,1,1,1,0,0,0,0,0,0,0,0,Opiekun,B,A,A,A,A,A,A,A,A,A,A,B,Czarodziej
+R0754,kobieta,15-39,wyższe,bezrobotny,powodzi mi się raczej źle,3,6,6,1,5,5,7,2,3,3,6,6,7,2,3,7,3,3,1,0,0,1,0,1,0,0,0,0,0,0,Błazen,A,A,A,A,A,A,A,A,A,A,A,A,Niewinny
+R0755,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,6,5,6,6,6,6,6,6,3,6,6,6,3,3,3,5,3,1,0,0,0,1,0,0,0,0,1,0,0,Władca,A,A,A,A,B,A,A,A,A,A,A,A,Czarodziej
+R0756,kobieta,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,2,2,3,5,3,2,5,3,6,5,5,2,6,5,3,6,5,0,0,0,1,1,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,A,B,B,B,B,B,Buntownik
+R0757,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,5,3,3,2,5,3,2,4,4,5,5,6,3,5,3,4,3,3,0,0,1,1,0,0,0,0,0,1,0,0,Towarzysz,A,B,A,B,A,A,A,A,A,A,A,B,Towarzysz
+R0758,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,2,1,2,2,2,1,6,7,5,7,7,5,3,3,5,3,6,0,1,0,0,0,0,0,0,1,1,0,0,Czarodziej,B,B,B,B,B,A,B,B,B,B,B,B,Błazen
+R0759,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,2,6,2,6,6,7,2,7,7,1,5,3,6,3,5,2,6,0,1,1,1,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0760,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,6,6,6,7,6,6,6,6,7,7,5,5,6,6,6,6,0,1,0,0,0,0,0,1,0,0,0,0,Odkrywca,A,A,A,A,A,B,B,A,A,A,A,A,Niewinny
+R0761,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,"powodzi mi się przeciętnie, średnio",5,5,3,5,6,6,5,6,5,2,2,2,3,2,7,2,2,2,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,A,A,A,A,B,A,A,B,B,A,Czarodziej
+R0762,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,5,7,2,5,2,5,6,6,2,2,5,4,1,7,5,2,2,0,0,0,1,1,0,0,0,0,1,0,0,Kochanek,A,A,A,B,A,A,A,A,A,B,A,B,Błazen
+R0763,kobieta,60 i więcej,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",5,4,6,5,5,5,6,5,5,5,6,5,5,6,6,5,6,6,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,B,B,B,A,A,A,B,A,B,B,B,Odkrywca
+R0764,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,4,1,4,3,4,4,3,4,6,6,3,4,4,4,3,4,0,0,0,0,0,0,0,0,1,0,1,1,Czarodziej,A,A,A,A,A,A,A,B,A,A,A,A,Buntownik
+R0765,kobieta,15-39,wyższe,student/uczeń,powodzi mi się raczej dobrze,4,1,2,1,3,1,7,2,1,1,6,6,6,1,2,6,1,1,1,0,1,1,0,0,0,0,0,0,0,0,Władca,B,A,B,A,A,A,A,A,B,A,B,A,Opiekun
+R0766,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,4,2,5,3,3,5,3,5,4,5,5,6,3,6,3,6,2,1,1,0,0,1,0,0,0,0,0,0,0,Władca,B,B,A,B,B,B,B,B,B,B,B,B,Opiekun
+R0767,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,2,5,1,6,2,2,1,2,4,6,6,6,4,2,4,3,5,1,0,1,0,0,0,1,0,0,0,0,0,Władca,B,A,A,B,B,A,A,A,A,A,A,B,Twórca
+R0768,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,2,2,2,1,1,2,2,2,6,2,6,2,7,6,2,3,0,0,0,0,0,0,1,1,0,1,0,0,Towarzysz,B,B,B,B,B,A,A,B,B,B,B,B,Opiekun
+R0769,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,1,1,7,6,1,7,1,1,1,1,2,2,2,2,1,1,1,5,0,1,1,0,0,0,0,1,0,0,0,0,Mędrzec,B,A,A,A,A,B,A,A,B,A,B,A,Czarodziej
+R0770,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,1,3,6,6,6,2,7,2,2,7,6,6,2,1,2,2,1,0,1,0,0,1,0,0,1,0,0,0,0,Bohater,A,B,A,B,A,A,A,A,A,A,A,A,Towarzysz
+R0771,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,2,4,1,3,3,1,4,1,5,6,4,4,4,6,6,3,5,0,1,1,0,0,0,0,0,0,1,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R0772,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,1,4,2,5,3,3,3,3,3,5,3,3,5,5,6,0,0,0,0,1,1,0,0,0,0,0,1,Błazen,A,A,A,A,A,A,A,B,A,A,A,A,Władca
+R0773,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,4,2,2,3,6,3,2,2,6,6,6,6,7,6,1,5,1,1,0,0,0,0,0,0,0,0,1,0,Władca,A,B,A,A,B,B,B,A,A,A,B,B,Niewinny
+R0774,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,3,5,5,5,5,7,2,5,6,7,5,3,5,5,3,5,5,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,A,B,A,B,B,A,A,B,B,B,B,Buntownik
+R0775,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się bardzo dobrze,2,1,1,6,1,1,7,1,1,1,7,7,7,1,1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Błazen
+R0776,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,3,3,3,5,5,6,5,5,5,5,5,6,3,5,5,3,3,0,0,0,0,0,0,1,0,0,1,1,0,Towarzysz,A,B,B,A,B,A,A,B,B,A,B,A,Władca
+R0777,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,6,2,5,6,5,5,5,3,6,3,3,6,3,5,2,5,5,0,0,0,0,0,0,1,0,0,0,0,1,Twórca,A,A,A,B,B,A,A,B,B,B,B,B,Niewinny
+R0778,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,5,5,2,2,6,2,1,2,7,7,6,6,6,2,2,7,0,0,1,0,1,1,0,0,0,0,0,0,Błazen,B,B,A,A,A,B,B,A,B,B,A,A,Bohater
+R0779,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",3,5,5,5,5,5,5,5,6,5,4,3,5,3,5,3,5,5,0,0,0,0,1,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0780,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,6,7,6,7,5,6,7,7,7,7,6,7,1,1,6,6,7,0,0,0,1,0,0,0,0,0,1,0,0,Towarzysz,A,A,A,A,B,B,A,B,A,B,B,B,Błazen
+R0781,kobieta,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,1,2,1,1,1,0,1,0,0,0,0,0,0,0,0,Opiekun,A,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0782,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,1,1,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0783,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,2,7,1,1,7,1,1,1,1,6,7,1,7,7,1,2,0,0,1,1,0,0,0,0,1,0,0,0,Opiekun,B,B,A,B,B,A,A,B,A,B,A,B,Opiekun
+R0784,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,1,1,1,2,6,7,1,1,1,5,7,7,1,1,6,1,1,1,0,0,0,0,1,0,1,0,0,0,0,Odkrywca,B,B,B,A,A,A,B,A,B,B,B,B,Mędrzec
+R0785,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,3,3,1,3,5,1,2,3,4,5,4,4,4,3,4,3,3,1,0,0,0,0,0,0,0,0,0,1,1,Niewinny,B,B,B,A,B,A,B,A,A,B,B,A,Mędrzec
+R0786,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,6,2,2,2,1,2,6,3,7,7,2,6,2,1,2,6,0,0,0,0,0,1,1,0,1,0,0,0,Czarodziej,B,B,B,A,B,A,B,A,A,B,B,B,Mędrzec
+R0787,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,4,4,3,5,4,1,4,3,3,5,3,6,5,4,6,2,3,1,1,1,0,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,B,A,B,B,B,B,B,Towarzysz
+R0788,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,5,2,2,1,1,2,1,1,1,6,6,2,6,2,1,3,0,1,0,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,A,B,A,B,B,B,B,B,B,Mędrzec
+R0789,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",1,2,6,3,7,7,7,7,3,1,7,1,7,7,7,7,1,1,1,0,0,0,0,0,1,0,1,0,0,0,Czarodziej,A,B,A,B,B,B,A,A,B,A,B,B,Czarodziej
+R0790,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,7,5,6,2,1,3,6,2,2,1,7,6,6,2,2,6,1,2,0,1,1,1,0,0,0,0,0,0,0,0,Bohater,A,B,B,B,B,A,B,B,A,B,A,B,Odkrywca
+R0791,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,1,3,4,5,5,5,2,1,3,6,6,7,2,5,6,1,3,0,1,0,1,0,0,0,1,0,0,0,0,Opiekun,B,B,B,B,B,A,B,A,A,B,B,B,Błazen
+R0792,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,2,5,2,1,1,6,1,1,7,2,2,6,7,7,1,2,1,1,0,0,0,0,0,0,0,1,0,0,Władca,B,B,B,B,B,A,B,B,B,B,B,B,Władca
+R0793,kobieta,60 i więcej,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",4,5,5,5,7,4,5,5,5,5,5,6,5,5,6,5,5,6,1,1,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,A,B,B,B,B,B,B,Władca
+R0794,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,2,6,2,2,2,5,5,5,1,7,5,5,5,5,5,3,5,0,0,1,0,0,1,1,0,0,0,0,0,Mędrzec,A,A,B,A,B,A,A,A,B,B,A,A,Mędrzec
+R0795,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,5,5,2,6,5,5,3,6,5,3,6,3,5,6,2,1,5,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,A,B,A,B,A,A,B,B,B,B,A,Bohater
+R0796,kobieta,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,2,6,4,3,4,7,4,3,2,3,6,5,3,4,6,1,3,1,0,1,0,0,0,0,0,0,1,0,0,Władca,B,B,B,B,B,A,B,B,A,B,B,B,Mędrzec
+R0797,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się bardzo dobrze,1,1,2,1,2,2,1,1,1,1,2,1,1,1,1,1,1,1,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0798,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej źle,1,2,3,5,1,1,1,3,1,3,2,1,7,1,7,7,2,7,0,0,0,1,0,0,0,1,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0799,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,7,6,7,6,3,3,6,7,6,5,7,6,6,5,6,6,7,0,0,0,0,1,0,1,1,0,0,0,0,Odkrywca,A,A,A,B,B,A,B,A,B,A,A,B,Twórca
+R0800,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,4,3,3,3,4,4,3,3,3,5,5,3,5,5,3,3,0,0,0,1,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,A,B,Buntownik
+R0801,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,6,2,5,1,5,5,2,2,5,3,6,1,6,2,7,5,2,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,B,B,A,A,A,B,A,A,A,B,A,A,Buntownik
+R0802,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,5,6,5,5,6,6,5,6,2,3,3,5,5,3,5,2,7,0,1,0,0,1,0,0,0,0,0,1,0,Kochanek,B,B,B,A,A,A,B,B,A,A,A,A,Błazen
+R0803,kobieta,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",6,3,4,5,2,6,4,3,5,3,5,4,3,5,3,3,4,4,0,0,1,0,1,0,1,0,0,0,0,0,Kochanek,A,B,B,A,B,A,B,B,B,A,B,B,Twórca
+R0804,kobieta,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",6,3,4,2,2,3,2,4,2,3,3,5,6,3,3,6,2,3,0,0,1,0,0,0,0,0,0,1,0,1,Towarzysz,B,B,A,A,B,A,B,B,A,A,B,B,Władca
+R0805,mężczyzna,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,6,6,6,7,7,7,6,6,6,7,7,7,6,7,7,7,7,1,0,0,1,0,0,0,0,0,1,0,0,Opiekun,B,B,B,B,B,B,B,B,A,B,B,B,Niewinny
+R0806,mężczyzna,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,5,5,5,3,6,5,5,3,5,3,6,5,3,5,5,5,3,0,1,0,0,0,1,0,0,1,0,0,0,Bohater,B,B,B,B,A,A,B,A,A,B,B,B,Buntownik
+R0807,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,2,2,2,2,3,3,2,2,5,6,7,3,7,6,2,5,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,A,A,A,B,A,A,B,B,A,Czarodziej
+R0808,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,3,1,3,2,5,1,1,6,6,6,6,2,3,6,1,2,1,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0809,mężczyzna,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,6,6,5,6,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,0,0,0,1,0,0,Towarzysz,B,A,B,A,B,B,B,A,A,A,B,A,Czarodziej
+R0810,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",5,2,4,3,3,3,3,2,2,3,5,5,4,4,4,4,3,3,0,1,1,0,0,0,0,0,0,1,0,0,Mędrzec,B,B,B,B,B,A,B,A,B,B,B,A,Buntownik
+R0811,kobieta,60 i więcej,wyższe,bezrobotny,odmawiam udzielenia odpowiedzi,6,3,4,1,4,2,4,3,2,3,6,6,5,2,3,6,2,2,1,0,0,1,0,1,0,0,0,0,0,0,Opiekun,B,B,B,A,A,B,B,B,B,B,B,A,Towarzysz
+R0812,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,7,6,6,6,6,6,6,6,6,6,6,6,6,6,5,6,6,0,0,0,0,0,1,1,0,1,0,0,0,Czarodziej,A,A,B,B,A,B,B,B,A,B,B,A,Buntownik
+R0813,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",5,5,5,5,5,6,6,2,3,2,2,2,5,7,5,3,5,2,1,0,0,1,0,0,0,0,0,0,0,0,Opiekun,A,B,A,A,A,A,B,B,A,A,A,B,Bohater
+R0814,mężczyzna,15-39,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",3,4,6,5,3,5,3,5,3,5,3,4,6,3,5,5,4,4,1,0,0,0,0,0,0,0,0,1,1,0,Władca,B,B,A,A,A,A,B,B,A,B,B,A,Buntownik
+R0815,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,5,2,3,7,7,6,5,5,5,5,5,5,5,5,5,5,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,A,B,A,B,A,A,A,B,A,B,Mędrzec
+R0816,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,1,2,7,1,1,1,1,1,7,7,6,7,1,1,7,1,1,0,0,0,0,1,0,0,1,0,1,0,0,Odkrywca,B,A,B,A,A,A,A,B,A,A,B,B,Błazen
+R0817,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej źle,4,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,0,0,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0818,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",7,6,6,4,7,6,7,7,7,4,4,4,4,4,4,1,7,7,0,1,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,B,A,B,B,A,B,B,B,A,Towarzysz
+R0819,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,3,5,5,3,3,5,5,5,5,5,3,3,3,3,3,0,1,1,0,0,0,0,0,0,0,0,0,Mędrzec,A,A,B,B,A,B,B,B,A,A,B,B,Twórca
+R0820,mężczyzna,40-59,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,5,5,5,5,6,6,6,5,5,5,5,6,5,5,5,6,1,1,0,0,0,0,0,0,1,0,0,0,Bohater,B,B,B,A,B,B,A,A,B,B,B,A,Kochanek
+R0821,kobieta,15-39,wyższe,pracownik umysłowy,odmawiam udzielenia odpowiedzi,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0822,mężczyzna,60 i więcej,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,1,4,1,5,4,7,1,6,2,7,5,4,6,1,5,1,4,0,0,1,0,0,0,0,0,0,1,1,0,Mędrzec,B,A,B,A,B,B,B,B,B,B,B,B,Mędrzec
+R0823,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,1,4,1,1,1,7,1,1,1,4,1,7,1,4,7,1,4,1,0,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0824,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,3,3,6,5,3,6,2,4,5,3,5,3,3,3,3,5,0,0,0,0,1,0,1,0,0,0,1,0,Kochanek,B,B,A,B,A,B,B,B,B,A,B,A,Twórca
+R0825,kobieta,15-39,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,5,5,6,5,5,7,5,6,6,6,5,6,6,5,6,5,6,5,0,0,0,0,0,0,0,0,0,1,0,1,Buntownik,B,A,B,A,B,A,A,A,B,B,B,B,Niewinny
+R0826,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,6,6,2,7,6,7,6,1,1,6,2,7,7,7,1,7,1,7,1,1,0,0,0,0,1,0,0,0,0,0,Bohater,B,B,B,A,A,A,B,A,B,A,A,A,Błazen
+R0827,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,5,2,4,3,4,2,3,3,5,6,6,5,3,3,3,6,0,0,1,0,0,0,0,0,1,0,0,1,Czarodziej,B,B,B,A,B,A,B,B,B,B,A,B,Twórca
+R0828,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,5,5,3,3,5,5,5,5,5,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,1,0,Niewinny,A,A,A,A,A,B,B,A,B,B,B,B,Czarodziej
+R0829,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,2,2,2,2,2,2,1,2,3,4,5,2,5,4,5,5,5,5,0,0,0,0,1,1,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0830,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,6,5,2,1,3,6,3,5,1,7,6,6,6,2,6,7,1,1,0,0,0,0,0,0,0,0,1,0,Bohater,A,A,A,A,B,A,A,A,A,B,A,B,Bohater
+R0831,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,1,2,1,7,6,2,6,2,2,6,7,3,2,1,1,1,5,0,0,0,1,0,0,1,0,0,0,1,0,Niewinny,A,A,A,B,B,A,A,A,A,B,A,B,Błazen
+R0832,kobieta,40-59,średnie,rencista/emeryt,powodzi mi się raczej źle,6,2,5,2,2,2,7,2,1,1,2,6,1,2,6,7,1,1,1,0,1,0,0,0,0,0,0,1,0,0,Władca,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0833,mężczyzna,15-39,wyższe,student/uczeń,powodzi mi się raczej dobrze,5,3,4,4,3,3,2,4,4,4,4,4,4,4,4,3,4,4,0,1,0,0,0,1,0,0,0,0,1,0,Bohater,A,B,B,B,A,B,A,A,B,B,A,B,Twórca
+R0834,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,1,0,1,0,0,0,0,0,1,0,Kochanek,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0835,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik umysłowy,powodzi mi się raczej źle,6,2,6,3,6,3,3,5,5,3,5,2,6,6,6,2,2,6,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,A,B,A,A,A,B,B,B,B,A,B,B,Mędrzec
+R0836,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,7,4,6,6,6,5,5,6,3,5,6,6,7,1,1,1,5,0,0,0,0,0,1,1,0,1,0,0,0,Twórca,B,B,B,B,B,B,B,B,B,A,B,B,Błazen
+R0837,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,2,2,5,6,2,6,5,6,5,3,6,3,6,2,6,5,0,0,0,0,0,0,0,0,1,0,1,0,Niewinny,B,A,A,B,A,B,A,B,B,A,A,B,Odkrywca
+R0838,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,3,6,1,3,3,3,5,3,3,3,5,5,6,5,5,6,7,0,1,1,0,0,0,0,0,0,1,0,0,Mędrzec,B,A,B,A,B,A,A,B,B,B,B,A,Mędrzec
+R0839,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,2,2,3,3,5,3,6,2,5,3,2,5,2,2,6,3,3,3,0,0,0,1,0,0,0,1,0,0,0,1,Opiekun,A,A,A,B,B,A,A,A,A,A,A,A,Buntownik
+R0840,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,3,4,4,3,3,3,3,5,5,4,3,4,4,3,4,0,0,0,0,0,1,1,0,0,1,0,0,Twórca,B,B,A,B,B,B,B,B,B,B,B,A,Kochanek
+R0841,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,6,2,6,6,1,7,1,6,7,2,6,7,2,6,5,3,7,1,1,0,0,1,0,0,0,0,0,0,0,Władca,A,A,A,A,A,A,A,A,B,B,A,A,Twórca
+R0842,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,2,1,7,7,6,7,1,1,1,7,6,6,2,2,7,1,1,0,0,0,0,1,1,0,0,0,1,0,0,Kochanek,A,B,A,B,A,B,A,B,A,A,A,B,Bohater
+R0843,kobieta,40-59,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,3,7,7,6,5,2,3,3,3,5,3,5,3,3,6,3,3,0,1,0,1,0,0,0,0,0,0,1,0,Opiekun,A,A,B,B,A,A,B,A,A,B,B,A,Kochanek
+R0844,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się bardzo dobrze,6,6,6,6,6,6,6,6,5,6,6,6,6,6,6,7,6,6,0,0,0,0,0,0,0,0,1,1,0,1,Czarodziej,B,B,B,B,B,B,A,B,B,B,B,B,Błazen
+R0845,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,7,7,7,5,5,6,5,5,5,5,6,6,5,5,3,1,3,3,1,0,0,0,1,0,0,1,0,0,0,0,Odkrywca,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R0846,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej źle,2,1,1,6,7,7,1,1,1,1,7,3,1,1,1,7,1,1,0,1,0,1,0,0,0,1,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0847,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,6,3,3,3,6,5,5,5,3,6,5,3,6,3,5,3,1,0,1,0,0,0,0,0,0,0,0,1,Władca,A,A,B,B,B,A,A,B,B,B,B,A,Niewinny
+R0848,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,7,6,6,6,6,6,6,7,7,6,6,6,6,6,6,6,6,0,0,0,0,0,1,0,0,0,0,0,0,Błazen,A,A,B,A,A,B,B,B,A,B,B,B,Towarzysz
+R0849,kobieta,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,5,3,2,5,5,2,6,3,5,6,2,2,5,6,3,2,0,1,0,0,0,0,1,0,0,0,1,0,Niewinny,A,B,B,B,A,A,A,A,A,B,B,A,Bohater
+R0850,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,2,5,6,3,7,2,2,2,6,6,3,6,7,3,3,1,3,5,0,0,0,0,0,0,0,1,0,1,1,0,Odkrywca,B,B,B,B,B,A,B,A,B,A,B,A,Władca
+R0851,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R0852,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,7,2,6,1,2,2,2,2,5,3,3,5,3,5,3,3,3,5,0,0,1,0,0,0,0,0,0,1,1,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0853,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,2,6,2,5,5,7,4,2,3,5,5,6,5,3,2,3,6,1,0,0,0,0,0,0,0,1,0,0,1,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0854,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,2,6,3,6,3,5,3,3,6,7,7,1,7,7,7,2,7,1,0,0,0,0,0,1,0,0,0,0,0,Twórca,B,B,B,A,B,A,A,B,A,A,A,A,Mędrzec
+R0855,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się bardzo dobrze,3,2,7,1,3,5,1,7,3,6,2,3,6,2,3,6,2,6,0,1,0,0,0,0,0,0,0,0,1,0,Bohater,B,B,B,B,B,A,B,B,A,B,A,B,Błazen
+R0856,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,3,6,3,3,5,4,3,7,6,3,5,5,7,5,3,6,5,0,0,0,0,0,0,1,0,0,0,0,1,Twórca,B,B,A,A,A,B,B,A,A,B,A,B,Niewinny
+R0857,kobieta,15-39,średnie,student/uczeń,powodzi mi się bardzo dobrze,6,1,6,1,2,6,2,2,1,6,5,6,7,1,6,7,2,6,0,1,1,0,0,0,1,0,0,0,0,0,Bohater,A,B,A,B,B,A,A,A,A,B,B,A,Bohater
+R0858,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,3,5,3,3,1,3,2,2,5,4,5,3,3,5,2,2,0,0,0,0,1,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R0859,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,2,7,2,2,2,7,2,2,1,7,4,7,1,7,7,1,1,0,0,0,1,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0860,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,1,0,1,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0861,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,5,3,6,1,2,1,1,2,2,6,5,7,1,6,6,6,6,0,1,0,0,0,1,0,0,0,1,0,0,Bohater,B,B,B,A,B,A,B,A,B,A,B,A,Kochanek
+R0862,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",6,2,5,6,3,5,5,4,3,2,6,3,7,5,6,3,2,2,0,1,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,A,B,B,B,A,A,B,A,A,Kochanek
+R0863,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,2,2,3,5,7,2,2,1,5,5,3,6,3,6,3,5,1,0,0,1,0,0,0,0,0,0,0,1,Buntownik,A,B,B,B,A,A,B,B,B,B,B,B,Bohater
+R0864,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,1,2,1,4,5,1,1,1,1,4,6,3,5,2,3,1,1,0,0,0,1,0,0,0,0,0,0,1,1,Niewinny,B,A,B,B,A,A,B,A,A,B,B,B,Błazen
+R0865,mężczyzna,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,4,2,5,4,5,5,5,6,5,2,6,3,5,3,6,3,5,0,1,0,0,0,0,0,0,1,0,0,1,Bohater,A,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R0866,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,5,5,6,5,6,5,5,5,5,5,5,5,5,5,5,4,5,5,0,0,0,0,1,0,0,0,0,0,1,1,Buntownik,B,A,A,B,A,A,A,A,A,A,A,A,Czarodziej
+R0867,mężczyzna,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,5,6,2,5,6,4,5,3,6,5,5,5,6,3,3,5,0,0,0,0,0,0,1,1,0,1,0,0,Odkrywca,B,B,B,B,B,B,B,A,A,B,B,A,Twórca
+R0868,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,powodzi mi się raczej źle,7,3,2,1,2,6,3,2,6,5,3,1,2,2,7,2,6,7,0,0,1,1,0,0,0,0,0,1,0,0,Opiekun,B,B,A,B,A,B,B,A,A,B,B,A,Buntownik
+R0869,kobieta,60 i więcej,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,5,1,7,1,1,7,7,1,1,7,7,7,1,7,7,1,1,0,0,0,1,1,0,0,0,0,0,1,0,Opiekun,B,B,A,B,B,B,B,B,B,B,B,B,Buntownik
+R0870,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,6,6,7,1,2,2,7,2,2,2,7,7,2,7,1,7,1,2,1,1,0,0,0,0,1,0,0,0,0,0,Bohater,B,A,A,A,B,A,A,A,A,B,B,A,Mędrzec
+R0871,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,7,7,5,6,5,2,3,7,3,6,5,7,3,5,6,5,6,0,0,0,1,0,0,0,0,0,1,0,1,Opiekun,B,B,B,B,B,A,B,B,B,B,B,B,Bohater
+R0872,kobieta,40-59,średnie,rencista/emeryt,powodzi mi się raczej źle,7,1,2,1,1,1,7,1,1,1,6,6,1,2,6,7,1,1,1,0,1,0,0,0,0,0,0,1,0,0,Towarzysz,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0873,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,1,1,1,1,7,7,1,1,1,4,1,7,1,4,7,1,1,1,0,0,1,1,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0874,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,2,2,5,5,2,2,2,2,3,5,3,3,3,3,5,2,3,0,0,1,0,0,0,0,0,0,1,1,0,Towarzysz,B,B,B,B,B,B,B,B,B,A,B,B,Opiekun
+R0875,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,7,3,2,3,6,3,3,3,6,2,6,7,6,7,2,6,1,1,0,0,0,0,1,0,0,0,0,0,Bohater,B,B,A,B,A,A,A,B,B,A,B,A,Czarodziej
+R0876,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,6,1,2,2,7,3,2,2,3,5,6,2,5,7,1,2,1,1,0,0,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,A,A,B,B,A,B,B,A,Bohater
+R0877,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,5,3,2,3,5,3,3,3,6,3,5,3,5,5,3,5,1,0,0,1,0,0,0,0,0,0,0,0,Władca,A,B,A,A,A,A,A,A,A,A,B,A,Bohater
+R0878,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,6,5,6,3,6,5,3,5,5,6,6,3,5,5,2,5,0,0,0,0,0,0,0,1,0,0,0,1,Buntownik,A,A,B,B,B,A,B,B,A,A,B,A,Kochanek
+R0879,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,6,5,5,6,6,6,6,6,6,7,6,6,7,6,6,7,0,0,0,1,1,0,0,0,0,1,0,0,Towarzysz,B,A,A,A,B,A,A,B,A,A,B,A,Niewinny
+R0880,kobieta,40-59,średnie,pracownik fizyczny,powodzi mi się bardzo dobrze,6,6,7,6,6,6,7,5,6,6,6,6,6,6,6,6,6,6,0,1,0,1,1,0,0,0,0,0,0,0,Kochanek,B,B,B,B,B,B,A,B,A,B,B,A,Czarodziej
+R0881,kobieta,40-59,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,1,1,4,1,1,7,1,1,1,4,1,7,1,4,7,1,1,0,0,0,1,1,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0882,mężczyzna,15-39,wyższe,pracownik fizyczny,powodzi mi się bardzo dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,1,0,0,0,0,1,1,0,0,0,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0883,mężczyzna,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,6,5,5,5,5,5,5,5,5,5,5,6,5,5,5,5,0,1,0,1,0,0,0,0,0,0,0,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0884,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,3,5,3,5,5,3,3,3,5,3,5,3,5,3,4,3,0,0,0,1,1,0,0,0,0,0,1,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R0885,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",1,1,1,7,1,1,7,7,1,7,7,1,7,1,7,7,1,1,0,1,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0886,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,3,3,3,3,3,2,3,3,3,3,3,3,3,3,3,3,3,0,0,0,1,0,0,1,0,0,0,0,0,Twórca,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0887,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,6,6,3,5,3,4,3,5,6,3,5,3,4,2,3,6,0,0,1,1,0,0,0,0,0,0,0,1,Mędrzec,B,A,B,A,A,A,B,B,A,A,B,B,Buntownik
+R0888,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,4,5,3,4,4,5,4,5,4,5,5,5,3,5,5,3,5,1,0,0,1,0,0,0,0,0,1,0,0,Towarzysz,A,A,A,A,B,A,A,A,A,A,A,A,Mędrzec
+R0889,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,2,3,2,1,4,4,3,3,4,5,5,5,4,4,5,2,3,0,0,1,1,1,0,0,0,0,0,0,0,Opiekun,B,B,B,B,A,A,B,A,B,A,B,A,Bohater
+R0890,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",prowadzę własną firmę,powodzi mi się raczej źle,6,2,6,6,3,7,5,5,2,3,5,3,2,3,6,5,6,3,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,A,A,A,A,A,B,Towarzysz
+R0891,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się bardzo dobrze,7,7,6,6,7,5,7,6,5,6,4,5,2,5,6,1,7,6,0,0,1,0,0,1,0,0,0,0,0,1,Błazen,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0892,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej źle,4,1,1,6,7,6,1,1,1,1,7,4,1,2,1,5,2,1,0,0,0,1,1,1,0,0,0,0,0,0,Kochanek,B,B,B,B,B,B,B,B,B,B,B,B,Odkrywca
+R0893,mężczyzna,40-59,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,1,6,1,5,1,3,6,5,2,6,1,6,5,3,5,3,5,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,B,B,B,A,B,B,B,B,B,B,B,B,Władca
+R0894,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,5,5,6,5,6,5,6,5,5,6,5,5,6,5,5,5,1,0,0,0,0,0,1,0,0,0,0,1,Władca,A,A,A,B,B,A,A,B,B,B,B,A,Władca
+R0895,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",1,1,1,7,1,1,7,7,1,7,7,2,7,2,7,7,2,2,0,1,0,1,0,1,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0896,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",5,2,6,1,1,5,6,2,1,2,3,5,6,2,2,6,1,2,0,0,0,1,0,0,0,0,0,1,1,0,Towarzysz,B,A,B,A,B,A,B,A,B,B,B,B,Towarzysz
+R0897,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,5,4,3,3,5,3,3,5,5,3,5,3,5,5,5,5,0,0,0,1,1,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,A,B,Mędrzec
+R0898,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,5,6,6,7,7,2,5,5,3,6,2,1,7,6,6,2,0,0,0,1,0,0,0,0,1,0,1,0,Niewinny,A,B,B,B,A,B,A,B,A,B,A,A,Błazen
+R0899,kobieta,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,2,3,3,4,5,2,2,2,5,3,6,2,4,6,2,3,0,0,0,0,0,0,0,0,0,0,1,1,Niewinny,A,A,A,B,B,B,A,A,A,A,A,B,Czarodziej
+R0900,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",4,4,4,4,4,4,4,4,4,4,4,4,5,5,1,1,1,2,0,1,0,1,0,0,0,0,0,1,0,0,Opiekun,A,B,A,B,A,A,A,B,A,B,B,A,Czarodziej
+R0901,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,5,5,7,6,5,5,5,6,6,6,6,6,6,7,6,6,1,0,1,0,0,0,1,0,0,0,0,0,Mędrzec,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0902,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej dobrze,5,5,6,7,5,5,3,6,3,6,6,5,3,5,2,3,6,3,0,1,0,1,0,0,0,0,0,0,1,0,Opiekun,A,B,A,A,B,A,B,B,B,B,A,A,Mędrzec
+R0903,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,3,2,2,3,5,3,2,3,5,5,7,3,5,6,2,3,1,0,1,1,0,0,0,0,0,0,0,0,Władca,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0904,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,3,3,3,5,3,3,3,3,5,5,3,5,5,5,3,3,1,0,0,0,0,0,0,0,0,0,1,0,Władca,A,A,A,A,B,A,A,A,A,A,A,A,Opiekun
+R0905,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej źle,4,2,4,3,3,3,4,4,2,3,5,5,6,3,5,4,2,4,0,0,0,1,0,0,1,0,0,1,0,0,Opiekun,A,A,A,B,B,A,A,A,A,B,A,A,Błazen
+R0906,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,4,4,7,2,2,3,7,4,2,1,4,5,7,4,4,6,1,3,1,0,1,0,0,0,0,0,0,1,0,0,Mędrzec,B,A,B,A,A,A,B,A,A,B,B,A,Błazen
+R0907,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",1,7,7,7,7,7,7,1,1,1,1,1,7,7,7,7,1,3,1,0,0,0,0,0,1,0,0,0,0,1,Władca,B,A,A,A,B,B,A,A,B,A,B,B,Odkrywca
+R0908,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,2,1,3,3,3,3,4,3,4,3,2,1,3,5,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,Władca,A,B,B,A,A,A,B,B,B,B,A,B,Towarzysz
+R0909,kobieta,15-39,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",1,7,2,4,1,7,1,1,1,3,6,2,5,7,3,2,7,2,1,1,0,1,0,0,0,0,0,0,0,0,Bohater,A,A,B,B,A,A,B,A,B,B,B,A,Towarzysz
+R0910,kobieta,40-59,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,3,5,3,5,3,3,3,5,3,5,5,3,5,3,3,3,0,1,0,0,0,1,0,0,0,0,1,0,Bohater,A,B,A,A,A,A,A,B,A,B,A,A,Buntownik
+R0911,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,3,5,5,3,5,3,3,3,5,5,3,5,3,5,3,3,0,0,1,0,0,0,0,1,0,0,1,0,Niewinny,A,A,A,A,A,A,A,A,A,B,A,B,Błazen
+R0912,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej źle,2,7,6,2,6,6,2,6,2,6,1,6,1,7,7,3,7,3,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,B,B,B,B,B,A,A,B,A,A,B,A,Towarzysz
+R0913,kobieta,15-39,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,A,A,A,A,A,A,A,A,A,A,A,A,Towarzysz
+R0914,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,2,3,4,5,5,3,2,5,5,6,5,3,4,7,6,3,0,0,1,0,0,1,0,0,1,0,0,0,Błazen,B,B,B,B,B,B,B,B,B,B,A,B,Opiekun
+R0915,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,4,2,2,3,2,4,4,3,5,6,3,4,3,5,2,2,1,1,0,0,0,0,0,0,0,1,0,0,Towarzysz,A,A,A,B,B,A,A,B,B,A,A,A,Władca
+R0916,kobieta,40-59,średnie,rencista/emeryt,powodzi mi się raczej źle,4,1,1,6,6,6,1,2,1,2,6,4,1,1,1,6,1,1,0,0,0,1,1,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0917,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,2,6,5,6,5,3,3,6,6,6,5,6,5,6,6,5,5,6,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,A,A,B,A,B,A,A,B,A,A,A,A,Władca
+R0918,mężczyzna,60 i więcej,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,6,3,3,2,3,3,1,3,1,3,3,5,3,3,5,6,3,3,0,1,0,0,0,0,0,0,0,1,0,1,Bohater,A,A,A,A,B,A,A,A,A,A,A,A,Czarodziej
+R0919,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,3,7,1,2,2,1,5,5,6,2,7,7,3,5,6,6,7,1,1,0,1,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,A,B,B,A,B,B,B,A,Władca
+R0920,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,1,3,2,1,5,6,2,1,1,6,6,7,1,2,7,1,2,1,0,0,0,0,1,0,0,0,1,0,0,Towarzysz,A,B,B,B,B,A,B,A,A,B,B,B,Towarzysz
+R0921,kobieta,40-59,średnie,rencista/emeryt,powodzi mi się raczej źle,3,1,1,6,6,6,1,1,1,1,4,3,1,1,1,7,1,2,0,0,0,1,1,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0922,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,5,5,5,3,3,5,5,5,3,3,3,3,5,5,5,0,1,0,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,A,A,A,B,A,A,B,A,B,Kochanek
+R0923,kobieta,60 i więcej,średnie,rencista/emeryt,powodzi mi się raczej źle,5,1,1,6,7,7,1,1,1,2,6,3,1,1,1,5,1,1,0,0,0,1,1,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0924,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się bardzo dobrze,5,2,5,5,3,5,6,3,3,5,5,6,3,5,2,5,3,5,0,0,0,0,0,1,0,0,0,1,1,0,Niewinny,A,A,A,A,A,B,A,B,A,B,B,A,Buntownik
+R0925,kobieta,15-39,średnie,prowadzę własną firmę,odmawiam udzielenia odpowiedzi,3,2,3,3,2,5,5,3,5,2,6,3,5,3,6,5,3,5,0,0,0,0,1,1,0,0,0,0,1,0,Niewinny,B,A,A,A,B,B,B,B,A,A,B,A,Twórca
+R0926,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,4,4,4,4,3,4,3,3,3,4,5,4,5,3,4,3,4,0,0,1,0,0,0,0,1,0,0,0,1,Buntownik,B,B,A,B,A,A,B,A,A,B,B,A,Czarodziej
+R0927,kobieta,15-39,średnie,student/uczeń,powodzi mi się bardzo dobrze,5,2,6,5,7,1,6,2,2,1,7,6,6,2,2,5,2,2,0,1,0,0,1,1,0,0,0,0,0,0,Kochanek,A,B,B,B,A,A,B,A,A,A,A,B,Opiekun
+R0928,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,5,5,3,5,5,6,5,3,6,7,2,5,5,2,7,5,0,0,0,1,0,0,1,0,0,1,0,0,Opiekun,B,A,B,B,A,B,B,B,A,A,A,A,Kochanek
+R0929,kobieta,60 i więcej,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",6,1,2,2,3,3,2,2,2,2,3,6,6,1,5,5,1,1,0,0,1,1,0,0,0,1,0,0,0,0,Mędrzec,B,B,B,B,B,A,B,A,B,B,B,B,Towarzysz
+R0930,kobieta,40-59,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,2,2,3,1,1,2,1,3,2,2,5,7,3,7,1,1,3,1,0,0,1,1,0,0,0,0,0,0,0,Władca,B,A,A,A,B,A,A,A,A,A,A,B,Twórca
+R0931,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",3,3,3,5,2,5,3,3,5,2,5,6,5,3,6,6,2,5,1,1,0,1,0,0,0,0,0,0,0,0,Władca,B,B,A,A,A,A,B,B,A,B,B,B,Niewinny
+R0932,kobieta,60 i więcej,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,6,6,6,6,3,2,7,6,2,5,2,2,3,5,6,5,3,1,1,0,1,0,0,0,0,0,0,0,0,Opiekun,B,A,B,B,A,B,B,A,B,B,B,B,Opiekun
+R0933,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,6,6,6,6,6,6,6,6,6,5,5,5,5,5,5,5,5,5,0,0,0,0,1,0,0,0,1,0,1,0,Kochanek,B,B,A,A,B,A,B,B,B,A,B,A,Kochanek
+R0934,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,3,3,3,6,3,1,5,1,6,1,2,7,2,6,6,2,5,0,0,1,1,0,0,0,0,0,1,0,0,Mędrzec,B,B,A,B,A,B,B,B,A,A,A,B,Towarzysz
+R0935,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,3,1,3,1,2,2,1,1,2,2,1,2,2,2,1,1,1,0,0,0,0,0,0,1,0,0,0,0,1,Buntownik,A,B,A,B,A,A,B,A,A,A,A,A,Czarodziej
+R0936,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik umysłowy,powodzi mi się raczej dobrze,2,2,3,2,3,4,2,3,3,5,5,3,3,5,5,3,7,5,0,0,0,1,0,0,0,1,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R0937,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0938,kobieta,60 i więcej,średnie,rencista/emeryt,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,6,2,2,0,1,0,1,0,0,1,0,0,0,0,0,Opiekun,B,B,B,B,B,A,A,A,A,A,B,A,Błazen
+R0939,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,3,6,5,5,5,3,7,7,5,5,6,5,3,3,5,5,7,1,0,0,0,0,0,0,0,0,0,0,0,Władca,A,A,B,A,A,A,B,B,A,B,B,B,Towarzysz
+R0940,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,5,6,3,3,5,5,3,6,6,4,5,3,5,3,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,Władca,B,B,A,B,A,A,A,B,B,B,B,A,Kochanek
+R0941,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,3,5,3,5,5,2,3,6,3,6,3,3,5,2,2,3,5,1,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,A,A,B,B,A,B,B,A,B,A,A,Czarodziej
+R0942,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,powodzi mi się raczej źle,3,3,3,2,5,3,5,3,2,3,3,3,5,3,5,5,3,3,0,0,1,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,A,B,B,A,B,B,B,B,B,B,Niewinny
+R0943,kobieta,60 i więcej,wyższe,rencista/emeryt,powodzi mi się raczej źle,6,2,6,3,4,5,5,3,5,6,6,3,6,6,2,2,6,5,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,B,A,B,B,B,A,B,A,B,A,Opiekun
+R0944,kobieta,40-59,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,odmawiam udzielenia odpowiedzi,7,1,7,7,7,7,7,1,7,7,4,7,4,7,1,7,1,1,0,0,0,0,0,1,0,1,1,0,0,0,Odkrywca,B,B,A,B,B,B,B,B,B,B,A,B,Kochanek
+R0945,kobieta,40-59,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,5,3,2,3,3,5,5,3,5,5,5,5,5,3,3,5,0,1,1,0,0,0,0,0,0,0,1,0,Bohater,A,A,A,A,A,A,B,A,A,A,A,A,Czarodziej
+R0946,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,7,2,6,2,2,1,6,1,3,1,7,5,7,3,6,6,3,2,0,0,0,0,1,1,0,0,1,0,0,0,Błazen,A,A,B,B,B,A,A,B,B,A,A,B,Czarodziej
+R0947,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,odmawiam udzielenia odpowiedzi,4,3,3,4,4,4,4,3,4,2,4,4,4,4,3,4,4,4,0,1,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,B,B,B,A,A,B,B,A,B,B,Kochanek
+R0948,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,4,4,4,4,4,4,4,4,4,5,5,5,5,5,6,6,3,3,0,0,1,1,0,0,0,0,0,0,0,0,Mędrzec,A,B,A,B,B,A,B,A,A,B,B,B,Błazen
+R0949,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,6,3,5,5,3,3,5,3,5,5,6,6,6,6,5,6,0,0,0,1,0,0,0,0,0,0,1,1,Buntownik,B,B,B,B,A,A,B,A,A,A,B,B,Twórca
+R0950,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,6,5,5,5,5,5,5,5,6,3,5,3,3,5,5,3,1,0,0,0,0,1,0,0,0,0,1,0,Władca,B,A,B,B,A,A,B,B,A,A,B,A,Towarzysz
+R0951,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,6,6,7,7,6,2,6,2,2,2,2,2,2,3,2,2,1,0,0,0,0,0,1,0,0,0,0,1,Władca,B,A,A,B,A,A,B,A,A,A,B,A,Niewinny
+R0952,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,5,2,2,3,3,4,3,5,5,5,3,2,3,5,2,3,1,1,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,A,B,A,A,A,A,B,A,A,A,Błazen
+R0953,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,5,2,4,3,6,3,5,3,3,3,6,6,2,5,1,2,7,6,0,1,0,0,0,1,0,0,1,0,0,0,Błazen,A,A,B,A,B,A,B,A,A,B,B,B,Towarzysz
+R0954,kobieta,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,3,3,5,2,6,2,6,2,2,2,5,6,6,2,6,6,2,5,1,0,0,0,0,0,0,0,1,1,0,0,Władca,A,A,B,B,B,A,A,A,B,B,A,B,Bohater
+R0955,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,2,6,1,7,6,7,6,5,6,5,6,6,6,6,6,5,6,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,A,A,A,A,A,A,A,A,B,A,A,Opiekun
+R0956,kobieta,15-39,wyższe,student/uczeń,powodzi mi się raczej dobrze,6,5,6,6,6,7,7,7,7,6,5,6,3,5,5,7,5,7,0,1,0,0,0,0,0,0,0,1,1,0,Bohater,A,A,B,B,B,B,A,B,A,B,A,A,Towarzysz
+R0957,mężczyzna,15-39,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,0,0,1,0,0,1,0,0,0,0,1,0,Mędrzec,B,B,B,B,B,A,A,B,B,A,B,A,Towarzysz
+R0958,mężczyzna,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",7,6,3,6,1,6,1,5,1,2,6,7,7,2,5,1,5,2,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,A,A,A,A,B,B,A,B,B,B,Błazen
+R0959,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",5,4,5,6,5,6,6,6,6,6,4,4,7,4,4,4,6,4,0,0,0,0,0,0,1,1,0,0,0,0,Odkrywca,B,A,B,A,A,B,B,A,A,A,B,B,Buntownik
+R0960,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,1,0,0,1,1,0,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Twórca
+R0961,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,4,6,4,5,5,5,4,2,3,5,5,4,5,3,4,2,5,0,1,0,0,0,0,1,0,0,1,0,0,Twórca,B,B,B,B,A,A,B,B,B,B,B,B,Błazen
+R0962,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,5,5,5,5,6,6,5,5,5,6,5,6,5,6,6,3,0,1,0,0,0,0,1,1,0,0,0,0,Twórca,B,A,A,B,A,B,B,A,A,B,B,A,Towarzysz
+R0963,kobieta,40-59,średnie,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",4,1,1,4,1,1,7,1,1,1,4,4,7,1,4,7,1,1,0,1,0,1,1,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,B,B,B,B,B,Opiekun
+R0964,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,5,3,5,3,3,4,3,6,3,3,3,3,3,5,3,5,3,0,1,1,0,0,0,1,0,0,0,0,0,Bohater,B,B,B,B,B,B,B,B,A,B,B,B,Niewinny
+R0965,kobieta,60 i więcej,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,1,2,1,1,1,2,1,2,7,2,6,7,1,6,1,2,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,A,A,B,A,A,A,B,A,A,A,Kochanek
+R0966,mężczyzna,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,4,4,6,6,5,5,5,6,6,5,5,6,6,4,5,6,0,1,0,0,0,0,0,0,0,0,1,0,Bohater,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0967,mężczyzna,15-39,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,5,5,5,5,6,5,5,6,6,5,5,6,5,6,6,5,6,5,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,A,A,B,A,A,A,B,A,A,A,A,A,Czarodziej
+R0968,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",2,4,2,7,2,2,6,2,2,1,1,1,7,1,1,7,1,2,1,1,0,1,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,B,A,A,A,B,B,B,Odkrywca
+R0969,kobieta,15-39,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",7,2,6,5,4,6,6,5,5,2,3,5,3,5,6,3,6,2,0,0,0,0,1,0,0,0,1,1,0,0,Kochanek,B,A,A,B,A,B,A,A,A,B,A,A,Buntownik
+R0970,mężczyzna,15-39,wyższe,pracownik fizyczny,powodzi mi się bardzo dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,1,0,0,1,0,1,0,0,0,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R0971,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,3,2,4,5,3,2,2,5,3,5,5,3,3,3,2,3,0,0,1,1,1,0,0,0,0,0,0,0,Mędrzec,B,B,B,B,A,A,B,A,A,B,B,B,Niewinny
+R0972,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,5,2,2,2,1,4,2,5,3,5,3,3,4,5,5,3,0,0,1,1,0,0,1,0,0,0,0,0,Opiekun,A,B,B,B,A,B,A,A,A,A,B,B,Niewinny
+R0973,kobieta,60 i więcej,średnie,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",5,3,6,3,5,5,6,3,6,6,6,6,2,3,2,2,6,6,0,0,1,0,0,0,0,0,1,0,0,1,Buntownik,B,B,B,B,B,B,A,A,B,A,B,B,Niewinny
+R0974,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",4,2,3,3,2,3,3,3,3,3,4,4,5,3,4,4,3,4,0,1,0,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,B,B,B,B,B,B,Czarodziej
+R0975,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",4,4,4,4,4,4,4,4,3,4,4,4,4,4,4,4,4,4,1,1,0,1,0,0,0,0,0,0,0,0,Władca,B,B,B,B,A,B,B,B,B,B,B,B,Towarzysz
+R0976,kobieta,15-39,średnie,student/uczeń,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",3,5,5,2,6,2,5,3,6,6,3,6,2,5,3,6,3,6,0,0,0,0,0,0,0,1,1,0,0,1,Buntownik,A,B,A,A,A,B,B,B,B,A,A,A,Opiekun
+R0977,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,5,5,6,5,3,3,5,5,2,3,6,5,3,5,5,5,0,1,0,0,0,0,0,1,0,0,0,1,Bohater,A,B,B,A,A,A,B,B,B,B,A,A,Twórca
+R0978,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,5,2,4,3,4,5,5,3,3,2,5,6,5,3,2,3,3,5,0,0,0,0,0,0,1,0,0,0,0,1,Buntownik,A,B,A,B,A,A,B,A,A,B,A,A,Mędrzec
+R0979,kobieta,15-39,średnie,bezrobotny,odmawiam udzielenia odpowiedzi,7,7,1,7,1,7,7,1,7,7,1,7,1,7,1,7,7,1,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,A,B,B,A,B,B,B,A,A,B,B,Mędrzec
+R0980,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,5,3,3,2,7,2,2,5,3,5,5,2,3,5,5,3,1,1,0,0,0,0,0,0,0,0,1,0,Niewinny,B,B,A,B,B,A,B,A,A,B,B,A,Niewinny
+R0981,kobieta,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",7,4,1,1,1,1,7,1,7,1,1,7,7,4,7,7,1,1,0,0,0,1,0,1,0,0,0,1,0,0,Opiekun,B,B,A,A,B,A,B,B,B,A,B,B,Buntownik
+R0982,kobieta,15-39,wyższe,student/uczeń,"powodzi mi się przeciętnie, średnio",4,4,1,1,1,2,4,3,3,1,7,7,5,3,5,3,1,1,1,0,0,1,0,1,0,0,0,0,0,0,Opiekun,B,B,B,B,A,A,B,A,B,B,B,B,Bohater
+R0983,mężczyzna,60 i więcej,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,5,6,5,5,5,5,5,5,5,5,5,6,5,5,5,5,0,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,B,B,B,A,A,B,B,A,B,B,Kochanek
+R0984,kobieta,40-59,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",2,2,2,2,6,6,6,6,5,6,5,5,5,5,2,6,5,5,0,0,0,0,1,1,0,0,0,1,0,0,Błazen,A,A,A,A,A,A,A,A,A,B,A,A,Opiekun
+R0985,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,5,6,5,5,7,5,7,7,5,5,5,5,5,5,6,6,5,0,1,0,1,1,0,0,0,0,0,0,0,Bohater,A,B,A,B,B,B,B,A,A,B,B,B,Opiekun
+R0986,mężczyzna,40-59,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",5,4,4,2,2,4,2,2,3,2,4,3,4,4,4,4,3,3,0,0,1,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,A,B,B,A,B,B,B,Buntownik
+R0987,mężczyzna,15-39,średnie,pracownik umysłowy,powodzi mi się raczej dobrze,3,2,5,3,5,6,3,6,3,6,5,3,5,5,5,5,7,5,0,0,1,0,1,0,0,0,0,1,0,0,Towarzysz,A,A,B,B,B,B,A,A,A,A,B,A,Odkrywca
+R0988,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,0,0,0,1,0,0,1,0,0,1,0,0,Towarzysz,B,B,B,A,B,B,B,A,A,B,A,A,Towarzysz
+R0989,kobieta,15-39,wyższe,prowadzę własną firmę,"powodzi mi się przeciętnie, średnio",2,2,5,1,2,2,6,2,2,3,7,2,6,3,7,6,2,6,0,0,1,1,0,0,0,0,0,1,0,0,Mędrzec,B,B,B,B,A,B,B,B,A,B,B,B,Towarzysz
+R0990,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się raczej źle,1,3,1,5,1,1,1,1,1,3,1,1,7,1,7,7,1,7,0,1,0,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Niewinny
+R0991,mężczyzna,60 i więcej,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,7,7,7,6,6,6,5,7,7,6,5,6,5,5,5,6,6,6,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,A,B,A,A,A,A,A,B,A,B,Niewinny
+R0992,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej źle,6,1,5,6,2,5,6,7,6,6,6,2,6,2,5,2,6,5,0,0,1,0,0,0,1,0,0,0,0,0,Mędrzec,A,A,A,B,A,B,A,B,B,B,B,B,Błazen
+R0993,kobieta,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,3,5,4,5,5,3,5,3,6,2,3,5,2,5,3,5,5,0,0,0,0,1,0,0,0,0,0,0,0,Kochanek,B,B,A,A,B,A,B,B,A,A,B,A,Buntownik
+R0994,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,5,3,3,4,6,3,5,5,3,5,5,3,3,5,5,5,3,3,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,B,B,B,B,B,B,B,A,B,A,A,A,Bohater
+R0995,kobieta,60 i więcej,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",6,6,5,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,1,1,1,0,0,Odkrywca,B,B,B,A,B,B,B,A,A,B,A,B,Władca
+R0996,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,6,6,6,7,1,3,2,6,2,6,6,6,6,3,7,2,3,6,0,0,0,1,0,0,0,0,1,0,0,0,Opiekun,A,A,A,A,A,A,A,A,A,A,A,A,Twórca
+R0997,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",2,3,7,4,1,1,1,2,2,4,7,5,5,3,3,5,1,6,0,0,0,1,0,0,0,0,0,1,1,0,Niewinny,B,A,B,B,B,A,B,B,B,B,B,B,Towarzysz
+R0998,mężczyzna,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",6,5,3,3,6,3,5,3,6,2,6,5,6,3,6,5,5,6,0,0,0,1,0,0,0,1,0,1,0,0,Opiekun,B,B,A,A,B,B,A,A,A,B,B,A,Twórca
+R0999,kobieta,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,3,2,5,2,1,3,3,3,3,1,3,5,6,4,6,5,3,7,0,0,1,0,0,0,0,1,0,1,0,0,Towarzysz,B,B,B,B,B,A,A,A,A,B,B,A,Towarzysz
+R1000,kobieta,40-59,średnie,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,3,3,6,2,3,6,2,3,6,6,3,6,2,7,6,2,6,1,0,0,0,0,0,0,0,0,0,1,1,Niewinny,A,A,B,B,A,A,A,B,A,B,A,A,Towarzysz
+R1001,kobieta,15-39,średnie,pracownik fizyczny,powodzi mi się raczej dobrze,6,7,6,7,6,3,6,3,6,6,6,2,3,7,3,6,3,6,0,1,0,0,0,0,0,1,0,0,0,1,Odkrywca,A,B,A,A,A,B,B,B,A,B,B,B,Buntownik
+R1002,mężczyzna,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",rencista/emeryt,"powodzi mi się przeciętnie, średnio",5,7,7,2,6,2,6,3,6,2,7,3,6,2,6,2,6,2,0,0,0,1,0,0,0,0,1,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Kochanek
+R1003,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",6,3,5,5,2,2,6,2,3,6,5,2,6,6,2,5,2,2,0,1,0,0,0,1,0,1,0,0,0,0,Odkrywca,B,B,B,A,A,A,A,A,A,A,A,A,Buntownik
+R1004,kobieta,15-39,średnie,student/uczeń,powodzi mi się bardzo dobrze,3,5,7,5,6,2,5,3,2,6,5,3,2,6,5,3,5,6,0,0,1,1,0,0,0,1,0,0,0,0,Opiekun,A,A,B,A,B,A,B,B,A,A,B,B,Bohater
+R1005,mężczyzna,15-39,wyższe,pracownik fizyczny,powodzi mi się bardzo dobrze,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,1,0,0,0,0,0,Twórca,A,A,A,A,A,A,A,A,A,A,A,A,Czarodziej
+R1006,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,6,5,5,3,3,4,5,5,6,5,4,3,5,5,6,5,5,1,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,A,A,A,B,A,B,A,B,B,A,B,Błazen
+R1007,kobieta,15-39,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,6,2,6,3,4,6,5,1,1,2,5,6,7,3,5,5,2,3,0,0,0,0,0,1,0,1,0,1,0,0,Towarzysz,A,A,A,A,B,A,B,A,A,B,A,A,Odkrywca
+R1008,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,6,6,2,6,6,2,7,2,6,6,6,2,6,2,6,3,6,1,1,0,0,0,0,0,0,0,0,0,0,Bohater,B,B,A,B,B,A,A,B,A,B,B,B,Niewinny
+R1009,kobieta,15-39,wyższe,bezrobotny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",3,4,4,4,4,4,5,5,4,4,4,4,4,4,5,4,4,4,0,0,1,0,0,0,1,0,0,0,0,1,Buntownik,B,B,B,B,B,B,B,B,B,B,B,B,Buntownik
+R1010,mężczyzna,40-59,wyższe,prowadzę własną firmę,powodzi mi się raczej dobrze,2,3,5,5,4,4,5,5,3,3,3,3,5,3,7,6,5,5,1,0,1,0,0,0,0,0,0,0,1,0,Mędrzec,B,A,B,A,B,B,B,B,A,B,A,B,Towarzysz
+R1011,kobieta,60 i więcej,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",3,4,3,2,1,3,3,3,3,3,3,3,3,4,3,3,3,3,0,0,0,0,1,1,0,1,0,0,0,0,Kochanek,B,B,B,B,B,B,B,B,B,B,A,B,Opiekun
+R1012,kobieta,40-59,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,5,3,4,3,2,3,6,2,4,3,6,5,5,5,5,3,3,5,0,0,1,0,0,0,0,0,0,1,1,0,Niewinny,B,B,B,B,A,A,B,A,A,A,A,B,Władca
+R1013,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",6,6,6,5,7,6,2,5,5,6,2,5,5,3,5,5,3,5,0,1,0,1,0,0,1,0,0,0,0,0,Bohater,A,B,B,A,A,A,B,B,B,A,B,B,Buntownik
+R1014,mężczyzna,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",4,5,3,6,6,7,5,3,6,5,6,6,5,3,2,2,3,5,1,1,1,0,0,0,0,0,0,0,0,0,Bohater,A,A,A,B,B,B,A,B,A,A,B,B,Twórca
+R1015,kobieta,15-39,wyższe,bezrobotny,powodzi mi się raczej dobrze,5,3,6,3,6,5,5,6,5,3,2,5,3,6,3,5,3,5,0,1,0,0,0,0,0,0,0,0,1,1,Niewinny,B,A,A,A,A,B,B,A,A,A,B,B,Bohater
+R1016,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,3,5,6,3,6,3,2,1,5,6,3,2,4,5,5,6,6,6,0,1,0,0,0,0,1,0,0,0,1,0,Bohater,A,A,A,A,B,A,A,B,A,B,A,B,Czarodziej
+R1017,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",bezrobotny,powodzi mi się raczej dobrze,7,2,3,6,6,7,1,2,2,1,7,6,1,6,1,1,2,1,0,0,0,1,0,1,0,1,0,0,0,0,Błazen,A,B,B,A,B,A,A,B,A,A,B,B,Buntownik
+R1018,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,1,2,2,1,3,1,2,1,2,5,5,5,3,3,3,3,1,0,1,0,0,1,0,0,0,0,1,0,0,Towarzysz,B,B,B,B,B,B,A,B,B,B,B,B,Kochanek
+R1019,kobieta,40-59,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,3,2,3,3,1,6,2,1,2,3,5,6,2,5,7,3,5,1,1,0,0,0,0,0,0,0,0,1,0,Niewinny,B,B,A,B,B,A,A,A,B,B,B,B,Twórca
+R1020,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,2,1,2,4,2,4,3,1,3,6,5,5,3,5,5,1,3,0,0,1,1,0,0,0,0,0,0,1,0,Mędrzec,A,B,B,B,A,A,B,A,A,B,A,A,Błazen
+R1021,kobieta,60 i więcej,"podstawowe, gimnazjalne, zasadnicze zawodowe",prowadzę własną firmę,odmawiam udzielenia odpowiedzi,6,7,3,6,6,3,6,2,5,2,6,2,2,6,3,7,2,6,0,0,1,0,0,0,1,0,0,0,0,1,Twórca,B,B,A,A,B,B,B,A,A,A,A,B,Towarzysz
+R1022,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,6,5,2,2,6,5,6,7,3,7,3,7,5,2,3,6,7,3,1,0,0,0,0,0,0,1,0,0,1,0,Niewinny,B,B,B,B,B,B,B,A,B,B,B,B,Twórca
+R1023,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,5,3,3,5,3,2,5,5,3,3,5,5,5,6,6,5,5,0,0,0,1,0,0,0,0,1,0,1,0,Niewinny,B,A,B,A,B,A,B,B,B,B,A,B,Czarodziej
+R1024,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej dobrze,2,6,2,3,6,5,7,2,1,3,2,6,6,3,2,5,3,6,0,0,1,1,0,0,0,0,0,0,0,1,Opiekun,A,A,B,B,B,A,A,A,A,B,B,A,Towarzysz
+R1025,kobieta,15-39,średnie,prowadzę własną firmę,powodzi mi się raczej dobrze,6,3,5,5,3,5,2,5,5,2,6,3,6,3,7,5,3,7,1,1,0,0,0,1,0,0,0,0,0,0,Bohater,B,B,B,B,A,A,B,A,B,A,B,B,Buntownik
+R1026,mężczyzna,40-59,wyższe,pracownik umysłowy,powodzi mi się bardzo dobrze,7,3,7,6,3,3,6,6,3,5,6,4,3,2,2,4,3,5,0,0,0,0,1,0,0,1,0,0,0,0,Kochanek,A,B,B,A,A,A,A,A,A,A,A,A,Odkrywca
+R1027,kobieta,15-39,średnie,student/uczeń,powodzi mi się bardzo dobrze,5,6,5,5,5,1,5,5,5,3,3,3,3,3,6,3,3,3,0,0,0,1,1,0,1,0,0,0,0,0,Opiekun,A,A,A,A,A,A,A,A,A,A,A,A,Mędrzec
+R1028,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,3,2,3,3,3,2,3,2,3,5,5,5,3,3,3,3,3,0,0,0,1,0,0,1,0,0,0,0,1,Buntownik,B,B,B,B,B,A,B,A,A,B,B,B,Bohater
+R1029,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",3,2,1,1,1,2,5,1,2,1,2,2,7,6,3,6,1,3,0,0,1,1,1,0,0,0,0,0,0,0,Opiekun,A,A,A,B,A,A,B,A,A,B,A,B,Bohater
+R1030,kobieta,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",3,2,3,2,3,2,6,4,2,2,4,5,5,4,5,6,3,3,0,0,1,0,0,0,0,0,0,1,1,0,Mędrzec,A,B,B,B,B,A,B,B,A,A,B,B,Towarzysz
+R1031,mężczyzna,15-39,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,7,7,6,6,6,6,5,5,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,0,1,0,0,0,Czarodziej,B,B,B,B,B,B,B,B,B,B,B,B,Błazen
+R1032,mężczyzna,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,2,5,2,3,6,5,2,2,6,3,2,5,6,2,2,5,5,6,0,0,1,0,0,0,1,0,0,0,0,1,Mędrzec,B,B,B,A,A,A,B,A,B,B,B,B,Błazen
+R1033,mężczyzna,60 i więcej,wyższe,rencista/emeryt,"powodzi mi się przeciętnie, średnio",6,3,3,3,5,3,5,3,5,5,5,5,3,3,3,3,3,5,0,0,0,0,0,0,0,1,0,1,0,0,Towarzysz,A,B,A,A,A,A,A,A,A,B,A,A,Błazen
+R1034,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,"powodzi mi się przeciętnie, średnio",7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,1,0,0,0,0,0,0,0,0,Opiekun,A,A,A,A,A,A,A,A,A,A,A,A,Bohater
+R1035,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,"powodzi mi się przeciętnie, średnio",5,2,5,2,3,5,7,3,3,2,5,6,7,2,6,5,1,5,0,0,1,1,0,0,0,0,0,1,0,0,Towarzysz,B,B,B,A,A,A,B,A,A,B,B,B,Buntownik
+R1036,kobieta,40-59,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",4,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,0,1,0,1,0,0,0,0,0,1,0,0,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Bohater
+R1037,mężczyzna,60 i więcej,wyższe,prowadzę własną firmę,powodzi mi się bardzo dobrze,5,3,5,2,5,5,5,2,5,6,3,5,2,4,3,6,2,6,0,0,1,0,0,0,0,0,1,1,0,0,Czarodziej,B,A,A,B,B,A,B,A,A,A,A,A,Czarodziej
+R1038,mężczyzna,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",2,1,2,1,2,1,1,2,1,2,2,2,3,2,5,6,2,2,1,0,1,0,0,0,0,0,0,0,1,0,Niewinny,B,B,B,B,B,B,B,B,B,B,B,B,Towarzysz
+R1039,mężczyzna,15-39,średnie,student/uczeń,powodzi mi się raczej dobrze,6,2,7,1,5,5,2,5,5,5,6,5,3,6,3,2,5,5,0,0,1,0,0,0,1,0,1,0,0,0,Mędrzec,B,B,B,B,B,B,A,A,B,B,A,B,Towarzysz
+R1040,kobieta,15-39,średnie,student/uczeń,"powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",3,2,4,2,6,3,5,3,3,3,6,6,6,3,5,5,2,2,0,1,0,1,0,0,0,0,0,1,0,0,Opiekun,A,B,B,B,A,B,A,B,A,B,A,B,Opiekun
+R1041,kobieta,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",student/uczeń,powodzi mi się raczej źle,7,5,6,6,6,5,6,6,7,7,7,6,7,6,2,7,2,5,0,0,0,0,0,0,0,0,0,0,0,1,Buntownik,A,B,B,B,B,B,A,A,B,B,A,A,Odkrywca
+R1042,kobieta,15-39,średnie,student/uczeń,"powodzi mi się przeciętnie, średnio",2,7,2,5,2,6,6,1,7,1,1,6,6,5,1,7,1,7,0,1,0,1,0,0,0,0,0,0,1,0,Opiekun,B,B,A,A,B,A,A,A,A,B,B,B,Błazen
+R1043,kobieta,15-39,wyższe,pracownik umysłowy,powodzi mi się raczej dobrze,5,2,5,1,1,2,5,2,2,3,6,6,2,4,3,5,2,4,0,0,0,0,0,0,0,1,1,1,0,0,Czarodziej,B,B,B,A,A,A,B,B,B,B,B,B,Twórca
+R1044,mężczyzna,15-39,"podstawowe, gimnazjalne, zasadnicze zawodowe",pracownik fizyczny,powodzi mi się raczej dobrze,6,4,5,4,4,4,6,6,4,4,3,6,6,4,3,3,4,3,0,1,1,1,0,0,0,0,0,0,0,0,Mędrzec,B,B,B,A,A,A,A,B,B,B,B,A,Odkrywca
+R1045,kobieta,40-59,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",7,1,5,1,7,3,5,3,3,3,3,6,6,6,3,3,3,5,0,0,1,0,0,0,1,0,0,0,1,0,Mędrzec,B,A,B,B,A,A,B,A,A,A,B,A,Towarzysz
+R1046,kobieta,15-39,średnie,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",2,3,6,2,5,2,2,6,7,6,2,5,5,2,3,5,2,6,0,0,1,0,0,0,0,0,0,1,0,1,Mędrzec,B,A,A,A,A,B,B,A,B,B,A,B,Niewinny
+R1047,kobieta,15-39,wyższe,pracownik fizyczny,powodzi mi się raczej dobrze,5,3,5,5,3,4,5,4,3,2,5,5,4,4,4,4,3,3,0,1,0,1,0,0,0,0,0,0,0,1,Bohater,B,B,B,B,B,B,B,B,B,B,B,B,Mędrzec
+R1048,mężczyzna,15-39,wyższe,pracownik fizyczny,"powodzi mi się przeciętnie, średnio",5,3,5,2,6,2,2,2,2,2,6,6,2,2,1,6,2,2,0,1,0,0,0,0,0,0,0,1,1,0,Niewinny,A,B,B,A,B,A,B,A,A,A,A,A,Władca
+R1049,kobieta,60 i więcej,wyższe,pracownik umysłowy,"powodzi mi się przeciętnie, średnio",5,5,3,3,5,5,3,5,3,5,5,5,5,5,5,5,5,5,1,0,0,1,0,0,0,1,0,0,0,0,Władca,B,A,A,B,B,B,B,B,B,B,B,B,Bohater
+R1050,kobieta,15-39,średnie,bezrobotny,"powodzi mi się przeciętnie, średnio",6,2,3,5,2,2,6,3,3,2,6,5,3,5,2,2,1,2,0,0,0,1,1,0,0,0,0,0,0,1,Opiekun,A,B,B,B,B,A,B,B,A,B,A,B,Buntownik

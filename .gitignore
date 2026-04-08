@@ -92,3 +92,9 @@ ext.py
 
 # tylko root
 /*.png
+
+# Wrażliwe dane badań i artefakty analiz JST
+JST_Archetypy_Analiza/WYNIKI/
+JST_Archetypy_Analiza/_runs/
+JST_Archetypy_Analiza/_runs*/
+opisy_archetypow/

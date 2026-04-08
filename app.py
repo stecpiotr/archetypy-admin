@@ -1,10 +1,12 @@
 from __future__ import annotations
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 import contextlib
 from datetime import datetime, timedelta, timezone
 import warnings
 import re
 import html
+from io import BytesIO
+from pathlib import Path
 from urllib.parse import urlparse
 import pandas as pd
 import streamlit as st
@@ -15,6 +17,22 @@ from db_utils import (
     insert_study,
     update_study,
     check_slug_availability,
+)
+from db_jst_utils import (
+    ARCHETYPES as JST_ARCHETYPES,
+    CANONICAL_COLUMNS as JST_CANONICAL_COLUMNS,
+    check_jst_slug_availability,
+    ensure_jst_schema,
+    fetch_jst_response_counts,
+    fetch_jst_studies,
+    insert_jst_response,
+    insert_jst_study,
+    list_jst_responses,
+    make_payload_from_row as jst_make_payload_from_row,
+    normalize_response_row as jst_normalize_response_row,
+    response_rows_to_dataframe as jst_response_rows_to_dataframe,
+    soft_delete_jst_study,
+    update_jst_study,
 )
 from polish import (
     slugify,
@@ -31,6 +49,8 @@ except Exception:
 
 from utils import make_token
 from send_link import render as render_send_link
+from send_link_jst import render as render_send_link_jst
+from jst_analysis import generate_jst_report, inline_local_assets
 from streamlit.components.v1 import html as html_component
 from email_client import send_email
 from report_share import (
@@ -131,7 +151,7 @@ def inject_scroll_to_top() -> None:
           #toTopWrapper{
             position: fixed;
             z-index: 2147483647;
-            top: 70px;           /* Twoje położenie */
+            top: calc(70px + env(safe-area-inset-top, 0px));
             left: 15px;
             width: 0; height: 0;
             pointer-events: none;
@@ -143,6 +163,8 @@ def inject_scroll_to_top() -> None:
             display: inline-flex; align-items:center; justify-content:center;
             border: 1px solid #D7DEE8;
             background:#FFFFFF;
+            color:#8898AC;
+            line-height:0;
             box-shadow: 0 1px 2px rgba(0,0,0,.05);
             cursor: pointer;
             transition: transform .08s ease, background .15s ease, border-color .15s ease;
@@ -151,6 +173,17 @@ def inject_scroll_to_top() -> None:
           #toTopBtn:hover{ background:#F3F6FA; border-color:#CBD5E1; }
           #toTopBtn:active{ transform: translateY(1px) scale(0.98); }
           #toTopBtn svg{ width:18px; height:18px; opacity:.9; }
+          @media (prefers-color-scheme: dark){
+            #toTopBtn{
+              background:#182436;
+              border-color:#334155;
+              color:#D7DEE8;
+            }
+            #toTopBtn:hover{
+              background:#213145;
+              border-color:#475569;
+            }
+          }
         </style>
 
         <div id="toTopWrapper" aria-hidden="true">
@@ -414,6 +447,27 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 inject_scroll_to_top()
 
 sb = get_supabase()
+JST_SCHEMA_READY = False
+JST_SCHEMA_INIT_ATTEMPTED = False
+JST_SCHEMA_ERROR: Optional[str] = None
+
+
+def _ensure_jst_schema_initialized(force_retry: bool = False) -> bool:
+    global JST_SCHEMA_READY, JST_SCHEMA_INIT_ATTEMPTED, JST_SCHEMA_ERROR
+    if JST_SCHEMA_READY:
+        return True
+    if JST_SCHEMA_INIT_ATTEMPTED and not force_retry:
+        return False
+    JST_SCHEMA_INIT_ATTEMPTED = True
+    try:
+        ensure_jst_schema()
+        JST_SCHEMA_READY = True
+        JST_SCHEMA_ERROR = None
+        return True
+    except Exception as exc:
+        JST_SCHEMA_READY = False
+        JST_SCHEMA_ERROR = str(exc)
+        return False
 
 def render_titlebar(crumbs: List[str]) -> None:
     """
@@ -688,6 +742,47 @@ def _get_query_token() -> str:
         except Exception:
             return ""
 
+
+def _inject_report_dark_fix_css() -> None:
+    st.markdown(
+        """
+        <style>
+        @media (prefers-color-scheme: dark){
+          .img,
+          .img-profile-sm,
+          .ap-ext-zestawy-card,
+          .ap-ext-card-modal-img,
+          .cluster-figure-wrap img,
+          img[src$=".png"],
+          img[src$=".jpg"],
+          img[src$=".jpeg"]{
+            background:#0f172a !important;
+          }
+          .ap-ext-card-modal-content{
+            background:rgba(9,16,27,.75) !important;
+            border-color:rgba(148,163,184,.45) !important;
+          }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _require_jst_ready() -> bool:
+    if _ensure_jst_schema_initialized():
+        return True
+    if JST_SCHEMA_ERROR:
+        st.error(
+            "Moduł JST nie został zainicjalizowany poprawnie. "
+            "Sprawdź konfigurację bazy i uprawnienia PostgreSQL.\n\n"
+            f"Szczegóły: {JST_SCHEMA_ERROR}"
+        )
+        if st.button("Spróbuj ponownie połączenie JST", type="secondary"):
+            _ensure_jst_schema_initialized(force_retry=True)
+            st.rerun()
+    return False
+
 CASES = ["nom", "gen", "dat", "acc", "ins", "loc", "voc"]
 
 def _split_two(s: str) -> Tuple[str, str]:
@@ -817,9 +912,147 @@ def _payload_only_changes(study: Dict, full_payload: Dict) -> Dict:
         if (full_payload.get(lk) or "") != (study.get(lk) or ""): out[lk] = full_payload.get(lk,"")
     return out
 
+
+JST_CASES = ["nom", "gen", "dat", "acc", "ins", "loc", "voc"]
+
+
+def _jst_type_forms(jst_type: str) -> Dict[str, str]:
+    jt = (jst_type or "miasto").strip().lower()
+    if jt == "gmina":
+        return {
+            "nom": "Gmina",
+            "gen": "Gminy",
+            "dat": "Gminie",
+            "acc": "Gminę",
+            "ins": "Gminą",
+            "loc": "Gminie",
+            "voc": "Gmino",
+        }
+    return {
+        "nom": "Miasto",
+        "gen": "Miasta",
+        "dat": "Miastu",
+        "acc": "Miasto",
+        "ins": "Miastem",
+        "loc": "Mieście",
+        "voc": "Miasto",
+    }
+
+
+def _guess_word_cases(word: str, is_secondary: bool) -> Dict[str, str]:
+    w = (word or "").strip()
+    if not w:
+        return {c: "" for c in JST_CASES}
+
+    low = w.lower()
+
+    # Częsty przymiotnik w drugim członie (np. Biała Podlaska, Niedrzwica Duża)
+    if is_secondary and low.endswith(
+        (
+            "ska", "cka", "dzka", "zka", "na", "ta", "ra", "wa", "la", "ma", "ga",
+            "da", "ża", "ła",
+        )
+    ):
+        base = w[:-1]
+        return {
+            "nom": w,
+            "gen": base + "ej",
+            "dat": base + "ej",
+            "acc": base + "ą",
+            "ins": base + "ą",
+            "loc": base + "ej",
+            "voc": w,
+        }
+
+    if low.endswith("a"):
+        base = w[:-1]
+        gen_end = "i" if base.lower().endswith(("k", "g")) else "y"
+        return {
+            "nom": w,
+            "gen": base + gen_end,
+            "dat": base + "ie",
+            "acc": base + "ę",
+            "ins": base + "ą",
+            "loc": base + "ie",
+            "voc": w,
+        }
+
+    ins_end = "iem" if low.endswith(("k", "g")) else "em"
+    return {
+        "nom": w,
+        "gen": w + "a",
+        "dat": w + "owi",
+        "acc": w + "a",
+        "ins": w + ins_end,
+        "loc": w + "ie",
+        "voc": w + "ie",
+    }
+
+
+def _guess_phrase_cases(phrase: str) -> Dict[str, str]:
+    words = [w for w in (phrase or "").split() if w.strip()]
+    if not words:
+        return {c: "" for c in JST_CASES}
+
+    word_cases = [_guess_word_cases(w, is_secondary=(i > 0)) for i, w in enumerate(words)]
+    out: Dict[str, str] = {}
+    for c in JST_CASES:
+        out[c] = " ".join(x[c] for x in word_cases if x.get(c)).strip()
+    return out
+
+
+def _make_jst_defaults(jst_type: str, jst_name: str) -> Dict[str, str]:
+    type_forms = _jst_type_forms(jst_type)
+    base_cases = _guess_phrase_cases(jst_name)
+
+    out: Dict[str, str] = {
+        "jst_type": (jst_type or "miasto").strip().lower(),
+        "jst_name": (jst_name or "").strip(),
+    }
+
+    for c in JST_CASES:
+        out[f"jst_name_{c}"] = (base_cases.get(c) or "").strip()
+        type_piece = type_forms.get(c, "").strip()
+        name_piece = out[f"jst_name_{c}"]
+        out[f"jst_full_{c}"] = f"{type_piece} {name_piece}".strip()
+
+    return out
+
+
+def _suggest_jst_slug(jst_type: str, jst_name: str) -> str:
+    base = slugify((jst_name or "").strip())
+    if not base:
+        return ""
+    jt = (jst_type or "").strip().lower()
+    return f"gmina-{base}" if jt == "gmina" else base
+
+
+def _jst_option_label(s: Dict[str, Any]) -> str:
+    full_nom = (s.get("jst_full_nom") or "").strip()
+    if not full_nom:
+        full_nom = f"{(s.get('jst_type') or '').title()} {(s.get('jst_name') or '')}".strip()
+    slug = (s.get("slug") or "").strip()
+    return f"{full_nom} – /{slug}"
+
+
+def _next_jst_respondent_id(existing: set[str]) -> str:
+    max_n = 0
+    for rid in existing:
+        txt = str(rid or "")
+        m = re.fullmatch(r"R(\d{4,})", txt)
+        if m:
+            max_n = max(max_n, int(m.group(1)))
+    n = max_n + 1
+    while True:
+        cand = f"R{n:04d}"
+        if cand not in existing:
+            return cand
+        n += 1
+
 # ───────────────────────── wspólne UI ─────────────────────────
-def back_button() -> None:
-    if st.button("← Cofnij", type="secondary"): goto("home")
+def back_button(dest: str = "home_personal") -> None:
+    if st.button("← Cofnij", type="secondary"):
+        goto(dest)
 
 def person_fields(prefix: str, data: Optional[Dict] = None) -> Tuple[str, str, str, str]:
     c1,c2 = st.columns(2)
@@ -892,14 +1125,16 @@ def login_view() -> None:
     if ok:
         su = st.secrets.get("ADMIN_USER",""); sp = st.secrets.get("ADMIN_PASS","")
         if u==su and p==sp and su and sp:
-            st.session_state["auth_ok"] = True; st.toast("Zalogowano ✅"); goto("home")
+            st.session_state["auth_ok"] = True; st.toast("Zalogowano ✅"); goto("home_root")
         else:
             st.error("Błędny login lub hasło.")
 
-def home_view() -> None:
+def home_personal_view() -> None:
     require_auth()
     header("Archetypy – panel administratora")
-    render_titlebar(["Panel", "Start"])
+    render_titlebar(["Panel", "Badania personalne"])
+    if st.button("← Powrót do wyboru modułu", type="secondary"):
+        goto("home_root")
 
     # kafle
     st.markdown('<div class="tiles">', unsafe_allow_html=True)
@@ -921,6 +1156,713 @@ def home_view() -> None:
 
     # panel statystyk
     stats_panel()
+
+
+def home_root_view() -> None:
+    require_auth()
+    header("Archetypy – panel administratora")
+    render_titlebar(["Panel", "Start"])
+
+    st.markdown('<div class="tiles">', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("🧑‍💼\nBadania personalne", type="secondary"):
+            goto("home_personal")
+    with c2:
+        if st.button("🏘️\nBadania mieszkańców", type="secondary"):
+            goto("home_jst")
+    with c3:
+        if st.button("🧭\nMatching", type="secondary"):
+            goto("matching")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def home_jst_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("🏘️ Badania mieszkańców")
+    render_titlebar(["Panel", "Badania mieszkańców"])
+    if st.button("← Powrót do wyboru modułu", type="secondary"):
+        goto("home_root")
+
+    st.markdown('<div class="tiles">', unsafe_allow_html=True)
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        if st.button("➕\nDodaj badanie\nmieszkańców", type="secondary"):
+            goto("jst_add")
+    with c2:
+        if st.button("✏️\nEdytuj dane\nbadania", type="secondary"):
+            goto("jst_edit")
+    with c3:
+        if st.button("✉️\nWyślij link\ndo ankiety", type="secondary"):
+            goto("jst_send")
+    with c4:
+        if st.button("💾\nImport i eksport\nbaz danych", type="secondary"):
+            goto("jst_io")
+    with c5:
+        if st.button("📊\nAnaliza\nbadania", type="secondary"):
+            goto("jst_analysis")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    studies = fetch_jst_studies(sb)
+    counts = fetch_jst_response_counts(sb)
+    total_resp = int(sum(counts.values()))
+    rows = []
+    for s in studies:
+        sid = str(s.get("id") or "")
+        rows.append(
+            {
+                "JST": (s.get("jst_full_nom") or f"{str(s.get('jst_type') or '').title()} {s.get('jst_name') or ''}").strip(),
+                "Link": f"/{s.get('slug') or ''}",
+                "Liczba odpowiedzi": int(counts.get(sid, 0)),
+                "Data utworzenia": _fmt_local_ts(s.get("created_at")),
+            }
+        )
+    st.markdown("<hr class='hr-thin'>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("Liczba badań JST", len(studies))
+    with c2:
+        st.metric("Łączna liczba odpowiedzi JST", total_resp)
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=min(450, 80 + 36 * len(rows)))
+
+
+_JST_CASE_LABELS = {
+    "nom": "Mianownik (kto? co?)",
+    "gen": "Dopełniacz (kogo? czego?)",
+    "dat": "Celownik (komu? czemu?)",
+    "acc": "Biernik (kogo? co?)",
+    "ins": "Narzędnik (z kim? z czym?)",
+    "loc": "Miejscownik (o kim? o czym?)",
+    "voc": "Wołacz (o!)",
+}
+
+
+def _next_free_jst_slug(base: str, exclude_id: Optional[str] = None) -> str:
+    stem = (base or "").strip()
+    if not stem:
+        return ""
+    if check_jst_slug_availability(sb, stem, exclude_id=exclude_id):
+        return stem
+    n = 2
+    while n < 200:
+        cand = f"{stem}-{n}"
+        if check_jst_slug_availability(sb, cand, exclude_id=exclude_id):
+            return cand
+        n += 1
+    return stem
+
+
+def _jst_cases_editor(prefix: str, defaults: Dict[str, str]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for c in JST_CASES:
+        c1, c2 = st.columns([0.32, 0.68])
+        with c1:
+            st.markdown(f"<div class='form-label-strong'>{_JST_CASE_LABELS[c]}</div>", unsafe_allow_html=True)
+        key = f"{prefix}_case_{c}"
+        if key not in st.session_state:
+            st.session_state[key] = defaults.get(c, "")
+        with c2:
+            out[c] = st.text_input(
+                key,
+                value=st.session_state.get(key, defaults.get(c, "")),
+                label_visibility="collapsed",
+                placeholder=f"Wpisz odmianę ({c})",
+            ).strip()
+    return out
+
+
+def _jst_url_editor(prefix: str, jst_type: str, jst_name: str, study_id: Optional[str] = None, current_slug: str = "") -> Tuple[str, bool]:
+    base_url = (st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown(
+        "<div style='font-size:18px;font-weight:600;margin-top:10px;margin-bottom:10px;border-top:1px solid #ccc;padding-top:30px;'>Wybór adresu badania</div>",
+        unsafe_allow_html=True,
+    )
+
+    allow_key = f"{prefix}_allow_custom_slug"
+    if allow_key not in st.session_state:
+        st.session_state[allow_key] = False
+    allow_custom = st.checkbox("Chcę wpisać własny link", key=allow_key)
+
+    suggested = _next_free_jst_slug(_suggest_jst_slug(jst_type, jst_name), exclude_id=study_id)
+    if current_slug and not allow_custom:
+        suggested = current_slug
+
+    slug_key = f"{prefix}_slug"
+    if slug_key not in st.session_state:
+        st.session_state[slug_key] = current_slug or suggested
+    if not allow_custom:
+        st.session_state[slug_key] = current_slug or suggested
+
+    col_l, col_r = st.columns([0.42, 0.58])
+    with col_l:
+        st.text_input(f"{prefix}_url_base", value=f"{base_url}/", disabled=True, label_visibility="collapsed")
+    with col_r:
+        slug_val = st.text_input(slug_key, value=st.session_state.get(slug_key, ""), disabled=(not allow_custom), placeholder="np. lublin", label_visibility="collapsed").strip()
+    chosen = slug_val if allow_custom else (current_slug or suggested)
+    free = check_jst_slug_availability(sb, chosen, exclude_id=study_id) if chosen else False
+    st.caption(f"Wybrany: **/{chosen or '—'}** – {'✅ wolny' if free else ('❌ zajęty' if chosen else '—')}")
+    return chosen, free
+
+
+def _jst_payload_from_form(jst_type: str, jst_name: str, forms: Dict[str, str], slug: str) -> Dict[str, Any]:
+    f = _jst_type_forms(jst_type)
+    payload: Dict[str, Any] = {
+        "jst_type": (jst_type or "miasto").strip().lower(),
+        "jst_name": (jst_name or "").strip(),
+        "slug": (slug or "").strip(),
+        "is_active": True,
+    }
+    for c in JST_CASES:
+        name_case = (forms.get(c) or "").strip()
+        payload[f"jst_name_{c}"] = name_case
+        payload[f"jst_full_{c}"] = f"{f.get(c, '').strip()} {name_case}".strip()
+    return payload
+
+
+def _xlsx_bytes_from_df(df: pd.DataFrame, sheet_name: str = "Dane") -> bytes:
+    out = BytesIO()
+    with pd.ExcelWriter(out, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+        ws = writer.sheets[sheet_name]
+        for i, col in enumerate(df.columns):
+            max_len = int(max(len(str(col)), df[col].astype(str).str.len().max() if len(df) else 0))
+            ws.set_column(i, i, min(52, max(12, max_len + 2)))
+    return out.getvalue()
+
+
+def jst_add_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("➕ Dodaj badanie mieszkańców")
+    render_titlebar(["Panel", "Badania mieszkańców", "Dodaj badanie"])
+    back_button("home_jst")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        jst_type_ui = st.radio("Typ JST", ["Miasto", "Gmina"], horizontal=True)
+    with c2:
+        st.markdown('<span class="form-label-strong">Nazwa JST (bez członu typu)</span>', unsafe_allow_html=True)
+        jst_name = st.text_input("Nazwa JST", placeholder="np. Poznań, Lublin, Biała Podlaska", label_visibility="collapsed").strip()
+    jst_type = "miasto" if jst_type_ui == "Miasto" else "gmina"
+
+    defaults = _make_jst_defaults(jst_type, jst_name)
+    if st.button("Uzupełnij odmiany automatycznie", type="secondary"):
+        for c in JST_CASES:
+            st.session_state[f"jst_add_case_{c}"] = defaults.get(f"jst_name_{c}", "")
+        st.rerun()
+
+    with st.expander("Pokaż zaawansowane (odmiana) – opcjonalne", expanded=True):
+        forms = _jst_cases_editor(
+            "jst_add",
+            {c: defaults.get(f"jst_name_{c}", "") for c in JST_CASES},
+        )
+
+    slug, slug_free = _jst_url_editor("jst_add", jst_type, jst_name, study_id=None, current_slug="")
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    if st.button("Zapisz badanie", type="primary"):
+        if not jst_name:
+            st.error("Uzupełnij nazwę JST.")
+            return
+        if not slug:
+            st.error("Uzupełnij końcówkę linku.")
+            return
+        if not slug_free:
+            st.error("Wybrany link jest zajęty.")
+            return
+        if any(not (forms.get(c) or "").strip() for c in JST_CASES):
+            st.error("Uzupełnij odmiany nazwy JST (mianownik–wołacz).")
+            return
+        payload = _jst_payload_from_form(jst_type, jst_name, forms, slug)
+        try:
+            saved = insert_jst_study(sb, payload)
+            base = (st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
+            st.success(f"✅ Dodano badanie: {saved.get('jst_full_nom')} – {base}/{saved.get('slug')}")
+            for c in JST_CASES:
+                st.session_state.pop(f"jst_add_case_{c}", None)
+            st.session_state.pop("jst_add_slug", None)
+            st.session_state.pop("jst_add_allow_custom_slug", None)
+        except Exception as e:
+            st.error(f"Błąd zapisu: {e}")
+
+
+def jst_edit_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("✏️ Edytuj dane badania mieszkańców")
+    render_titlebar(["Panel", "Badania mieszkańców", "Edycja"])
+    back_button("home_jst")
+
+    studies = fetch_jst_studies(sb)
+    if not studies:
+        st.info("Brak badań JST w bazie.")
+        return
+    options = {_jst_option_label(s): s for s in studies}
+    choice = st.selectbox("Wybierz rekord", list(options.keys()), label_visibility="visible")
+    study = options[choice]
+    active_id = str(study.get("id") or "")
+    if st.session_state.get("jst_edit_loaded_id") != active_id:
+        st.session_state["jst_edit_loaded_id"] = active_id
+        for c in JST_CASES:
+            st.session_state[f"jst_edit_case_{c}"] = str(study.get(f"jst_name_{c}") or "")
+        st.session_state["jst_edit_slug"] = str(study.get("slug") or "")
+        st.session_state["jst_edit_allow_custom_slug"] = False
+
+    type_idx = 0 if str(study.get("jst_type") or "miasto").lower() == "miasto" else 1
+    c1, c2 = st.columns(2)
+    with c1:
+        jst_type_ui = st.radio("Typ JST", ["Miasto", "Gmina"], index=type_idx, horizontal=True)
+    with c2:
+        jst_name = st.text_input("Nazwa JST", value=str(study.get("jst_name") or ""), label_visibility="visible").strip()
+    jst_type = "miasto" if jst_type_ui == "Miasto" else "gmina"
+
+    defaults = {
+        c: str(study.get(f"jst_name_{c}") or "")
+        for c in JST_CASES
+    }
+    if st.button("Uzupełnij odmiany automatycznie", type="secondary"):
+        auto = _make_jst_defaults(jst_type, jst_name)
+        for c in JST_CASES:
+            st.session_state[f"jst_edit_case_{c}"] = auto.get(f"jst_name_{c}", "")
+        st.rerun()
+
+    with st.expander("Odmiana nazwy JST", expanded=True):
+        forms = _jst_cases_editor("jst_edit", defaults)
+
+    slug, slug_free = _jst_url_editor(
+        "jst_edit",
+        jst_type=jst_type,
+        jst_name=jst_name,
+        study_id=str(study.get("id")),
+        current_slug=str(study.get("slug") or ""),
+    )
+
+    left, right = st.columns(2)
+    with left:
+        if st.button("Zapisz zmiany", type="primary"):
+            if not jst_name:
+                st.error("Uzupełnij nazwę JST.")
+                return
+            if not slug:
+                st.error("Uzupełnij końcówkę linku.")
+                return
+            if not slug_free and slug != str(study.get("slug") or ""):
+                st.error("Wybrany link jest zajęty.")
+                return
+            if any(not (forms.get(c) or "").strip() for c in JST_CASES):
+                st.error("Uzupełnij odmiany nazwy JST (mianownik–wołacz).")
+                return
+            payload = _jst_payload_from_form(jst_type, jst_name, forms, slug)
+            try:
+                update_jst_study(sb, str(study["id"]), payload)
+                st.success("✅ Zapisano zmiany.")
+            except Exception as e:
+                st.error(f"Błąd zapisu: {e}")
+    with right:
+        if st.button("🗑️ Usuń badanie", type="secondary"):
+            st.session_state["jst_delete_confirm_id"] = str(study["id"])
+
+    if st.session_state.get("jst_delete_confirm_id") == str(study["id"]):
+        with modal("Czy na pewno usunąć to badanie?"):
+            st.warning("Tej operacji nie można cofnąć.")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Tak, usuń", type="primary"):
+                    try:
+                        soft_delete_jst_study(sb, str(study["id"]))
+                        st.session_state.pop("jst_delete_confirm_id", None)
+                        st.success("Badanie zostało usunięte.")
+                        goto("home_jst")
+                    except Exception as e:
+                        st.error(f"Błąd usuwania: {e}")
+            with c2:
+                if st.button("Anuluj", type="secondary"):
+                    st.session_state.pop("jst_delete_confirm_id", None)
+                    st.rerun()
+
+
+def jst_send_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("✉️ Wyślij link do ankiety")
+    render_titlebar(["Panel", "Badania mieszkańców", "Wyślij link"])
+    render_send_link_jst(lambda: back_button("home_jst"))
+
+
+def jst_io_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("💾 Import i eksport baz danych")
+    render_titlebar(["Panel", "Badania mieszkańców", "Import / eksport"])
+    back_button("home_jst")
+
+    studies = fetch_jst_studies(sb)
+    if not studies:
+        st.info("Brak badań JST w bazie.")
+        return
+
+    options = {_jst_option_label(s): s for s in studies}
+    chosen = st.selectbox("Wybierz badanie", list(options.keys()))
+    study = options[chosen]
+    study_id = str(study["id"])
+
+    st.markdown("### Import odpowiedzi (CSV / XLSX)")
+    uploaded = st.file_uploader("Wybierz plik", type=["csv", "xlsx"])
+    if st.button("Importuj dane", type="primary"):
+        if uploaded is None:
+            st.error("Wybierz plik do importu.")
+        else:
+            try:
+                if uploaded.name.lower().endswith(".xlsx"):
+                    src_df = pd.read_excel(uploaded)
+                else:
+                    src_df = pd.read_csv(uploaded, encoding="utf-8-sig")
+                if src_df.empty:
+                    st.warning("Plik nie zawiera rekordów.")
+                    return
+
+                existing_rows = list_jst_responses(sb, study_id)
+                existing_ids = {str(r.get("respondent_id") or "").strip() for r in existing_rows if str(r.get("respondent_id") or "").strip()}
+                next_id = _next_jst_respondent_id(existing_ids)
+                next_n = int(next_id[1:]) if len(next_id) > 1 and next_id[1:].isdigit() else (len(existing_ids) + 1)
+
+                inserted = 0
+                skipped = 0
+                for _, row in src_df.iterrows():
+                    raw = {k: row.get(k) for k in src_df.columns}
+                    rid = str(raw.get("respondent_id") or "").strip()
+                    if not rid:
+                        rid = f"R{next_n:04d}"
+                        next_n += 1
+                    norm = jst_normalize_response_row(raw, respondent_id_fallback=rid)
+                    if not norm.get("respondent_id"):
+                        norm["respondent_id"] = rid
+                    if norm["respondent_id"] in existing_ids:
+                        skipped += 1
+                        continue
+                    ok = insert_jst_response(
+                        sb,
+                        study_id=study_id,
+                        respondent_id=str(norm["respondent_id"]),
+                        payload=jst_make_payload_from_row(norm),
+                        source="import",
+                        skip_if_exists=True,
+                    )
+                    if ok:
+                        inserted += 1
+                        existing_ids.add(str(norm["respondent_id"]))
+                    else:
+                        skipped += 1
+
+                st.success(f"Import zakończony. Dodano: {inserted}, pominięto: {skipped}.")
+            except Exception as e:
+                st.error(f"Błąd importu: {e}")
+
+    st.markdown("---")
+    st.markdown("### Eksport odpowiedzi")
+    rows = list_jst_responses(sb, study_id)
+    if not rows:
+        st.info("Brak odpowiedzi do eksportu.")
+        return
+    out_df = jst_response_rows_to_dataframe(rows)
+    slug = str(study.get("slug") or "jst")
+    safe_name = slugify(str(study.get("jst_full_nom") or slug)) or slug
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            "Pobierz CSV",
+            data=out_df.to_csv(index=False, encoding="utf-8-sig"),
+            file_name=f"baza-odpowiedzi-{safe_name}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with c2:
+        st.download_button(
+            "Pobierz XLSX",
+            data=_xlsx_bytes_from_df(out_df, sheet_name="Odpowiedzi"),
+            file_name=f"baza-odpowiedzi-{safe_name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+    st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
+
+
+def jst_analysis_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("📊 Analiza badania mieszkańców")
+    render_titlebar(["Panel", "Badania mieszkańców", "Analiza"])
+    back_button("home_jst")
+
+    studies = fetch_jst_studies(sb)
+    if not studies:
+        st.info("Brak badań JST w bazie.")
+        return
+    options = {_jst_option_label(s): s for s in studies}
+    chosen = st.selectbox("Wybierz badanie", list(options.keys()))
+    study = options[chosen]
+    sid = str(study.get("id") or "")
+
+    rows = list_jst_responses(sb, sid)
+    if not rows:
+        st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
+        return
+
+    out_df = jst_response_rows_to_dataframe(rows)
+    template_root = Path(__file__).resolve().parent / "JST_Archetypy_Analiza"
+    run_base = template_root / "_runs"
+    cache_key = f"jst_report_html_{sid}"
+
+    c1, c2 = st.columns([0.35, 0.65], gap="small")
+    with c1:
+        generate_now = st.button("Generuj raport", type="primary", use_container_width=True)
+    with c2:
+        regenerate_now = st.button("Przelicz od nowa", type="secondary", use_container_width=True)
+
+    if generate_now or regenerate_now or cache_key not in st.session_state:
+        with st.spinner("Generujemy raport dla tego badania. Prosimy o chwilę cierpliwości."):
+            try:
+                report_path = generate_jst_report(
+                    template_root=template_root,
+                    run_base_dir=run_base,
+                    study=study,
+                    data_df=out_df[JST_CANONICAL_COLUMNS].copy(),
+                    force=bool(regenerate_now),
+                )
+                raw_html = report_path.read_text(encoding="utf-8", errors="ignore")
+                inlined = inline_local_assets(raw_html, report_path.parent)
+                st.session_state[cache_key] = inlined
+                st.success("Raport gotowy.")
+            except Exception as e:
+                st.error(f"Nie udało się wygenerować raportu: {e}")
+                return
+
+    rendered = st.session_state.get(cache_key)
+    if rendered:
+        html_component(rendered, height=1800, scrolling=True)
+
+
+def _load_personal_profile_pct(study_id: str) -> Tuple[Dict[str, float], int]:
+    try:
+        import admin_dashboard as AD
+    except Exception:
+        return {}, 0
+
+    try:
+        df = AD.load(study_id=study_id)
+    except Exception:
+        return {}, 0
+    if df is None or len(df) == 0:
+        return {}, 0
+
+    sums = {a: 0.0 for a in JST_ARCHETYPES}
+    n = 0
+    for ans in df.get("answers", []):
+        scores = AD.archetype_scores(ans)
+        if not isinstance(scores, dict):
+            continue
+        n += 1
+        for a in JST_ARCHETYPES:
+            val = scores.get(a)
+            if val is None:
+                continue
+            sums[a] += float(val)
+    if n <= 0:
+        return {}, 0
+    pct = {a: round((sums[a] / n) / 20.0 * 100.0, 2) for a in JST_ARCHETYPES}
+    return pct, n
+
+
+def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, float], List[Dict[str, Any]]]:
+    if not rows:
+        return {}, []
+    totals = {a: 0.0 for a in JST_ARCHETYPES}
+    respondent_vectors: List[Dict[str, Any]] = []
+    for rec in rows:
+        payload = rec.get("payload") or {}
+        if not isinstance(payload, dict):
+            payload = {}
+        vec = {a: 0.0 for a in JST_ARCHETYPES}
+        b2 = str(payload.get("B2") or "").strip()
+        if b2 in vec:
+            vec[b2] += 0.5
+        selected_b1 = [a for a in JST_ARCHETYPES if str(payload.get(f"B1_{a}") or "") in {"1", "1.0", "True", "true"}]
+        if selected_b1:
+            bonus = 0.3 / float(len(selected_b1))
+            for a in selected_b1:
+                vec[a] += bonus
+        d13 = str(payload.get("D13") or "").strip()
+        if d13 in vec:
+            vec[d13] += 0.2
+
+        for a in JST_ARCHETYPES:
+            totals[a] += vec[a]
+        respondent_vectors.append({"payload": payload, "vec": vec})
+
+    n = float(len(rows))
+    profile = {a: round((totals[a] / n) * 100.0, 2) for a in JST_ARCHETYPES}
+    return profile, respondent_vectors
+
+
+def _dot(a: Dict[str, float], b: Dict[str, float]) -> float:
+    return float(sum(float(a.get(k, 0.0)) * float(b.get(k, 0.0)) for k in JST_ARCHETYPES))
+
+
+def _norm(a: Dict[str, float]) -> float:
+    return float(sum(float(a.get(k, 0.0)) ** 2 for k in JST_ARCHETYPES)) ** 0.5
+
+
+def matching_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("🧭 Matching")
+    render_titlebar(["Panel", "Matching"])
+    if st.button("← Powrót do wyboru modułu", type="secondary"):
+        goto("home_root")
+
+    personal_studies = fetch_studies(sb)
+    jst_studies = fetch_jst_studies(sb)
+    if not personal_studies:
+        st.info("Brak badań personalnych.")
+        return
+    if not jst_studies:
+        st.info("Brak badań mieszkańców.")
+        return
+
+    p_options = {
+        f"{(s.get('last_name_nom') or s.get('last_name') or '')} {(s.get('first_name_nom') or s.get('first_name') or '')} ({s.get('city') or ''}) – /{s.get('slug') or ''}": s
+        for s in personal_studies
+    }
+    j_options = {_jst_option_label(s): s for s in jst_studies}
+
+    tab_pick, tab_summary, tab_demo, tab_strategy = st.tabs(["Wybierz badania", "Podsumowanie", "Demografia", "Strategia komunikacji"])
+
+    with tab_pick:
+        pick_personal = st.selectbox("Badanie personalne", list(p_options.keys()))
+        pick_jst = st.selectbox("Badanie mieszkańców", list(j_options.keys()))
+        if st.button("Połącz i policz matching", type="primary"):
+            person = p_options[pick_personal]
+            jst_study = j_options[pick_jst]
+
+            p_profile, p_n = _load_personal_profile_pct(str(person.get("id")))
+            j_rows = list_jst_responses(sb, str(jst_study.get("id")))
+            j_profile, respondent_vectors = _calc_jst_target_profile(j_rows)
+
+            if not p_profile:
+                st.error("Nie udało się policzyć profilu personalnego (brak odpowiedzi).")
+                return
+            if not j_profile:
+                st.error("Nie udało się policzyć profilu mieszkańców (brak odpowiedzi).")
+                return
+
+            diffs = {a: abs(float(p_profile.get(a, 0.0)) - float(j_profile.get(a, 0.0))) for a in JST_ARCHETYPES}
+            mae = float(sum(diffs.values()) / len(JST_ARCHETYPES))
+            match_score = max(0.0, min(100.0, 100.0 - mae))
+
+            strengths = sorted(JST_ARCHETYPES, key=lambda a: diffs[a])[:3]
+            gaps = sorted(JST_ARCHETYPES, key=lambda a: diffs[a], reverse=True)[:3]
+
+            unit_person = {a: float(p_profile.get(a, 0.0)) for a in JST_ARCHETYPES}
+            top_sim_rows = []
+            base_norm = _norm(unit_person) or 1.0
+            for rec in respondent_vectors:
+                vec = {a: float(rec["vec"].get(a, 0.0)) * 100.0 for a in JST_ARCHETYPES}
+                sim = _dot(unit_person, vec) / (base_norm * (_norm(vec) or 1.0))
+                top_sim_rows.append({"sim": sim, "payload": rec.get("payload") or {}})
+            top_sim_rows.sort(key=lambda x: x["sim"], reverse=True)
+            take_n = max(1, int(len(top_sim_rows) * 0.25))
+            subset = top_sim_rows[:take_n]
+
+            def _dist(field: str) -> Dict[str, int]:
+                out: Dict[str, int] = {}
+                for r in subset:
+                    v = str((r.get("payload") or {}).get(field) or "brak")
+                    out[v] = int(out.get(v, 0)) + 1
+                return dict(sorted(out.items(), key=lambda kv: kv[1], reverse=True))
+
+            demo_dist = {
+                "Płeć": _dist("M_PLEC"),
+                "Wiek": _dist("M_WIEK"),
+                "Wykształcenie": _dist("M_WYKSZT"),
+                "Status zawodowy": _dist("M_ZAWOD"),
+                "Sytuacja materialna": _dist("M_MATERIAL"),
+            }
+
+            st.session_state["matching_result"] = {
+                "person_label": pick_personal,
+                "jst_label": pick_jst,
+                "match_score": round(match_score, 1),
+                "personal_n": p_n,
+                "jst_n": len(j_rows),
+                "personal_profile": p_profile,
+                "jst_profile": j_profile,
+                "strengths": strengths,
+                "gaps": gaps,
+                "demo_dist": demo_dist,
+            }
+            st.success("Wynik dopasowania został obliczony.")
+
+    result = st.session_state.get("matching_result")
+    if not result:
+        with tab_summary:
+            st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
+        with tab_demo:
+            st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
+        with tab_strategy:
+            st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
+        return
+
+    with tab_summary:
+        st.markdown(f"**Badanie personalne:** {result['person_label']}")
+        st.markdown(f"**Badanie mieszkańców:** {result['jst_label']}")
+        st.progress(min(100, max(0, int(round(result["match_score"])))))
+        st.metric("Poziom dopasowania", f"{result['match_score']}%")
+        st.caption(f"Próba personalna: {result['personal_n']} odpowiedzi · Próba mieszkańców: {result['jst_n']} odpowiedzi")
+
+        df_cmp = pd.DataFrame(
+            [
+                {
+                    "Archetyp": a,
+                    "Profil polityka (%)": round(float(result["personal_profile"].get(a, 0.0)), 2),
+                    "Oczekiwania mieszkańców (%)": round(float(result["jst_profile"].get(a, 0.0)), 2),
+                    "Różnica |Δ|": round(abs(float(result["personal_profile"].get(a, 0.0)) - float(result["jst_profile"].get(a, 0.0))), 2),
+                }
+                for a in JST_ARCHETYPES
+            ]
+        ).sort_values("Różnica |Δ|", ascending=True)
+        st.dataframe(df_cmp, use_container_width=True, hide_index=True)
+        st.markdown(f"**Najlepsze dopasowanie:** {', '.join(result['strengths'])}")
+        st.markdown(f"**Największe luki:** {', '.join(result['gaps'])}")
+
+    with tab_demo:
+        st.markdown("Demografia respondentów najbardziej zbliżonych profilem do wybranego polityka (górne 25% podobieństwa):")
+        for title, dist in result["demo_dist"].items():
+            st.markdown(f"**{title}**")
+            if not dist:
+                st.caption("Brak danych.")
+                continue
+            ddf = pd.DataFrame([{"Kategoria": k, "Liczba": v} for k, v in dist.items()])
+            st.dataframe(ddf, use_container_width=True, hide_index=True)
+
+    with tab_strategy:
+        st.markdown("**Rekomendacje komunikacyjne (automatyczne):**")
+        strengths = result["strengths"]
+        gaps = result["gaps"]
+        st.markdown(f"1. W komunikacji wzmacniaj osie: **{strengths[0]}**, **{strengths[1]}**, **{strengths[2]}** – to naturalne pola dopasowania.")
+        st.markdown(f"2. Opracuj osobne narracje dla luk: **{gaps[0]}**, **{gaps[1]}**, **{gaps[2]}** (krótkie, konkretne obietnice + dowód wykonania).")
+        st.markdown("3. Dla grup najlepiej dopasowanych demograficznie przygotuj dedykowane komunikaty i testuj je w kampaniach SMS/e-mail.")
 
 def add_view() -> None:
     require_auth()
@@ -1023,7 +1965,7 @@ def edit_view() -> None:
                         }).eq("id", study["id"]).execute()
                         st.session_state["show_del_modal"] = False
                         st.success("Badanie oznaczone jako usunięte.");
-                        goto("home")
+                        goto("home_personal")
                     except Exception as e:
                         st.error(f"Nie udało się usunąć: {e}")
             with c[1]:
@@ -1158,8 +2100,16 @@ def _render_public_gate(token: str) -> bool:
         }
         /* mobile-only: poprawa czytelności formularza odblokowania na iPhone */
         @media (max-width: 900px){
+          .public-unlock-note{
+            font-size:1.04rem;
+            color:#334155;
+          }
           div[data-testid="stForm"]{
             background: transparent !important;
+          }
+          div[data-testid="stForm"] label{
+            color:#334155 !important;
+            font-weight:600 !important;
           }
           div[data-testid="stForm"] [data-baseweb="input"]{
             background:#ffffff !important;
@@ -1175,6 +2125,27 @@ def _render_public_gate(token: str) -> bool:
           div[data-testid="stForm"] input::placeholder{
             color:#64748b !important;
             opacity:1 !important;
+          }
+        }
+        @media (prefers-color-scheme: dark){
+          .public-unlock-note{
+            color:#d9e4f0 !important;
+          }
+          div[data-testid="stForm"] label{
+            color:#d9e4f0 !important;
+          }
+          div[data-testid="stForm"] [data-baseweb="input"]{
+            background:#111b2a !important;
+            border:1px solid #334155 !important;
+          }
+          div[data-testid="stForm"] input{
+            background:#111b2a !important;
+            color:#e2e8f0 !important;
+            -webkit-text-fill-color:#e2e8f0 !important;
+            caret-color:#e2e8f0 !important;
+          }
+          div[data-testid="stForm"] input::placeholder{
+            color:#9fb0c4 !important;
           }
         }
         div[data-testid="stForm"] button[kind="primaryFormSubmit"]{
@@ -1251,6 +2222,7 @@ def public_report_view(token: str) -> None:
         "<style>.block-container{max-width:98vw !important;padding-left:1.2rem !important;padding-right:1.2rem !important;}</style>",
         unsafe_allow_html=True,
     )
+    _inject_report_dark_fix_css()
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     try:
         import admin_dashboard as AD
@@ -1383,6 +2355,7 @@ def results_view() -> None:
 
     # ⬇️ PRZENIESIONA LINIA — TERAZ POD SELECTEM
     st.markdown('<hr class="hr-thin">', unsafe_allow_html=True)
+    _inject_report_dark_fix_css()
 
     try:
         import admin_dashboard as AD
@@ -1672,7 +2645,8 @@ def send_link_view() -> None:
     render_send_link(back_button)
 
 # ───────────────────────── routing ─────────────────────────
-if "view" not in st.session_state: st.session_state["view"] = "login"
+if "view" not in st.session_state:
+    st.session_state["view"] = "login"
 render_build_badge()
 with st.sidebar:
     if logged_in():
@@ -1683,10 +2657,33 @@ if public_token:
     public_report_view(public_token)
 else:
     view = st.session_state["view"]
-    if view=="login": login_view()
-    elif view=="home": home_view()
-    elif view=="add": add_view()
-    elif view=="edit": edit_view()
-    elif view=="results": results_view()
-    elif view=="send": send_link_view()
-    else: home_view()
+    if view == "login":
+        login_view()
+    elif view == "home_root":
+        home_root_view()
+    elif view == "home_personal":
+        home_personal_view()
+    elif view == "home_jst":
+        home_jst_view()
+    elif view == "matching":
+        matching_view()
+    elif view == "add":
+        add_view()
+    elif view == "edit":
+        edit_view()
+    elif view == "results":
+        results_view()
+    elif view == "send":
+        send_link_view()
+    elif view == "jst_add":
+        jst_add_view()
+    elif view == "jst_edit":
+        jst_edit_view()
+    elif view == "jst_send":
+        jst_send_view()
+    elif view == "jst_io":
+        jst_io_view()
+    elif view == "jst_analysis":
+        jst_analysis_view()
+    else:
+        home_root_view()
