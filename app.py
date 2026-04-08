@@ -271,7 +271,8 @@ st.markdown(
 .tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:22px; margin:8px 0 18px 0; }
 @media (max-width:1100px){ .tiles{ grid-template-columns:repeat(2,1fr); } }
 @media (max-width:640px){ .tiles{ grid-template-columns:1fr; } }
-.tiles .stButton>button{
+.tiles .stButton>button,
+.stButton>button.tile-btn{
   width:100%;
   height:148px;
   background:#fff !important;
@@ -287,14 +288,16 @@ st.markdown(
   white-space:pre-line;
   transition:transform .12s ease, box-shadow .16s ease, border-color .16s ease;
 }
-.tiles .stButton>button:hover{
+.tiles .stButton>button:hover,
+.stButton>button.tile-btn:hover{
   border-color:#D1D9E4 !important;
   transform:translateY(-3px);
   box-shadow:0 10px 28px rgba(15,23,42,.08);
 }
 .tiles.tiles-root .stButton>button,
 .tiles.tiles-home-personal .stButton>button,
-.tiles.tiles-home-jst .stButton>button{
+.tiles.tiles-home-jst .stButton>button,
+.stButton>button.tile-btn{
   min-height:172px !important;
   font-size:1.08rem !important;
   line-height:1.35 !important;
@@ -477,6 +480,23 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
   border-color:#b8c4d6 !important;
 }
 </style>
+""",
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+<script>
+setTimeout(() => {
+  const buttons = window.parent.document.querySelectorAll('.stButton > button');
+  buttons.forEach((btn) => {
+    const txt = (btn.innerText || '').trim();
+    const lineCount = txt ? txt.split('\\n').filter(Boolean).length : 0;
+    if (lineCount >= 2) btn.classList.add('tile-btn');
+    else btn.classList.remove('tile-btn');
+  });
+}, 0);
+</script>
 """,
     unsafe_allow_html=True,
 )
@@ -1226,13 +1246,13 @@ def home_root_view() -> None:
     st.markdown('<div class="tiles tiles-root">', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("🧑‍💼\n\nBadania personalne", type="secondary"):
+        if st.button("🧑‍💼\n\nBadania personalne\nProfil, wysyłka i raporty.", type="secondary"):
             goto("home_personal")
     with c2:
-        if st.button("🏘️\n\nBadania mieszkańców", type="secondary"):
+        if st.button("🏘️\n\nBadania mieszkańców\nBazy, ankieta i analiza.", type="secondary"):
             goto("home_jst")
     with c3:
-        if st.button("🧭\n\nMatching", type="secondary"):
+        if st.button("🧭\n\nMatching\nPorównanie profili.", type="secondary"):
             goto("matching")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1724,6 +1744,13 @@ def jst_analysis_view() -> None:
     header("📊 Analiza badania mieszkańców")
     render_titlebar(["Panel", "Badania mieszkańców", "Analiza"])
     back_button("home_jst")
+    if "wide_jst_report" not in st.session_state:
+        st.session_state["wide_jst_report"] = True
+    wide_jst = st.toggle("🔎 Szeroki raport", key="wide_jst_report")
+    st.markdown(
+        f"<style>.block-container{{max-width:{'100vw' if wide_jst else '1160px'} !important}}</style>",
+        unsafe_allow_html=True,
+    )
 
     studies = fetch_jst_studies(sb)
     if not studies:
@@ -1743,6 +1770,7 @@ def jst_analysis_view() -> None:
     template_root = Path(__file__).resolve().parent / "JST_Archetypy_Analiza"
     run_base = template_root / "_runs"
     cache_key = f"jst_report_html_{sid}"
+    cache_meta_key = f"jst_report_meta_{sid}"
 
     c1, c2 = st.columns([0.35, 0.65], gap="small")
     with c1:
@@ -1762,15 +1790,40 @@ def jst_analysis_view() -> None:
                 )
                 raw_html = report_path.read_text(encoding="utf-8", errors="ignore")
                 inlined = inline_local_assets(raw_html, report_path.parent)
-                st.session_state[cache_key] = inlined
+                inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 10_000_000) or 10_000_000)
+                inlined_bytes = len(inlined.encode("utf-8", errors="ignore"))
+                use_inlined = inlined_bytes <= inline_limit
+                st.session_state[cache_key] = inlined if use_inlined else raw_html
+                st.session_state[cache_meta_key] = {
+                    "report_path": str(report_path),
+                    "raw_bytes": len(raw_html.encode("utf-8", errors="ignore")),
+                    "inlined_bytes": inlined_bytes,
+                    "inlined_used": use_inlined,
+                }
                 st.success("Raport gotowy.")
             except Exception as e:
                 st.error(f"Nie udało się wygenerować raportu: {e}")
                 return
 
     rendered = st.session_state.get(cache_key)
+    meta = st.session_state.get(cache_meta_key) or {}
+    report_path_str = str(meta.get("report_path") or "")
+    report_path = Path(report_path_str) if report_path_str else None
+
+    if report_path and report_path.exists():
+        report_slug = slugify(str(study.get("jst_full_nom") or study.get("slug") or "raport-jst")) or "raport-jst"
+        st.download_button(
+            "📥 Pobierz raport HTML",
+            data=report_path.read_text(encoding="utf-8", errors="ignore"),
+            file_name=f"{report_slug}.html",
+            mime="text/html",
+            use_container_width=False,
+        )
+
+    if rendered and not bool(meta.get("inlined_used", True)):
+        st.info("Raport jest bardzo duży, dlatego użyliśmy lekkiego trybu renderowania, aby uniknąć zawieszeń widoku.")
     if rendered:
-        html_component(rendered, height=1800, scrolling=True)
+        html_component(rendered, height=2200 if wide_jst else 1800, scrolling=True)
 
 
 def _load_personal_profile_pct(study_id: str) -> Tuple[Dict[str, float], int]:

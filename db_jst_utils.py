@@ -281,8 +281,232 @@ def ensure_jst_schema() -> None:
     END;
     $func$;
 
+    CREATE TABLE IF NOT EXISTS public.jst_sms_messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      study_id TEXT NOT NULL REFERENCES public.jst_studies(id) ON DELETE CASCADE,
+      phone TEXT NOT NULL,
+      body TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'queued',
+      provider_message_id TEXT NULL,
+      error_text TEXT NULL,
+      clicked_at TIMESTAMPTZ NULL,
+      started_at TIMESTAMPTZ NULL,
+      completed_at TIMESTAMPTZ NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+    CREATE INDEX IF NOT EXISTS idx_jst_sms_messages_study ON public.jst_sms_messages(study_id);
+    CREATE INDEX IF NOT EXISTS idx_jst_sms_messages_created ON public.jst_sms_messages(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_jst_sms_messages_token ON public.jst_sms_messages(token);
+
+    CREATE TABLE IF NOT EXISTS public.jst_email_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      study_id TEXT NOT NULL REFERENCES public.jst_studies(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      text TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'queued',
+      provider_message_id TEXT NULL,
+      error_text TEXT NULL,
+      clicked_at TIMESTAMPTZ NULL,
+      started_at TIMESTAMPTZ NULL,
+      completed_at TIMESTAMPTZ NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+    CREATE INDEX IF NOT EXISTS idx_jst_email_logs_study ON public.jst_email_logs(study_id);
+    CREATE INDEX IF NOT EXISTS idx_jst_email_logs_created ON public.jst_email_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_jst_email_logs_token ON public.jst_email_logs(token);
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_sms_clicked(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_sms_messages
+      SET clicked_at = COALESCE(clicked_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_sms_started(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_sms_messages
+      SET started_at = COALESCE(started_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_sms_completed(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_sms_messages
+      SET completed_at = COALESCE(completed_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_email_clicked(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_email_logs
+      SET clicked_at = COALESCE(clicked_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_email_started(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_email_logs
+      SET started_at = COALESCE(started_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_email_completed(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_email_logs
+      SET completed_at = COALESCE(completed_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_token_started(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      PERFORM public.mark_jst_sms_started(p_token);
+      PERFORM public.mark_jst_email_started(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_token_completed(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      PERFORM public.mark_jst_sms_completed(p_token);
+      PERFORM public.mark_jst_email_completed(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.is_jst_token_completed(p_token text)
+    RETURNS boolean
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    DECLARE
+      v_token text := trim(coalesce(p_token, ''));
+      v_done boolean := false;
+    BEGIN
+      IF v_token = '' THEN
+        RETURN false;
+      END IF;
+
+      SELECT
+        EXISTS(
+          SELECT 1
+          FROM public.jst_sms_messages
+          WHERE token = v_token AND completed_at IS NOT NULL
+        )
+        OR
+        EXISTS(
+          SELECT 1
+          FROM public.jst_email_logs
+          WHERE token = v_token AND completed_at IS NOT NULL
+        )
+      INTO v_done;
+
+      RETURN COALESCE(v_done, false);
+    END;
+    $func$;
+
     GRANT EXECUTE ON FUNCTION public.get_jst_study_public(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.add_jst_response_by_slug(text, jsonb, text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_sms_clicked(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_sms_started(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_sms_completed(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_email_clicked(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_email_started(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_email_completed(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_token_started(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_token_completed(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.is_jst_token_completed(text) TO anon, authenticated;
     """
     with _db_connect() as conn:
         with conn.cursor() as cur:
@@ -354,14 +578,7 @@ def check_jst_slug_availability(sb: Client, slug: str, exclude_id: Optional[str]
     s = (slug or "").strip()
     if not s:
         return False
-    q = (
-        sb.table("jst_studies")
-        .select("id")
-        .eq("slug", s)
-        .or_("is_active.is.true,is_active.is.null")
-        .is_("deleted_at", "null")
-        .limit(1)
-    )
+    q = sb.table("jst_studies").select("id").eq("slug", s).limit(1)
     if exclude_id:
         q = q.neq("id", str(exclude_id))
     res = q.execute()

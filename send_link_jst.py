@@ -11,8 +11,6 @@ from streamlit import column_config as cc
 
 from db_utils import get_supabase
 from db_jst_utils import fetch_jst_studies
-from db_sms import create_sms_record, mark_sms_sent, list_sms_for_study, DuplicateTokenError as DuplicateSmsTokenError
-from db_email import create_email_record, mark_email_sent, list_email_for_study, DuplicateTokenError as DuplicateEmailTokenError
 from smsapi_client import send_sms
 from email_client import send_email
 from utils import make_token
@@ -20,6 +18,105 @@ from send_link import _df_to_xlsx_bytes, _df_to_pdf_bytes
 
 
 _EMAIL_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.I)
+
+class DuplicateJstTokenError(Exception):
+    pass
+
+
+def _is_unique_violation(err: Exception) -> bool:
+    msg = (getattr(err, "message", "") or str(err) or "").lower()
+    return (
+        "23505" in msg
+        or "unique" in msg
+        or "duplicate" in msg
+        or "conflict" in msg
+        or "409" in msg
+    )
+
+
+def _create_jst_sms_record(sb, study_id: str, phone: str, text: str, token: str) -> Dict[str, Any]:
+    try:
+        ins = (
+            sb.table("jst_sms_messages")
+            .insert(
+                {
+                    "study_id": study_id,
+                    "phone": phone,
+                    "body": text,
+                    "token": token,
+                    "status": "queued",
+                }
+            )
+            .execute()
+        )
+    except Exception as e:
+        if _is_unique_violation(e):
+            raise DuplicateJstTokenError("Token already exists") from e
+        raise
+
+    if ins.data:
+        return ins.data[0]
+    raise RuntimeError("Nie udało się zapisać rekordu jst_sms_messages.")
+
+
+def _mark_jst_sms_sent(sb, sms_id: str, provider_message_id: str) -> None:
+    sb.table("jst_sms_messages").update(
+        {"status": "sent", "provider_message_id": provider_message_id, "updated_at": pd.Timestamp.utcnow().isoformat()}
+    ).eq("id", sms_id).execute()
+
+
+def _list_jst_sms_for_study(sb, study_id: str) -> List[Dict[str, Any]]:
+    res = (
+        sb.table("jst_sms_messages")
+        .select("*")
+        .eq("study_id", study_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return res.data or []
+
+
+def _create_jst_email_record(sb, study_id: str, email: str, subject: str, text: str, token: str) -> Dict[str, Any]:
+    try:
+        ins = (
+            sb.table("jst_email_logs")
+            .insert(
+                {
+                    "study_id": study_id,
+                    "email": email,
+                    "subject": subject,
+                    "text": text,
+                    "token": token,
+                    "status": "queued",
+                }
+            )
+            .execute()
+        )
+    except Exception as e:
+        if _is_unique_violation(e):
+            raise DuplicateJstTokenError("Token already exists") from e
+        raise
+
+    if ins.data:
+        return ins.data[0]
+    raise RuntimeError("Nie udało się zapisać rekordu jst_email_logs.")
+
+
+def _mark_jst_email_sent(sb, email_id: str, provider_message_id: str) -> None:
+    sb.table("jst_email_logs").update(
+        {"status": "sent", "provider_message_id": provider_message_id, "updated_at": pd.Timestamp.utcnow().isoformat()}
+    ).eq("id", email_id).execute()
+
+
+def _list_jst_email_for_study(sb, study_id: str) -> List[Dict[str, Any]]:
+    res = (
+        sb.table("jst_email_logs")
+        .select("*")
+        .eq("study_id", study_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return res.data or []
 
 
 def _normalize_recipients(raw: str, mode: str) -> List[str]:
@@ -142,7 +239,7 @@ def _fmt_dt(val: Optional[str]) -> str:
 
 
 def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
-    rows = (list_sms_for_study if mode == "sms" else list_email_for_study)(sb, study_id) or []
+    rows = (_list_jst_sms_for_study if mode == "sms" else _list_jst_email_for_study)(sb, study_id) or []
 
     def _dur_str(click_iso, done_iso) -> str:
         try:
@@ -317,6 +414,9 @@ def render(back_btn: Callable[[], None]) -> None:
     if st.session_state.get("jst_send_method") != method:
         st.session_state["jst_send_method"] = method
         st.session_state["jst_send_body"] = default_sms if method == "SMS" else default_email
+    reset_to_key = "jst_send_body_reset_to"
+    if reset_to_key in st.session_state:
+        st.session_state["jst_send_body"] = st.session_state.pop(reset_to_key)
 
     if method == "E-mail":
         subj_key = "jst_send_subject"
@@ -344,7 +444,7 @@ def render(back_btn: Callable[[], None]) -> None:
         st.markdown('<div class="btn-stack">', unsafe_allow_html=True)
         st.markdown('<div class="btn-reset">', unsafe_allow_html=True)
         if st.button("Przywróć domyślną treść", key="jst_send_reset"):
-            st.session_state["jst_send_body"] = default_sms if method == "SMS" else default_email
+            st.session_state[reset_to_key] = default_sms if method == "SMS" else default_email
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown('<div class="btn-send">', unsafe_allow_html=True)
@@ -381,9 +481,9 @@ def render(back_btn: Callable[[], None]) -> None:
                 msg = body_tpl.replace(link_preview, final_link)
                 for _ in range(5):
                     try:
-                        rec = create_sms_record(sb, study_id=study["id"], phone=phone, text=msg, token=token)
+                        rec = _create_jst_sms_record(sb, study_id=study["id"], phone=phone, text=msg, token=token)
                         break
-                    except DuplicateSmsTokenError:
+                    except DuplicateJstTokenError:
                         token = make_token(8)
                         final_link = _build_link(base, slug, token)
                         msg = body_tpl.replace(link_preview, final_link)
@@ -392,7 +492,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     continue
                 ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=msg, sender=sender)
                 if ok:
-                    mark_sms_sent(sb, sms_id=rec["id"], provider_message_id=provider_id or "")
+                    _mark_jst_sms_sent(sb, sms_id=rec["id"], provider_message_id=provider_id or "")
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano SMS do {phone}: {err or 'unknown error'}")
@@ -407,9 +507,16 @@ def render(back_btn: Callable[[], None]) -> None:
                 msg = body_tpl.replace(link_preview, final_link)
                 for _ in range(5):
                     try:
-                        rec = create_email_record(sb, study_id=study["id"], email=email, subject=subject, text=msg, token=token)
+                        rec = _create_jst_email_record(
+                            sb,
+                            study_id=study["id"],
+                            email=email,
+                            subject=subject,
+                            text=msg,
+                            token=token,
+                        )
                         break
-                    except DuplicateEmailTokenError:
+                    except DuplicateJstTokenError:
                         token = make_token(8)
                         final_link = _build_link(base, slug, token)
                         msg = body_tpl.replace(link_preview, final_link)
@@ -429,7 +536,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     text=msg,
                 )
                 if ok:
-                    mark_email_sent(sb, email_id=rec["id"], provider_message_id=provider_mid or "")
+                    _mark_jst_email_sent(sb, email_id=rec["id"], provider_message_id=provider_mid or "")
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano e-maila do {email}: {err or 'unknown error'}")
