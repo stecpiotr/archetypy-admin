@@ -58,13 +58,59 @@ def _font_available(name: str) -> bool:
         return False
 
 
+def _candidate_font_files() -> List[Path]:
+    here = Path(__file__).resolve().parent
+    rel_candidates = [
+        Path("assets/fonts/segoeui.ttf"),
+        Path("assets/fonts/segoeuib.ttf"),
+        Path("assets/fonts/ArialNova.ttf"),
+        Path("assets/fonts/ArialNova-Bold.ttf"),
+        Path("assets/fonts/DejaVuSans.ttf"),
+        Path("assets/DejaVuSans.ttf"),
+    ]
+    out: List[Path] = []
+    seen: set[str] = set()
+    for base in [here, *list(here.parents)]:
+        for rel in rel_candidates:
+            p = (base / rel).resolve()
+            key = str(p).lower()
+            if key in seen or (not p.exists()) or (not p.is_file()):
+                continue
+            seen.add(key)
+            out.append(p)
+    return out
+
+
+def _register_font(path: Path) -> str:
+    try:
+        fm.fontManager.addfont(str(path))
+        return str(fm.FontProperties(fname=str(path)).get_name() or "").strip()
+    except Exception:
+        return ""
+
+
+def _pick_base_font() -> str:
+    # Priorytet 1: fonty dostarczone razem z repo (spójny wygląd między środowiskami).
+    # Priorytet 2: fonty systemowe.
+    loaded_names: List[str] = []
+    for font_path in _candidate_font_files():
+        nm = _register_font(font_path)
+        if nm and nm not in loaded_names:
+            loaded_names.append(nm)
+    for nm in loaded_names + ["Segoe UI", "Calibri", "Arial", "DejaVu Sans"]:
+        if _font_available(nm):
+            return nm
+    return "DejaVu Sans"
+
+
 def set_global_fonts() -> None:
-    # Wybierz pierwszy dostępny font (bez spamowania warningami)
-    candidates = ["Segoe UI", "Calibri", "Arial", "DejaVu Sans"]
-    base_font = next((f for f in candidates if _font_available(f)), "DejaVu Sans")
+    # Wybierz deterministycznie font bazowy (repo -> system), żeby raporty były
+    # wizualnie spójne także po wygenerowaniu na innym serwerze.
+    base_font = _pick_base_font()
 
     matplotlib.rcParams.update({
         "font.family": [base_font],
+        "font.sans-serif": [base_font, "Segoe UI", "Calibri", "Arial", "DejaVu Sans"],
 
         # spójna typografia (jedna „rodzina” dla wszystkich PNG)
         "font.size": 10,

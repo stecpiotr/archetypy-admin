@@ -1950,6 +1950,7 @@ def jst_io_view() -> None:
             file_name=f"baza-odpowiedzi-{safe_name}.csv",
             mime="text/csv",
             use_container_width=True,
+            on_click="ignore",
         )
     with c2:
         st.download_button(
@@ -1958,6 +1959,7 @@ def jst_io_view() -> None:
             file_name=f"baza-odpowiedzi-{safe_name}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
+            on_click="ignore",
         )
 
     st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
@@ -2019,6 +2021,15 @@ html, body {
     if re.search(r"</body\s*>", html_text, flags=re.IGNORECASE):
         return re.sub(r"</body\s*>", autosize_js + "</body>", html_text, flags=re.IGNORECASE, count=1)
     return html_text + autosize_js
+
+
+def _fmt_bytes_compact(size_bytes: int) -> str:
+    n = max(0, int(size_bytes or 0))
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 * 1024:
+        return f"{n / 1024.0:.1f} KB"
+    return f"{n / (1024.0 * 1024.0):.1f} MB"
 
 
 _SEGMENT_HIT_THRESHOLD_DEFAULTS: Dict[str, float] = {
@@ -2125,9 +2136,14 @@ def jst_analysis_view() -> None:
     run_base = template_root / "_runs"
     cache_key = f"jst_report_html_v2_{sid}"
     cache_meta_key = f"jst_report_meta_v2_{sid}"
+    preview_inline_key = f"jst_report_inline_preview_v1_{sid}"
+    preview_inline_meta_key = f"jst_report_inline_preview_meta_v1_{sid}"
     inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 45_000_000) or 45_000_000)
     inline_source_limit = int(st.secrets.get("JST_REPORT_INLINE_SOURCE_LIMIT_BYTES", 70_000_000) or 70_000_000)
     safe_message_limit = int(st.secrets.get("JST_REPORT_SAFE_MESSAGE_LIMIT_BYTES", 185_000_000) or 185_000_000)
+    standalone_html_limit = int(
+        st.secrets.get("JST_REPORT_STANDALONE_HTML_LIMIT_BYTES", 85_000_000) or 85_000_000
+    )
 
     c1, c2 = st.columns([0.35, 0.65], gap="small")
     with c1:
@@ -2231,7 +2247,10 @@ def jst_analysis_view() -> None:
                     "inline_limit": inline_limit,
                     "inline_source_limit": inline_source_limit,
                     "safe_message_limit": safe_message_limit,
+                    "standalone_html_limit": standalone_html_limit,
                 }
+                st.session_state.pop(preview_inline_key, None)
+                st.session_state.pop(preview_inline_meta_key, None)
                 st.success("Raport gotowy.")
             except Exception as e:
                 st.error(f"Nie udało się wygenerować raportu: {e}")
@@ -2253,24 +2272,50 @@ def jst_analysis_view() -> None:
     inlined_bytes = int(meta.get("inlined_bytes") or 0)
     inlined_used = bool(meta.get("inlined_used"))
     safe_limit = int(meta.get("safe_message_limit") or safe_message_limit)
+    standalone_limit = int(meta.get("standalone_html_limit") or standalone_html_limit)
+    raw_report_for_preview = ""
 
     if report_path and report_path.exists():
         report_slug = slugify(str((study or {}).get("jst_full_nom") or (study or {}).get("slug") or "raport-jst")) or "raport-jst"
         raw_report = report_path.read_text(encoding="utf-8", errors="ignore")
-        full_report = raw_report
-        try:
-            full_report = inline_local_assets(raw_report, report_path.parent)
-        except Exception:
-            full_report = raw_report
+        raw_report_for_preview = raw_report
+        full_report = ""
+        full_report_bytes = 0
+        full_report_error = ""
+        full_report_available = False
+        if len(raw_report.encode("utf-8", errors="ignore")) > int(meta.get("inline_source_limit") or inline_source_limit):
+            full_report_error = (
+                "Raport źródłowy jest zbyt duży, aby bezpiecznie przygotować "
+                "samodzielny plik HTML."
+            )
+        else:
+            try:
+                full_report = inline_local_assets(raw_report, report_path.parent)
+                full_report_bytes = len(full_report.encode("utf-8", errors="ignore"))
+                full_report_available = bool(full_report and full_report_bytes <= standalone_limit)
+                if not full_report_available:
+                    full_report_error = (
+                        "Samodzielny HTML byłby zbyt ciężki "
+                        f"({_fmt_bytes_compact(full_report_bytes)} > {_fmt_bytes_compact(standalone_limit)})."
+                    )
+            except Exception as ex:
+                full_report_error = f"Nie udało się osadzić wszystkich zasobów HTML: {ex}"
         report_zip = bundle_report_dir_zip(report_path.parent)
         d1, d2 = st.columns(2)
         with d1:
             st.download_button(
                 "📥 Pobierz raport HTML (pełny)",
-                data=full_report,
+                data=(full_report or ""),
                 file_name=f"{report_slug}.html",
                 mime="text/html",
                 use_container_width=True,
+                on_click="ignore",
+                disabled=not full_report_available,
+                help=(
+                    "Jednoplikowy HTML z osadzonymi zasobami (działa samodzielnie offline)."
+                    if full_report_available
+                    else "Dla tego raportu zalecana jest paczka ZIP (stabilniejsza i lżejsza)."
+                ),
             )
         with d2:
             if report_zip:
@@ -2280,9 +2325,18 @@ def jst_analysis_view() -> None:
                     file_name=f"{report_slug}-WYNIKI.zip",
                     mime="application/zip",
                     use_container_width=True,
+                    on_click="ignore",
                 )
             else:
                 st.caption("Nie udało się przygotować paczki ZIP raportu.")
+        if full_report_available:
+            st.caption(
+                "HTML (pełny) jest samowystarczalny: wszystkie obrazy, style i skrypty są osadzone w jednym pliku."
+            )
+        elif full_report_error:
+            st.warning(
+                f"{full_report_error} Pobierz paczkę ZIP (WYNIKI) i otwórz lokalnie plik `raport.html` z tego folderu."
+            )
 
     preview_enabled = st.toggle(
         "Podgląd raportu online w panelu",
@@ -2309,34 +2363,86 @@ def jst_analysis_view() -> None:
         value=auto_light,
         key=f"jst_light_mode_{sid}",
     )
-    if rendered:
-        to_render = rendered
-        if to_render == "__report_path_only__":
-            if report_path and report_path.exists():
-                to_render = report_path.read_text(encoding="utf-8", errors="ignore")
-            else:
-                st.error("Nie udało się odnaleźć pliku raportu do podglądu.")
-                return
-        if light_mode and report_path and report_path.exists():
-            to_render = report_path.read_text(encoding="utf-8", errors="ignore")
+    to_render = ""
+    if light_mode:
+        if report_path and report_path.exists():
+            to_render = raw_report_for_preview or report_path.read_text(encoding="utf-8", errors="ignore")
             st.info("Tryb lekki jest włączony. Raport renderuje się szybciej i stabilniej przy dużych danych.")
-        elif (not light_mode) and (not inlined_used) and report_path and report_path.exists():
-            to_render = report_path.read_text(encoding="utf-8", errors="ignore")
-
-        render_size = len(to_render.encode("utf-8", errors="ignore"))
-        if render_size > safe_limit:
-            st.error(
-                "Podgląd raportu w panelu został wyłączony, bo przekracza bezpieczny limit przesyłania danych do przeglądarki."
-            )
-            st.info("Użyj przycisku „📥 Pobierz raport HTML (pełny)” lub „🧳 Pobierz raport ZIP (WYNIKI)” i otwórz lokalnie.")
+        elif rendered and rendered != "__report_path_only__":
+            to_render = str(rendered)
+        else:
+            st.error("Nie udało się odnaleźć pliku raportu do podglądu.")
             return
+    else:
+        if rendered and rendered != "__report_path_only__" and inlined_used:
+            to_render = str(rendered)
+        else:
+            cached_inline = st.session_state.get(preview_inline_key)
+            cached_meta = st.session_state.get(preview_inline_meta_key) or {}
+            if cached_inline is None:
+                if not (report_path and report_path.exists()):
+                    st.error("Nie udało się odnaleźć pliku raportu do podglądu.")
+                    return
+                source_html = raw_report_for_preview or report_path.read_text(encoding="utf-8", errors="ignore")
+                with st.spinner("Przygotowujemy pełny podgląd (osadzanie obrazów i zasobów)..."):
+                    try:
+                        inlined_preview = inline_local_assets(source_html, report_path.parent)
+                        inlined_preview_bytes = len(inlined_preview.encode("utf-8", errors="ignore"))
+                        if inlined_preview_bytes <= safe_limit:
+                            st.session_state[preview_inline_key] = inlined_preview
+                            st.session_state[preview_inline_meta_key] = {
+                                "status": "ok",
+                                "bytes": inlined_preview_bytes,
+                                "error": "",
+                            }
+                        else:
+                            st.session_state[preview_inline_key] = "__too_large__"
+                            st.session_state[preview_inline_meta_key] = {
+                                "status": "too_large",
+                                "bytes": inlined_preview_bytes,
+                                "error": "",
+                            }
+                    except Exception as ex:
+                        st.session_state[preview_inline_key] = "__inline_error__"
+                        st.session_state[preview_inline_meta_key] = {
+                            "status": "error",
+                            "bytes": 0,
+                            "error": str(ex),
+                        }
+                cached_inline = st.session_state.get(preview_inline_key)
+                cached_meta = st.session_state.get(preview_inline_meta_key) or {}
 
-        prepared = _prepare_report_html_for_iframe(to_render)
-        html_component(
-            prepared,
-            height=_estimate_report_iframe_height(prepared, wide_mode=wide_jst),
-            scrolling=False,
+            status = str(cached_meta.get("status") or "")
+            if isinstance(cached_inline, str) and status == "ok" and cached_inline not in {"__too_large__", "__inline_error__"}:
+                to_render = cached_inline
+            elif status == "too_large":
+                sz = _fmt_bytes_compact(int(cached_meta.get("bytes") or 0))
+                lim = _fmt_bytes_compact(safe_limit)
+                st.error(f"Pełny podgląd jest zbyt duży dla panelu ({sz} > {lim}).")
+                st.info("Włącz „Tryb lekki renderowania” albo pobierz raport ZIP (WYNIKI) i otwórz lokalnie.")
+                return
+            else:
+                err = str(cached_meta.get("error") or "").strip()
+                st.error("Nie udało się osadzić zasobów pełnego podglądu w panelu.")
+                if err:
+                    st.caption(f"Szczegóły techniczne: {err}")
+                st.info("Włącz „Tryb lekki renderowania” albo pobierz raport ZIP (WYNIKI) i otwórz lokalnie.")
+                return
+
+    render_size = len(to_render.encode("utf-8", errors="ignore"))
+    if render_size > safe_limit:
+        st.error(
+            "Podgląd raportu w panelu został wyłączony, bo przekracza bezpieczny limit przesyłania danych do przeglądarki."
         )
+        st.info("Użyj przycisku „📥 Pobierz raport HTML (pełny)” lub „🧳 Pobierz raport ZIP (WYNIKI)” i otwórz lokalnie.")
+        return
+
+    prepared = _prepare_report_html_for_iframe(to_render)
+    html_component(
+        prepared,
+        height=_estimate_report_iframe_height(prepared, wide_mode=wide_jst),
+        scrolling=False,
+    )
 
 
 def _load_personal_profile_pct(study_id: str) -> Tuple[Dict[str, float], int]:
