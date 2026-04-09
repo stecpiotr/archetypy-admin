@@ -267,6 +267,49 @@ def _build_link(base_url: str, slug: str, token: str) -> str:
     return f"{(base_url or '').rstrip('/')}/{(slug or '').lstrip('/')}?t={token}"
 
 
+def _fetch_jst_study_context(sb, study_id: str) -> Optional[Dict[str, Any]]:
+    sid = str(study_id or "").strip()
+    if not sid:
+        return None
+    try:
+        res = (
+            sb.table("jst_studies")
+            .select("id,slug,jst_full_gen,jst_full_nom,jst_type")
+            .eq("id", sid)
+            .limit(1)
+            .execute()
+        )
+        if res.data:
+            return res.data[0]
+    except Exception:
+        return None
+    return None
+
+
+def _looks_like_default_sms_body(body: str) -> bool:
+    norm = _strip_pl_diacritics(str(body or "").strip().lower())
+    return "zwracamy sie z prosba o wypelnienie ankiety" in norm and "link do ankiety" in norm
+
+
+def _inject_link_into_message(body: str, expected_link: str, token: str) -> str:
+    text = str(body or "").strip()
+    if not text:
+        return expected_link
+    if expected_link in text:
+        return text
+
+    token_rx = re.escape(str(token or "").strip())
+    if token_rx:
+        text2 = re.sub(rf"https?://\S*\?t={token_rx}\b", expected_link, text, count=1, flags=re.IGNORECASE)
+        if text2 != text:
+            return text2
+        text = text2
+
+    if re.search(r"https?://\S+", text, flags=re.IGNORECASE):
+        return re.sub(r"https?://\S+", expected_link, text, count=1, flags=re.IGNORECASE)
+    return f"{text}\n\nLink do ankiety: {expected_link}"
+
+
 def _can_resend_row(row: Dict[str, Any]) -> bool:
     if row.get("completed_at") or row.get("rejected_at"):
         return False
@@ -275,21 +318,35 @@ def _can_resend_row(row: Dict[str, Any]) -> bool:
     return True
 
 
-def _resend_sms_row(sb, row: Dict[str, Any], slug: str) -> Tuple[bool, str]:
+def _resend_sms_row(sb, row: Dict[str, Any], selected_study: Dict[str, Any]) -> Tuple[bool, str]:
     sms_id = str(row.get("id") or "").strip()
     phone = str(row.get("phone") or "").strip()
     token = str(row.get("token") or "").strip()
     body = str(row.get("body") or "").strip()
+    row_study_id = str(row.get("study_id") or "").strip()
+    selected_study_id = str((selected_study or {}).get("id") or "").strip()
     if not sms_id or not phone or not token:
         return False, "Brak danych rekordu (id/telefon/token)."
+    if row_study_id and selected_study_id and row_study_id != selected_study_id:
+        return False, "Wybrany rekord należy do innego badania JST. Odśwież listę i wybierz właściwy rekord."
 
     try:
         api_token, sender, base_url = _sms_env()
     except Exception as e:
         return False, str(e)
 
-    if not body:
-        body = _default_sms_text("", _build_link(base_url, slug, token))
+    study_ctx = _fetch_jst_study_context(sb, row_study_id) or (selected_study or {})
+    slug = str(study_ctx.get("slug") or (selected_study or {}).get("slug") or "").strip()
+    jst_full_gen = str(study_ctx.get("jst_full_gen") or "").strip()
+    if not slug:
+        return False, "Nie udało się ustalić slugu JST dla wybranego rekordu."
+
+    expected_link = _build_link(base_url, slug, token)
+    if not body or _looks_like_default_sms_body(body):
+        body = _default_sms_text(jst_full_gen, expected_link)
+    else:
+        body = _inject_link_into_message(body, expected_link=expected_link, token=token)
+
     ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=body, sender=sender)
     if ok:
         _mark_jst_sms_sent(sb, sms_id=sms_id, provider_message_id=provider_id or "")
@@ -879,6 +936,10 @@ def render(back_btn: Callable[[], None]) -> None:
                 token = make_token(8)
                 final_link = _build_link(base, slug, token)
                 msg = body_tpl.replace(link_preview, final_link)
+                if _looks_like_default_sms_body(msg):
+                    msg = _default_sms_text(jst_full_gen, final_link)
+                else:
+                    msg = _inject_link_into_message(msg, expected_link=final_link, token=token)
                 for _ in range(5):
                     try:
                         rec = _create_jst_sms_record(sb, study_id=study["id"], phone=phone, text=msg, token=token)
@@ -887,6 +948,10 @@ def render(back_btn: Callable[[], None]) -> None:
                         token = make_token(8)
                         final_link = _build_link(base, slug, token)
                         msg = body_tpl.replace(link_preview, final_link)
+                        if _looks_like_default_sms_body(msg):
+                            msg = _default_sms_text(jst_full_gen, final_link)
+                        else:
+                            msg = _inject_link_into_message(msg, expected_link=final_link, token=token)
                 else:
                     st.error(f"Nie udało się wygenerować unikalnego tokena dla {phone}.")
                     continue
@@ -1040,7 +1105,7 @@ def render(back_btn: Callable[[], None]) -> None:
             if st.button("🔁 Wyślij ponownie (ten sam link)", key=f"jst_resend_btn_{mode}_{study['id']}"):
                 picked = label_to_row.get(chosen_row_label) or {}
                 if mode == "sms":
-                    ok, err = _resend_sms_row(sb, picked, slug=slug)
+                    ok, err = _resend_sms_row(sb, picked, selected_study=study)
                 else:
                     ok, err = _resend_email_row(sb, picked, slug=slug)
                 if ok:

@@ -520,6 +520,85 @@ def ensure_jst_schema() -> None:
     END;
     $func$;
 
+    CREATE OR REPLACE FUNCTION public.get_jst_token_meta(p_token text)
+    RETURNS jsonb
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    DECLARE
+      v_token text := trim(coalesce(p_token, ''));
+      v_channel text;
+      v_contact text;
+      v_study_id text;
+      v_study_slug text;
+      v_completed_at timestamptz;
+      v_rejected_at timestamptz;
+    BEGIN
+      IF v_token = '' THEN
+        RETURN jsonb_build_object(
+          'found', false,
+          'completed', false,
+          'rejected', false
+        );
+      END IF;
+
+      SELECT x.channel, x.contact, x.study_id, x.study_slug, x.completed_at, x.rejected_at
+      INTO v_channel, v_contact, v_study_id, v_study_slug, v_completed_at, v_rejected_at
+      FROM (
+        SELECT
+          'sms'::text AS channel,
+          m.phone::text AS contact,
+          m.study_id::text AS study_id,
+          s.slug::text AS study_slug,
+          m.completed_at,
+          m.rejected_at,
+          m.created_at
+        FROM public.jst_sms_messages m
+        LEFT JOIN public.jst_studies s ON s.id = m.study_id
+        WHERE m.token = v_token
+
+        UNION ALL
+
+        SELECT
+          'email'::text AS channel,
+          e.email::text AS contact,
+          e.study_id::text AS study_id,
+          s.slug::text AS study_slug,
+          e.completed_at,
+          e.rejected_at,
+          e.created_at
+        FROM public.jst_email_logs e
+        LEFT JOIN public.jst_studies s ON s.id = e.study_id
+        WHERE e.token = v_token
+      ) x
+      ORDER BY
+        CASE WHEN x.completed_at IS NOT NULL THEN 0 ELSE 1 END,
+        x.created_at DESC
+      LIMIT 1;
+
+      IF v_channel IS NULL THEN
+        RETURN jsonb_build_object(
+          'found', false,
+          'completed', false,
+          'rejected', false
+        );
+      END IF;
+
+      RETURN jsonb_build_object(
+        'found', true,
+        'channel', v_channel,
+        'contact', coalesce(v_contact, ''),
+        'study_id', coalesce(v_study_id, ''),
+        'study_slug', coalesce(v_study_slug, ''),
+        'completed', (v_completed_at IS NOT NULL),
+        'rejected', (v_rejected_at IS NOT NULL),
+        'completed_at', v_completed_at,
+        'rejected_at', v_rejected_at
+      );
+    END;
+    $func$;
+
     CREATE OR REPLACE FUNCTION public.is_jst_token_completed(p_token text)
     RETURNS boolean
     LANGUAGE plpgsql
@@ -565,6 +644,7 @@ def ensure_jst_schema() -> None:
     GRANT EXECUTE ON FUNCTION public.mark_jst_token_started(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_token_completed(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_token_rejected(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.get_jst_token_meta(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.is_jst_token_completed(text) TO anon, authenticated;
 
     DO $cleanup$
