@@ -2413,6 +2413,7 @@ def matching_view() -> None:
 
             all_payloads = [r.get("payload") or {} for r in top_sim_rows]
             subset_payloads = [r.get("payload") or {} for r in subset]
+            jst_name_nom = str(jst_study.get("jst_full_nom") or "").strip() or str(jst_study.get("jst_name") or "").strip() or str(pick_jst)
 
             dim_specs = [
                 {
@@ -2522,11 +2523,77 @@ def matching_view() -> None:
                         return "bardzo zła"
                 return raw or "brak danych"
 
-            def _count(payloads: List[Dict[str, Any]], field: str) -> Dict[str, int]:
-                out: Dict[str, int] = {}
+            def _poststrat_cell(payload: Dict[str, Any]) -> Optional[str]:
+                g = _canon_demo("M_PLEC", payload.get("M_PLEC"))
+                a = _canon_demo("M_WIEK", payload.get("M_WIEK"))
+                if g == "kobieta":
+                    g_id = 1
+                elif g == "mężczyzna":
+                    g_id = 2
+                else:
+                    return None
+                if a == "15-39":
+                    a_id = 1
+                elif a == "40-59":
+                    a_id = 2
+                elif a == "60+":
+                    a_id = 3
+                else:
+                    return None
+                return f"{g_id}_{a_id}"
+
+            def _calc_poststrat_weights(payloads: List[Dict[str, Any]], study: Dict[str, Any]) -> Tuple[List[float], bool]:
+                if not payloads:
+                    return [], False
+                targets = _load_poststrat_targets(study)
+                target_sum = float(sum(float(v or 0.0) for v in targets.values()))
+                if target_sum <= 0:
+                    return [1.0] * len(payloads), False
+
+                sample_counts: Dict[str, int] = {}
                 for p in payloads:
+                    cell = _poststrat_cell(p)
+                    if cell:
+                        sample_counts[cell] = int(sample_counts.get(cell, 0)) + 1
+                present_cells = [k for k, v in sample_counts.items() if int(v) > 0]
+                if not present_cells:
+                    return [1.0] * len(payloads), False
+
+                present_target_sum = float(sum(float(targets.get(k, 0.0) or 0.0) for k in present_cells))
+                if present_target_sum <= 0:
+                    return [1.0] * len(payloads), False
+
+                sample_total = float(sum(sample_counts.values()))
+                if sample_total <= 0:
+                    return [1.0] * len(payloads), False
+
+                cell_weights: Dict[str, float] = {}
+                for k in present_cells:
+                    target_share = float(targets.get(k, 0.0) or 0.0) / present_target_sum
+                    sample_share = float(sample_counts.get(k, 0)) / sample_total
+                    if sample_share > 0:
+                        cell_weights[k] = target_share / sample_share
+
+                if not cell_weights:
+                    return [1.0] * len(payloads), False
+
+                weights = [float(cell_weights.get(_poststrat_cell(p) or "", 1.0)) for p in payloads]
+                mean_w = float(sum(weights) / max(1, len(weights)))
+                if mean_w > 0:
+                    weights = [float(max(0.0, w / mean_w)) for w in weights]
+                return weights, True
+
+            all_weights, weights_used = _calc_poststrat_weights(all_payloads, jst_study)
+            subset_weights = all_weights[:take_n] if all_weights else [1.0] * len(subset_payloads)
+
+            def _weighted_count(payloads: List[Dict[str, Any]], weights: List[float], field: str) -> Dict[str, float]:
+                out: Dict[str, float] = {}
+                for idx, p in enumerate(payloads):
+                    w = float(weights[idx]) if idx < len(weights) else 1.0
+                    if w <= 0:
+                        continue
                     val = _canon_demo(field, p.get(field))
-                    out[val] = int(out.get(val, 0)) + 1
+                    out[val] = float(out.get(val, 0.0)) + w
                 return out
 
             demo_rows: List[Dict[str, Any]] = []
@@ -2534,8 +2601,10 @@ def matching_view() -> None:
             for spec in dim_specs:
                 dim_label = str(spec["label"])
                 field = str(spec["field"])
-                dist_sub = _count(subset_payloads, field)
-                dist_all = _count(all_payloads, field)
+                dist_sub = _weighted_count(subset_payloads, subset_weights, field)
+                dist_all = _weighted_count(all_payloads, all_weights, field)
+                sum_sub = float(sum(float(v) for v in dist_sub.values()))
+                sum_all = float(sum(float(v) for v in dist_all.values()))
                 known_order = list(spec.get("order") or [])
                 unknown = sorted((set(dist_sub.keys()) | set(dist_all.keys())) - set(known_order))
                 cats = known_order + unknown
@@ -2544,10 +2613,10 @@ def matching_view() -> None:
                 top_pct = -1.0
                 top_all_pct = 0.0
                 for cat in cats:
-                    c_sub = int(dist_sub.get(cat, 0))
-                    c_all = int(dist_all.get(cat, 0))
-                    pct_sub = (100.0 * c_sub / len(subset_payloads)) if subset_payloads else 0.0
-                    pct_all = (100.0 * c_all / len(all_payloads)) if all_payloads else 0.0
+                    c_sub = float(dist_sub.get(cat, 0.0))
+                    c_all = float(dist_all.get(cat, 0.0))
+                    pct_sub = (100.0 * c_sub / sum_sub) if sum_sub > 0 else 0.0
+                    pct_all = (100.0 * c_all / sum_all) if sum_all > 0 else 0.0
                     if pct_sub > top_pct:
                         top_pct = pct_sub
                         top_cat = cat
@@ -2557,8 +2626,8 @@ def matching_view() -> None:
                             "Zmienna": dim_label,
                             "Kategoria": cat,
                             "% grupa dopasowana": round(pct_sub, 1),
-                            "% ogół mieszkańców": round(pct_all, 1),
-                            "Różnica pp": round(pct_sub - pct_all, 1),
+                            "% ogół mieszkańców (ważony)": round(pct_all, 1),
+                            "Róznica (w pp.)": round(pct_sub - pct_all, 1),
                         }
                     )
                 if top_cat is not None:
@@ -2584,6 +2653,8 @@ def matching_view() -> None:
                 "gaps": gaps,
                 "demo_cards": demo_cards,
                 "demo_rows": demo_rows,
+                "demo_jst_weighted_header": f"{jst_name_nom} / (po wagowaniu)",
+                "demo_weights_used": bool(weights_used),
                 "match_formula": "match = max(0, 100 - MAE), gdzie MAE to średnia z |profil_polityka - profil_mieszkańców| dla 12 archetypów",
             }
             st.success("Wynik dopasowania został obliczony.")
@@ -2640,7 +2711,7 @@ def matching_view() -> None:
             """
             <style>
               .match-demo-box{border:1px solid #dbe4ef;border-radius:12px;background:#fff;padding:10px 12px;margin:0 0 10px 0;}
-              .match-demo-box-label{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;color:#334155;display:flex;align-items:center;gap:6px;}
+              .match-demo-box-label{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;color:#334155;display:flex;align-items:center;gap:6px;}
               .match-demo-box-note{color:#5f6b7a;font-size:12px;margin:2px 0 6px 0;}
               .match-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin:10px 0 12px 0;}
               .match-demo-stat{border:1px solid #dbe4ef;border-radius:10px;background:#fff;padding:8px 10px;}
@@ -2687,10 +2758,11 @@ def matching_view() -> None:
         if ddf.empty:
             st.caption("Brak danych demograficznych.")
         else:
+            jst_weighted_header = str(result.get("demo_jst_weighted_header") or "JST / (po wagowaniu)")
             ddf = ddf.copy()
             ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0).round(1)
-            ddf["% ogół mieszkańców"] = pd.to_numeric(ddf["% ogół mieszkańców"], errors="coerce").fillna(0.0).round(1)
-            ddf["Różnica pp"] = pd.to_numeric(ddf["Różnica pp"], errors="coerce").fillna(0.0).round(1)
+            ddf["% ogół mieszkańców (ważony)"] = pd.to_numeric(ddf["% ogół mieszkańców (ważony)"], errors="coerce").fillna(0.0).round(1)
+            ddf["Róznica (w pp.)"] = pd.to_numeric(ddf["Róznica (w pp.)"], errors="coerce").fillna(0.0).round(1)
 
             variable_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
             category_order = {
@@ -2746,8 +2818,8 @@ def matching_view() -> None:
                 for idx, (_, row) in enumerate(part.iterrows()):
                     cat = str(row["Kategoria"])
                     pct_sub = float(row["% grupa dopasowana"])
-                    pct_all = float(row["% ogół mieszkańców"])
-                    diff = float(row["Różnica pp"])
+                    pct_all = float(row["% ogół mieszkańców (ważony)"])
+                    diff = float(row["Róznica (w pp.)"])
                     is_top = bool(row.name == top_idx)
                     bar_w = max(0.0, min(100.0, pct_sub))
                     var_icon = variable_emoji.get(var_name, "📌")
@@ -2785,10 +2857,11 @@ def matching_view() -> None:
                         "</div>"
                         "</td>"
                         f"<td style=\"font-size:13px; text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
-                        f"<td style=\"font-size:13px; text-align:right; color:{diff_color}; font-weight:700; border-right:3px solid #b8c2cc; {top_border if idx == 0 else ''}\">{diff_text}</td>"
+                        f"<td style=\"font-size:13px; text-align:right; color:{diff_color}; font-weight:400; border-right:3px solid #b8c2cc; {top_border if idx == 0 else ''}\">{diff_text}</td>"
                         "</tr>"
                     )
 
+            jst_weighted_header_html = html.escape(jst_weighted_header).replace(" / ", " /<br>")
             table_html = (
                 "<div class='match-demo-table-wrap'>"
                 "<table class='match-demo-table'>"
@@ -2796,17 +2869,23 @@ def matching_view() -> None:
                 "<th style='min-width:150px; font-size:13px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
                 "<th style='min-width:220px; font-size:13px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
                 "<th style='min-width:176px; text-align:center; border-top:3px solid #b8c2cc;'>% grupa dopasowana</th>"
-                "<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>% ogół mieszkańców</th>"
-                "<th style='min-width:110px; text-align:center; border-top:3px solid #b8c2cc; border-right:3px solid #b8c2cc;'>Różnica pp</th>"
+                f"<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>{jst_weighted_header_html}</th>"
+                "<th style='min-width:120px; text-align:center; border-top:3px solid #b8c2cc; border-right:3px solid #b8c2cc;'>Róznica (w pp.)</th>"
                 "</tr></thead><tbody>"
                 + "".join(table_rows)
                 + "</tbody></table></div>"
+            )
+            weights_note = (
+                "Wartości w kolumnie referencyjnej i grupie dopasowanej liczone po wagowaniu (płeć × wiek)."
+                if bool(result.get("demo_weights_used"))
+                else "Brak zdefiniowanych wag poststratyfikacyjnych dla tego badania — pokazujemy rozkład surowy."
             )
             st.markdown(
                 f"""
                 <div class="match-demo-box">
                   <div class="match-demo-box-label">👥 PROFIL DEMOGRAFICZNY</div>
                   <div class="match-demo-box-note">W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.</div>
+                  <div class="match-demo-box-note">{html.escape(weights_note)}</div>
                   {table_html}
                 </div>
                 """,
