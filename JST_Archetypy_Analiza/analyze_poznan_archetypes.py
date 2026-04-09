@@ -14740,7 +14740,7 @@ def main() -> None:
     df_B2.to_csv(outdir / "B2_top1.csv", index=False, encoding="utf-8-sig")
     df_B_tr.to_csv(outdir / "B1_trojki.csv", index=False, encoding="utf-8-sig")
 
-    plot_B_bar(df_B1, outdir / "B1_top3.png", "Kluczowe oczekiwania od miasta (TOP3 archetypów")
+    plot_B_bar(df_B1, outdir / "B1_top3.png", "Kluczowe oczekiwania od miasta (TOP3 archetypów)")
     plot_B_bar(
         df_display_values(df_B1, brand_values),
         outdir / "B1_top3_values.png",
