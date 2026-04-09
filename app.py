@@ -10,10 +10,13 @@ import json
 import subprocess
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 import shutil
+import urllib.request
+import urllib.error
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 from zoneinfo import ZoneInfo
 
 from db_utils import (
@@ -96,46 +99,160 @@ for _chrome_candidate in (
         os.environ.setdefault("PLOTLY_CHROME_PATH", _chrome_candidate)
         break
 
+
+def _first_nonempty(*values: Any) -> str:
+    for value in values:
+        txt = str(value or "").strip()
+        if txt:
+            return txt
+    return ""
+
+
+def _secret_get(name: str) -> str:
+    try:
+        return str(st.secrets.get(name) or "").strip()
+    except Exception:
+        return ""
+
+
+def _to_warsaw_time(raw: str) -> str:
+    txt = str(raw or "").strip()
+    if not txt:
+        return ""
+    dt_obj: Optional[datetime] = None
+    try:
+        dt_obj = datetime.fromisoformat(txt.replace("Z", "+00:00"))
+    except Exception:
+        dt_obj = None
+    if dt_obj is None:
+        try:
+            dt_obj = datetime.fromtimestamp(float(txt), tz=timezone.utc)
+        except Exception:
+            return ""
+    if dt_obj.tzinfo is None:
+        dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+    try:
+        return dt_obj.astimezone(ZoneInfo("Europe/Warsaw")).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return ""
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _fetch_github_head_commit(repo: str, branch: str, token: str = "") -> Tuple[str, str]:
+    repo_slug = str(repo or "").strip().strip("/")
+    branch_name = str(branch or "").strip() or "main"
+    if not repo_slug:
+        return "", ""
+    url = f"https://api.github.com/repos/{repo_slug}/commits/{quote(branch_name, safe='')}"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "archetypy-admin-panel",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=4.5) as resp:
+            raw = resp.read().decode("utf-8", errors="ignore")
+    except Exception:
+        return "", ""
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return "", ""
+    sha = str(data.get("sha") or "").strip()
+    commit = data.get("commit") or {}
+    committer = commit.get("committer") or {}
+    committed_at = str(committer.get("date") or "").strip()
+    return sha, committed_at
+
+
 def _app_build_signature() -> str:
     """Krótki znacznik buildu do szybkiej weryfikacji, czy działa nowy deploy."""
     repo_root = str(Path(__file__).resolve().parent)
     git_bin = shutil.which("git") or "git"
 
-    commit = (
-        os.getenv("STREAMLIT_GIT_COMMIT_SHA")
-        or os.getenv("GITHUB_SHA")
-        or os.getenv("COMMIT_SHA")
-        or ""
-    ).strip()
+    commit = _first_nonempty(
+        os.getenv("STREAMLIT_GIT_COMMIT_SHA"),
+        os.getenv("GITHUB_SHA"),
+        os.getenv("COMMIT_SHA"),
+        os.getenv("VERCEL_GIT_COMMIT_SHA"),
+        _secret_get("STREAMLIT_GIT_COMMIT_SHA"),
+        _secret_get("GITHUB_SHA"),
+        _secret_get("COMMIT_SHA"),
+    )
+    raw_commit_time = _first_nonempty(
+        os.getenv("STREAMLIT_GIT_COMMIT_TIME"),
+        os.getenv("GITHUB_COMMIT_TIME"),
+        os.getenv("COMMIT_TIME"),
+        os.getenv("VERCEL_GIT_COMMIT_TIMESTAMP"),
+        os.getenv("SOURCE_COMMIT_TIMESTAMP"),
+        _secret_get("STREAMLIT_GIT_COMMIT_TIME"),
+        _secret_get("GITHUB_COMMIT_TIME"),
+        _secret_get("COMMIT_TIME"),
+    )
 
     if not commit:
+        deployed_sha = _first_nonempty(
+            _secret_get("DEPLOYED_SHA"),
+        )
+        if deployed_sha:
+            commit = deployed_sha
+    if not commit:
+        deployed_sha_path = Path(repo_root) / ".deployed_sha"
+        if deployed_sha_path.exists():
+            try:
+                commit = str(deployed_sha_path.read_text(encoding="utf-8", errors="ignore")).strip()
+            except Exception:
+                commit = ""
+
+    if not commit or not raw_commit_time:
         try:
-            commit = subprocess.run(
-                [git_bin, "-C", repo_root, "rev-parse", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5.0,
-            ).stdout.strip()
+            if not commit:
+                commit = subprocess.run(
+                    [git_bin, "-C", repo_root, "rev-parse", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5.0,
+                ).stdout.strip()
+            if not raw_commit_time:
+                raw_commit_time = subprocess.run(
+                    [git_bin, "-C", repo_root, "show", "-s", "--format=%cI", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5.0,
+                ).stdout.strip()
         except Exception:
-            commit = ""
+            pass
 
-    build_time = ""
-    try:
-        raw_commit_date = subprocess.run(
-            [git_bin, "-C", repo_root, "show", "-s", "--format=%cI", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=5.0,
-        ).stdout.strip()
-        if raw_commit_date:
-            dt = datetime.fromisoformat(raw_commit_date.replace("Z", "+00:00"))
-            build_time = dt.astimezone(ZoneInfo("Europe/Warsaw")).strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        build_time = ""
+    if not commit or not raw_commit_time:
+        gh_repo = _first_nonempty(
+            os.getenv("GITHUB_REPOSITORY"),
+            _secret_get("GITHUB_REPOSITORY"),
+            "stecpiotr/archetypy-admin",
+        )
+        gh_branch = _first_nonempty(
+            os.getenv("GITHUB_REF_NAME"),
+            _secret_get("GITHUB_REF_NAME"),
+            "main",
+        )
+        gh_token = _first_nonempty(
+            os.getenv("GITHUB_TOKEN"),
+            os.getenv("GH_TOKEN"),
+            _secret_get("GITHUB_TOKEN"),
+            _secret_get("GH_TOKEN"),
+        )
+        gh_commit, gh_committed_at = _fetch_github_head_commit(gh_repo, gh_branch, gh_token)
+        if not commit and gh_commit:
+            commit = gh_commit
+        if not raw_commit_time and gh_committed_at:
+            raw_commit_time = gh_committed_at
 
-    commit_short = commit[:8] if commit else "local"
+    build_time = _to_warsaw_time(raw_commit_time)
+
+    commit_short = commit[:8] if commit else "unknown"
 
     if build_time:
         return f"build: {build_time} | commit: {commit_short}"
@@ -2714,6 +2831,10 @@ def matching_view() -> None:
             st.session_state["matching_result"] = {
                 "person_label": pick_personal,
                 "jst_label": pick_jst,
+                "person_study_id": str(person.get("id") or ""),
+                "jst_study_id": str(jst_study.get("id") or ""),
+                "person_name_nom": f"{(person.get('first_name_nom') or person.get('first_name') or '').strip()} {(person.get('last_name_nom') or person.get('last_name') or '').strip()}".strip(),
+                "jst_name_nom": jst_name_nom,
                 "match_score": round(match_score, 1),
                 "personal_n": p_n,
                 "jst_n": len(j_rows),
@@ -2887,6 +3008,165 @@ def matching_view() -> None:
             """,
             unsafe_allow_html=True,
         )
+
+        st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
+        st.markdown("### Porównanie profili archetypowych")
+
+        person_name = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
+        jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "JST")
+        person_sid = str(result.get("person_study_id") or "")
+        jst_sid = str(result.get("jst_study_id") or "")
+
+        person_profile_100 = {a: float(result["personal_profile"].get(a, 0.0)) for a in JST_ARCHETYPES}
+        jst_profile_100 = {a: float(result["jst_profile"].get(a, 0.0)) for a in JST_ARCHETYPES}
+
+        radar_order: List[str] = [
+            "Buntownik", "Błazen", "Kochanek", "Opiekun", "Towarzysz", "Niewinny",
+            "Władca", "Mędrzec", "Czarodziej", "Bohater", "Twórca", "Odkrywca",
+        ]
+        person_profile_20 = {a: float(person_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
+        jst_profile_20 = {a: float(jst_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
+
+        def _top3(profile: Dict[str, float], order: List[str]) -> List[str]:
+            return sorted(order, key=lambda a: (-float(profile.get(a, 0.0)), order.index(a)))[:3]
+
+        p_top = _top3(person_profile_20, radar_order)
+        j_top = _top3(jst_profile_20, radar_order)
+
+        person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
+        jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
+
+        def _marker_series(profile: Dict[str, float], top3: List[str], palette: Dict[str, str]) -> Tuple[List[Optional[float]], List[str]]:
+            r_vals: List[Optional[float]] = []
+            colors: List[str] = []
+            mapping = {
+                top3[0]: palette["main"] if len(top3) > 0 else "rgba(0,0,0,0)",
+                top3[1]: palette["aux"] if len(top3) > 1 else "rgba(0,0,0,0)",
+                top3[2]: palette["supp"] if len(top3) > 2 else "rgba(0,0,0,0)",
+            }
+            for arche in radar_order:
+                if arche in mapping:
+                    r_vals.append(float(profile.get(arche, 0.0)))
+                    colors.append(str(mapping[arche]))
+                else:
+                    r_vals.append(None)
+                    colors.append("rgba(0,0,0,0)")
+            return r_vals, colors
+
+        p_marker_r, p_marker_c = _marker_series(person_profile_20, p_top, person_top_colors)
+        j_marker_r, j_marker_c = _marker_series(jst_profile_20, j_top, jst_top_colors)
+        person_vals = [float(person_profile_20.get(a, 0.0)) for a in radar_order]
+        jst_vals = [float(jst_profile_20.get(a, 0.0)) for a in radar_order]
+
+        fig_cmp = go.Figure(
+            data=[
+                go.Scatterpolar(
+                    r=person_vals + [person_vals[0]],
+                    theta=radar_order + [radar_order[0]],
+                    fill="toself",
+                    fillcolor="rgba(37,99,235,0.18)",
+                    line=dict(color="#2563eb", width=3),
+                    marker=dict(size=5),
+                    name=f"Profil polityka: {person_name}",
+                    hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
+                ),
+                go.Scatterpolar(
+                    r=jst_vals + [jst_vals[0]],
+                    theta=radar_order + [radar_order[0]],
+                    fill="toself",
+                    fillcolor="rgba(15,118,110,0.16)",
+                    line=dict(color="#0f766e", width=3, dash="dot"),
+                    marker=dict(size=5),
+                    name=f"Mieszkańcy: {jst_name} (N={int(result.get('jst_n') or 0)})",
+                    hovertemplate="<b>%{theta}</b><br>Mieszkańcy: %{r:.2f}<extra></extra>",
+                ),
+                go.Scatterpolar(
+                    r=p_marker_r,
+                    theta=radar_order,
+                    mode="markers",
+                    marker=dict(size=16, color=p_marker_c, opacity=0.92, line=dict(color="black", width=2.6)),
+                    name="TOP3 polityka",
+                    showlegend=False,
+                    hovertemplate="<b>%{theta}</b><br>TOP3 polityka: %{r:.2f}<extra></extra>",
+                ),
+                go.Scatterpolar(
+                    r=j_marker_r,
+                    theta=radar_order,
+                    mode="markers",
+                    marker=dict(size=14, color=j_marker_c, opacity=0.94, line=dict(color="#0f172a", width=2.0)),
+                    name="TOP3 mieszkańców",
+                    showlegend=False,
+                    hovertemplate="<b>%{theta}</b><br>TOP3 mieszkańców: %{r:.2f}<extra></extra>",
+                ),
+            ]
+        )
+        fig_cmp.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            polar=dict(
+                bgcolor="rgba(0,0,0,0)",
+                radialaxis=dict(visible=True, range=[0, 20]),
+                angularaxis=dict(
+                    tickfont=dict(size=14),
+                    tickvals=radar_order,
+                    ticktext=radar_order,
+                    rotation=90,
+                    direction="clockwise",
+                ),
+            ),
+            margin=dict(l=20, r=20, t=26, b=20),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.03,
+                xanchor="center",
+                x=0.5,
+                font=dict(size=12),
+            ),
+        )
+        st.plotly_chart(
+            fig_cmp,
+            use_container_width=True,
+            config={"displaylogo": False, "displayModeBar": True, "responsive": True},
+            key=f"matching-radar-compare-{person_sid}-{jst_sid}",
+        )
+        st.markdown(
+            f"""
+            <div style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 20px;margin-top:6px;margin-bottom:10px;">
+              <span style="font-size:0.84em;font-weight:700;color:#334155;min-width:135px;">TOP3 polityka:</span>
+              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['main']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">główny</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['aux']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">wspierający</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['supp']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">poboczny</span></span>
+              <span style="font-size:0.84em;font-weight:700;color:#334155;min-width:135px;">TOP3 mieszkańców:</span>
+              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['main']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">główny</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['aux']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">wspierający</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['supp']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">poboczny</span></span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+        left_profile_col, right_profile_col = st.columns(2, gap="large")
+        try:
+            import admin_dashboard as AD
+            p_key = re.sub(r"[^a-zA-Z0-9_-]+", "_", person_sid or "person")
+            j_key = re.sub(r"[^a-zA-Z0-9_-]+", "_", jst_sid or "jst")
+            person_profile_img = AD.make_segment_profile_wheel_png(
+                mean_scores=person_profile_100,
+                out_path=f"matching_profile_person_{p_key}_{j_key}.png",
+            )
+            jst_profile_img = AD.make_segment_profile_wheel_png(
+                mean_scores=jst_profile_100,
+                out_path=f"matching_profile_jst_{j_key}_{p_key}.png",
+            )
+            with left_profile_col:
+                st.markdown(f"**Profil archetypowy {person_name} (siła archetypu, skala: 0-100)**")
+                st.image(person_profile_img, use_container_width=True)
+            with right_profile_col:
+                st.markdown(f"**Profil archetypowy mieszkańców {jst_name} (siła archetypu, skala: 0-100)**")
+                st.image(jst_profile_img, use_container_width=True)
+        except Exception as e:
+            st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")
 
     with tab_demo:
         st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
