@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import warnings
 import re
 import html
+import math
 import json
 import subprocess
 from io import BytesIO
@@ -2441,11 +2442,31 @@ def matching_view() -> None:
                 return
 
             diffs = {a: abs(float(p_profile.get(a, 0.0)) - float(j_profile.get(a, 0.0))) for a in JST_ARCHETYPES}
-            mae = float(sum(diffs.values()) / len(JST_ARCHETYPES))
-            match_score = max(0.0, min(100.0, 100.0 - mae))
+            diff_vals = [float(v) for v in diffs.values()]
+            mae = float(sum(diff_vals) / max(1, len(diff_vals)))
+            rmse = math.sqrt(float(sum(v * v for v in diff_vals) / max(1, len(diff_vals))))
+            sorted_gaps_desc = sorted(diff_vals, reverse=True)
+            top3_gap_mae = float(sum(sorted_gaps_desc[:3]) / max(1, min(3, len(sorted_gaps_desc))))
+
+            score_mae = max(0.0, min(100.0, 100.0 - mae))
+            score_rmse = max(0.0, min(100.0, 100.0 - rmse))
+            score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
+            # Metryka mieszana: średni błąd + kara za duże odchylenia i największe luki.
+            match_score = max(0.0, min(100.0, 0.40 * score_mae + 0.25 * score_rmse + 0.35 * score_top3))
 
             strengths = sorted(JST_ARCHETYPES, key=lambda a: diffs[a])[:3]
             gaps = sorted(JST_ARCHETYPES, key=lambda a: diffs[a], reverse=True)[:3]
+            strengths_rows = [{"archetyp": a, "diff": round(float(diffs[a]), 1)} for a in strengths]
+            gaps_rows = [{"archetyp": a, "diff": round(float(diffs[a]), 1)} for a in gaps]
+
+            if match_score >= 80:
+                match_band = ("Bardzo wysokie", "Różnice są niskie i stabilne także na największych lukach.")
+            elif match_score >= 65:
+                match_band = ("Umiarkowanie wysokie", "Profil jest częściowo zgodny, ale wymaga korekty na największych lukach.")
+            elif match_score >= 50:
+                match_band = ("Umiarkowane", "Widać istotne rozjazdy między profilem polityka i oczekiwaniami mieszkańców.")
+            else:
+                match_band = ("Niskie", "Duże luki dominują - warto przebudować komunikację i priorytety.")
 
             unit_person = {a: float(p_profile.get(a, 0.0)) for a in JST_ARCHETYPES}
             top_sim_rows = []
@@ -2698,12 +2719,28 @@ def matching_view() -> None:
                 "jst_profile": j_profile,
                 "strengths": strengths,
                 "gaps": gaps,
+                "strengths_rows": strengths_rows,
+                "gaps_rows": gaps_rows,
+                "match_metrics": {
+                    "mae": round(mae, 1),
+                    "rmse": round(rmse, 1),
+                    "top3_gap_mae": round(top3_gap_mae, 1),
+                    "score_mae": round(score_mae, 1),
+                    "score_rmse": round(score_rmse, 1),
+                    "score_top3": round(score_top3, 1),
+                    "band_label": str(match_band[0]),
+                    "band_desc": str(match_band[1]),
+                },
                 "demo_cards": demo_cards,
                 "demo_rows": demo_rows,
                 "demo_jst_weighted_header": f"{jst_name_nom} / (po wagowaniu)",
                 "demo_weights_used": bool(weights_used),
                 "target_audit": target_audit,
-                "match_formula": "match = max(0, 100 - MAE), gdzie MAE to średnia z |profil_polityka - profil_mieszkańców| dla 12 archetypów",
+                "match_formula": (
+                    "match = clamp(0,100, 0.40*(100 - MAE) + 0.25*(100 - RMSE) + 0.35*(100 - TOP3_MAE)); "
+                    "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
+                    "TOP3_MAE = średnia z 3 największych |Δ|."
+                ),
             }
             st.success("Wynik dopasowania został obliczony.")
 
@@ -2720,8 +2757,15 @@ def matching_view() -> None:
     with tab_summary:
         st.markdown(f"**Badanie personalne:** {result['person_label']}")
         st.markdown(f"**Badanie mieszkańców:** {result['jst_label']}")
+        metrics = result.get("match_metrics") or {}
         st.progress(min(100, max(0, int(round(result["match_score"])))))
         st.metric("Poziom dopasowania", f"{result['match_score']}%")
+        if metrics:
+            st.caption(f"Ocena: {str(metrics.get('band_label') or '')} · {str(metrics.get('band_desc') or '')}")
+            mcol1, mcol2, mcol3 = st.columns(3)
+            mcol1.metric("Średnia różnica (MAE)", f"{float(metrics.get('mae', 0.0)):.1f} pp")
+            mcol2.metric("Różnica z karą za odchylenia (RMSE)", f"{float(metrics.get('rmse', 0.0)):.1f} pp")
+            mcol3.metric("Średnia TOP3 luk", f"{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp")
         st.caption(f"Próba personalna: {result['personal_n']} odpowiedzi · Próba mieszkańców: {result['jst_n']} odpowiedzi")
 
         cmp_rows = []
@@ -2754,8 +2798,16 @@ def matching_view() -> None:
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
             st.markdown(result.get("match_formula", ""))
             st.markdown(
-                "To wynik porównania 12 archetypów: im mniejsza średnia różnica profilu polityka i oczekiwań mieszkańców, tym wyższy wynik procentowy."
+                "Metryka celowo bardziej karze duże luki archetypowe: oprócz średniej różnicy uwzględnia "
+                "także RMSE (wrażliwy na skrajne odchylenia) i średnią z 3 największych luk."
             )
+            if metrics:
+                st.markdown(
+                    f"**Składowe dla tego porównania:** "
+                    f"MAE `{float(metrics.get('mae', 0.0)):.1f} pp`, "
+                    f"RMSE `{float(metrics.get('rmse', 0.0)):.1f} pp`, "
+                    f"TOP3_MAE `{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp`."
+                )
             st.markdown("**Jak dokładnie liczony jest komponent `A` (40%)?**")
             st.markdown(
                 "- Dla każdej pary `A1..A18` odpowiedź 1–7 jest przeliczana liniowo na udział lewego/prawego archetypu.\n"
@@ -2792,8 +2844,47 @@ def matching_view() -> None:
                         hide_index=True,
                         height=max(92, min(520, 40 + len(comp_rows) * 35)),
                     )
-        st.markdown(f"**Najlepsze dopasowanie:** {', '.join(result['strengths'])}")
-        st.markdown(f"**Największe luki:** {', '.join(result['gaps'])}")
+        strengths_rows = result.get("strengths_rows") or []
+        gaps_rows = result.get("gaps_rows") or []
+        strength_items_html = "".join(
+            [
+                f"<span class='match-chip good'>{html.escape(str(r.get('archetyp') or ''))} "
+                f"<small>|Δ| {float(r.get('diff', 0.0)):.1f} pp</small></span>"
+                for r in strengths_rows
+            ]
+        )
+        gap_items_html = "".join(
+            [
+                f"<span class='match-chip gap'>{html.escape(str(r.get('archetyp') or ''))} "
+                f"<small>|Δ| {float(r.get('diff', 0.0)):.1f} pp</small></span>"
+                for r in gaps_rows
+            ]
+        )
+        st.markdown(
+            f"""
+            <style>
+              .match-insight-grid{{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}}
+              .match-insight-box{{border:1px solid #d9e2ef;border-radius:12px;background:#fff;padding:12px 14px;}}
+              .match-insight-title{{font-size:14px;font-weight:900;color:#1f2f44;margin:0 0 8px 0;}}
+              .match-chip{{display:inline-flex;align-items:center;gap:6px;margin:4px 6px 4px 0;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:700;}}
+              .match-chip small{{font-size:12px;font-weight:700;opacity:.9;}}
+              .match-chip.good{{background:#ecfdf3;border:1px solid #b7efcc;color:#11663a;}}
+              .match-chip.gap{{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239;}}
+              @media (max-width: 900px){{.match-insight-grid{{grid-template-columns:1fr;}}}}
+            </style>
+            <div class="match-insight-grid">
+              <div class="match-insight-box">
+                <div class="match-insight-title">Najlepsze dopasowania</div>
+                {strength_items_html or "<span class='match-chip good'>Brak danych</span>"}
+              </div>
+              <div class="match-insight-box">
+                <div class="match-insight-title">Największe luki</div>
+                {gap_items_html or "<span class='match-chip gap'>Brak danych</span>"}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     with tab_demo:
         st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
