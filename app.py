@@ -11,6 +11,7 @@ import subprocess
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
+import shutil
 import pandas as pd
 import streamlit as st
 from zoneinfo import ZoneInfo
@@ -98,7 +99,7 @@ for _chrome_candidate in (
 def _app_build_signature() -> str:
     """Krótki znacznik buildu do szybkiej weryfikacji, czy działa nowy deploy."""
     repo_root = str(Path(__file__).resolve().parent)
-    git_bin = "/usr/bin/git"
+    git_bin = shutil.which("git") or "git"
 
     commit = (
         os.getenv("STREAMLIT_GIT_COMMIT_SHA")
