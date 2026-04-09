@@ -272,3 +272,23 @@ Wynik:
   - render kol 0-100 jest ograniczony szerokoscia (`width=520`) i pozostaje kompatybilny ze starszym Streamlit przez fallback.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-006 [DONE]
+Temat: Nazwy profili 0-100 w `🧭 Matching` w dopełniaczu.
+Kryteria ukonczenia:
+1. Naglowek osoby ma forme: `Profil archetypowy {imie i nazwisko w dopelniaczu}`.
+2. Naglowek JST ma forme: `Profil archetypowy mieszkańców {nazwa JST w dopelniaczu}`.
+3. Usuniety dopisek `(siła archetypu, skala: 0-100)` z obu naglowkow.
+Pierwszy krok wykonawczy:
+- zasilic `matching_view` polami `person_name_gen` i `jst_name_gen` (z fallbackiem), a nastepnie podmienic naglowki sekcji 0-100.
+Wynik:
+- `app.py` (`matching_view`):
+  - do wyniku dopasowania dodano pola:
+    - `person_name_gen` (z `_person_genitive(person)`),
+    - `jst_name_gen` (priorytet: `jst_full_gen`, fallback: auto-odmiana z `_make_jst_defaults`, potem `jst_name_nom`),
+  - naglowki dwoch profili 0-100 zmieniono na:
+    - `Profil archetypowy {person_name_gen}`,
+    - `Profil archetypowy mieszkańców {jst_name_gen}`,
+  - usunieto dopisek `(siła archetypu, skala: 0-100)` z obu etykiet.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

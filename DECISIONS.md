@@ -261,3 +261,13 @@ Decyzja:
 Uzasadnienie:
 - W praktyce poprzedni uklad powodowal nakladanie i chaos wizualny na czesci ekranow.
 - Celem tej sekcji jest porownanie analityczne, wiec najpierw musi byc czytelna i stabilna.
+
+### D-032: Naglowki profili 0-100 w Matching wyswietlamy w dopelniaczu
+Decyzja:
+- W sekcji porownania kol 0-100 (`🧭 Matching`) etykiety sa:
+  - `Profil archetypowy {osoby w dopelniaczu}`,
+  - `Profil archetypowy mieszkańców {JST w dopelniaczu}`.
+- Usuwamy z naglowkow dopisek o skali `(siła archetypu, skala: 0-100)`.
+Uzasadnienie:
+- User wymaga precyzyjnej formy jezykowej i krotszego, czystszego naglowka.
+- Dane odmiany sa juz w modelu (`*_gen`) albo mozliwe do bezpiecznego wyliczenia fallbackiem.

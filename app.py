@@ -2601,6 +2601,19 @@ def matching_view() -> None:
             all_payloads = [r.get("payload") or {} for r in top_sim_rows]
             subset_payloads = [r.get("payload") or {} for r in subset]
             jst_name_nom = str(jst_study.get("jst_full_nom") or "").strip() or str(jst_study.get("jst_name") or "").strip() or str(pick_jst)
+            person_name_gen = _person_genitive(person)
+            jst_name_gen = str(jst_study.get("jst_full_gen") or "").strip()
+            if not jst_name_gen:
+                try:
+                    auto_jst = _make_jst_defaults(
+                        str(jst_study.get("jst_type") or "miasto"),
+                        str(jst_study.get("jst_name") or ""),
+                    )
+                    jst_name_gen = str(auto_jst.get("jst_full_gen") or "").strip()
+                except Exception:
+                    jst_name_gen = ""
+            if not jst_name_gen:
+                jst_name_gen = jst_name_nom
 
             dim_specs = [
                 {
@@ -2834,7 +2847,9 @@ def matching_view() -> None:
                 "person_study_id": str(person.get("id") or ""),
                 "jst_study_id": str(jst_study.get("id") or ""),
                 "person_name_nom": f"{(person.get('first_name_nom') or person.get('first_name') or '').strip()} {(person.get('last_name_nom') or person.get('last_name') or '').strip()}".strip(),
+                "person_name_gen": person_name_gen,
                 "jst_name_nom": jst_name_nom,
+                "jst_name_gen": jst_name_gen,
                 "match_score": round(match_score, 1),
                 "personal_n": p_n,
                 "jst_n": len(j_rows),
@@ -3014,6 +3029,8 @@ def matching_view() -> None:
 
         person_name = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
         jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "JST")
+        person_name_gen = str(result.get("person_name_gen") or "").strip() or person_name
+        jst_name_gen = str(result.get("jst_name_gen") or "").strip() or jst_name
         person_sid = str(result.get("person_study_id") or "")
         jst_sid = str(result.get("jst_study_id") or "")
 
@@ -3181,10 +3198,10 @@ def matching_view() -> None:
                         st.image(img_path)
 
             with left_profile_col:
-                st.markdown(f"**Profil archetypowy {person_name} (siła archetypu, skala: 0-100)**")
+                st.markdown(f"**Profil archetypowy {person_name_gen}**")
                 _show_image_compat(person_profile_img, max_width_px=520)
             with right_profile_col:
-                st.markdown(f"**Profil archetypowy mieszkańców {jst_name} (siła archetypu, skala: 0-100)**")
+                st.markdown(f"**Profil archetypowy mieszkańców {jst_name_gen}**")
                 _show_image_compat(jst_profile_img, max_width_px=520)
         except Exception as e:
             st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")

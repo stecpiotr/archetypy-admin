@@ -272,6 +272,28 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Start Hotfix H-006 (2026-04-09, pozny wieczor)
+- Zgloszenie usera: naglowki profili 0-100 w `🧭 Matching` maja byc w dopelniaczu:
+  - `Profil archetypowy {osoby w dopelniaczu}`,
+  - `Profil archetypowy mieszkańców {JST w dopelniaczu}`,
+  bez dopisku o skali.
+- Pierwszy krok wykonawczy:
+  - podmienic zrodlo etykiet w `matching_view` na pola `*_gen` z sensownym fallbackiem i zmienic render naglowkow.
+
+### Zrobione w Hotfix H-006 (naglowki profili 0-100 w dopelniaczu)
+- `app.py` (`matching_view`):
+  - dodano `person_name_gen` do `matching_result` (z `_person_genitive(person)`),
+  - dodano `jst_name_gen` do `matching_result`:
+    - najpierw `jst_full_gen` ze studium JST,
+    - fallback: auto-odmiana `_make_jst_defaults(...)["jst_full_gen"]`,
+    - ostateczny fallback: `jst_name_nom`,
+  - podmieniono naglowki sekcji kol 0-100 na:
+    - `Profil archetypowy {person_name_gen}`,
+    - `Profil archetypowy mieszkańców {jst_name_gen}`,
+  - usunieto dopisek `(siła archetypu, skala: 0-100)` z obu naglowkow.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
