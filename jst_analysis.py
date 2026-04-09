@@ -103,6 +103,18 @@ def _write_settings(path: Path, study: Dict[str, Any]) -> None:
 
 def _prepare_tool_run_dir(template_root: Path, run_root: Path) -> None:
     if run_root.exists() and (run_root / "analyze_poznan_archetypes.py").exists():
+        # Synchronizujemy silnik raportu także dla istniejących runów,
+        # aby poprawki generatora działały bez ręcznego czyszczenia katalogu _runs.
+        src_engine = template_root / "analyze_poznan_archetypes.py"
+        dst_engine = run_root / "analyze_poznan_archetypes.py"
+        if src_engine.exists():
+            dst_engine.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_engine, dst_engine)
+        for rel in ("requirements.txt", "README_PL.txt"):
+            src = template_root / rel
+            dst = run_root / rel
+            if src.exists() and not dst.exists():
+                shutil.copy2(src, dst)
         return
 
     ignore = shutil.ignore_patterns(

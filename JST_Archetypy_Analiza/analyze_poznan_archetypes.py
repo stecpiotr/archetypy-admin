@@ -6668,7 +6668,8 @@ def save_report(outdir: Path, settings: Settings,
                 poststrat_diag: Optional[pd.DataFrame] = None,
                 b2_declared_demo_payload: Optional[Dict[str, Any]] = None,
                 top5_simulation_payload: Optional[Dict[str, Any]] = None,
-                cluster_pack: Optional[Dict[str, Any]] = None) -> None:
+                cluster_pack: Optional[Dict[str, Any]] = None,
+                n_respondents: Optional[int] = None) -> None:
     brand_values = brand_values or dict(DEFAULT_BRAND_VALUES)
     filters_pct = filters_pct or {}
     cluster_pack = cluster_pack or {}
@@ -8108,8 +8109,11 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             "</div>"
         )
 
+    report_n = int(max(0, int(n_respondents or 0)))
+    report_n_suffix = f" (N={report_n})" if report_n > 0 else ""
+
     html_doc = f"""<html><head><meta charset="utf-8">{css}</head><body>
-<h1><span class="mode-arche">Raport: Archetypy</span><span class="mode-values">Raport: Wartości</span> – {_html_escape(settings.city_label)}</h1>
+<h1><span class="mode-arche">Raport: Archetypy</span><span class="mode-values">Raport: Wartości</span> – {_html_escape(settings.city_label)}{_html_escape(report_n_suffix)}</h1>
 <div class="small">
 Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class="mono">WYNIKI</span>.
 </div>
@@ -15381,7 +15385,8 @@ def main() -> None:
         poststrat_diag=poststrat_diag,
         b2_declared_demo_payload=b2_declared_demo_payload,
         top5_simulation_payload=top5_simulation_payload,
-        cluster_pack=cluster_pack
+        cluster_pack=cluster_pack,
+        n_respondents=int(len(df)),
     )
 
     # Automatyczne otwarcie raportu w przeglądarce

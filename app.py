@@ -2275,11 +2275,20 @@ JST_A_PAIR_COUNTS: Dict[str, int] = {
 }
 
 
-def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, float], List[Dict[str, Any]]]:
+def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, float], List[Dict[str, Any]], Dict[str, Any]]:
     if not rows:
-        return {}, []
+        return {}, [], {}
     totals = {a: 0.0 for a in JST_ARCHETYPES}
     respondent_vectors: List[Dict[str, Any]] = []
+    component_sums: Dict[str, Dict[str, float]] = {
+        a: {"A": 0.0, "B1": 0.0, "B2": 0.0, "D13": 0.0, "TOTAL": 0.0} for a in JST_ARCHETYPES
+    }
+    a_valid_total = 0
+    a_expected_total = len(rows) * len(JST_A_PAIRS)
+    a_valid_by_q = {qid: 0 for qid, _, _ in JST_A_PAIRS}
+    b1_selected_total = 0
+    b2_valid_total = 0
+    d13_valid_total = 0
 
     def _parse_a_value(raw: Any) -> Optional[int]:
         try:
@@ -2305,6 +2314,8 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
             val = _parse_a_value(payload.get(qid))
             if val is None:
                 continue
+            a_valid_total += 1
+            a_valid_by_q[qid] = int(a_valid_by_q.get(qid, 0)) + 1
             p_right = float(val - 1) / 6.0
             p_left = 1.0 - p_right
             if left_arch in a_acc:
@@ -2322,6 +2333,11 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
         d13_raw = str(payload.get("D13") or "").strip()
         b2 = arch_by_lower.get(b2_raw.casefold(), b2_raw)
         d13 = arch_by_lower.get(d13_raw.casefold(), d13_raw)
+        b1_selected_total += int(len(selected_b1))
+        if b2 in JST_ARCHETYPES:
+            b2_valid_total += 1
+        if d13 in JST_ARCHETYPES:
+            d13_valid_total += 1
 
         vec: Dict[str, float] = {}
         for a in JST_ARCHETYPES:
@@ -2330,8 +2346,17 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
             b1_hit = 1.0 if a in selected_b1 else 0.0
             b2_hit = 1.0 if b2 == a else 0.0
             d13_hit = 1.0 if d13 == a else 0.0
-            score = (0.40 * a_norm + 0.20 * b1_hit + 0.25 * b2_hit + 0.15 * d13_hit) * 100.0
+            a_component = 0.40 * a_norm * 100.0
+            b1_component = 0.20 * b1_hit * 100.0
+            b2_component = 0.25 * b2_hit * 100.0
+            d13_component = 0.15 * d13_hit * 100.0
+            score = a_component + b1_component + b2_component + d13_component
             vec[a] = score
+            component_sums[a]["A"] += a_component
+            component_sums[a]["B1"] += b1_component
+            component_sums[a]["B2"] += b2_component
+            component_sums[a]["D13"] += d13_component
+            component_sums[a]["TOTAL"] += score
 
         for a in JST_ARCHETYPES:
             totals[a] += vec[a]
@@ -2339,7 +2364,29 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
 
     n = float(len(rows))
     profile = {a: round((totals[a] / n), 2) for a in JST_ARCHETYPES}
-    return profile, respondent_vectors
+    rows_n = int(len(rows))
+    component_means = {
+        a: {
+            "A": round(component_sums[a]["A"] / max(1, rows_n), 2),
+            "B1": round(component_sums[a]["B1"] / max(1, rows_n), 2),
+            "B2": round(component_sums[a]["B2"] / max(1, rows_n), 2),
+            "D13": round(component_sums[a]["D13"] / max(1, rows_n), 2),
+            "TOTAL": round(component_sums[a]["TOTAL"] / max(1, rows_n), 2),
+        }
+        for a in JST_ARCHETYPES
+    }
+    audit: Dict[str, Any] = {
+        "rows_n": rows_n,
+        "a_valid_rate_pct": round((100.0 * a_valid_total / a_expected_total), 1) if a_expected_total > 0 else 0.0,
+        "a_valid_by_q_rate_pct": {
+            qid: round((100.0 * int(cnt) / max(1, rows_n)), 1) for qid, cnt in a_valid_by_q.items()
+        },
+        "b1_mean_selected": round(float(b1_selected_total) / max(1, rows_n), 2),
+        "b2_valid_rate_pct": round((100.0 * b2_valid_total / max(1, rows_n)), 1),
+        "d13_valid_rate_pct": round((100.0 * d13_valid_total / max(1, rows_n)), 1),
+        "component_means_by_archetype": component_means,
+    }
+    return profile, respondent_vectors, audit
 
 
 def _dot(a: Dict[str, float], b: Dict[str, float]) -> float:
@@ -2384,7 +2431,7 @@ def matching_view() -> None:
 
             p_profile, p_n = _load_personal_profile_pct(str(person.get("id")))
             j_rows = list_jst_responses(sb, str(jst_study.get("id")))
-            j_profile, respondent_vectors = _calc_jst_target_profile(j_rows)
+            j_profile, respondent_vectors, target_audit = _calc_jst_target_profile(j_rows)
 
             if not p_profile:
                 st.error("Nie udało się policzyć profilu personalnego (brak odpowiedzi).")
@@ -2655,6 +2702,7 @@ def matching_view() -> None:
                 "demo_rows": demo_rows,
                 "demo_jst_weighted_header": f"{jst_name_nom} / (po wagowaniu)",
                 "demo_weights_used": bool(weights_used),
+                "target_audit": target_audit,
                 "match_formula": "match = max(0, 100 - MAE), gdzie MAE to średnia z |profil_polityka - profil_mieszkańców| dla 12 archetypów",
             }
             st.success("Wynik dopasowania został obliczony.")
@@ -2676,19 +2724,23 @@ def matching_view() -> None:
         st.metric("Poziom dopasowania", f"{result['match_score']}%")
         st.caption(f"Próba personalna: {result['personal_n']} odpowiedzi · Próba mieszkańców: {result['jst_n']} odpowiedzi")
 
-        df_cmp = pd.DataFrame(
-            [
+        cmp_rows = []
+        for a in JST_ARCHETYPES:
+            pol = float(result["personal_profile"].get(a, 0.0))
+            ocz = float(result["jst_profile"].get(a, 0.0))
+            diff = abs(pol - ocz)
+            cmp_rows.append(
                 {
                     "Archetyp": a,
-                    "Profil polityka (%)": round(float(result["personal_profile"].get(a, 0.0)), 2),
-                    "Oczekiwania mieszkańców (%)": round(float(result["jst_profile"].get(a, 0.0)), 2),
-                    "Różnica |Δ|": round(abs(float(result["personal_profile"].get(a, 0.0)) - float(result["jst_profile"].get(a, 0.0))), 2),
+                    "Profil polityka (%)": f"{pol:.1f}",
+                    "Oczekiwania mieszkańców (%)": f"{ocz:.1f}",
+                    "Różnica |Δ|": f"{diff:.1f}",
+                    "__sort_diff": diff,
                 }
-                for a in JST_ARCHETYPES
-            ]
-        ).sort_values("Różnica |Δ|", ascending=True)
-        cmp_rows = len(df_cmp.index)
-        cmp_height = max(92, min(760, 40 + cmp_rows * 35))
+            )
+        df_cmp = pd.DataFrame(cmp_rows).sort_values("__sort_diff", ascending=True).drop(columns="__sort_diff")
+        cmp_rows_n = len(df_cmp.index)
+        cmp_height = max(92, min(760, 40 + cmp_rows_n * 35))
         st.dataframe(
             df_cmp,
             use_container_width=True,
@@ -2704,6 +2756,42 @@ def matching_view() -> None:
             st.markdown(
                 "To wynik porównania 12 archetypów: im mniejsza średnia różnica profilu polityka i oczekiwań mieszkańców, tym wyższy wynik procentowy."
             )
+            st.markdown("**Jak dokładnie liczony jest komponent `A` (40%)?**")
+            st.markdown(
+                "- Dla każdej pary `A1..A18` odpowiedź 1–7 jest przeliczana liniowo na udział lewego/prawego archetypu.\n"
+                "- Wzór dla pary: `p_prawy = (wartość_A - 1) / 6`, `p_lewy = 1 - p_prawy`.\n"
+                "- Dla archetypu sumujemy wkłady z jego par i dzielimy przez liczbę par, w których występuje (`A_norm` 0–1).\n"
+                "- Składanie wyniku archetypu: `score = 100 * (0.40*A_norm + 0.20*B1_hit + 0.25*B2_hit + 0.15*D13_hit)`."
+            )
+            audit = result.get("target_audit") or {}
+            if audit:
+                st.markdown(
+                    f"**Audyt danych wejściowych:** A valid `{float(audit.get('a_valid_rate_pct', 0.0)):.1f}%`, "
+                    f"B2 valid `{float(audit.get('b2_valid_rate_pct', 0.0)):.1f}%`, "
+                    f"D13 valid `{float(audit.get('d13_valid_rate_pct', 0.0)):.1f}%`, "
+                    f"średnia liczba wskazań B1: `{float(audit.get('b1_mean_selected', 0.0)):.2f}`."
+                )
+                comp = audit.get("component_means_by_archetype") or {}
+                if isinstance(comp, dict) and comp:
+                    comp_rows: List[Dict[str, str]] = []
+                    for a in JST_ARCHETYPES:
+                        row = comp.get(a) or {}
+                        comp_rows.append(
+                            {
+                                "Archetyp": a,
+                                "A (40%)": f"{float(row.get('A', 0.0)):.1f}",
+                                "B1 (20%)": f"{float(row.get('B1', 0.0)):.1f}",
+                                "B2 (25%)": f"{float(row.get('B2', 0.0)):.1f}",
+                                "D13 (15%)": f"{float(row.get('D13', 0.0)):.1f}",
+                                "Suma": f"{float(row.get('TOTAL', 0.0)):.1f}",
+                            }
+                        )
+                    st.dataframe(
+                        pd.DataFrame(comp_rows),
+                        use_container_width=True,
+                        hide_index=True,
+                        height=max(92, min(520, 40 + len(comp_rows) * 35)),
+                    )
         st.markdown(f"**Najlepsze dopasowanie:** {', '.join(result['strengths'])}")
         st.markdown(f"**Największe luki:** {', '.join(result['gaps'])}")
 
