@@ -58,6 +58,12 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
 from archetype_docx_loader import load_archetype_extended
+from db_jst_utils import (
+    ARCHETYPES as JST_ARCHETYPES,
+    fetch_jst_studies,
+    list_jst_responses,
+    response_rows_to_dataframe as jst_response_rows_to_dataframe,
+)
 
 import sys
 if sys.platform.startswith("linux"):
@@ -2968,6 +2974,144 @@ def should_show_supplement(third_name: str | None,
         return float(means_pct.get(third_name, 0.0)) >= (threshold - 1e-9)
     except Exception:
         return False
+
+
+JST_A_PAIRS: list[tuple[str, str, str]] = [
+    ("A1", "Opiekun", "Odkrywca"),
+    ("A2", "Towarzysz", "Władca"),
+    ("A3", "Opiekun", "Twórca"),
+    ("A4", "Mędrzec", "Bohater"),
+    ("A5", "Władca", "Buntownik"),
+    ("A6", "Niewinny", "Odkrywca"),
+    ("A7", "Buntownik", "Kochanek"),
+    ("A8", "Opiekun", "Bohater"),
+    ("A9", "Towarzysz", "Czarodziej"),
+    ("A10", "Kochanek", "Bohater"),
+    ("A11", "Władca", "Błazen"),
+    ("A12", "Niewinny", "Czarodziej"),
+    ("A13", "Czarodziej", "Mędrzec"),
+    ("A14", "Towarzysz", "Twórca"),
+    ("A15", "Błazen", "Niewinny"),
+    ("A16", "Odkrywca", "Mędrzec"),
+    ("A17", "Kochanek", "Buntownik"),
+    ("A18", "Błazen", "Twórca"),
+]
+JST_A_PAIR_COUNTS: dict[str, int] = {
+    a: sum(1 for _, left, right in JST_A_PAIRS if left == a or right == a)
+    for a in JST_ARCHETYPES
+}
+
+
+def _jst_option_label(study: dict) -> str:
+    name = str(study.get("jst_full_nom") or "").strip()
+    if not name:
+        jst_type = str(study.get("jst_type") or "").strip().title()
+        jst_name = str(study.get("jst_name") or "").strip()
+        name = f"{jst_type} {jst_name}".strip()
+    slug = str(study.get("slug") or "").strip()
+    if slug:
+        return f"{name} – /{slug}"
+    return name or "Badanie mieszkańców"
+
+
+def _jst_name_nom(study: dict) -> str:
+    full = str(study.get("jst_full_nom") or "").strip()
+    if full:
+        return full
+    jst_type = str(study.get("jst_type") or "").strip().title()
+    jst_name = str(study.get("jst_name") or "").strip()
+    return f"{jst_type} {jst_name}".strip() or "JST"
+
+
+def _parse_a_1_7(raw: object) -> int | None:
+    try:
+        val = int(float(str(raw).strip().replace(",", ".")))
+    except Exception:
+        return None
+    return val if 1 <= val <= 7 else None
+
+
+def _is_truthy_mark(raw: object) -> bool:
+    txt = str(raw or "").strip().lower()
+    if not txt:
+        return False
+    if txt in {"1", "1.0", "true", "t", "tak", "yes", "y", "on", "x"}:
+        return True
+    try:
+        return float(txt) > 0.0
+    except Exception:
+        return False
+
+
+def _canon_jst_archetype(raw: object) -> str:
+    txt = str(raw or "").strip()
+    if not txt:
+        return ""
+    lower_map = {a.casefold(): a for a in JST_ARCHETYPES}
+    direct = lower_map.get(txt.casefold())
+    if direct:
+        return direct
+    m = re.search(r"(\d{1,2})", txt)
+    if m:
+        idx = int(m.group(1))
+        if 1 <= idx <= len(JST_ARCHETYPES):
+            return JST_ARCHETYPES[idx - 1]
+    return txt
+
+
+def calc_jst_profile_0_100(rows: list[dict]) -> tuple[dict[str, float], int]:
+    if not rows:
+        return {}, 0
+
+    try:
+        df = jst_response_rows_to_dataframe(rows)
+    except Exception:
+        return {}, 0
+    if df is None or df.empty:
+        return {}, 0
+
+    totals = {a: 0.0 for a in JST_ARCHETYPES}
+    n = 0
+
+    for rec in df.to_dict("records"):
+        a_acc = {a: 0.0 for a in JST_ARCHETYPES}
+        valid_a = 0
+        for qid, left_arch, right_arch in JST_A_PAIRS:
+            val = _parse_a_1_7(rec.get(qid))
+            if val is None:
+                continue
+            valid_a += 1
+            p_right = float(val - 1) / 6.0
+            p_left = 1.0 - p_right
+            if left_arch in a_acc:
+                a_acc[left_arch] += p_left
+            if right_arch in a_acc:
+                a_acc[right_arch] += p_right
+
+        selected_b1 = {
+            a for a in JST_ARCHETYPES if _is_truthy_mark(rec.get(f"B1_{a}"))
+        }
+        b2 = _canon_jst_archetype(rec.get("B2"))
+        d13 = _canon_jst_archetype(rec.get("D13"))
+
+        if valid_a <= 0 and not selected_b1 and b2 not in JST_ARCHETYPES and d13 not in JST_ARCHETYPES:
+            continue
+
+        n += 1
+        for a in JST_ARCHETYPES:
+            denom = float(JST_A_PAIR_COUNTS.get(a, 1) or 1)
+            a_norm = float(a_acc.get(a, 0.0)) / denom
+            b1_hit = 1.0 if a in selected_b1 else 0.0
+            b2_hit = 1.0 if b2 == a else 0.0
+            d13_hit = 1.0 if d13 == a else 0.0
+            score = 100.0 * (0.40 * a_norm + 0.20 * b1_hit + 0.25 * b2_hit + 0.15 * d13_hit)
+            totals[a] += score
+
+    if n <= 0:
+        return {}, 0
+
+    profile = {a: round(totals[a] / n, 2) for a in JST_ARCHETYPES}
+    return profile, n
 
 def add_image(paragraph, img, width):
     """
@@ -6121,6 +6265,72 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             supp_data = archetype_extended.get(supp_avg, {}) if supp_avg and supp_avg not in [
                 main_avg, aux_avg] else {}
 
+            # Krok 7: porównanie profilu polityka z profilem mieszkańców JST (0-100 oraz radar 0-20).
+            compare_jst_enabled = False
+            jst_compare_profile_100: dict[str, float] = {}
+            jst_compare_profile_20: dict[str, float] = {}
+            jst_compare_n = 0
+            jst_compare_name = ""
+            jst_compare_id = ""
+            jst_main = None
+            jst_aux = None
+            jst_supp = None
+
+            if not public_view:
+                try:
+                    jst_studies = fetch_jst_studies(sb)
+                except Exception:
+                    jst_studies = []
+
+                if jst_studies:
+                    by_label: dict[str, dict | None] = {"Brak porównania mieszkańców": None}
+                    for jst_study in jst_studies:
+                        by_label[_jst_option_label(jst_study)] = jst_study
+
+                    city_nom_cf = str(study.get("city_nom") or "").strip().casefold()
+                    default_label = "Brak porównania mieszkańców"
+                    if city_nom_cf:
+                        for label, jst_study in by_label.items():
+                            if not jst_study:
+                                continue
+                            full_nom_cf = str(jst_study.get("jst_full_nom") or "").strip().casefold()
+                            name_cf = str(jst_study.get("jst_name") or "").strip().casefold()
+                            if city_nom_cf and (city_nom_cf == name_cf or city_nom_cf in full_nom_cf):
+                                default_label = label
+                                break
+
+                    labels = list(by_label.keys())
+                    default_idx = labels.index(default_label) if default_label in labels else 0
+                    picked_label = st.selectbox(
+                        "Porównaj z badaniem mieszkańców (JST)",
+                        labels,
+                        index=default_idx,
+                        key=f"personal_jst_compare_{study_id}",
+                    )
+                    picked_jst = by_label.get(picked_label)
+
+                    if picked_jst:
+                        jst_compare_id = str(picked_jst.get("id") or "").strip()
+                        if jst_compare_id:
+                            try:
+                                jst_rows = list_jst_responses(sb, jst_compare_id)
+                            except Exception:
+                                jst_rows = []
+                            jst_compare_profile_100, jst_compare_n = calc_jst_profile_0_100(jst_rows)
+                            if jst_compare_profile_100:
+                                compare_jst_enabled = True
+                                jst_compare_name = _jst_name_nom(picked_jst)
+                                jst_compare_profile_20 = {
+                                    a: float(jst_compare_profile_100.get(a, 0.0)) / 5.0
+                                    for a in archetype_names
+                                }
+                                jst_main, jst_aux, jst_supp = pick_top_3_archetypes(
+                                    jst_compare_profile_20,
+                                    archetype_names,
+                                )
+                            else:
+                                st.info("Wybrane badanie JST nie ma jeszcze kompletnych danych do porównania profilu archetypowego.")
+
             def _with_core_triplet(payload: dict, arche_name: str | None) -> dict:
                 out = dict(payload or {})
                 if arche_name and not out.get("core_triplet"):
@@ -6468,62 +6678,96 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     components.html(_html_block, height=_table_height, scrolling=False)
 
             with col2:
-                theta_labels = []
-                for n in archetype_names:
-                    label = disp_name(n)
-                    if n == main_avg:
-                        theta_labels.append(f"<b><span style='color:red;'>{label}</span></b>")
-                    elif n == aux_avg:
-                        theta_labels.append(f"<b><span style='color:#FFD22F;'>{label}</span></b>")
-                    elif n == supp_avg:
-                        theta_labels.append(f"<b><span style='color:#40b900;'>{label}</span></b>")
-                    else:
-                        theta_labels.append(f"<span style='color:#656565;'>{label}</span>")
+                theta_labels = [f"<span style='color:#656565;'>{disp_name(n)}</span>" for n in archetype_names]
 
-                # markery TOP-3 z mean_archetype_scores
-                highlight_r = []
-                highlight_marker_color = []
-                for name in archetype_names:
-                    if name == main_avg:
-                        highlight_r.append(mean_archetype_scores.get(name, 0.0))
-                        highlight_marker_color.append("red")
-                    elif name == aux_avg:
-                        highlight_r.append(mean_archetype_scores.get(name, 0.0))
-                        highlight_marker_color.append("#FFD22F")
-                    elif name == supp_avg:
-                        highlight_r.append(mean_archetype_scores.get(name, 0.0))
-                        highlight_marker_color.append("#40b900")
-                    else:
-                        highlight_r.append(None)
-                        highlight_marker_color.append("rgba(0,0,0,0)")
+                person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
+                jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
 
-                # ŚREDNIE (0–20) w KOLEJNOŚCI archetype_names
-                mean_vals_ordered = [mean_archetype_scores.get(n, 0.0) for n in archetype_names]
+                def _top3_markers(values: dict[str, float], main_name: str | None, aux_name: str | None,
+                                  supp_name: str | None, palette: dict[str, str]) -> tuple[list[float | None], list[str]]:
+                    out_r: list[float | None] = []
+                    out_colors: list[str] = []
+                    for arche_name in archetype_names:
+                        if main_name and arche_name == main_name:
+                            out_r.append(float(values.get(arche_name, 0.0)))
+                            out_colors.append(palette["main"])
+                        elif aux_name and arche_name == aux_name:
+                            out_r.append(float(values.get(arche_name, 0.0)))
+                            out_colors.append(palette["aux"])
+                        elif supp_name and arche_name == supp_name:
+                            out_r.append(float(values.get(arche_name, 0.0)))
+                            out_colors.append(palette["supp"])
+                        else:
+                            out_r.append(None)
+                            out_colors.append("rgba(0,0,0,0)")
+                    return out_r, out_colors
+
+                # ŚREDNIE (0–20) polityka w kolejności KOLO_NAMES_ORDER.
+                mean_vals_ordered = [float(mean_archetype_scores.get(n, 0.0)) for n in archetype_names]
+                person_highlight_r, person_highlight_colors = _top3_markers(
+                    mean_archetype_scores, main_avg, aux_avg, supp_avg, person_top_colors
+                )
+
+                traces: list[go.Scatterpolar] = [
+                    go.Scatterpolar(
+                        r=mean_vals_ordered + [mean_vals_ordered[0]],
+                        theta=archetype_names + [archetype_names[0]],
+                        fill="toself",
+                        fillcolor="rgba(37,99,235,0.18)",
+                        name=f"Profil polityka: {personGen}",
+                        line=dict(color="#2563eb", width=3),
+                        marker=dict(size=5),
+                        hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
+                    )
+                ]
+
+                if compare_jst_enabled:
+                    jst_vals_ordered = [float(jst_compare_profile_20.get(n, 0.0)) for n in archetype_names]
+                    traces.append(
+                        go.Scatterpolar(
+                            r=jst_vals_ordered + [jst_vals_ordered[0]],
+                            theta=archetype_names + [archetype_names[0]],
+                            fill="toself",
+                            fillcolor="rgba(15,118,110,0.16)",
+                            name=f"Mieszkańcy: {jst_compare_name} (N={jst_compare_n})",
+                            line=dict(color="#0f766e", width=3, dash="dot"),
+                            marker=dict(size=5),
+                            hovertemplate="<b>%{theta}</b><br>Mieszkańcy: %{r:.2f}<extra></extra>",
+                        )
+                    )
+
+                traces.append(
+                    go.Scatterpolar(
+                        r=person_highlight_r,
+                        theta=archetype_names,
+                        mode="markers",
+                        marker=dict(size=16, color=person_highlight_colors, opacity=0.92,
+                                    line=dict(color="black", width=2.6)),
+                        name="TOP3 polityka",
+                        showlegend=False,
+                        hovertemplate="<b>%{theta}</b><br>TOP3 polityka: %{r:.2f}<extra></extra>",
+                    )
+                )
+
+                if compare_jst_enabled:
+                    jst_highlight_r, jst_highlight_colors = _top3_markers(
+                        jst_compare_profile_20, jst_main, jst_aux, jst_supp, jst_top_colors
+                    )
+                    traces.append(
+                        go.Scatterpolar(
+                            r=jst_highlight_r,
+                            theta=archetype_names,
+                            mode="markers",
+                            marker=dict(size=14, color=jst_highlight_colors, opacity=0.94,
+                                        line=dict(color="#0f172a", width=2.0)),
+                            name="TOP3 mieszkańców",
+                            showlegend=False,
+                            hovertemplate="<b>%{theta}</b><br>TOP3 mieszkańców: %{r:.2f}<extra></extra>",
+                        )
+                    )
 
                 fig = go.Figure(
-                    data=[
-                        go.Scatterpolar(
-                            r=mean_vals_ordered + [mean_vals_ordered[0]],
-                            theta=archetype_names + [archetype_names[0]],
-                            fill='toself',
-                            name='średnia wszystkich',
-                            line=dict(color="royalblue", width=3),
-                            marker=dict(size=6),
-                            # 👇 własny tooltip: bez "r:" i "θ:", zaokrąglenie do 2 miejsc
-                            hovertemplate="<b>%{theta}</b><br>średnia: %{r:.2f}<extra></extra>",
-                        ),
-                        go.Scatterpolar(
-                            r=highlight_r,
-                            theta=archetype_names,
-                            mode='markers',
-                            marker=dict(size=18, color=highlight_marker_color, opacity=0.90,
-                                        line=dict(color="black", width=3)),
-                            name='Archetyp główny/wspierający/poboczny',
-                            showlegend=False,
-                            # 👇 spójny tooltip z 2 miejscami po przecinku
-                            hovertemplate="<b>%{theta}</b><br>wartość: %{r:.2f}<extra></extra>",
-                        )
-                    ],
+                    data=traces,
                     layout=go.Layout(
                         polar=dict(
                             radialaxis=dict(visible=True, range=[0, 20]),
@@ -6535,17 +6779,17 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 direction="clockwise",
                             )
                         ),
-                        width=400, height=400,
+                        width=400,
+                        height=400,
                         margin=dict(l=20, r=20, t=32, b=32),
-                        showlegend=False
+                        showlegend=compare_jst_enabled,
                     )
                 )
 
-                # PRZEZROCZYSTE TŁO RADARU — bez zmian
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     polar=dict(
-                        domain=dict(x=[0, 1], y=[0, 1]),  # pełna szerokość/wysokość domeny
+                        domain=dict(x=[0, 1], y=[0, 1]),
                         bgcolor="rgba(0,0,0,0)",
                         radialaxis=dict(visible=True, range=[0, 20]),
                         angularaxis=dict(
@@ -6557,12 +6801,19 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         ),
                     ),
                     autosize=False,
-                    width=radar_plot_size, height=radar_plot_size,
+                    width=radar_plot_size,
+                    height=radar_plot_size,
                     margin=radar_margins,
-                    showlegend=False,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.04,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=12),
+                        bgcolor="rgba(255,255,255,0.6)",
+                    ),
                 )
-
-                # 👇 większa czcionka w dymkach hover
                 fig.update_layout(hoverlabel=dict(font=dict(size=radar_hover_size)))
 
                 radar_config = {
@@ -6571,63 +6822,69 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     "responsive": True,
                 }
 
+                radar_heading = (
+                    f"Profil archetypów (0-20): {personGen} vs mieszkańcy {jst_compare_name}"
+                    if compare_jst_enabled
+                    else f"Profil archetypów {personGen}"
+                )
+
+                if compare_jst_enabled:
+                    top3_legend_html = f"""
+                    <div style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 20px;margin-top:12px;margin-bottom:10px;">
+                      <span style="font-size:0.84em;font-weight:700;color:#334155;min-width:135px;">TOP3 polityka:</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['main']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">główny</span></span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['aux']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">wspierający</span></span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['supp']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">poboczny</span></span>
+                      <span style="font-size:0.84em;font-weight:700;color:#334155;min-width:135px;">TOP3 mieszkańców:</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['main']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">główny</span></span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['aux']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">wspierający</span></span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['supp']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">poboczny</span></span>
+                    </div>
+                    """
+                else:
+                    top3_legend_html = """
+                    <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+                      <span style="display:flex;align-items:center;margin-right:34px;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:#ef4444;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp główny</span>
+                      </span>
+                      <span style="display:flex;align-items:center;margin-right:34px;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:#facc15;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp wspierający</span>
+                      </span>
+                      <span style="display:flex;align-items:center;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:#22c55e;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp poboczny</span>
+                      </span>
+                    </div>
+                    """
+
                 if is_mobile:
                     st.markdown(
-                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
+                        ap_section_heading(radar_heading, center=True, margin_bottom_px=8),
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
                         fig,
                         use_container_width=True,
                         config=radar_config,
-                        key=f"radar-{study_id}",
+                        key=f"radar-{study_id}-{jst_compare_id or 'none'}",
                     )
-                    st.markdown("""
-                    <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
-                      <span style="display:flex;align-items:center;margin-right:34px;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp główny</span>
-                      </span>
-                      <span style="display:flex;align-items:center;margin-right:34px;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp wspierający</span>
-                      </span>
-                      <span style="display:flex;align-items:center;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp poboczny</span>
-                      </span>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(top3_legend_html, unsafe_allow_html=True)
                 else:
-                    # desktop: węższe boczne „bufory” + środkowa kolumna z wykresem
                     padL, mid, padR = st.columns([0.05, 0.90, 0.05], gap="small")
                     with mid:
                         st.markdown(
-                            ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
+                            ap_section_heading(radar_heading, center=True, margin_bottom_px=8),
                             unsafe_allow_html=True,
                         )
                         st.plotly_chart(
                             fig,
                             use_container_width=True,
                             config=radar_config,
-                            key=f"radar-{study_id}",
+                            key=f"radar-{study_id}-{jst_compare_id or 'none'}",
                         )
-                        st.markdown("""
-                        <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
-                          <span style="display:flex;align-items:center;margin-right:34px;">
-                            <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                            <span style="font-size:0.85em;">Archetyp główny</span>
-                          </span>
-                          <span style="display:flex;align-items:center;margin-right:34px;">
-                            <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                            <span style="font-size:0.85em;">Archetyp wspierający</span>
-                          </span>
-                          <span style="display:flex;align-items:center;">
-                            <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                            <span style="font-size:0.85em;">Archetyp poboczny</span>
-                          </span>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(top3_legend_html, unsafe_allow_html=True)
 
 
             # --- Heurystyczna analiza koloru (bąbelki OUT; słupki po LEWEJ; prawa pusta) ---
@@ -6770,20 +7027,67 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 mean_scores=means_pct,
                 out_path=f"segment_profile_{study_id}.png",
             )
+            segment_profile_compare_path = None
+            if compare_jst_enabled and jst_compare_profile_100:
+                safe_jst_key = re.sub(r"[^a-zA-Z0-9_-]+", "_", jst_compare_id or jst_compare_name or "jst")
+                segment_profile_compare_path = make_segment_profile_wheel_png(
+                    mean_scores=jst_compare_profile_100,
+                    out_path=f"segment_profile_jst_{study_id}_{safe_jst_key}.png",
+                )
             st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
-            st.markdown(
-                ap_section_heading(
-                    f"Profil archetypowy {personGen} (siła archetypu, skala: 0-100)",
-                    center=False,
-                    margin_bottom_px=12,
-                    margin_top_px=6,
-                ),
-                unsafe_allow_html=True,
-            )
-            if is_mobile:
-                st.image(segment_profile_png_path, use_column_width=True)
+            if compare_jst_enabled and segment_profile_compare_path:
+                st.markdown(
+                    ap_section_heading(
+                        "Porównanie profili archetypowych (siła archetypu, skala: 0-100)",
+                        center=False,
+                        margin_bottom_px=12,
+                        margin_top_px=6,
+                    ),
+                    unsafe_allow_html=True,
+                )
+                if is_mobile:
+                    st.markdown(
+                        f"<div style='font-size:1.03em;font-weight:650;color:#1f2937;margin:4px 0 8px;'>"
+                        f"Profil archetypowy {personGen}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.image(segment_profile_png_path, use_column_width=True)
+                    st.markdown(
+                        f"<div style='font-size:1.03em;font-weight:650;color:#1f2937;margin:14px 0 8px;'>"
+                        f"Profil archetypowy mieszkańców {jst_compare_name} (N={jst_compare_n})</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.image(segment_profile_compare_path, use_column_width=True)
+                else:
+                    profile_col1, profile_col2 = st.columns([0.5, 0.5], gap="large")
+                    with profile_col1:
+                        st.markdown(
+                            f"<div style='font-size:1.07em;font-weight:650;color:#1f2937;margin:2px 0 8px;'>"
+                            f"Profil archetypowy {personGen}</div>",
+                            unsafe_allow_html=True,
+                        )
+                        st.image(segment_profile_png_path, width=segment_profile_width)
+                    with profile_col2:
+                        st.markdown(
+                            f"<div style='font-size:1.07em;font-weight:650;color:#1f2937;margin:2px 0 8px;'>"
+                            f"Profil archetypowy mieszkańców {jst_compare_name} (N={jst_compare_n})</div>",
+                            unsafe_allow_html=True,
+                        )
+                        st.image(segment_profile_compare_path, width=segment_profile_width)
             else:
-                st.image(segment_profile_png_path, width=segment_profile_width)
+                st.markdown(
+                    ap_section_heading(
+                        f"Profil archetypowy {personGen} (siła archetypu, skala: 0-100)",
+                        center=False,
+                        margin_bottom_px=12,
+                        margin_top_px=6,
+                    ),
+                    unsafe_allow_html=True,
+                )
+                if is_mobile:
+                    st.image(segment_profile_png_path, use_column_width=True)
+                else:
+                    st.image(segment_profile_png_path, width=segment_profile_width)
             st.markdown(
                 """
                 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">

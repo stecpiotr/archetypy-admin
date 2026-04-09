@@ -97,47 +97,48 @@ for _chrome_candidate in (
 
 def _app_build_signature() -> str:
     """Krótki znacznik buildu do szybkiej weryfikacji, czy działa nowy deploy."""
+    repo_root = str(Path(__file__).resolve().parent)
+    git_bin = "/usr/bin/git"
+
     commit = (
         os.getenv("STREAMLIT_GIT_COMMIT_SHA")
         or os.getenv("GITHUB_SHA")
         or os.getenv("COMMIT_SHA")
         or ""
     ).strip()
-    commit_date = ""
-    repo_root = str(Path(__file__).resolve().parent)
+
     if not commit:
         try:
             commit = subprocess.run(
-                ["git", "-C", repo_root, "rev-parse", "HEAD"],
+                [git_bin, "-C", repo_root, "rev-parse", "HEAD"],
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=2.0,
+                timeout=5.0,
             ).stdout.strip()
         except Exception:
             commit = ""
+
+    build_time = ""
     try:
         raw_commit_date = subprocess.run(
-            ["git", "-C", repo_root, "show", "-s", "--format=%cI", "HEAD"],
+            [git_bin, "-C", repo_root, "show", "-s", "--format=%cI", "HEAD"],
             capture_output=True,
             text=True,
             check=True,
-            timeout=2.0,
+            timeout=5.0,
         ).stdout.strip()
         if raw_commit_date:
             dt = datetime.fromisoformat(raw_commit_date.replace("Z", "+00:00"))
-            commit_date = dt.astimezone(ZoneInfo("Europe/Warsaw")).strftime("%Y-%m-%d %H:%M")
+            build_time = dt.astimezone(ZoneInfo("Europe/Warsaw")).strftime("%Y-%m-%d %H:%M")
     except Exception:
-        commit_date = ""
+        build_time = ""
 
     commit_short = commit[:8] if commit else "local"
-    try:
-        src_mtime = datetime.fromtimestamp(os.path.getmtime(__file__)).strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        src_mtime = "unknown-time"
-    if commit_date:
-        return f"build: {src_mtime} | commit: {commit_short} ({commit_date})"
-    return f"build: {src_mtime} | commit: {commit_short}"
+
+    if build_time:
+        return f"build: {build_time} | commit: {commit_short}"
+    return f"build: unknown-time | commit: {commit_short}"
 
 
 def render_build_badge() -> None:
