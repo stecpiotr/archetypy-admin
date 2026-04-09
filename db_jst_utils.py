@@ -617,13 +617,13 @@ def ensure_jst_schema() -> None:
         EXISTS(
           SELECT 1
           FROM public.jst_sms_messages
-          WHERE token = v_token AND completed_at IS NOT NULL
+          WHERE token = v_token AND (completed_at IS NOT NULL OR rejected_at IS NOT NULL)
         )
         OR
         EXISTS(
           SELECT 1
           FROM public.jst_email_logs
-          WHERE token = v_token AND completed_at IS NOT NULL
+          WHERE token = v_token AND (completed_at IS NOT NULL OR rejected_at IS NOT NULL)
         )
       INTO v_done;
 
