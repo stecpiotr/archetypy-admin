@@ -395,6 +395,29 @@ def _clean_1to7(x: Any) -> Optional[int]:
     return None
 
 
+def _clean_binary_mark(x: Any) -> float:
+    """
+    Normalizuje zaznaczenie 0/1 z różnych formatów importu.
+    Zwraca 1.0 dla wartości prawdziwych, inaczej 0.0.
+    """
+    if x is None or (isinstance(x, float) and (not np.isfinite(x))):
+        return 0.0
+    s = str(x).strip().lower()
+    if not s:
+        return 0.0
+    if s in {"1", "true", "t", "tak", "yes", "y", "on", "x"}:
+        return 1.0
+    if s in {"0", "false", "f", "nie", "no", "n", "off"}:
+        return 0.0
+    try:
+        v = float(str(x).replace(",", "."))
+        if np.isfinite(v) and v > 0:
+            return 1.0
+    except Exception:
+        pass
+    return 0.0
+
+
 def _normalize_text_token(x: Any) -> str:
     if x is None or (isinstance(x, float) and (not np.isfinite(x))):
         return ""
@@ -425,6 +448,22 @@ def _parse_archetype_index(value: Any, lookup: Optional[Dict[str, int]] = None) 
     key = _normalize_text_token(value)
     if not key:
         return -1
+    # Numery archetypów: 1..12 (legacy) oraz 0..11 (indeksy)
+    m_num = re.match(r"^(\d{1,2})$", key)
+    if m_num:
+        n = int(m_num.group(1))
+        if 1 <= n <= len(ARCHETYPES):
+            return int(n - 1)
+        if 0 <= n < len(ARCHETYPES):
+            return int(n)
+    # Formaty typu "1 Władca", "nr 1" itp.
+    m_pref = re.match(r"^(?:nr|no)?\s*(\d{1,2})\b", key)
+    if m_pref:
+        n = int(m_pref.group(1))
+        if 1 <= n <= len(ARCHETYPES):
+            return int(n - 1)
+        if 0 <= n < len(ARCHETYPES):
+            return int(n)
     if key in lut:
         return int(lut[key])
     key2 = key.replace(" ", "")
@@ -749,9 +788,7 @@ def parse_B(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
 
     b1 = np.zeros((len(df), len(ARCHETYPES)), dtype=float)
     for j, c in enumerate(b1_cols):
-        b1[:, j] = df[c].apply(
-            lambda x: 1.0 if str(x).strip().lower() in ("1", "true", "t", "tak", "yes", "y") else 0.0
-        ).values
+        b1[:, j] = df[c].apply(_clean_binary_mark).values
 
     if "B2" not in df.columns:
         raise ValueError("Brak kolumny B2.")
@@ -1454,29 +1491,44 @@ def A_raw_vote_balance(A: np.ndarray) -> pd.DataFrame:
 
 def B_rankings(b1: np.ndarray, b2: np.ndarray, weights: np.ndarray) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     # B1: archetyp w trójce
-    w = weights.reshape(-1, 1)
-    sel_counts = (b1 * w).sum(axis=0)
-    total_w = float(weights.sum())
+    w = np.asarray(weights, dtype=float).reshape(-1)
+    w_col = w.reshape(-1, 1)
+    b1_flag = (np.nan_to_num(b1, nan=0.0) > 0.5).astype(float)
+    sel_counts_w = (b1_flag * w_col).sum(axis=0)
+    sel_counts_raw = (b1_flag > 0.5).sum(axis=0).astype(int)
+    answered_b1 = (b1_flag > 0.5).any(axis=1)
+    total_w_b1 = float(w[answered_b1].sum()) if np.any(answered_b1) else float(w.sum())
     df_b1 = pd.DataFrame({
         "archetyp": ARCHETYPES,
-        "liczba": sel_counts.round(0).astype(int),
-        "%": (sel_counts / total_w) * 100.0
+        "liczba": sel_counts_raw,
+        "%": np.where(total_w_b1 > 0, (sel_counts_w / total_w_b1) * 100.0, np.nan)
     }).sort_values("%", ascending=False).reset_index(drop=True)
 
     if "%" in df_b1.columns:
         df_b1["%"] = pd.to_numeric(df_b1["%"], errors="coerce").round(1)
 
     # B1: ranking trójek (kombinacje)
-    combos: Dict[str, float] = {}
+    combos_w: Dict[str, float] = {}
+    combos_n: Dict[str, int] = {}
     for i in range(b1.shape[0]):
-        picked = [ARCHETYPES[j] for j in range(len(ARCHETYPES)) if b1[i, j] > 0.5]
+        picked = [ARCHETYPES[j] for j in range(len(ARCHETYPES)) if b1_flag[i, j] > 0.5]
         if len(picked) == 0:
             continue
         picked = sorted(picked)
         key = " + ".join(picked)
-        combos[key] = combos.get(key, 0.0) + float(weights[i])
+        combos_w[key] = combos_w.get(key, 0.0) + float(w[i])
+        combos_n[key] = combos_n.get(key, 0) + 1
+    total_w_combo = float(w[(b1_flag > 0.5).any(axis=1)].sum()) if np.any((b1_flag > 0.5).any(axis=1)) else float(w.sum())
     df_tr = pd.DataFrame(
-        [{"trójka": k, "liczba": int(round(v)), "%": (v / total_w) * 100.0} for k, v in combos.items()])
+        [
+            {
+                "trójka": k,
+                "liczba": int(combos_n.get(k, 0)),
+                "%": ((float(combos_w.get(k, 0.0)) / total_w_combo) * 100.0) if total_w_combo > 0 else np.nan,
+            }
+            for k in combos_w.keys()
+        ]
+    )
     if len(df_tr) == 0:
         df_tr = pd.DataFrame(columns=["trójka", "liczba", "%"])
     df_tr = df_tr.sort_values("%", ascending=False).reset_index(drop=True)
@@ -1484,16 +1536,20 @@ def B_rankings(b1: np.ndarray, b2: np.ndarray, weights: np.ndarray) -> Tuple[pd.
         df_tr["%"] = pd.to_numeric(df_tr["%"], errors="coerce").round(1)
 
     # B2: najważniejszy
-    counts2 = np.zeros(len(ARCHETYPES), dtype=float)
+    counts2_w = np.zeros(len(ARCHETYPES), dtype=float)
+    counts2_n = np.zeros(len(ARCHETYPES), dtype=int)
     m = (b2 >= 0)
     idxs = np.where(m)[0]
+    total_w_b2 = float(w[m].sum()) if np.any(m) else float(w.sum())
 
     for i in idxs:
-        counts2[b2[i]] += float(weights[i])
+        idx = int(b2[i])
+        counts2_w[idx] += float(w[i])
+        counts2_n[idx] += 1
     df_b2 = pd.DataFrame({
         "archetyp": ARCHETYPES,
-        "liczba": counts2.round(0).astype(int),
-        "%": (counts2 / total_w) * 100.0
+        "liczba": counts2_n.astype(int),
+        "%": np.where(total_w_b2 > 0, (counts2_w / total_w_b2) * 100.0, np.nan),
     }).sort_values("%", ascending=False).reset_index(drop=True)
 
     if "%" in df_b2.columns:
@@ -5186,6 +5242,79 @@ def mentions_counts_by_question_for_report(df_mentions_q: pd.DataFrame) -> pd.Da
         out.loc[mask_data, c] = out.loc[mask_data, c].where(~zeros, "")
 
     return out
+
+
+def build_question_aggregation_audit(
+        A: np.ndarray,
+        b1: np.ndarray,
+        b2: np.ndarray,
+        d13: np.ndarray,
+        df_B1: pd.DataFrame,
+        df_B2: pd.DataFrame,
+        df_D13: pd.DataFrame,
+        df_mentions_q_raw: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Audyt spójności liczników pytań (surowe dane vs tabele raportowe).
+    Zwraca tabelę z delta dla A1..A18 oraz bloków B1/B2/D13.
+    """
+    rows: List[Dict[str, Any]] = []
+    q_ids = [pid for pid, _left, _right in A_PAIRS]
+
+    # A1..A18: expected = liczba odpowiedzi nieneutralnych (1-3 / 5-7), reported = suma kolumny z tabeli raw.
+    for j, qid in enumerate(q_ids):
+        v = np.asarray(A[:, j], dtype=float)
+        expected = int(np.sum(np.isfinite(v) & (v != float(A_SCALE_CENTER))))
+        reported = 0
+        if (df_mentions_q_raw is not None) and (qid in df_mentions_q_raw.columns):
+            reported = int(pd.to_numeric(df_mentions_q_raw[qid], errors="coerce").fillna(0).sum())
+        rows.append(
+            {
+                "pytanie": qid,
+                "expected_raw": int(expected),
+                "reported_raw": int(reported),
+                "delta": int(reported - expected),
+            }
+        )
+
+    # B1 (TOP3): suma zaznaczeń 0/1
+    b1_flag = (np.nan_to_num(b1, nan=0.0) > 0.5)
+    b1_expected = int(np.sum(b1_flag))
+    b1_reported = int(pd.to_numeric(df_B1.get("liczba"), errors="coerce").fillna(0).sum()) if isinstance(df_B1, pd.DataFrame) else 0
+    rows.append(
+        {
+            "pytanie": "B1",
+            "expected_raw": int(b1_expected),
+            "reported_raw": int(b1_reported),
+            "delta": int(b1_reported - b1_expected),
+        }
+    )
+
+    # B2 (TOP1): liczba odpowiedzi rozpoznanych
+    b2_expected = int(np.sum(np.asarray(b2, dtype=int) >= 0))
+    b2_reported = int(pd.to_numeric(df_B2.get("liczba"), errors="coerce").fillna(0).sum()) if isinstance(df_B2, pd.DataFrame) else 0
+    rows.append(
+        {
+            "pytanie": "B2",
+            "expected_raw": int(b2_expected),
+            "reported_raw": int(b2_reported),
+            "delta": int(b2_reported - b2_expected),
+        }
+    )
+
+    # D13 (TOP1): liczba odpowiedzi rozpoznanych
+    d13_expected = int(np.sum(np.asarray(d13, dtype=int) >= 0))
+    d13_reported = int(pd.to_numeric(df_D13.get("liczba"), errors="coerce").fillna(0).sum()) if isinstance(df_D13, pd.DataFrame) else 0
+    rows.append(
+        {
+            "pytanie": "D13",
+            "expected_raw": int(d13_expected),
+            "reported_raw": int(d13_reported),
+            "delta": int(d13_reported - d13_expected),
+        }
+    )
+
+    return pd.DataFrame(rows, columns=["pytanie", "expected_raw", "reported_raw", "delta"])
 
 
 def top5_blocks_table(
@@ -14732,7 +14861,9 @@ def main() -> None:
     df_mentions_out.to_csv(outdir / "mentions_total.csv", index=False, encoding="utf-8-sig")
 
     # Tabela: ile wskazań było w poszczególnych pytaniach (A1–A18, B1, B2, D13)
-    df_mentions_q = mentions_counts_by_question(A, b1, b2, d13, weights)
+    # Liczniki raportujemy surowo (1:1 z bazą), bez ważenia.
+    raw_weights = np.ones(len(df), dtype=float)
+    df_mentions_q = mentions_counts_by_question(A, b1, b2, d13, raw_weights, as_int=True)
     df_mentions_q.to_csv(outdir / "mentions_by_question.csv", index=False, encoding="utf-8-sig")
 
     # Wersja do raportu: puste zamiast 0 + sumy wierszy/kolumn
@@ -14812,6 +14943,29 @@ def main() -> None:
         df_display_values(df_D13, brand_values),
         outdir / "D13_top1_values.png"
     )
+
+    # Audyt spójności liczników pytań (raw expected vs reported)
+    df_q_audit = build_question_aggregation_audit(
+        A=A,
+        b1=b1,
+        b2=b2,
+        d13=d13,
+        df_B1=df_B1,
+        df_B2=df_B2,
+        df_D13=df_D13,
+        df_mentions_q_raw=df_mentions_q,
+    )
+    df_q_audit.to_csv(outdir / "question_aggregation_audit.csv", index=False, encoding="utf-8-sig")
+    bad = df_q_audit[pd.to_numeric(df_q_audit["delta"], errors="coerce").fillna(0).astype(int) != 0]
+    if len(bad) > 0:
+        print("[WARN] Audyt agregacji pytan wykryl rozjazdy:")
+        for _r in bad.itertuples(index=False):
+            print(
+                f"  - {str(getattr(_r, 'pytanie', '?'))}: "
+                f"expected={int(getattr(_r, 'expected_raw', 0) or 0)}, "
+                f"reported={int(getattr(_r, 'reported_raw', 0) or 0)}, "
+                f"delta={int(getattr(_r, 'delta', 0) or 0)}"
+            )
 
     # ===== TOP5 (A, B1, B2, D13) – poprawne % =====
     # + dodatkowo: pełne % dla WSZYSTKICH archetypów (dla zakładki "Filtry")
