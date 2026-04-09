@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 import re
 import unicodedata
 import uuid
@@ -300,6 +300,7 @@ def ensure_jst_schema() -> None:
     ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ NULL;
     ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
     ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ NULL;
     ALTER TABLE public.jst_sms_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
     CREATE INDEX IF NOT EXISTS idx_jst_sms_messages_study ON public.jst_sms_messages(study_id);
@@ -326,6 +327,7 @@ def ensure_jst_schema() -> None:
     ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ NULL;
     ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
     ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ NULL;
     ALTER TABLE public.jst_email_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
     CREATE INDEX IF NOT EXISTS idx_jst_email_logs_study ON public.jst_email_logs(study_id);
@@ -383,6 +385,23 @@ def ensure_jst_schema() -> None:
     END;
     $func$;
 
+    CREATE OR REPLACE FUNCTION public.mark_jst_sms_rejected(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_sms_messages
+      SET rejected_at = COALESCE(rejected_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
     CREATE OR REPLACE FUNCTION public.mark_jst_email_clicked(p_token text)
     RETURNS void
     LANGUAGE plpgsql
@@ -434,6 +453,23 @@ def ensure_jst_schema() -> None:
     END;
     $func$;
 
+    CREATE OR REPLACE FUNCTION public.mark_jst_email_rejected(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      UPDATE public.jst_email_logs
+      SET rejected_at = COALESCE(rejected_at, NOW()),
+          updated_at = NOW()
+      WHERE token = trim(p_token);
+    END;
+    $func$;
+
     CREATE OR REPLACE FUNCTION public.mark_jst_token_started(p_token text)
     RETURNS void
     LANGUAGE plpgsql
@@ -461,6 +497,21 @@ def ensure_jst_schema() -> None:
       END IF;
       PERFORM public.mark_jst_sms_completed(p_token);
       PERFORM public.mark_jst_email_completed(p_token);
+    END;
+    $func$;
+
+    CREATE OR REPLACE FUNCTION public.mark_jst_token_rejected(p_token text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $func$
+    BEGIN
+      IF trim(coalesce(p_token, '')) = '' THEN
+        RETURN;
+      END IF;
+      PERFORM public.mark_jst_sms_rejected(p_token);
+      PERFORM public.mark_jst_email_rejected(p_token);
     END;
     $func$;
 
@@ -501,12 +552,45 @@ def ensure_jst_schema() -> None:
     GRANT EXECUTE ON FUNCTION public.mark_jst_sms_clicked(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_sms_started(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_sms_completed(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_sms_rejected(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_email_clicked(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_email_started(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_email_completed(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_email_rejected(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_token_started(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.mark_jst_token_completed(text) TO anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.mark_jst_token_rejected(text) TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION public.is_jst_token_completed(text) TO anon, authenticated;
+
+    DO $cleanup$
+    DECLARE
+      r record;
+      v_new_slug text;
+    BEGIN
+      FOR r IN
+        SELECT id, slug
+        FROM public.jst_studies
+        WHERE COALESCE(is_active, false) = false
+          AND COALESCE(slug, '') <> ''
+          AND POSITION('--deleted--' IN slug) = 0
+      LOOP
+        v_new_slug := r.slug || '--deleted--' || left(r.id::text, 8) || '--' || to_char(clock_timestamp(), 'YYYYMMDDHH24MISSMS');
+        BEGIN
+          UPDATE public.jst_studies
+          SET slug = v_new_slug,
+              updated_at = NOW(),
+              deleted_at = COALESCE(deleted_at, NOW())
+          WHERE id = r.id;
+        EXCEPTION WHEN unique_violation THEN
+          UPDATE public.jst_studies
+          SET slug = '__deleted__' || left(r.id::text, 8) || '__' || to_char(clock_timestamp(), 'YYYYMMDDHH24MISSMS'),
+              updated_at = NOW(),
+              deleted_at = COALESCE(deleted_at, NOW())
+          WHERE id = r.id;
+        END;
+      END LOOP;
+    END;
+    $cleanup$;
     """
     with _db_connect() as conn:
         with conn.cursor() as cur:
@@ -574,15 +658,78 @@ def soft_delete_jst_study(sb: Client, study_id: str) -> None:
     ).eq("id", sid).execute()
 
 
+def _release_inactive_slug_conflicts(sb: Client, slug: str, exclude_id: Optional[str] = None) -> None:
+    s = (slug or "").strip()
+    if not s:
+        return
+    try:
+        rows = sb.table("jst_studies").select("id,slug,is_active,deleted_at").eq("slug", s).execute().data or []
+    except Exception:
+        return
+
+    now_tag = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+    for row in rows:
+        rid = str(row.get("id") or "").strip()
+        if not rid:
+            continue
+        if exclude_id and rid == str(exclude_id):
+            continue
+        is_active = bool(row.get("is_active") is True and not row.get("deleted_at"))
+        if is_active:
+            continue
+
+        archived_slug = f"{s}--deleted--{rid[:8]}--{now_tag}"
+        try:
+            sb.table("jst_studies").update(
+                {
+                    "slug": archived_slug,
+                    "deleted_at": row.get("deleted_at") or _utc_now_iso(),
+                    "updated_at": _utc_now_iso(),
+                }
+            ).eq("id", rid).execute()
+        except Exception:
+            # Fallback jeśli suffix wygenerował konflikt unikalności.
+            try:
+                sb.table("jst_studies").update(
+                    {
+                        "slug": f"__deleted__{rid[:8]}__{now_tag}",
+                        "deleted_at": row.get("deleted_at") or _utc_now_iso(),
+                        "updated_at": _utc_now_iso(),
+                    }
+                ).eq("id", rid).execute()
+            except Exception:
+                # Nie blokujemy działania formularza.
+                pass
+
+
 def check_jst_slug_availability(sb: Client, slug: str, exclude_id: Optional[str] = None) -> bool:
     s = (slug or "").strip()
     if not s:
         return False
-    q = sb.table("jst_studies").select("id").eq("slug", s).limit(1)
+    _release_inactive_slug_conflicts(sb, s, exclude_id=exclude_id)
+    q = sb.table("jst_studies").select("id").eq("slug", s).eq("is_active", True).limit(1)
     if exclude_id:
         q = q.neq("id", str(exclude_id))
     res = q.execute()
     return len(res.data or []) == 0
+
+
+def _fetch_all_pages(
+    fetch_page: Callable[[int, int], List[Dict[str, Any]]],
+    page_size: int = 1000,
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    offset = 0
+    limit = max(100, int(page_size))
+    while True:
+        chunk = fetch_page(offset, offset + limit - 1) or []
+        if not chunk:
+            break
+        out.extend(chunk)
+        if len(chunk) < limit:
+            break
+        offset += limit
+    return out
 
 
 def fetch_jst_response_counts(sb: Client) -> Dict[str, int]:
@@ -599,7 +746,17 @@ def fetch_jst_response_counts(sb: Client) -> Dict[str, int]:
 
     # fallback bez widoku
     try:
-        rows = sb.table("jst_responses").select("study_id").execute().data or []
+        rows = _fetch_all_pages(
+            lambda frm, to: (
+                sb.table("jst_responses")
+                .select("study_id")
+                .order("study_id", desc=False)
+                .range(frm, to)
+                .execute()
+                .data
+                or []
+            )
+        )
         for r in rows:
             sid = str(r.get("study_id") or "").strip()
             if sid:
@@ -610,14 +767,22 @@ def fetch_jst_response_counts(sb: Client) -> Dict[str, int]:
 
 
 def list_jst_responses(sb: Client, study_id: str) -> List[Dict[str, Any]]:
-    res = (
-        sb.table("jst_responses")
-        .select("*")
-        .eq("study_id", str(study_id))
-        .order("created_at", desc=False)
-        .execute()
+    sid = str(study_id or "").strip()
+    if not sid:
+        return []
+    return _fetch_all_pages(
+        lambda frm, to: (
+            sb.table("jst_responses")
+            .select("*")
+            .eq("study_id", sid)
+            .order("created_at", desc=False)
+            .order("id", desc=False)
+            .range(frm, to)
+            .execute()
+            .data
+            or []
+        )
     )
-    return res.data or []
 
 
 def insert_jst_response(

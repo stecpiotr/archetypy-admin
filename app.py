@@ -268,9 +268,35 @@ st.markdown(
 .block-container{ max-width:1160px !important; padding-top:72px !important; }
 .page-title{ font-size:36px; font-weight:800; color:#111827; letter-spacing:.2px; margin:15px 0 45px 0; padding-bottom:12px; border-bottom:1px solid var(--line); }
 .hr-thin{ border:0; border-top:1px solid var(--line); margin:16px 0 22px 0; }
-.tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:22px; margin:8px 0 18px 0; }
-@media (max-width:1100px){ .tiles{ grid-template-columns:repeat(2,1fr); } }
-@media (max-width:640px){ .tiles{ grid-template-columns:1fr; } }
+.tiles{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:22px;
+  margin:8px 0 18px 0;
+}
+.tiles.tiles-home-personal{ grid-template-columns:repeat(4, minmax(0, 1fr)); }
+.tiles.tiles-home-jst{ grid-template-columns:repeat(5, minmax(0, 1fr)); }
+.tiles.tiles-root{
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  max-width:1100px;
+  margin:8px auto 18px auto;
+}
+@media (max-width:1300px){
+  .tiles.tiles-home-jst{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width:1100px){
+  .tiles{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .tiles.tiles-root{ grid-template-columns:repeat(3, minmax(0, 1fr)); max-width:none; margin:8px 0 18px 0; }
+}
+@media (max-width:900px){
+  .tiles.tiles-root{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width:640px){
+  .tiles,
+  .tiles.tiles-home-personal,
+  .tiles.tiles-home-jst,
+  .tiles.tiles-root{ grid-template-columns:1fr; }
+}
 .tiles .stButton>button,
 .stButton>button.tile-btn{
   width:100%;
@@ -304,12 +330,12 @@ st.markdown(
   padding:18px 14px !important;
 }
 .tiles.tiles-root .stButton>button{
-  min-height:156px !important;
-  height:156px !important;
-  font-size:1.02rem !important;
+  min-height:182px !important;
+  height:182px !important;
+  font-size:1.14rem !important;
   line-height:1.25 !important;
   border-radius:14px !important;
-  padding:18px 14px !important;
+  padding:20px 16px !important;
 }
 .top-back-wrap{ margin:0 0 8px 0; }
 .top-back-wrap .stButton>button{
@@ -1200,19 +1226,14 @@ def home_personal_view() -> None:
 
     # kafle
     st.markdown('<div class="tiles tiles-home-personal">', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        if st.button("➕\n\nDodaj badanie archetypu", type="secondary"):
-            goto("add")
-    with c2:
-        if st.button("✏️\n\nEdytuj dane badania", type="secondary"):
-            goto("edit")
-    with c3:
-        if st.button("✉️\n\nWyślij link do ankiety", type="secondary"):
-            goto("send")
-    with c4:
-        if st.button("📊\n\nSprawdź wyniki badania archetypu", type="secondary"):
-            goto("results")
+    if st.button("➕\n\nDodaj badanie archetypu", type="secondary", use_container_width=True):
+        goto("add")
+    if st.button("✏️\n\nEdytuj dane badania", type="secondary", use_container_width=True):
+        goto("edit")
+    if st.button("✉️\n\nWyślij link do ankiety", type="secondary", use_container_width=True):
+        goto("send")
+    if st.button("📊\n\nSprawdź wyniki badania archetypu", type="secondary", use_container_width=True):
+        goto("results")
     st.markdown("</div>", unsafe_allow_html=True)
 
     # 🔽 linia oddzielająca kafle od statystyk
@@ -1230,16 +1251,12 @@ def home_root_view() -> None:
     render_titlebar(["Panel", "Start"])
 
     st.markdown('<div class="tiles tiles-root">', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("🧑‍💼\n\nBadania personalne", type="secondary"):
-            goto("home_personal")
-    with c2:
-        if st.button("🏘️\n\nBadania mieszkańców", type="secondary"):
-            goto("home_jst")
-    with c3:
-        if st.button("🧭\n\nMatching", type="secondary"):
-            goto("matching")
+    if st.button("🧑‍💼\n\nBadania personalne", type="secondary", use_container_width=True):
+        goto("home_personal")
+    if st.button("🏘️\n\nBadania mieszkańców", type="secondary", use_container_width=True):
+        goto("home_jst")
+    if st.button("🧭\n\nMatching", type="secondary", use_container_width=True):
+        goto("matching")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1252,22 +1269,16 @@ def home_jst_view() -> None:
     render_titlebar(["Panel", "Badania mieszkańców"])
 
     st.markdown('<div class="tiles tiles-home-jst">', unsafe_allow_html=True)
-    c1, c2, c3, c4, c5 = st.columns(5)
-    with c1:
-        if st.button("➕\n\nDodaj badanie\nmieszkańców", type="secondary"):
-            goto("jst_add")
-    with c2:
-        if st.button("✏️\n\nEdytuj dane\nbadania", type="secondary"):
-            goto("jst_edit")
-    with c3:
-        if st.button("✉️\n\nWyślij link\ndo ankiety", type="secondary"):
-            goto("jst_send")
-    with c4:
-        if st.button("💾\n\nImport i eksport\nbaz danych", type="secondary"):
-            goto("jst_io")
-    with c5:
-        if st.button("📊\n\nAnaliza\nbadania", type="secondary"):
-            goto("jst_analysis")
+    if st.button("➕\n\nDodaj badanie\nmieszkańców", type="secondary", use_container_width=True):
+        goto("jst_add")
+    if st.button("✏️\n\nEdytuj dane\nbadania", type="secondary", use_container_width=True):
+        goto("jst_edit")
+    if st.button("✉️\n\nWyślij link\ndo ankiety", type="secondary", use_container_width=True):
+        goto("jst_send")
+    if st.button("💾\n\nImport i eksport\nbaz danych", type="secondary", use_container_width=True):
+        goto("jst_io")
+    if st.button("📊\n\nAnaliza\nbadania", type="secondary", use_container_width=True):
+        goto("jst_analysis")
     st.markdown("</div>", unsafe_allow_html=True)
 
     studies = fetch_jst_studies(sb)
@@ -1830,8 +1841,8 @@ def jst_analysis_view() -> None:
     sid = str((study or {}).get("id") or "")
     template_root = Path(__file__).resolve().parent / "JST_Archetypy_Analiza"
     run_base = template_root / "_runs"
-    cache_key = f"jst_report_html_{sid}"
-    cache_meta_key = f"jst_report_meta_{sid}"
+    cache_key = f"jst_report_html_v2_{sid}"
+    cache_meta_key = f"jst_report_meta_v2_{sid}"
 
     c1, c2 = st.columns([0.35, 0.65], gap="small")
     with c1:
@@ -1961,34 +1972,89 @@ def _load_personal_profile_pct(study_id: str) -> Tuple[Dict[str, float], int]:
     return pct, n
 
 
+JST_A_PAIRS: List[Tuple[str, str, str]] = [
+    ("A1", "Opiekun", "Odkrywca"),
+    ("A2", "Towarzysz", "Władca"),
+    ("A3", "Opiekun", "Twórca"),
+    ("A4", "Mędrzec", "Bohater"),
+    ("A5", "Władca", "Buntownik"),
+    ("A6", "Niewinny", "Odkrywca"),
+    ("A7", "Buntownik", "Kochanek"),
+    ("A8", "Opiekun", "Bohater"),
+    ("A9", "Towarzysz", "Czarodziej"),
+    ("A10", "Kochanek", "Bohater"),
+    ("A11", "Władca", "Błazen"),
+    ("A12", "Niewinny", "Czarodziej"),
+    ("A13", "Czarodziej", "Mędrzec"),
+    ("A14", "Towarzysz", "Twórca"),
+    ("A15", "Błazen", "Niewinny"),
+    ("A16", "Odkrywca", "Mędrzec"),
+    ("A17", "Kochanek", "Buntownik"),
+    ("A18", "Błazen", "Twórca"),
+]
+JST_A_PAIR_COUNTS: Dict[str, int] = {
+    a: sum(1 for _, left, right in JST_A_PAIRS if left == a or right == a) for a in JST_ARCHETYPES
+}
+
+
 def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, float], List[Dict[str, Any]]]:
     if not rows:
         return {}, []
     totals = {a: 0.0 for a in JST_ARCHETYPES}
     respondent_vectors: List[Dict[str, Any]] = []
+
+    def _parse_a_value(raw: Any) -> Optional[int]:
+        try:
+            val = int(float(str(raw).strip().replace(",", ".")))
+        except Exception:
+            return None
+        return val if 1 <= val <= 7 else None
+
     for rec in rows:
         payload = rec.get("payload") or {}
         if not isinstance(payload, dict):
             payload = {}
-        vec = {a: 0.0 for a in JST_ARCHETYPES}
+
+        # Oczekiwania mieszkańców z komponentem A:
+        # A = 40% (średnia preferencja z par A1..A18),
+        # B1 = 35% (czy archetyp jest w TOP3),
+        # B2 = 25% (czy archetyp jest TOP1).
+        # Każdy archetyp kończy ze skalą 0..100 i nie jest sztucznie
+        # normalizowany do sumy 100%.
+        a_acc = {a: 0.0 for a in JST_ARCHETYPES}
+        for qid, left_arch, right_arch in JST_A_PAIRS:
+            val = _parse_a_value(payload.get(qid))
+            if val is None:
+                continue
+            p_right = float(val - 1) / 6.0
+            p_left = 1.0 - p_right
+            if left_arch in a_acc:
+                a_acc[left_arch] += p_left
+            if right_arch in a_acc:
+                a_acc[right_arch] += p_right
+
+        selected_b1 = {
+            a
+            for a in JST_ARCHETYPES
+            if str(payload.get(f"B1_{a}") or "").strip().lower() in {"1", "1.0", "true", "t", "tak", "yes", "y"}
+        }
         b2 = str(payload.get("B2") or "").strip()
-        if b2 in vec:
-            vec[b2] += 0.5
-        selected_b1 = [a for a in JST_ARCHETYPES if str(payload.get(f"B1_{a}") or "") in {"1", "1.0", "True", "true"}]
-        if selected_b1:
-            bonus = 0.3 / float(len(selected_b1))
-            for a in selected_b1:
-                vec[a] += bonus
-        d13 = str(payload.get("D13") or "").strip()
-        if d13 in vec:
-            vec[d13] += 0.2
+
+        vec: Dict[str, float] = {}
+        for a in JST_ARCHETYPES:
+            denom = float(JST_A_PAIR_COUNTS.get(a, 1) or 1)
+            a_norm = float(a_acc.get(a, 0.0)) / denom
+            b1_hit = 1.0 if a in selected_b1 else 0.0
+            b2_hit = 1.0 if b2 == a else 0.0
+            score = (0.40 * a_norm + 0.35 * b1_hit + 0.25 * b2_hit) * 100.0
+            vec[a] = score
 
         for a in JST_ARCHETYPES:
             totals[a] += vec[a]
         respondent_vectors.append({"payload": payload, "vec": vec})
 
     n = float(len(rows))
-    profile = {a: round((totals[a] / n) * 100.0, 2) for a in JST_ARCHETYPES}
+    profile = {a: round((totals[a] / n), 2) for a in JST_ARCHETYPES}
     return profile, respondent_vectors
 
 
@@ -2054,7 +2120,7 @@ def matching_view() -> None:
             top_sim_rows = []
             base_norm = _norm(unit_person) or 1.0
             for rec in respondent_vectors:
-                vec = {a: float(rec["vec"].get(a, 0.0)) * 100.0 for a in JST_ARCHETYPES}
+                vec = {a: float(rec["vec"].get(a, 0.0)) for a in JST_ARCHETYPES}
                 sim = _dot(unit_person, vec) / (base_norm * (_norm(vec) or 1.0))
                 top_sim_rows.append({"sim": sim, "payload": rec.get("payload") or {}})
             top_sim_rows.sort(key=lambda x: x["sim"], reverse=True)
@@ -2152,8 +2218,16 @@ def matching_view() -> None:
                 for a in JST_ARCHETYPES
             ]
         ).sort_values("Różnica |Δ|", ascending=True)
-        st.dataframe(df_cmp, use_container_width=True, hide_index=True, height=520)
-        st.caption("„Oczekiwania mieszkańców (%)” liczymy z odpowiedzi: B2 = 50%, suma wskazań B1 = 30%, D13 = 20% (na respondenta).")
+        st.dataframe(
+            df_cmp,
+            use_container_width=True,
+            hide_index=True,
+            height=max(len(df_cmp) * 36 + 40, 220),
+        )
+        st.caption(
+            "„Oczekiwania mieszkańców (%)” liczymy łącząc komponent A (40%), B1 (35%) i B2 (25%) "
+            "dla każdego archetypu. Skala nie jest sztucznie zamykana do 100% sumarycznie."
+        )
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
             st.markdown(result.get("match_formula", ""))
             st.markdown(
@@ -2204,53 +2278,18 @@ def matching_view() -> None:
         if ddf.empty:
             st.caption("Brak danych demograficznych.")
         else:
-            ddf = ddf.copy()
-            ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0)
-            ddf["% ogół mieszkańców"] = pd.to_numeric(ddf["% ogół mieszkańców"], errors="coerce").fillna(0.0)
-            ddf["Różnica pp"] = pd.to_numeric(ddf["Różnica pp"], errors="coerce").fillna(0.0)
-
-            body_rows: List[str] = []
-            for _, row in ddf.iterrows():
-                pct_seg = float(row["% grupa dopasowana"])
-                pct_all = float(row["% ogół mieszkańców"])
-                diff = float(row["Różnica pp"])
-                diff_cls = "match-demo-diff-pos" if diff >= 0 else "match-demo-diff-neg"
-                body_rows.append(
-                    f"""
-                    <tr>
-                      <td>{html.escape(str(row['Zmienna']))}</td>
-                      <td>{html.escape(str(row['Kategoria']))}</td>
-                      <td class="match-demo-bar-cell">
-                        <div style="display:flex;align-items:center;gap:8px;">
-                          <div class="match-demo-bar-bg"><div class="match-demo-bar-fill" style="width:{max(0.0, min(100.0, pct_seg)):.1f}%;"></div></div>
-                          <span class="match-demo-pct">{pct_seg:.1f}%</span>
-                        </div>
-                      </td>
-                      <td>{pct_all:.1f}%</td>
-                      <td class="{diff_cls}">{diff:+.1f} pp</td>
-                    </tr>
-                    """
-                )
-            st.markdown(
-                f"""
-                <div class="match-demo-wrap">
-                  <table class="match-demo-table">
-                    <thead>
-                      <tr>
-                        <th>Zmienna</th>
-                        <th>Kategoria</th>
-                        <th>% grupa dopasowana</th>
-                        <th>% ogół mieszkańców</th>
-                        <th>Różnica pp</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {''.join(body_rows)}
-                    </tbody>
-                  </table>
-                </div>
-                """,
-                unsafe_allow_html=True,
+            ddf = ddf.copy().sort_values(["Zmienna", "% grupa dopasowana"], ascending=[True, False])
+            ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0).round(1)
+            ddf["% ogół mieszkańców"] = pd.to_numeric(ddf["% ogół mieszkańców"], errors="coerce").fillna(0.0).round(1)
+            ddf["Różnica pp"] = pd.to_numeric(ddf["Różnica pp"], errors="coerce").fillna(0.0).round(1)
+            ddf["% grupa dopasowana"] = ddf["% grupa dopasowana"].map(lambda v: f"{v:.1f}%")
+            ddf["% ogół mieszkańców"] = ddf["% ogół mieszkańców"].map(lambda v: f"{v:.1f}%")
+            ddf["Różnica pp"] = ddf["Różnica pp"].map(lambda v: f"{v:+.1f} pp")
+            st.dataframe(
+                ddf[["Zmienna", "Kategoria", "% grupa dopasowana", "% ogół mieszkańców", "Różnica pp"]],
+                use_container_width=True,
+                hide_index=True,
+                height=max(len(ddf) * 35 + 40, 240),
             )
 
     with tab_strategy:
@@ -2494,7 +2533,7 @@ def jst_stats_panel(studies: List[Dict[str, Any]], rows: List[Dict[str, Any]], t
                     df,
                     use_container_width=True,
                     hide_index=True,
-                    height=max(rows_count * 36 + 38, 140),
+                    height=max(rows_count * 36 + 72, 220),
                 )
             else:
                 st.caption("Brak badań JST.")

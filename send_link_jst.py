@@ -84,14 +84,29 @@ def _mark_jst_sms_sent(sb, sms_id: str, provider_message_id: str) -> None:
 
 
 def _list_jst_sms_for_study(sb, study_id: str) -> List[Dict[str, Any]]:
-    res = (
-        sb.table("jst_sms_messages")
-        .select("*")
-        .eq("study_id", study_id)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return res.data or []
+    out: List[Dict[str, Any]] = []
+    offset = 0
+    page_size = 1000
+    sid = str(study_id or "").strip()
+    if not sid:
+        return out
+    while True:
+        res = (
+            sb.table("jst_sms_messages")
+            .select("*")
+            .eq("study_id", sid)
+            .order("created_at", desc=True)
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        chunk = res.data or []
+        if not chunk:
+            break
+        out.extend(chunk)
+        if len(chunk) < page_size:
+            break
+        offset += page_size
+    return out
 
 
 def _create_jst_email_record(sb, study_id: str, email: str, subject: str, text: str, token: str) -> Dict[str, Any]:
@@ -127,14 +142,29 @@ def _mark_jst_email_sent(sb, email_id: str, provider_message_id: str) -> None:
 
 
 def _list_jst_email_for_study(sb, study_id: str) -> List[Dict[str, Any]]:
-    res = (
-        sb.table("jst_email_logs")
-        .select("*")
-        .eq("study_id", study_id)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return res.data or []
+    out: List[Dict[str, Any]] = []
+    offset = 0
+    page_size = 1000
+    sid = str(study_id or "").strip()
+    if not sid:
+        return out
+    while True:
+        res = (
+            sb.table("jst_email_logs")
+            .select("*")
+            .eq("study_id", sid)
+            .order("created_at", desc=True)
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        chunk = res.data or []
+        if not chunk:
+            break
+        out.extend(chunk)
+        if len(chunk) < page_size:
+            break
+        offset += page_size
+    return out
 
 
 def _normalize_recipients(raw: str, mode: str) -> List[str]:
@@ -227,6 +257,8 @@ def _build_link(base_url: str, slug: str, token: str) -> str:
 
 def _status_icon(row: Dict[str, Any]) -> str:
     status = str(row.get("status") or "").lower()
+    if row.get("rejected_at"):
+        return "🚫"
     if row.get("completed_at"):
         return "✅"
     if row.get("started_at"):
@@ -283,6 +315,7 @@ def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
                 "Kliknięto": _fmt_dt(r.get("clicked_at")),
                 "Rozpoczęto": _fmt_dt(r.get("started_at")),
                 "Zakończono": _fmt_dt(r.get("completed_at")),
+                "Nie spełnia": _fmt_dt(r.get("rejected_at")),
                 "Błąd": "✖" if str(r.get("status") or "").lower() == "failed" else "",
             }
         )
@@ -296,14 +329,16 @@ def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
         "Kliknięto",
         "Rozpoczęto",
         "Zakończono",
+        "Nie spełnia",
         "Błąd",
     ]
     return pd.DataFrame(out, columns=cols)
 
 
 def _default_sms_text(jst_full_gen: str, link_preview: str) -> str:
+    jst_full_gen_ascii = _strip_pl_diacritics(str(jst_full_gen or ""))
     return (
-        f"Zwracamy sie z prosba o wypelnienie ankiety dla mieszkańców {jst_full_gen}.\n\n"
+        f"Zwracamy sie z prosba o wypelnienie ankiety dla mieszkancow {jst_full_gen_ascii}.\n\n"
         f"Link do ankiety: {link_preview}\n\n"
         "Dziekujemy!"
     )
@@ -316,7 +351,7 @@ def _default_email_text(jst_type: str, jst_full_gen: str, jst_full_nom: str, lin
         "Zwracamy się z prośbą o wypełnienie ankiety w badaniu realizowanym "
         f"wśród mieszkańców {jst_full_gen}. W tym badaniu chcemy przekonać się, jakie jest "
         f"Państwa podejście do spraw {type_gen} i oczekiwania dotyczące tego, jak {verb} {jst_full_nom}.\n\n"
-        "Wypełnienie ankiety nie powinno zająć więcej niż 5-7 minut.\n"
+        "Wypełnienie ankiety nie powinno zająć więcej niż 5-7 minut.\n\n"
         f"Link do ankiety: {link_preview}\n\n"
         "Dziękujemy,\n"
         "Zespół badawczy Badania.pro®"
@@ -388,7 +423,7 @@ def render(back_btn: Callable[[], None]) -> None:
     }
 
     st.markdown(
-        '<div style="font-size:17.5px; font-weight:675; margin-top:20px; margin-bottom:0px;">Wybierz badanie mieszkańców:</div>',
+        '<div style="font-size:17.5px; font-weight:675; margin-top:20px; margin-bottom:18px;">Wybierz badanie mieszkańców:</div>',
         unsafe_allow_html=True,
     )
     label = st.selectbox(
@@ -425,13 +460,21 @@ def render(back_btn: Callable[[], None]) -> None:
 
     default_sms = _default_sms_text(jst_full_gen, link_preview)
     default_email = _default_email_text(jst_type, jst_full_gen, jst_full_nom, link_preview)
-    if "jst_send_method" not in st.session_state:
-        st.session_state["jst_send_method"] = method
+    study_id = str(study.get("id") or "")
+    default_body = default_sms if method == "SMS" else default_email
     if "jst_send_body" not in st.session_state:
-        st.session_state["jst_send_body"] = default_sms if method == "SMS" else default_email
-    if st.session_state.get("jst_send_method") != method:
+        st.session_state["jst_send_body"] = default_body
         st.session_state["jst_send_method"] = method
-        st.session_state["jst_send_body"] = default_sms if method == "SMS" else default_email
+        st.session_state["jst_send_last_study"] = study_id
+        st.session_state["jst_send_auto_template"] = default_body
+    else:
+        changed_study = st.session_state.get("jst_send_last_study") != study_id
+        changed_method = st.session_state.get("jst_send_method") != method
+        if changed_study or changed_method:
+            st.session_state["jst_send_body"] = default_body
+        st.session_state["jst_send_method"] = method
+        st.session_state["jst_send_last_study"] = study_id
+        st.session_state["jst_send_auto_template"] = default_body
     reset_to_key = "jst_send_body_reset_to"
     if reset_to_key in st.session_state:
         st.session_state["jst_send_body"] = st.session_state.pop(reset_to_key)
@@ -845,6 +888,7 @@ def render(back_btn: Callable[[], None]) -> None:
             "Kliknięto",
             "Rozpoczęto",
             "Zakończono",
+            "Nie spełnia",
             "Błąd",
         ]
         for col in wanted_cols:
@@ -856,6 +900,8 @@ def render(back_btn: Callable[[], None]) -> None:
 
         def _status_icon_fixed(row: Dict[str, Any]) -> str:
             status = str(row.get("status") or "").lower()
+            if row.get("rejected_at"):
+                return "🚫"
             if status == "failed":
                 return "✖"
             if row.get("completed_at"):
@@ -918,6 +964,7 @@ def render(back_btn: Callable[[], None]) -> None:
       🔗 – odbiorca kliknął w link<br>
       🏁 – ankieta rozpoczęta<br>
       ✅ – ankieta zakończona<br>
+      🚫 – odbiorca nie spełnia warunków udziału<br>
       ✖ – błąd wysyłki<br>
       ⏳ – oczekuje w kolejce<br>
       • – inny / nieznany status

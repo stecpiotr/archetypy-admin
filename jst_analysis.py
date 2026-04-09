@@ -48,7 +48,7 @@ def _write_settings(path: Path, study: Dict[str, Any]) -> None:
         "city": city,
         "city_label": city_label,
         "population_15_plus": 0,
-        "bootstrap_reps": 1200,
+        "bootstrap_reps": 700,
         "w_A": 1.0,
         "weight_column": "",
         "segments_k_min": 3,
@@ -308,8 +308,10 @@ def _write_poststrat_targets(run_root: Path, study: Dict[str, Any], data_df: pd.
 
 
 def _hash_payload(df: pd.DataFrame, study: Dict[str, Any]) -> str:
+    poststrat = study.get("poststrat_targets")
+    poststrat_serialized = json.dumps(poststrat, ensure_ascii=False, sort_keys=True, default=str)
     raw = (
-        f"{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}\n"
+        f"v2|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|{poststrat_serialized}\n"
         + df.to_csv(index=False)
     )
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
@@ -462,6 +464,7 @@ def inline_local_assets(html_text: str, base_dir: Path) -> str:
         return f"<style>\n{css_text}\n</style>"
 
     def _replace_script(match: re.Match) -> str:
+        attrs = (match.group("attrs") or "") + (match.group("tail") or "")
         src = match.group("src") or ""
         js_path = _resolve_local_ref(src, root=root, base_dir=root)
         if js_path is None or js_path.suffix.lower() != ".js":
@@ -470,7 +473,7 @@ def inline_local_assets(html_text: str, base_dir: Path) -> str:
             js_text = js_path.read_text(encoding="utf-8", errors="ignore")
         except Exception:
             return match.group(0)
-        return f"<script>\n{js_text}\n</script>"
+        return f"<script{attrs}>\n{js_text}\n</script>"
 
     html_text = _LINK_STYLESHEET_RE.sub(_replace_stylesheet, html_text or "")
     html_text = _SCRIPT_SRC_RE.sub(_replace_script, html_text or "")
