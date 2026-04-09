@@ -3173,7 +3173,7 @@ def matching_view() -> None:
             )
 
         st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-        st.markdown("#### Profile archetypowe 0-100")
+        st.markdown("#### Profile archetypowe 0-100 (siła archetypu, skala: 0-100)")
         left_profile_col, right_profile_col = st.columns(2, gap="large")
         try:
             import admin_dashboard as AD
