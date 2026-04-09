@@ -357,14 +357,25 @@ def _write_poststrat_targets(run_root: Path, study: Dict[str, Any], data_df: pd.
     )
 
 
-def _hash_payload(df: pd.DataFrame, study: Dict[str, Any]) -> str:
+def _file_sha256(path: Path) -> str:
+    try:
+        blob = path.read_bytes()
+        return hashlib.sha256(blob).hexdigest()
+    except Exception:
+        return ""
+
+
+def _hash_payload(df: pd.DataFrame, study: Dict[str, Any], template_root: Path) -> str:
     poststrat = study.get("poststrat_targets")
     poststrat_serialized = json.dumps(poststrat, ensure_ascii=False, sort_keys=True, default=str)
     population_15_plus = study.get("population_15_plus")
     segment_overrides = _normalize_segment_threshold_overrides(study.get("segment_hit_threshold_overrides"))
     overrides_serialized = json.dumps(segment_overrides, ensure_ascii=False, sort_keys=True, default=str)
+    engine_sha = _file_sha256(template_root / "analyze_poznan_archetypes.py")
+    jst_analysis_schema = "jst_analysis_hash_v5"
     raw = (
-        f"v4|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|{poststrat_serialized}|{population_15_plus}|{overrides_serialized}\n"
+        f"{jst_analysis_schema}|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|"
+        f"{poststrat_serialized}|{population_15_plus}|{overrides_serialized}|{engine_sha}\n"
         + df.to_csv(index=False)
     )
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
@@ -385,7 +396,7 @@ def generate_jst_report(
     run_root = run_base_dir / study_id
     _prepare_tool_run_dir(template_root, run_root)
 
-    payload_hash = _hash_payload(data_df, study)
+    payload_hash = _hash_payload(data_df, study, template_root)
     hash_file = run_root / ".source_hash.txt"
     out_report = run_root / "WYNIKI" / "raport.html"
 

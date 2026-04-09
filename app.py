@@ -3068,6 +3068,7 @@ def matching_view() -> None:
                     line=dict(color="#2563eb", width=3),
                     marker=dict(size=5),
                     name=f"Profil polityka: {person_name}",
+                    showlegend=False,
                     hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -3078,6 +3079,7 @@ def matching_view() -> None:
                     line=dict(color="#0f766e", width=3, dash="dot"),
                     marker=dict(size=5),
                     name=f"Mieszkańcy: {jst_name} (N={int(result.get('jst_n') or 0)})",
+                    showlegend=False,
                     hovertemplate="<b>%{theta}</b><br>Mieszkańcy: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -3114,6 +3116,7 @@ def matching_view() -> None:
                 ),
             ),
             margin=dict(l=20, r=20, t=26, b=20),
+            showlegend=False,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -3128,6 +3131,10 @@ def matching_view() -> None:
             use_container_width=True,
             config={"displaylogo": False, "displayModeBar": True, "responsive": True},
             key=f"matching-radar-compare-{person_sid}-{jst_sid}",
+        )
+        st.caption(
+            f"Niebieska linia: profil polityka ({person_name}) • "
+            f"Turkusowa linia przerywana: profil mieszkańców ({jst_name}, N={int(result.get('jst_n') or 0)})."
         )
         st.markdown(
             f"""
@@ -3159,12 +3166,22 @@ def matching_view() -> None:
                 mean_scores=jst_profile_100,
                 out_path=f"matching_profile_jst_{j_key}_{p_key}.png",
             )
+
+            def _show_image_compat(img_path: str) -> None:
+                try:
+                    st.image(img_path, use_container_width=True)
+                except TypeError:
+                    try:
+                        st.image(img_path, use_column_width=True)
+                    except Exception:
+                        st.image(img_path)
+
             with left_profile_col:
                 st.markdown(f"**Profil archetypowy {person_name} (siła archetypu, skala: 0-100)**")
-                st.image(person_profile_img, use_container_width=True)
+                _show_image_compat(person_profile_img)
             with right_profile_col:
                 st.markdown(f"**Profil archetypowy mieszkańców {jst_name} (siła archetypu, skala: 0-100)**")
-                st.image(jst_profile_img, use_container_width=True)
+                _show_image_compat(jst_profile_img)
         except Exception as e:
             st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")
 
