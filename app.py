@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import warnings
 import re
 import html
+import json
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
@@ -50,7 +51,7 @@ except Exception:
 from utils import make_token
 from send_link import render as render_send_link
 from send_link_jst import render as render_send_link_jst
-from jst_analysis import generate_jst_report, inline_local_assets
+from jst_analysis import generate_jst_report, inline_local_assets, bundle_report_dir_zip
 from streamlit.components.v1 import html as html_component
 from email_client import send_email
 from report_share import (
@@ -1271,13 +1272,13 @@ def home_root_view() -> None:
 
     c1, c2, c3 = st.columns(3, gap="large")
     with c1:
-        if st.button("🧑‍💼\nBadania personalne\nDodawanie, edycja, wyniki.", key="tile_home_root_personal", type="secondary", use_container_width=True):
+        if st.button("🧑‍💼\nBadania personalne", key="tile_home_root_personal", type="secondary", use_container_width=True):
             goto("home_personal")
     with c2:
-        if st.button("🏘️\nBadania mieszkańców\nDane, wysyłka, analiza.", key="tile_home_root_jst", type="secondary", use_container_width=True):
+        if st.button("🏘️\nBadania mieszkańców", key="tile_home_root_jst", type="secondary", use_container_width=True):
             goto("home_jst")
     with c3:
-        if st.button("🧭\nMatching\nDopasowanie profili.", key="tile_home_root_matching", type="secondary", use_container_width=True):
+        if st.button("🧭\nMatching - dopadowywanie profili", key="tile_home_root_matching", type="secondary", use_container_width=True):
             goto("matching")
 
 
@@ -1517,7 +1518,7 @@ def jst_add_view() -> None:
             "Liczba mieszkańców 15+",
             min_value=0,
             value=0,
-            step=100,
+            step=1,
             format="%d",
             label_visibility="collapsed",
             help="Opcjonalnie. Przykład dla Poznania: 466292.",
@@ -1606,7 +1607,7 @@ def jst_edit_view() -> None:
             "Podaj liczbę mieszkańców 15+ dla JST:",
             min_value=0,
             value=pop_default,
-            step=100,
+            step=1,
             format="%d",
             help="Opcjonalnie. Przykład dla Poznania: 466292.",
         )
@@ -1869,6 +1870,74 @@ html, body {
     return html_text + autosize_js
 
 
+_SEGMENT_HIT_THRESHOLD_DEFAULTS: Dict[str, float] = {
+    "2 z 2 · #1": 3.94,
+    "4 z 4 · #1": 3.0,
+    "3 z 4 · #2": 2.1,
+    "1 z 4 · #4": 2.1,
+    "1 z 4 · #3": 2.1,
+}
+
+
+def _normalize_segment_threshold_overrides(raw: Any) -> Dict[str, float]:
+    out: Dict[str, float] = {}
+    if not isinstance(raw, dict):
+        return out
+    for k, v in raw.items():
+        key = str(k or "").strip()
+        if not key:
+            continue
+        try:
+            val = float(str(v).replace(",", ".").strip())
+        except Exception:
+            continue
+        out[key] = val
+    return out
+
+
+def _load_segment_threshold_overrides(
+    template_root: Path,
+    run_base: Path,
+    study_id: str,
+    study: Dict[str, Any],
+) -> Dict[str, float]:
+    merged: Dict[str, float] = dict(_SEGMENT_HIT_THRESHOLD_DEFAULTS)
+    template_settings = template_root / "settings.json"
+    if template_settings.exists():
+        try:
+            raw_template = json.loads(template_settings.read_text(encoding="utf-8"))
+            merged.update(_normalize_segment_threshold_overrides(raw_template.get("segment_hit_threshold_overrides")))
+        except Exception:
+            pass
+    merged.update(_normalize_segment_threshold_overrides(study.get("segment_hit_threshold_overrides")))
+
+    if study_id:
+        override_path = run_base / study_id / "segment_hit_threshold_overrides.json"
+        if override_path.exists():
+            try:
+                raw_override = json.loads(override_path.read_text(encoding="utf-8"))
+                merged.update(_normalize_segment_threshold_overrides(raw_override))
+            except Exception:
+                pass
+    return merged
+
+
+def _save_segment_threshold_overrides(run_base: Path, study_id: str, overrides: Dict[str, float]) -> None:
+    if not study_id:
+        return
+    target = run_base / study_id / "segment_hit_threshold_overrides.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(overrides, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _parse_segment_threshold_overrides_text(text: str) -> Dict[str, float]:
+    src = (text or "").strip() or "{}"
+    raw = json.loads(src)
+    if not isinstance(raw, dict):
+        raise ValueError("Wpisz poprawny JSON obiektowy (np. {\"2 z 2 · #1\": 3.94}).")
+    return _normalize_segment_threshold_overrides(raw)
+
+
 def jst_analysis_view() -> None:
     require_auth()
     if not _require_jst_ready():
@@ -1929,18 +1998,56 @@ def jst_analysis_view() -> None:
         st.info("Wybierz badanie z listy i kliknij „Generuj raport”.")
         return
 
+    overrides_editor_key = f"jst_segment_threshold_editor_{sid}"
+    saved_overrides = _load_segment_threshold_overrides(template_root, run_base, sid, study or {})
+    if overrides_editor_key not in st.session_state:
+        st.session_state[overrides_editor_key] = json.dumps(saved_overrides, ensure_ascii=False, indent=2)
+
+    with st.expander("⚙️ segment_hit_threshold_overrides", expanded=False):
+        st.caption(
+            "Możesz tutaj zmieniać i dodawać progi segmentów. "
+            "Zmiana zostanie uwzględniona przy generowaniu nowego raportu."
+        )
+        st.text_area(
+            "segment_hit_threshold_overrides (JSON)",
+            key=overrides_editor_key,
+            height=220,
+            label_visibility="collapsed",
+        )
+        cset1, cset2 = st.columns(2)
+        with cset1:
+            if st.button("💾 Zapisz progi segmentów", key=f"save_segment_overrides_{sid}", use_container_width=True):
+                try:
+                    parsed = _parse_segment_threshold_overrides_text(str(st.session_state.get(overrides_editor_key) or "{}"))
+                    _save_segment_threshold_overrides(run_base, sid, parsed)
+                    st.success("Zapisano progi segmentów dla tego badania.")
+                except Exception as e:
+                    st.error(f"Niepoprawny JSON progów: {e}")
+        with cset2:
+            if st.button("↩ Przywróć domyślne", key=f"reset_segment_overrides_{sid}", use_container_width=True):
+                st.session_state[overrides_editor_key] = json.dumps(_SEGMENT_HIT_THRESHOLD_DEFAULTS, ensure_ascii=False, indent=2)
+                _save_segment_threshold_overrides(run_base, sid, dict(_SEGMENT_HIT_THRESHOLD_DEFAULTS))
+                st.success("Przywrócono domyślne progi segmentów.")
+
     if generate_now or regenerate_now:
+        try:
+            active_overrides = _parse_segment_threshold_overrides_text(str(st.session_state.get(overrides_editor_key) or "{}"))
+        except Exception as e:
+            st.error(f"Nie można wygenerować raportu: niepoprawny JSON progów segmentów ({e}).")
+            return
         rows = list_jst_responses(sb, sid)
         if not rows:
             st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
             return
         out_df = jst_response_rows_to_dataframe(rows)
+        study_for_report = dict(study or {})
+        study_for_report["segment_hit_threshold_overrides"] = active_overrides
         with st.spinner("Generujemy raport dla tego badania. Prosimy o chwilę cierpliwości."):
             try:
                 report_path = generate_jst_report(
                     template_root=template_root,
                     run_base_dir=run_base,
-                    study=study or {},
+                    study=study_for_report,
                     data_df=out_df[JST_CANONICAL_COLUMNS].copy(),
                     force=bool(regenerate_now),
                 )
@@ -1998,13 +2105,45 @@ def jst_analysis_view() -> None:
 
     if report_path and report_path.exists():
         report_slug = slugify(str((study or {}).get("jst_full_nom") or (study or {}).get("slug") or "raport-jst")) or "raport-jst"
-        st.download_button(
-            "📥 Pobierz raport HTML",
-            data=report_path.read_text(encoding="utf-8", errors="ignore"),
-            file_name=f"{report_slug}.html",
-            mime="text/html",
-            use_container_width=False,
+        raw_report = report_path.read_text(encoding="utf-8", errors="ignore")
+        full_report = raw_report
+        try:
+            full_report = inline_local_assets(raw_report, report_path.parent)
+        except Exception:
+            full_report = raw_report
+        report_zip = bundle_report_dir_zip(report_path.parent)
+        d1, d2 = st.columns(2)
+        with d1:
+            st.download_button(
+                "📥 Pobierz raport HTML (pełny)",
+                data=full_report,
+                file_name=f"{report_slug}.html",
+                mime="text/html",
+                use_container_width=True,
+            )
+        with d2:
+            if report_zip:
+                st.download_button(
+                    "🧳 Pobierz raport ZIP (WYNIKI)",
+                    data=report_zip,
+                    file_name=f"{report_slug}-WYNIKI.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                )
+            else:
+                st.caption("Nie udało się przygotować paczki ZIP raportu.")
+
+    preview_enabled = st.toggle(
+        "Podgląd raportu online w panelu",
+        value=False,
+        key=f"jst_preview_online_{sid}",
+    )
+    if not preview_enabled:
+        st.info(
+            "Podgląd online jest wyłączony. To tryb stabilny dla dużych raportów. "
+            "Pobierz raport HTML (pełny) albo paczkę ZIP i otwórz lokalnie."
         )
+        return
 
     if inlined_bytes > int(meta.get("inline_limit") or inline_limit):
         st.warning(
@@ -2038,7 +2177,7 @@ def jst_analysis_view() -> None:
             st.error(
                 "Podgląd raportu w panelu został wyłączony, bo przekracza bezpieczny limit przesyłania danych do przeglądarki."
             )
-            st.info("Użyj przycisku „📥 Pobierz raport HTML” i otwórz plik lokalnie, aby zachować pełną interaktywność.")
+            st.info("Użyj przycisku „📥 Pobierz raport HTML (pełny)” lub „🧳 Pobierz raport ZIP (WYNIKI)” i otwórz lokalnie.")
             return
 
         prepared = _prepare_report_html_for_iframe(to_render)
@@ -2450,7 +2589,7 @@ def matching_view() -> None:
             df_cmp,
             use_container_width=True,
             hide_index=True,
-            height=max(160, len(df_cmp) * 34 + 24),
+            height=max(240, min(760, 92 + len(df_cmp) * 38)),
         )
         st.caption(
             "„Oczekiwania mieszkańców (%)” liczymy łącząc komponent A (40%), B1 (20%), B2 (25%) i D13 (15%) "
@@ -2471,13 +2610,13 @@ def matching_view() -> None:
             <style>
               .match-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:6px 0 14px;}
               .match-demo-stat{border:1px solid #dfe6ee;border-radius:12px;padding:10px 12px;background:#fff;box-shadow:0 4px 12px rgba(15,23,42,.04);}
-              .match-demo-stat-label{font-size:11px;color:#6b7a89;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
-              .match-demo-stat-main{font-size:24px;font-weight:800;color:#10253c;line-height:1.2;margin-top:3px;}
-              .match-demo-stat-sub{font-size:12px;color:#3d4f62;margin-top:3px;font-weight:600;}
-              .match-demo-table-wrap{overflow:auto;border:1px solid #dce4ee;border-radius:12px;background:#fff;}
-              .match-demo-table{width:100%;border-collapse:collapse;min-width:920px;}
+              .match-demo-stat-label{font-size:11px;color:#6b7a89;font-weight:800;text-transform:uppercase;letter-spacing:.03em;}
+              .match-demo-stat-main{font-size:24px;font-weight:900;color:#10253c;line-height:1.15;margin-top:3px;}
+              .match-demo-stat-sub{font-size:12px;color:#3d4f62;margin-top:3px;font-weight:700;}
+              .match-demo-table-wrap{overflow:auto;border:1px solid #dce4ee;border-radius:12px;background:#fff;max-width:940px;}
+              .match-demo-table{width:100%;border-collapse:collapse;min-width:860px;border:2px solid #b8c2cc;}
               .match-demo-table th,.match-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
-              .match-demo-table th{background:#f6f8fb;color:#1f2f44;font-weight:700;}
+              .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;}
               .match-demo-var{font-weight:800;vertical-align:top;background:#fafbfc;border-top:2px solid #9aa7b4 !important;}
             </style>
             """,
@@ -2507,6 +2646,7 @@ def matching_view() -> None:
             st.caption("Brak danych demograficznych.")
         else:
             st.markdown("### 👥 Profil demograficzny")
+            st.caption("W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.")
             ddf = ddf.copy()
             ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0).round(1)
             ddf["% ogół mieszkańców"] = pd.to_numeric(ddf["% ogół mieszkańców"], errors="coerce").fillna(0.0).round(1)
@@ -2570,7 +2710,7 @@ def matching_view() -> None:
                     diff = float(row["Różnica pp"])
                     is_top = bool(row.name == top_idx)
                     bar_w = max(0.0, min(100.0, pct_sub))
-                    bar_alpha = "0.74" if is_top else "0.30"
+                    bar_alpha = "0.82" if is_top else "0.32"
                     diff_color = "#15803d" if diff >= 0 else "#b91c1c"
                     diff_text = f"{diff:+.1f} pp"
                     cat_weight = "800" if is_top else "500"
@@ -2581,45 +2721,34 @@ def matching_view() -> None:
                         else ""
                     )
                     table_rows.append(
-                        f"""
-                        <tr>
-                          {first_col}
-                          <td style="font-weight:{cat_weight};">{html.escape(category_emoji.get(cat, ""))} {html.escape(cat)}</td>
-                          <td style="padding:0; min-width:176px;">
-                            <div style="position:relative; height:34px; background:#fff;">
-                              <div style="position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:rgba(224,49,49,{bar_alpha});"></div>
-                              <span style="position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;">{pct_sub:.1f}%</span>
-                            </div>
-                          </td>
-                          <td style="text-align:right;">{pct_all:.1f}%</td>
-                          <td style="text-align:right; color:{diff_color}; font-weight:700;">{diff_text}</td>
-                        </tr>
-                        """
+                        "<tr>"
+                        f"{first_col}"
+                        f"<td style=\"font-weight:{cat_weight};\">{html.escape(category_emoji.get(cat, ''))} {html.escape(cat)}</td>"
+                        "<td style=\"padding:0; min-width:176px;\">"
+                        "<div style=\"position:relative; height:34px; background:#fff;\">"
+                        f"<div style=\"position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:rgba(64,145,214,{bar_alpha});\"></div>"
+                        f"<span style=\"position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.90); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
+                        "</div>"
+                        "</td>"
+                        f"<td style=\"text-align:right;\">{pct_all:.1f}%</td>"
+                        f"<td style=\"text-align:right; color:{diff_color}; font-weight:700;\">{diff_text}</td>"
+                        "</tr>"
                     )
 
-            st.markdown(
-                """
-                <div class="match-demo-table-wrap">
-                  <table class="match-demo-table">
-                    <thead>
-                      <tr>
-                        <th>Zmienna</th>
-                        <th>Kategoria</th>
-                        <th>% grupa dopasowana</th>
-                        <th>% ogół mieszkańców</th>
-                        <th>Różnica pp</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                """
+            table_html = (
+                "<div class='match-demo-table-wrap'>"
+                "<table class='match-demo-table'>"
+                "<thead><tr>"
+                "<th>Zmienna</th>"
+                "<th>Kategoria</th>"
+                "<th>% grupa dopasowana</th>"
+                "<th>% ogół mieszkańców</th>"
+                "<th>Różnica pp</th>"
+                "</tr></thead><tbody>"
                 + "".join(table_rows)
-                + """
-                    </tbody>
-                  </table>
-                </div>
-                """,
-                unsafe_allow_html=True,
+                + "</tbody></table></div>"
             )
+            st.markdown(table_html, unsafe_allow_html=True)
 
     with tab_strategy:
         st.markdown("**Rekomendacje komunikacyjne (automatyczne):**")

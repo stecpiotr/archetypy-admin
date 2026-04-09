@@ -83,6 +83,12 @@ def _mark_jst_sms_sent(sb, sms_id: str, provider_message_id: str) -> None:
     ).eq("id", sms_id).execute()
 
 
+def _mark_jst_sms_failed(sb, sms_id: str, error_text: str) -> None:
+    sb.table("jst_sms_messages").update(
+        {"status": "failed", "error_text": str(error_text or ""), "updated_at": pd.Timestamp.utcnow().isoformat()}
+    ).eq("id", sms_id).execute()
+
+
 def _list_jst_sms_for_study(sb, study_id: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     offset = 0
@@ -138,6 +144,12 @@ def _create_jst_email_record(sb, study_id: str, email: str, subject: str, text: 
 def _mark_jst_email_sent(sb, email_id: str, provider_message_id: str) -> None:
     sb.table("jst_email_logs").update(
         {"status": "sent", "provider_message_id": provider_message_id, "updated_at": pd.Timestamp.utcnow().isoformat()}
+    ).eq("id", email_id).execute()
+
+
+def _mark_jst_email_failed(sb, email_id: str, error_text: str) -> None:
+    sb.table("jst_email_logs").update(
+        {"status": "failed", "error_text": str(error_text or ""), "updated_at": pd.Timestamp.utcnow().isoformat()}
     ).eq("id", email_id).execute()
 
 
@@ -253,6 +265,74 @@ def _email_env() -> Tuple[str, int, str, str, str, str, str, str]:
 
 def _build_link(base_url: str, slug: str, token: str) -> str:
     return f"{(base_url or '').rstrip('/')}/{(slug or '').lstrip('/')}?t={token}"
+
+
+def _can_resend_row(row: Dict[str, Any]) -> bool:
+    if row.get("completed_at") or row.get("rejected_at"):
+        return False
+    if not str(row.get("token") or "").strip():
+        return False
+    return True
+
+
+def _resend_sms_row(sb, row: Dict[str, Any], slug: str) -> Tuple[bool, str]:
+    sms_id = str(row.get("id") or "").strip()
+    phone = str(row.get("phone") or "").strip()
+    token = str(row.get("token") or "").strip()
+    body = str(row.get("body") or "").strip()
+    if not sms_id or not phone or not token:
+        return False, "Brak danych rekordu (id/telefon/token)."
+
+    try:
+        api_token, sender, base_url = _sms_env()
+    except Exception as e:
+        return False, str(e)
+
+    if not body:
+        body = _default_sms_text("", _build_link(base_url, slug, token))
+    ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=body, sender=sender)
+    if ok:
+        _mark_jst_sms_sent(sb, sms_id=sms_id, provider_message_id=provider_id or "")
+        return True, ""
+    _mark_jst_sms_failed(sb, sms_id=sms_id, error_text=err or "unknown error")
+    return False, str(err or "unknown error")
+
+
+def _resend_email_row(sb, row: Dict[str, Any], slug: str) -> Tuple[bool, str]:
+    email_id = str(row.get("id") or "").strip()
+    to_email = str(row.get("email") or "").strip()
+    token = str(row.get("token") or "").strip()
+    subject = str(row.get("subject") or "").strip()
+    text = str(row.get("text") or "").strip()
+    if not email_id or not to_email or not token:
+        return False, "Brak danych rekordu (id/e-mail/token)."
+
+    try:
+        host, port, user, pwd, secure, from_email, from_name, base_url = _email_env()
+    except Exception as e:
+        return False, str(e)
+
+    if not text:
+        text = _default_email_text("", "", "", _build_link(base_url, slug, token))
+    if not subject:
+        subject = "Prośba o wypełnienie ankiety"
+    ok, provider_mid, err = send_email(
+        host=host,
+        port=port,
+        username=user,
+        password=pwd,
+        secure=secure,
+        from_email=from_email,
+        from_name=from_name,
+        to_email=to_email,
+        subject=subject,
+        text=text,
+    )
+    if ok:
+        _mark_jst_email_sent(sb, email_id=email_id, provider_message_id=provider_mid or "")
+        return True, ""
+    _mark_jst_email_failed(sb, email_id=email_id, error_text=err or "unknown error")
+    return False, str(err or "unknown error")
 
 
 def _status_icon(row: Dict[str, Any]) -> str:
@@ -921,6 +1001,11 @@ def render(back_btn: Callable[[], None]) -> None:
         icons = [_status_icon_fixed(r) for r in raw_rows]
         if len(icons) == len(df_logs.index):
             df_logs["Status"] = icons
+        can_resend_flags = [_can_resend_row(r) for r in raw_rows]
+        if len(can_resend_flags) == len(df_logs.index):
+            df_logs["Ponów"] = ["🔁" if flag else "" for flag in can_resend_flags]
+        else:
+            df_logs["Ponów"] = ""
 
         st.markdown(
             """
@@ -930,13 +1015,43 @@ def render(back_btn: Callable[[], None]) -> None:
         )
         widths = _auto_col_widths(df_logs)
         col_cfg = {col: cc.Column(width=widths.get(col, 100)) for col in df_logs.columns}
-        table_height = max(170, min(680, 42 + len(df_logs.index) * 36))
+        table_height = max(220, min(760, 92 + len(df_logs.index) * 38))
         st.markdown('<div class="narrow-table">', unsafe_allow_html=True)
         st.dataframe(df_logs, hide_index=True, column_config=col_cfg, height=table_height)
         st.markdown("</div>", unsafe_allow_html=True)
 
+        resend_rows = [r for r in raw_rows if _can_resend_row(r)]
+        if resend_rows:
+            st.caption("🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku).")
+            label_to_row: Dict[str, Dict[str, Any]] = {}
+            for r in resend_rows:
+                recipient = str(r.get("phone") or "") if mode == "sms" else str(r.get("email") or "")
+                created_at = _fmt_dt(r.get("created_at") or r.get("created_at_pl"))
+                token = str(r.get("token") or "")
+                status_txt = str(r.get("status") or "").lower()
+                short_token = f"...{token[-6:]}" if len(token) > 6 else token
+                label = f"{recipient} • {created_at} • status: {status_txt} • token: {short_token}"
+                label_to_row[label] = r
+            chosen_row_label = st.selectbox(
+                "Wybierz rekord do ponownej wysyłki",
+                list(label_to_row.keys()),
+                key=f"jst_resend_pick_{mode}_{study['id']}",
+            )
+            if st.button("🔁 Wyślij ponownie (ten sam link)", key=f"jst_resend_btn_{mode}_{study['id']}"):
+                picked = label_to_row.get(chosen_row_label) or {}
+                if mode == "sms":
+                    ok, err = _resend_sms_row(sb, picked, slug=slug)
+                else:
+                    ok, err = _resend_email_row(sb, picked, slug=slug)
+                if ok:
+                    st.success("Ponowiono wysyłkę dla wybranego rekordu.")
+                    st.rerun()
+                else:
+                    st.error(f"Nie udało się ponowić wysyłki: {err}")
+
+        export_df = df_logs.drop(columns=["Ponów"], errors="ignore")
         out_name = slug or "jst"
-        xlsx_bytes = _df_to_xlsx_bytes(df_logs, sheet_name=("SMS" if mode == "sms" else "EMAIL"), borders="none")
+        xlsx_bytes = _df_to_xlsx_bytes(export_df, sheet_name=("SMS" if mode == "sms" else "EMAIL"), borders="none")
         cxl, cpdf = st.columns(2)
         with cxl:
             st.download_button(
@@ -947,7 +1062,7 @@ def render(back_btn: Callable[[], None]) -> None:
                 use_container_width=True,
             )
         with cpdf:
-            pdf_bytes = _df_to_pdf_bytes(df_logs, title=f"Statusy {mode.upper()} – {jst_full_nom}")
+            pdf_bytes = _df_to_pdf_bytes(export_df, title=f"Statusy {mode.upper()} – {jst_full_nom}")
             if pdf_bytes:
                 st.download_button(
                     "📄 Eksport PDF",

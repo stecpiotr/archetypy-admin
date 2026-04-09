@@ -5,14 +5,41 @@ import hashlib
 import json
 import mimetypes
 import os
+from io import BytesIO
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
+import zipfile
 
 import pandas as pd
+
+
+_SEGMENT_HIT_THRESHOLD_DEFAULTS: Dict[str, float] = {
+    "2 z 2 · #1": 3.94,
+    "4 z 4 · #1": 3.0,
+    "3 z 4 · #2": 2.1,
+    "1 z 4 · #4": 2.1,
+    "1 z 4 · #3": 2.1,
+}
+
+
+def _normalize_segment_threshold_overrides(raw: Any) -> Dict[str, float]:
+    out: Dict[str, float] = {}
+    if not isinstance(raw, dict):
+        return out
+    for k, v in raw.items():
+        key = str(k or "").strip()
+        if not key:
+            continue
+        try:
+            val = float(str(v).replace(",", ".").strip())
+        except Exception:
+            continue
+        out[key] = val
+    return out
 
 
 def _slugify_ascii(text: str) -> str:
@@ -49,6 +76,9 @@ def _write_settings(path: Path, study: Dict[str, Any]) -> None:
         pop_15_plus = max(0, int(float(pop_raw))) if pop_raw else 0
     except Exception:
         pop_15_plus = 0
+    segment_overrides = _normalize_segment_threshold_overrides(study.get("segment_hit_threshold_overrides"))
+    if not segment_overrides:
+        segment_overrides = dict(_SEGMENT_HIT_THRESHOLD_DEFAULTS)
     settings = {
         "city": city,
         "city_label": city_label,
@@ -64,6 +94,9 @@ def _write_settings(path: Path, study: Dict[str, Any]) -> None:
         "clusters_k_default": 5,
         "require_metry": True,
         "random_seed": 2026,
+        "segment_hit_threshold_overrides": segment_overrides,
+        "segment_outline_style": "classic",
+        "silhouette_sample_max": 1800,
     }
     path.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -316,8 +349,10 @@ def _hash_payload(df: pd.DataFrame, study: Dict[str, Any]) -> str:
     poststrat = study.get("poststrat_targets")
     poststrat_serialized = json.dumps(poststrat, ensure_ascii=False, sort_keys=True, default=str)
     population_15_plus = study.get("population_15_plus")
+    segment_overrides = _normalize_segment_threshold_overrides(study.get("segment_hit_threshold_overrides"))
+    overrides_serialized = json.dumps(segment_overrides, ensure_ascii=False, sort_keys=True, default=str)
     raw = (
-        f"v3|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|{poststrat_serialized}|{population_15_plus}\n"
+        f"v4|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|{poststrat_serialized}|{population_15_plus}|{overrides_serialized}\n"
         + df.to_csv(index=False)
     )
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
@@ -505,3 +540,18 @@ def inline_local_assets(html_text: str, base_dir: Path) -> str:
         return f'{attr}="{data_uri}"'
 
     return _SRC_HREF_RE.sub(_replace, html_text or "")
+
+
+def bundle_report_dir_zip(report_dir: Path) -> bytes:
+    root = Path(report_dir or "").resolve()
+    if not root.exists() or not root.is_dir():
+        return b""
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for p in sorted(root.rglob("*")):
+            if not p.is_file():
+                continue
+            arcname = (Path(root.name) / p.relative_to(root)).as_posix()
+            zf.write(p, arcname=arcname)
+    return buf.getvalue()

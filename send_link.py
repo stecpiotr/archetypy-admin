@@ -271,6 +271,92 @@ def _build_link(base_url: str, slug: str, token: str) -> str:
     return f"{base}/{s}?t={token}" if s else f"{base}/?t={token}"
 
 
+def _can_resend_row(row: Dict) -> bool:
+    if row.get("completed_at") or row.get("rejected_at"):
+        return False
+    if not str(row.get("token") or "").strip():
+        return False
+    return True
+
+
+def _mark_sms_failed(sb, sms_id: str, error_text: str) -> None:
+    sb.table("sms_messages").update(
+        {"status": "failed", "error_text": str(error_text or "")}
+    ).eq("id", sms_id).execute()
+
+
+def _mark_email_failed(sb, email_id: str, error_text: str) -> None:
+    sb.table("email_logs").update(
+        {"status": "failed", "error_text": str(error_text or "")}
+    ).eq("id", email_id).execute()
+
+
+def _resend_sms_row(sb, row: Dict, slug: str) -> Tuple[bool, str]:
+    sms_id = str(row.get("id") or "").strip()
+    phone = str(row.get("phone") or "").strip()
+    token = str(row.get("token") or "").strip()
+    body = str(row.get("body") or "").strip()
+    if not sms_id or not phone or not token:
+        return False, "Brak danych rekordu (id/telefon/token)."
+
+    try:
+        api_token, sender, base_url = _sms_env()
+    except Exception as e:
+        return False, str(e)
+
+    if not body:
+        fallback_link = _build_link(base_url, slug, token)
+        body = f"Link do ankiety: {fallback_link}"
+    ok, provider_id, err = send_sms(
+        api_token=api_token,
+        to_phone=phone,
+        text=_strip_pl_diacritics(body),
+        sender=sender,
+    )
+    if ok:
+        mark_sms_sent(sb, sms_id=sms_id, provider_message_id=provider_id or "")
+        return True, ""
+    _mark_sms_failed(sb, sms_id=sms_id, error_text=err or "unknown error")
+    return False, str(err or "unknown error")
+
+
+def _resend_email_row(sb, row: Dict, slug: str, fn_gen: str, ln_gen: str) -> Tuple[bool, str]:
+    email_id = str(row.get("id") or "").strip()
+    to_email = str(row.get("email") or "").strip()
+    token = str(row.get("token") or "").strip()
+    subject = str(row.get("subject") or "").strip()
+    text = str(row.get("text") or "").strip()
+    if not email_id or not to_email or not token:
+        return False, "Brak danych rekordu (id/e-mail/token)."
+
+    try:
+        host, port, user, pwd, secure, from_email, from_name, base_url = _email_env()
+    except Exception as e:
+        return False, str(e)
+
+    if not text:
+        fallback_link = _build_link(base_url, slug, token)
+        text = f"Link do ankiety: {fallback_link}"
+    subject = _render_subject(subject or "Prośba o wypełnienie ankiety", fn_gen, ln_gen)
+    ok, message_id, err = send_email(
+        host=host,
+        port=port,
+        username=user,
+        password=pwd,
+        secure=secure,
+        from_email=from_email,
+        from_name=from_name,
+        to_email=to_email,
+        subject=subject,
+        text=text,
+    )
+    if ok:
+        mark_email_sent(sb, email_id=email_id, provider_message_id=message_id or "")
+        return True, ""
+    _mark_email_failed(sb, email_id=email_id, error_text=err or "unknown error")
+    return False, str(err or "unknown error")
+
+
 def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = None) -> pd.DataFrame:
     """
     mode: 'sms' | 'email'
@@ -776,6 +862,7 @@ def render(back_btn: Callable[[], None]) -> None:
     # Podgląd po prawej: telefon (SMS) albo monitor (e-mail)
     with cols[1]:
         msg_preview = _strip_pl_diacritics(st.session_state.sms_body) if method == "SMS" else st.session_state.sms_body
+        msg_preview_html = msg_preview.replace("\n", "<br/>")
 
         if method == "SMS":
             data_url = _mockup_css_bg(MOCKUP_PATH)
@@ -802,7 +889,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     f"""
                     <div class="mock-wrap">
                       <div class="mock-bg"></div>
-                      <div class="mock-screen v2">{msg_preview.replace("\n", "<br/>")}</div>
+                      <div class="mock-screen v2">{msg_preview_html}</div>
                     </div>
                     <style>
                       .mock-wrap {{
@@ -830,7 +917,7 @@ def render(back_btn: Callable[[], None]) -> None:
             else:
                 st.markdown(
                     f"""<div style="border:1px solid #e5e7eb;border-radius:8px;padding:18px;font:13px/1.5 system-ui;">
-                           {msg_preview.replace("\n", "<br/>")}
+                           {msg_preview_html}
                         </div>""",
                     unsafe_allow_html=True,
                 )
@@ -933,7 +1020,7 @@ def render(back_btn: Callable[[], None]) -> None:
                           <div class="mock-bg-email"></div>
                           <div class="mock-screen-email">
                             <div class="mock-email-subj">{_subject_preview}</div>
-                            <div class="email-body">{msg_preview.replace("\n", "<br/>")}</div>
+                            <div class="email-body">{msg_preview_html}</div>
                           </div>
                         </div>
                         <style>
@@ -977,7 +1064,7 @@ def render(back_btn: Callable[[], None]) -> None:
                 st.markdown(
                     f"""<div style="border:1px solid #e5e7eb;border-radius:8px;padding:18px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/0.04);font:13.5px/1.5 system-ui;">
                         <div style="opacity:.7;margin-bottom:8px">{_subject_preview}</div>
-                        {msg_preview.replace("\n", "<br/>")}
+                        {msg_preview_html}
                     </div>""",
                     unsafe_allow_html=True,
                 )
@@ -1164,6 +1251,11 @@ def render(back_btn: Callable[[], None]) -> None:
     icons = [_status_icon_fixed(r) for r in raw_rows]
     if len(icons) == len(df_logs):
         df_logs["Status"] = icons
+    can_resend_flags = [_can_resend_row(r) for r in raw_rows]
+    if len(can_resend_flags) == len(df_logs):
+        df_logs["Ponów"] = ["🔁" if flag else "" for flag in can_resend_flags]
+    else:
+        df_logs["Ponów"] = ""
 
     # wąska tabela
     st.markdown(
@@ -1178,15 +1270,46 @@ def render(back_btn: Callable[[], None]) -> None:
         col: cc.Column(width=widths.get(col, 100))
         for col in df_logs.columns
     }
+    table_height = max(220, min(760, 92 + len(df_logs.index) * 38))
 
     st.markdown('<div class="narrow-table">', unsafe_allow_html=True)
-    st.dataframe(df_logs, hide_index=True, column_config=col_cfg)
+    st.dataframe(df_logs, hide_index=True, column_config=col_cfg, height=table_height)
     st.markdown('</div>', unsafe_allow_html=True)
+
+    resend_rows = [r for r in raw_rows if _can_resend_row(r)]
+    if resend_rows:
+        st.caption("🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku).")
+        label_to_row: Dict[str, Dict] = {}
+        for r in resend_rows:
+            recipient = str(r.get("phone") or "") if mode == "sms" else str(r.get("email") or "")
+            created_at = _fmt_dt(r.get("created_at") or r.get("created_at_pl"))
+            token = str(r.get("token") or "")
+            status_txt = str(r.get("status") or "").lower()
+            short_token = f"...{token[-6:]}" if len(token) > 6 else token
+            label_r = f"{recipient} • {created_at} • status: {status_txt} • token: {short_token}"
+            label_to_row[label_r] = r
+        chosen_resend = st.selectbox(
+            "Wybierz rekord do ponownej wysyłki",
+            list(label_to_row.keys()),
+            key=f"resend_pick_{mode}_{study['id']}",
+        )
+        if st.button("🔁 Wyślij ponownie (ten sam link)", key=f"resend_btn_{mode}_{study['id']}"):
+            picked = label_to_row.get(chosen_resend) or {}
+            if mode == "sms":
+                ok, err = _resend_sms_row(sb, picked, slug=slug)
+            else:
+                ok, err = _resend_email_row(sb, picked, slug=slug, fn_gen=fn_gen, ln_gen=ln_gen)
+            if ok:
+                st.success("Ponowiono wysyłkę dla wybranego rekordu.")
+                st.rerun()
+            else:
+                st.error(f"Nie udało się ponowić wysyłki: {err}")
 
     # Eksport
     who = _safe_name(ln, fn)
     prefix = 'sms' if mode == 'sms' else 'email'
-    xlsx_bytes = _df_to_xlsx_bytes(df_logs, sheet_name=("SMS" if mode == "sms" else "EMAIL"))
+    export_df = df_logs.drop(columns=["Ponów"], errors="ignore")
+    xlsx_bytes = _df_to_xlsx_bytes(export_df, sheet_name=("SMS" if mode == "sms" else "EMAIL"))
     c1, c2 = st.columns([1, 1])
     c1.download_button(
         "📊 Eksport XLSX",
@@ -1195,7 +1318,7 @@ def render(back_btn: Callable[[], None]) -> None:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
-    pdf_bytes = _df_to_pdf_bytes(df_logs, title=f"Statusy – {'SMS' if mode == 'sms' else 'E-mail'} z wysyłki dla {fn_gen} {ln_gen}")
+    pdf_bytes = _df_to_pdf_bytes(export_df, title=f"Statusy – {'SMS' if mode == 'sms' else 'E-mail'} z wysyłki dla {fn_gen} {ln_gen}")
     if pdf_bytes:
         c2.download_button(
             "📄 Eksport PDF",

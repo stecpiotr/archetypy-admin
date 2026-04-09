@@ -131,7 +131,8 @@ def ensure_jst_schema() -> None:
     CREATE INDEX IF NOT EXISTS idx_jst_responses_study ON public.jst_responses(study_id);
     CREATE INDEX IF NOT EXISTS idx_jst_responses_created ON public.jst_responses(created_at);
 
-    CREATE OR REPLACE VIEW public.jst_response_count_v AS
+    CREATE OR REPLACE VIEW public.jst_response_count_v
+      WITH (security_invoker = on) AS
       SELECT study_id, COUNT(*)::INT AS responses
       FROM public.jst_responses
       GROUP BY study_id;
@@ -600,10 +601,31 @@ def ensure_jst_schema() -> None:
         with conn.cursor() as cur:
             cur.execute(ddl)
         conn.commit()
+    _notify_postgrest_schema_reload()
 
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _notify_postgrest_schema_reload() -> None:
+    try:
+        with _db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_notify('pgrst', 'reload schema');")
+            conn.commit()
+    except Exception:
+        # Brak uprawnień do notify nie powinien zatrzymywać działania panelu.
+        pass
+
+
+def _is_postgrest_missing_column_error(err: Exception, table_name: str, column_name: str) -> bool:
+    msg = (getattr(err, "message", "") or str(err) or "").lower()
+    return (
+        "pgrst204" in msg
+        and str(table_name or "").lower() in msg
+        and str(column_name or "").lower() in msg
+    )
 
 
 def fetch_jst_studies(sb: Client, include_inactive: bool = False) -> List[Dict[str, Any]]:
@@ -626,7 +648,14 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data.setdefault("is_active", True)
     data.setdefault("created_at", _utc_now_iso())
     data.setdefault("updated_at", _utc_now_iso())
-    ins = sb.table("jst_studies").insert(data).execute()
+    try:
+        ins = sb.table("jst_studies").insert(data).execute()
+    except Exception as e:
+        if "population_15_plus" in data and _is_postgrest_missing_column_error(e, "jst_studies", "population_15_plus"):
+            _notify_postgrest_schema_reload()
+            ins = sb.table("jst_studies").insert(data).execute()
+        else:
+            raise
     if ins.data:
         return ins.data[0]
     raise RuntimeError("Insert jst_study failed")
@@ -635,7 +664,14 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
 def update_jst_study(sb: Client, study_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     data = dict(payload)
     data["updated_at"] = _utc_now_iso()
-    sb.table("jst_studies").update(data).eq("id", str(study_id)).execute()
+    try:
+        sb.table("jst_studies").update(data).eq("id", str(study_id)).execute()
+    except Exception as e:
+        if "population_15_plus" in data and _is_postgrest_missing_column_error(e, "jst_studies", "population_15_plus"):
+            _notify_postgrest_schema_reload()
+            sb.table("jst_studies").update(data).eq("id", str(study_id)).execute()
+        else:
+            raise
     rec = fetch_jst_study_by_id(sb, study_id)
     if rec:
         return rec
