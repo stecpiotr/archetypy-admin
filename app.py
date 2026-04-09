@@ -3104,6 +3104,7 @@ def matching_view() -> None:
         )
         fig_cmp.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
+            height=560,
             polar=dict(
                 bgcolor="rgba(0,0,0,0)",
                 radialaxis=dict(visible=True, range=[0, 20]),
@@ -3129,30 +3130,33 @@ def matching_view() -> None:
         st.plotly_chart(
             fig_cmp,
             use_container_width=True,
-            config={"displaylogo": False, "displayModeBar": True, "responsive": True},
+            config={"displaylogo": False, "displayModeBar": False, "responsive": True},
             key=f"matching-radar-compare-{person_sid}-{jst_sid}",
         )
         st.caption(
             f"Niebieska linia: profil polityka ({person_name}) • "
             f"Turkusowa linia przerywana: profil mieszkańców ({jst_name}, N={int(result.get('jst_n') or 0)})."
         )
-        st.markdown(
-            f"""
-            <div style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 20px;margin-top:6px;margin-bottom:10px;">
-              <span style="font-size:0.84em;font-weight:700;color:#334155;min-width:135px;">TOP3 polityka:</span>
-              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['main']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">główny</span></span>
-              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['aux']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">wspierający</span></span>
-              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{person_top_colors['supp']};border:2px solid black;display:inline-block;"></span><span style="font-size:0.82em;">poboczny</span></span>
-              <span style="font-size:0.84em;font-weight:700;color:#334155;min-width:135px;">TOP3 mieszkańców:</span>
-              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['main']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">główny</span></span>
-              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['aux']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">wspierający</span></span>
-              <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:18px;height:18px;border-radius:50%;background:{jst_top_colors['supp']};border:2px solid #0f172a;display:inline-block;"></span><span style="font-size:0.82em;">poboczny</span></span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        lg1, lg2 = st.columns(2, gap="large")
+        with lg1:
+            st.markdown(
+                f"**TOP3 polityka:** "
+                f"<span style='color:{person_top_colors['main']};font-weight:800;'>●</span> główny, "
+                f"<span style='color:{person_top_colors['aux']};font-weight:800;'>●</span> wspierający, "
+                f"<span style='color:{person_top_colors['supp']};font-weight:800;'>●</span> poboczny",
+                unsafe_allow_html=True,
+            )
+        with lg2:
+            st.markdown(
+                f"**TOP3 mieszkańców:** "
+                f"<span style='color:{jst_top_colors['main']};font-weight:800;'>●</span> główny, "
+                f"<span style='color:{jst_top_colors['aux']};font-weight:800;'>●</span> wspierający, "
+                f"<span style='color:{jst_top_colors['supp']};font-weight:800;'>●</span> poboczny",
+                unsafe_allow_html=True,
+            )
 
-        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+        st.markdown("#### Profile archetypowe 0-100")
         left_profile_col, right_profile_col = st.columns(2, gap="large")
         try:
             import admin_dashboard as AD
@@ -3167,9 +3171,9 @@ def matching_view() -> None:
                 out_path=f"matching_profile_jst_{j_key}_{p_key}.png",
             )
 
-            def _show_image_compat(img_path: str) -> None:
+            def _show_image_compat(img_path: str, max_width_px: int = 520) -> None:
                 try:
-                    st.image(img_path, use_container_width=True)
+                    st.image(img_path, width=max_width_px)
                 except TypeError:
                     try:
                         st.image(img_path, use_column_width=True)
@@ -3178,10 +3182,10 @@ def matching_view() -> None:
 
             with left_profile_col:
                 st.markdown(f"**Profil archetypowy {person_name} (siła archetypu, skala: 0-100)**")
-                _show_image_compat(person_profile_img)
+                _show_image_compat(person_profile_img, max_width_px=520)
             with right_profile_col:
                 st.markdown(f"**Profil archetypowy mieszkańców {jst_name} (siła archetypu, skala: 0-100)**")
-                _show_image_compat(jst_profile_img)
+                _show_image_compat(jst_profile_img, max_width_px=520)
         except Exception as e:
             st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")
 
