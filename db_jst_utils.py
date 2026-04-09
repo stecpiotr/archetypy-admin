@@ -102,6 +102,7 @@ def ensure_jst_schema() -> None:
 
       slug TEXT NOT NULL UNIQUE,
       poststrat_targets JSONB NULL,
+      population_15_plus INTEGER NULL,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -110,6 +111,8 @@ def ensure_jst_schema() -> None:
 
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS poststrat_targets JSONB NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS population_15_plus INTEGER NULL;
 
     CREATE INDEX IF NOT EXISTS idx_jst_studies_active ON public.jst_studies(is_active);
     CREATE INDEX IF NOT EXISTS idx_jst_studies_slug ON public.jst_studies(slug);
@@ -183,6 +186,7 @@ def ensure_jst_schema() -> None:
           jst_full_ins,
           jst_full_loc,
           jst_full_voc,
+          population_15_plus,
           is_active
         FROM public.jst_studies
         WHERE slug = trim(coalesce(p_slug, ''))

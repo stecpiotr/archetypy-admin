@@ -44,10 +44,15 @@ def _city_title_from_study(study: Dict[str, Any]) -> Tuple[str, str]:
 
 def _write_settings(path: Path, study: Dict[str, Any]) -> None:
     city, city_label = _city_title_from_study(study)
+    pop_raw = str(study.get("population_15_plus") or "").strip().replace(",", ".")
+    try:
+        pop_15_plus = max(0, int(float(pop_raw))) if pop_raw else 0
+    except Exception:
+        pop_15_plus = 0
     settings = {
         "city": city,
         "city_label": city_label,
-        "population_15_plus": 0,
+        "population_15_plus": int(pop_15_plus),
         "bootstrap_reps": 700,
         "w_A": 1.0,
         "weight_column": "",
@@ -310,8 +315,9 @@ def _write_poststrat_targets(run_root: Path, study: Dict[str, Any], data_df: pd.
 def _hash_payload(df: pd.DataFrame, study: Dict[str, Any]) -> str:
     poststrat = study.get("poststrat_targets")
     poststrat_serialized = json.dumps(poststrat, ensure_ascii=False, sort_keys=True, default=str)
+    population_15_plus = study.get("population_15_plus")
     raw = (
-        f"v2|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|{poststrat_serialized}\n"
+        f"v3|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|{poststrat_serialized}|{population_15_plus}\n"
         + df.to_csv(index=False)
     )
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()

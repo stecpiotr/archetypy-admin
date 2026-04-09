@@ -930,8 +930,9 @@ def render(back_btn: Callable[[], None]) -> None:
         )
         widths = _auto_col_widths(df_logs)
         col_cfg = {col: cc.Column(width=widths.get(col, 100)) for col in df_logs.columns}
+        table_height = max(170, min(680, 42 + len(df_logs.index) * 36))
         st.markdown('<div class="narrow-table">', unsafe_allow_html=True)
-        st.dataframe(df_logs, hide_index=True, column_config=col_cfg)
+        st.dataframe(df_logs, hide_index=True, column_config=col_cfg, height=table_height)
         st.markdown("</div>", unsafe_allow_html=True)
 
         out_name = slug or "jst"

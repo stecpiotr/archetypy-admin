@@ -268,80 +268,76 @@ st.markdown(
 .block-container{ max-width:1160px !important; padding-top:72px !important; }
 .page-title{ font-size:36px; font-weight:800; color:#111827; letter-spacing:.2px; margin:15px 0 45px 0; padding-bottom:12px; border-bottom:1px solid var(--line); }
 .hr-thin{ border:0; border-top:1px solid var(--line); margin:16px 0 22px 0; }
-.tiles{
-  display:grid;
-  grid-template-columns:repeat(4, minmax(0, 1fr));
-  gap:22px;
-  margin:8px 0 18px 0;
-}
-.tiles.tiles-home-personal{ grid-template-columns:repeat(4, minmax(0, 1fr)); }
-.tiles.tiles-home-jst{ grid-template-columns:repeat(5, minmax(0, 1fr)); }
-.tiles.tiles-root{
-  grid-template-columns:repeat(3, minmax(0, 1fr));
-  max-width:1100px;
-  margin:8px auto 18px auto;
-}
-@media (max-width:1300px){
-  .tiles.tiles-home-jst{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width:1100px){
-  .tiles{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .tiles.tiles-root{ grid-template-columns:repeat(3, minmax(0, 1fr)); max-width:none; margin:8px 0 18px 0; }
-}
-@media (max-width:900px){
-  .tiles.tiles-root{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width:640px){
-  .tiles,
-  .tiles.tiles-home-personal,
-  .tiles.tiles-home-jst,
-  .tiles.tiles-root{ grid-template-columns:1fr; }
-}
-.tiles .stButton>button,
-.stButton>button.tile-btn{
+/* Kafelki panelu startowego (3 kolumny) */
+body[data-ap-view="home_root"] div[data-testid="stButton"] > button[kind="secondary"]{
   width:100%;
-  height:148px;
+  min-height:156px !important;
   background:#fff !important;
   color:#1F2937 !important;
-  font-weight:700 !important;
   border:1px solid var(--line) !important;
   border-radius:16px !important;
-  padding:18px 16px !important;
+  padding:20px 18px !important;
+  display:flex;
+  align-items:flex-start;
+  justify-content:flex-start;
+  text-align:left;
+  white-space:pre-line;
+  line-height:1.32 !important;
+  font-size:1.08rem !important;
+  font-weight:650 !important;
+  transition:transform .12s ease, box-shadow .16s ease, border-color .16s ease;
+}
+body[data-ap-view="home_root"] div[data-testid="stButton"] > button[kind="secondary"]:hover{
+  border-color:#D1D9E4 !important;
+  transform:translateY(-2px);
+  box-shadow:0 8px 20px rgba(15,23,42,.08);
+}
+/* Kafelki paneli "Badania personalne" i "Badania mieszkańców" */
+body[data-ap-view="home_personal"] div[data-testid="stButton"] > button[kind="secondary"],
+body[data-ap-view="home_jst"] div[data-testid="stButton"] > button[kind="secondary"]{
+  width:100%;
+  min-height:132px !important;
+  background:#fff !important;
+  color:#0f2847 !important;
+  border:1px solid #cfd8e6 !important;
+  border-radius:16px !important;
+  padding:14px 12px !important;
   display:flex;
   align-items:center;
   justify-content:center;
   text-align:center;
   white-space:pre-line;
+  line-height:1.34 !important;
+  font-size:1.05rem !important;
+  font-weight:600 !important;
   transition:transform .12s ease, box-shadow .16s ease, border-color .16s ease;
 }
-.tiles .stButton>button:hover,
-.stButton>button.tile-btn:hover{
-  border-color:#D1D9E4 !important;
-  transform:translateY(-3px);
-  box-shadow:0 10px 28px rgba(15,23,42,.08);
-}
-.tiles.tiles-home-personal .stButton>button,
-.tiles.tiles-home-jst .stButton>button,
-.stButton>button.tile-btn{
-  min-height:172px !important;
-  font-size:1.08rem !important;
-  line-height:1.35 !important;
-  border-radius:18px !important;
-  padding:18px 14px !important;
-}
-.tiles.tiles-root .stButton>button{
-  min-height:182px !important;
-  height:182px !important;
-  font-size:1.14rem !important;
-  line-height:1.25 !important;
-  border-radius:14px !important;
-  padding:20px 16px !important;
+body[data-ap-view="home_personal"] div[data-testid="stButton"] > button[kind="secondary"]:hover,
+body[data-ap-view="home_jst"] div[data-testid="stButton"] > button[kind="secondary"]:hover{
+  border-color:#c3d1e6 !important;
+  background:#f9fbff !important;
+  transform:translateY(-2px);
+  box-shadow:0 8px 18px rgba(15,23,42,.06);
 }
 .top-back-wrap{ margin:0 0 8px 0; }
 .top-back-wrap .stButton>button{
   border-radius:12px !important;
+  min-height:auto !important;
+  height:auto !important;
   padding:7px 12px !important;
   font-weight:600 !important;
+  font-size:0.95rem !important;
+  text-align:center !important;
+  justify-content:center !important;
+  align-items:center !important;
+}
+body[data-ap-view="home_personal"] .top-back-wrap div[data-testid="stButton"] > button[kind="secondary"],
+body[data-ap-view="home_jst"] .top-back-wrap div[data-testid="stButton"] > button[kind="secondary"]{
+  min-height:auto !important;
+  height:auto !important;
+  padding:7px 12px !important;
+  font-size:0.95rem !important;
+  line-height:1.2 !important;
 }
 .stButton>button[kind="primary"]{ background:var(--brand) !important; color:#fff !important; border:1px solid var(--brand) !important; border-radius:12px !important; }
 .stButton>button[kind="primary"]:hover{ background:var(--brand-hover) !important; border-color:var(--brand-hover) !important; }
@@ -1143,6 +1139,25 @@ def back_button(dest: str = "home_personal", label: str = "← Cofnij") -> None:
         goto(dest)
     st.markdown("</div>", unsafe_allow_html=True)
 
+
+def _set_view_scope(view_name: str) -> None:
+    safe = re.sub(r"[^a-z0-9_-]", "", str(view_name or "").lower())
+    if not safe:
+        return
+    st.markdown(
+        f"""
+        <script>
+        (function(){{
+          try {{
+            const body = window.parent?.document?.body || document.body;
+            if (body) body.setAttribute("data-ap-view", "{safe}");
+          }} catch(e) {{}}
+        }})();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
 def person_fields(prefix: str, data: Optional[Dict] = None) -> Tuple[str, str, str, str]:
     c1,c2 = st.columns(2)
     with c1:
@@ -1220,21 +1235,24 @@ def login_view() -> None:
 
 def home_personal_view() -> None:
     require_auth()
+    _set_view_scope("home_personal")
     back_button("home_root", "← Powrót do wyboru modułu")
     header("Badania personalne - panel")
     render_titlebar(["Panel", "Badania personalne"])
 
-    # kafle
-    st.markdown('<div class="tiles tiles-home-personal">', unsafe_allow_html=True)
-    if st.button("➕\n\nDodaj badanie archetypu", type="secondary", use_container_width=True):
-        goto("add")
-    if st.button("✏️\n\nEdytuj dane badania", type="secondary", use_container_width=True):
-        goto("edit")
-    if st.button("✉️\n\nWyślij link do ankiety", type="secondary", use_container_width=True):
-        goto("send")
-    if st.button("📊\n\nSprawdź wyniki badania archetypu", type="secondary", use_container_width=True):
-        goto("results")
-    st.markdown("</div>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4, gap="medium")
+    with c1:
+        if st.button("➕\n\nDodaj badanie archetypu", key="tile_home_personal_add", type="secondary", use_container_width=True):
+            goto("add")
+    with c2:
+        if st.button("✏️\n\nEdytuj dane badania", key="tile_home_personal_edit", type="secondary", use_container_width=True):
+            goto("edit")
+    with c3:
+        if st.button("✉️\n\nWyślij link do ankiety", key="tile_home_personal_send", type="secondary", use_container_width=True):
+            goto("send")
+    with c4:
+        if st.button("📊\n\nSprawdź wyniki badania archetypu", key="tile_home_personal_results", type="secondary", use_container_width=True):
+            goto("results")
 
     # 🔽 linia oddzielająca kafle od statystyk
     st.markdown(
@@ -1247,39 +1265,47 @@ def home_personal_view() -> None:
 
 def home_root_view() -> None:
     require_auth()
+    _set_view_scope("home_root")
     header("Archetypy – panel administratora")
     render_titlebar(["Panel", "Start"])
 
-    st.markdown('<div class="tiles tiles-root">', unsafe_allow_html=True)
-    if st.button("🧑‍💼\n\nBadania personalne", type="secondary", use_container_width=True):
-        goto("home_personal")
-    if st.button("🏘️\n\nBadania mieszkańców", type="secondary", use_container_width=True):
-        goto("home_jst")
-    if st.button("🧭\n\nMatching", type="secondary", use_container_width=True):
-        goto("matching")
-    st.markdown("</div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3, gap="large")
+    with c1:
+        if st.button("🧑‍💼\nBadania personalne\nDodawanie, edycja, wyniki.", key="tile_home_root_personal", type="secondary", use_container_width=True):
+            goto("home_personal")
+    with c2:
+        if st.button("🏘️\nBadania mieszkańców\nDane, wysyłka, analiza.", key="tile_home_root_jst", type="secondary", use_container_width=True):
+            goto("home_jst")
+    with c3:
+        if st.button("🧭\nMatching\nDopasowanie profili.", key="tile_home_root_matching", type="secondary", use_container_width=True):
+            goto("matching")
 
 
 def home_jst_view() -> None:
     require_auth()
     if not _require_jst_ready():
         return
+    _set_view_scope("home_jst")
     back_button("home_root", "← Powrót do wyboru modułu")
     header("Badania mieszkańców - panel")
     render_titlebar(["Panel", "Badania mieszkańców"])
 
-    st.markdown('<div class="tiles tiles-home-jst">', unsafe_allow_html=True)
-    if st.button("➕\n\nDodaj badanie\nmieszkańców", type="secondary", use_container_width=True):
-        goto("jst_add")
-    if st.button("✏️\n\nEdytuj dane\nbadania", type="secondary", use_container_width=True):
-        goto("jst_edit")
-    if st.button("✉️\n\nWyślij link\ndo ankiety", type="secondary", use_container_width=True):
-        goto("jst_send")
-    if st.button("💾\n\nImport i eksport\nbaz danych", type="secondary", use_container_width=True):
-        goto("jst_io")
-    if st.button("📊\n\nAnaliza\nbadania", type="secondary", use_container_width=True):
-        goto("jst_analysis")
-    st.markdown("</div>", unsafe_allow_html=True)
+    c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+    with c1:
+        if st.button("➕\n\nDodaj badanie\nmieszkańców", key="tile_home_jst_add", type="secondary", use_container_width=True):
+            goto("jst_add")
+    with c2:
+        if st.button("✏️\n\nEdytuj dane\nbadania", key="tile_home_jst_edit", type="secondary", use_container_width=True):
+            goto("jst_edit")
+    with c3:
+        if st.button("✉️\n\nWyślij link\ndo ankiety", key="tile_home_jst_send", type="secondary", use_container_width=True):
+            goto("jst_send")
+    with c4:
+        if st.button("💾\n\nImport i eksport\nbaz danych", key="tile_home_jst_io", type="secondary", use_container_width=True):
+            goto("jst_io")
+    with c5:
+        if st.button("📊\n\nAnaliza\nbadania", key="tile_home_jst_analysis", type="secondary", use_container_width=True):
+            goto("jst_analysis")
 
     studies = fetch_jst_studies(sb)
     counts = fetch_jst_response_counts(sb)
@@ -1408,6 +1434,17 @@ def _load_poststrat_targets(study: Dict[str, Any]) -> Dict[str, float]:
     return out
 
 
+def _normalize_population_15_plus(value: Any) -> Optional[int]:
+    txt = str(value or "").strip().replace(" ", "").replace(",", ".")
+    if not txt:
+        return None
+    try:
+        num = int(float(txt))
+    except Exception:
+        return None
+    return num if num > 0 else None
+
+
 def _render_poststrat_editor(prefix: str, current: Dict[str, float]) -> Dict[str, float]:
     st.markdown("### Wagi poststratyfikacyjne (płeć × wiek) – opcjonalne")
     st.caption("Podaj udziały docelowe (%) dla 6 komórek. System automatycznie znormalizuje sumę do 100%.")
@@ -1468,13 +1505,25 @@ def jst_add_view() -> None:
     render_titlebar(["Panel", "Badania mieszkańców", "Dodaj badanie"])
     back_button("home_jst")
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns([1.0, 1.35, 1.0], gap="small")
     with c1:
         jst_type_ui = st.radio("Typ JST", ["Miasto", "Gmina"], horizontal=True)
     with c2:
         st.markdown('<span class="form-label-strong">Nazwa JST (bez członu typu)</span>', unsafe_allow_html=True)
         jst_name = st.text_input("Nazwa JST", placeholder="np. Poznań, Lublin, Biała Podlaska", label_visibility="collapsed").strip()
+    with c3:
+        st.markdown('<span class="form-label-strong">Podaj liczbę mieszkańców 15+ dla JST:</span>', unsafe_allow_html=True)
+        population_15_plus_ui = st.number_input(
+            "Liczba mieszkańców 15+",
+            min_value=0,
+            value=0,
+            step=100,
+            format="%d",
+            label_visibility="collapsed",
+            help="Opcjonalnie. Przykład dla Poznania: 466292.",
+        )
     jst_type = "miasto" if jst_type_ui == "Miasto" else "gmina"
+    population_15_plus = _normalize_population_15_plus(population_15_plus_ui)
 
     defaults = _make_jst_defaults(jst_type, jst_name)
     if st.button("Uzupełnij odmiany automatycznie", type="secondary"):
@@ -1505,6 +1554,7 @@ def jst_add_view() -> None:
             st.error("Uzupełnij odmiany nazwy JST (mianownik–wołacz).")
             return
         payload = _jst_payload_from_form(jst_type, jst_name, forms, slug)
+        payload["population_15_plus"] = population_15_plus
         try:
             saved = insert_jst_study(sb, payload)
             base = (st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
@@ -1545,12 +1595,23 @@ def jst_edit_view() -> None:
                 st.session_state[f"jst_edit_post_{g}_{a}"] = float(ps.get(f"{g}_{a}", 0.0))
 
     type_idx = 0 if str(study.get("jst_type") or "miasto").lower() == "miasto" else 1
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns([1.0, 1.35, 1.0], gap="small")
     with c1:
         jst_type_ui = st.radio("Typ JST", ["Miasto", "Gmina"], index=type_idx, horizontal=True)
     with c2:
         jst_name = st.text_input("Nazwa JST", value=str(study.get("jst_name") or ""), label_visibility="visible").strip()
+    with c3:
+        pop_default = int(_normalize_population_15_plus(study.get("population_15_plus")) or 0)
+        population_15_plus_ui = st.number_input(
+            "Podaj liczbę mieszkańców 15+ dla JST:",
+            min_value=0,
+            value=pop_default,
+            step=100,
+            format="%d",
+            help="Opcjonalnie. Przykład dla Poznania: 466292.",
+        )
     jst_type = "miasto" if jst_type_ui == "Miasto" else "gmina"
+    population_15_plus = _normalize_population_15_plus(population_15_plus_ui)
 
     defaults = {
         c: str(study.get(f"jst_name_{c}") or "")
@@ -1592,6 +1653,7 @@ def jst_edit_view() -> None:
                 st.error("Uzupełnij odmiany nazwy JST (mianownik–wołacz).")
                 return
             payload = _jst_payload_from_form(jst_type, jst_name, forms, slug)
+            payload["population_15_plus"] = population_15_plus
             if any(float(v or 0.0) > 0 for v in poststrat_targets.values()):
                 payload["poststrat_targets"] = {k: float(v) for k, v in poststrat_targets.items() if float(v or 0.0) > 0}
             else:
@@ -1843,6 +1905,9 @@ def jst_analysis_view() -> None:
     run_base = template_root / "_runs"
     cache_key = f"jst_report_html_v2_{sid}"
     cache_meta_key = f"jst_report_meta_v2_{sid}"
+    inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 45_000_000) or 45_000_000)
+    inline_source_limit = int(st.secrets.get("JST_REPORT_INLINE_SOURCE_LIMIT_BYTES", 70_000_000) or 70_000_000)
+    safe_message_limit = int(st.secrets.get("JST_REPORT_SAFE_MESSAGE_LIMIT_BYTES", 185_000_000) or 185_000_000)
 
     c1, c2 = st.columns([0.35, 0.65], gap="small")
     with c1:
@@ -1880,16 +1945,34 @@ def jst_analysis_view() -> None:
                     force=bool(regenerate_now),
                 )
                 raw_html = report_path.read_text(encoding="utf-8", errors="ignore")
-                inlined = inline_local_assets(raw_html, report_path.parent)
-                inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 45_000_000) or 45_000_000)
-                inlined_bytes = len(inlined.encode("utf-8", errors="ignore"))
-                st.session_state[cache_key] = inlined
+                raw_bytes = len(raw_html.encode("utf-8", errors="ignore"))
+                inlined = ""
+                inlined_bytes = 0
+                inline_error = ""
+                if raw_bytes <= inline_source_limit:
+                    try:
+                        inlined = inline_local_assets(raw_html, report_path.parent)
+                        inlined_bytes = len(inlined.encode("utf-8", errors="ignore"))
+                    except Exception as ex:
+                        inline_error = str(ex)
+                        inlined = ""
+                        inlined_bytes = 0
+                inlined_used = bool(inlined and inlined_bytes <= safe_message_limit and inlined_bytes <= inline_limit)
+                if inlined_used:
+                    st.session_state[cache_key] = inlined
+                elif raw_bytes <= safe_message_limit:
+                    st.session_state[cache_key] = raw_html
+                else:
+                    st.session_state[cache_key] = "__report_path_only__"
                 st.session_state[cache_meta_key] = {
                     "report_path": str(report_path),
-                    "raw_bytes": len(raw_html.encode("utf-8", errors="ignore")),
+                    "raw_bytes": raw_bytes,
                     "inlined_bytes": inlined_bytes,
-                    "inlined_used": True,
+                    "inlined_used": inlined_used,
+                    "inline_error": inline_error,
                     "inline_limit": inline_limit,
+                    "inline_source_limit": inline_source_limit,
+                    "safe_message_limit": safe_message_limit,
                 }
                 st.success("Raport gotowy.")
             except Exception as e:
@@ -1908,6 +1991,10 @@ def jst_analysis_view() -> None:
 
     report_path_str = str(meta.get("report_path") or "")
     report_path = Path(report_path_str) if report_path_str else None
+    raw_bytes = int(meta.get("raw_bytes") or 0)
+    inlined_bytes = int(meta.get("inlined_bytes") or 0)
+    inlined_used = bool(meta.get("inlined_used"))
+    safe_limit = int(meta.get("safe_message_limit") or safe_message_limit)
 
     if report_path and report_path.exists():
         report_slug = slugify(str((study or {}).get("jst_full_nom") or (study or {}).get("slug") or "raport-jst")) or "raport-jst"
@@ -1919,20 +2006,41 @@ def jst_analysis_view() -> None:
             use_container_width=False,
         )
 
-    if rendered and int(meta.get("inlined_bytes") or 0) > int(meta.get("inline_limit") or 0):
+    if inlined_bytes > int(meta.get("inline_limit") or inline_limit):
         st.warning(
-            "Raport jest bardzo duży. Ładujemy pełny widok z wykresami, co może chwilę potrwać na słabszych urządzeniach."
+            "Raport jest duży. Domyślnie zalecamy tryb lekki, a pełny podgląd może wolniej działać na słabszych urządzeniach."
         )
+    if meta.get("inline_error"):
+        st.caption("Uwaga techniczna: nie udało się osadzić części zasobów raportu, dlatego użyty został tryb bezpieczniejszy.")
+
+    auto_light = (not inlined_used) or (inlined_bytes > safe_limit and raw_bytes <= safe_limit)
     light_mode = st.toggle(
         "Tryb lekki renderowania (szybciej, bez osadzonych wykresów)",
-        value=False,
+        value=auto_light,
         key=f"jst_light_mode_{sid}",
     )
     if rendered:
         to_render = rendered
+        if to_render == "__report_path_only__":
+            if report_path and report_path.exists():
+                to_render = report_path.read_text(encoding="utf-8", errors="ignore")
+            else:
+                st.error("Nie udało się odnaleźć pliku raportu do podglądu.")
+                return
         if light_mode and report_path and report_path.exists():
             to_render = report_path.read_text(encoding="utf-8", errors="ignore")
-            st.info("Tryb lekki jest włączony. Wykresy osadzone mogą być ograniczone, ale raport renderuje się szybciej.")
+            st.info("Tryb lekki jest włączony. Raport renderuje się szybciej i stabilniej przy dużych danych.")
+        elif (not light_mode) and (not inlined_used) and report_path and report_path.exists():
+            to_render = report_path.read_text(encoding="utf-8", errors="ignore")
+
+        render_size = len(to_render.encode("utf-8", errors="ignore"))
+        if render_size > safe_limit:
+            st.error(
+                "Podgląd raportu w panelu został wyłączony, bo przekracza bezpieczny limit przesyłania danych do przeglądarki."
+            )
+            st.info("Użyj przycisku „📥 Pobierz raport HTML” i otwórz plik lokalnie, aby zachować pełną interaktywność.")
+            return
+
         prepared = _prepare_report_html_for_iframe(to_render)
         html_component(
             prepared,
@@ -2017,8 +2125,9 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
 
         # Oczekiwania mieszkańców z komponentem A:
         # A = 40% (średnia preferencja z par A1..A18),
-        # B1 = 35% (czy archetyp jest w TOP3),
-        # B2 = 25% (czy archetyp jest TOP1).
+        # B1 = 20% (czy archetyp jest w TOP3),
+        # B2 = 25% (czy archetyp jest TOP1),
+        # D13 = 15% (archetyp preferowany w pytaniu D13).
         # Każdy archetyp kończy ze skalą 0..100 i nie jest sztucznie
         # normalizowany do sumy 100%.
         a_acc = {a: 0.0 for a in JST_ARCHETYPES}
@@ -2038,7 +2147,11 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
             for a in JST_ARCHETYPES
             if str(payload.get(f"B1_{a}") or "").strip().lower() in {"1", "1.0", "true", "t", "tak", "yes", "y"}
         }
-        b2 = str(payload.get("B2") or "").strip()
+        arch_by_lower = {a.casefold(): a for a in JST_ARCHETYPES}
+        b2_raw = str(payload.get("B2") or "").strip()
+        d13_raw = str(payload.get("D13") or "").strip()
+        b2 = arch_by_lower.get(b2_raw.casefold(), b2_raw)
+        d13 = arch_by_lower.get(d13_raw.casefold(), d13_raw)
 
         vec: Dict[str, float] = {}
         for a in JST_ARCHETYPES:
@@ -2046,7 +2159,8 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
             a_norm = float(a_acc.get(a, 0.0)) / denom
             b1_hit = 1.0 if a in selected_b1 else 0.0
             b2_hit = 1.0 if b2 == a else 0.0
-            score = (0.40 * a_norm + 0.35 * b1_hit + 0.25 * b2_hit) * 100.0
+            d13_hit = 1.0 if d13 == a else 0.0
+            score = (0.40 * a_norm + 0.20 * b1_hit + 0.25 * b2_hit + 0.15 * d13_hit) * 100.0
             vec[a] = score
 
         for a in JST_ARCHETYPES:
@@ -2130,30 +2244,135 @@ def matching_view() -> None:
             all_payloads = [r.get("payload") or {} for r in top_sim_rows]
             subset_payloads = [r.get("payload") or {} for r in subset]
 
-            dim_map = [
-                ("Płeć", "M_PLEC"),
-                ("Wiek", "M_WIEK"),
-                ("Wykształcenie", "M_WYKSZT"),
-                ("Status zawodowy", "M_ZAWOD"),
-                ("Sytuacja materialna", "M_MATERIAL"),
+            dim_specs = [
+                {
+                    "label": "Płeć",
+                    "field": "M_PLEC",
+                    "order": ["kobieta", "mężczyzna"],
+                    "emoji": {"kobieta": "👩", "mężczyzna": "👨"},
+                },
+                {
+                    "label": "Wiek",
+                    "field": "M_WIEK",
+                    "order": ["15-39", "40-59", "60+"],
+                    "emoji": {"15-39": "🧑", "40-59": "🧑‍💼", "60+": "🧓"},
+                },
+                {
+                    "label": "Wykształcenie",
+                    "field": "M_WYKSZT",
+                    "order": ["podst./gim./zaw.", "średnie", "wyższe"],
+                    "emoji": {"podst./gim./zaw.": "🛠️", "średnie": "📘", "wyższe": "🎓"},
+                },
+                {
+                    "label": "Status zawodowy",
+                    "field": "M_ZAWOD",
+                    "order": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
+                    "emoji": {
+                        "prac. umysłowy": "🧠",
+                        "prac. fizyczny": "🛠️",
+                        "własna firma": "🏢",
+                        "student/uczeń": "🧑‍🎓",
+                        "bezrobotny": "🔎",
+                        "rencista/emeryt": "🌿",
+                        "inna": "🧩",
+                    },
+                },
+                {
+                    "label": "Sytuacja materialna",
+                    "field": "M_MATERIAL",
+                    "order": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
+                    "emoji": {
+                        "bardzo dobra": "😄",
+                        "raczej dobra": "🙂",
+                        "przeciętna": "😐",
+                        "raczej zła": "🙁",
+                        "bardzo zła": "😟",
+                        "odmowa": "🤐",
+                    },
+                },
             ]
+
+            def _norm_demo(value: Any) -> str:
+                txt = str(value or "").strip().lower()
+                for src, dst in (("ą", "a"), ("ć", "c"), ("ę", "e"), ("ł", "l"), ("ń", "n"), ("ó", "o"), ("ś", "s"), ("ż", "z"), ("ź", "z")):
+                    txt = txt.replace(src, dst)
+                return re.sub(r"\s+", " ", txt)
+
+            def _canon_demo(field: str, value: Any) -> str:
+                raw = str(value or "").strip()
+                n = _norm_demo(value)
+                if not n:
+                    return "brak danych"
+                if field == "M_PLEC":
+                    if n in {"1", "k", "kobieta"} or "kobiet" in n:
+                        return "kobieta"
+                    if n in {"2", "m", "mezczyzna"} or "mezczyzn" in n:
+                        return "mężczyzna"
+                elif field == "M_WIEK":
+                    if re.search(r"15\D*39", n):
+                        return "15-39"
+                    if re.search(r"40\D*59", n):
+                        return "40-59"
+                    if "60" in n:
+                        return "60+"
+                elif field == "M_WYKSZT":
+                    if "wyzsze" in n:
+                        return "wyższe"
+                    if "srednie" in n:
+                        return "średnie"
+                    if any(k in n for k in ("podstaw", "gimnaz", "zawod")):
+                        return "podst./gim./zaw."
+                elif field == "M_ZAWOD":
+                    if "umysl" in n:
+                        return "prac. umysłowy"
+                    if "fizycz" in n:
+                        return "prac. fizyczny"
+                    if "wlasn" in n and "firm" in n:
+                        return "własna firma"
+                    if "student" in n or "uczen" in n:
+                        return "student/uczeń"
+                    if "bezrobot" in n:
+                        return "bezrobotny"
+                    if "renc" in n or "emery" in n:
+                        return "rencista/emeryt"
+                    if "inna" in n or "jaka" in n:
+                        return "inna"
+                elif field == "M_MATERIAL":
+                    if "odmaw" in n:
+                        return "odmowa"
+                    if "bardzo dobrze" in n or "bardzo dobra" in n:
+                        return "bardzo dobra"
+                    if "raczej dobrze" in n or "raczej dobra" in n:
+                        return "raczej dobra"
+                    if "przeciet" in n or "srednio" in n:
+                        return "przeciętna"
+                    if "raczej zle" in n or "raczej zla" in n:
+                        return "raczej zła"
+                    if "bardzo zle" in n or "bardzo zla" in n or "ciezk" in n:
+                        return "bardzo zła"
+                return raw or "brak danych"
 
             def _count(payloads: List[Dict[str, Any]], field: str) -> Dict[str, int]:
                 out: Dict[str, int] = {}
                 for p in payloads:
-                    val = str(p.get(field) or "brak danych").strip() or "brak danych"
+                    val = _canon_demo(field, p.get(field))
                     out[val] = int(out.get(val, 0)) + 1
                 return out
 
             demo_rows: List[Dict[str, Any]] = []
-            demo_cards: List[Dict[str, str]] = []
-            for dim_label, field in dim_map:
+            demo_cards: List[Dict[str, Any]] = []
+            for spec in dim_specs:
+                dim_label = str(spec["label"])
+                field = str(spec["field"])
                 dist_sub = _count(subset_payloads, field)
                 dist_all = _count(all_payloads, field)
-                cats = sorted(set(dist_sub.keys()) | set(dist_all.keys()))
+                known_order = list(spec.get("order") or [])
+                unknown = sorted((set(dist_sub.keys()) | set(dist_all.keys())) - set(known_order))
+                cats = known_order + unknown
 
                 top_cat = None
                 top_pct = -1.0
+                top_all_pct = 0.0
                 for cat in cats:
                     c_sub = int(dist_sub.get(cat, 0))
                     c_all = int(dist_all.get(cat, 0))
@@ -2162,6 +2381,7 @@ def matching_view() -> None:
                     if pct_sub > top_pct:
                         top_pct = pct_sub
                         top_cat = cat
+                        top_all_pct = pct_all
                     demo_rows.append(
                         {
                             "Zmienna": dim_label,
@@ -2172,7 +2392,15 @@ def matching_view() -> None:
                         }
                     )
                 if top_cat is not None:
-                    demo_cards.append({"label": dim_label, "top": str(top_cat), "pct": f"{max(top_pct, 0.0):.1f}%"})
+                    demo_cards.append(
+                        {
+                            "label": dim_label,
+                            "top": str(top_cat),
+                            "pct": round(max(top_pct, 0.0), 1),
+                            "diff_pp": round(top_pct - top_all_pct, 1),
+                            "emoji": str((spec.get("emoji") or {}).get(str(top_cat), "•")),
+                        }
+                    )
 
             st.session_state["matching_result"] = {
                 "person_label": pick_personal,
@@ -2222,10 +2450,10 @@ def matching_view() -> None:
             df_cmp,
             use_container_width=True,
             hide_index=True,
-            height=max(len(df_cmp) * 36 + 40, 220),
+            height=max(160, len(df_cmp) * 34 + 24),
         )
         st.caption(
-            "„Oczekiwania mieszkańców (%)” liczymy łącząc komponent A (40%), B1 (35%) i B2 (25%) "
+            "„Oczekiwania mieszkańców (%)” liczymy łącząc komponent A (40%), B1 (20%), B2 (25%) i D13 (15%) "
             "dla każdego archetypu. Skala nie jest sztucznie zamykana do 100% sumarycznie."
         )
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
@@ -2238,39 +2466,39 @@ def matching_view() -> None:
 
     with tab_demo:
         st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
+        st.markdown(
+            """
+            <style>
+              .match-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:6px 0 14px;}
+              .match-demo-stat{border:1px solid #dfe6ee;border-radius:12px;padding:10px 12px;background:#fff;box-shadow:0 4px 12px rgba(15,23,42,.04);}
+              .match-demo-stat-label{font-size:11px;color:#6b7a89;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+              .match-demo-stat-main{font-size:24px;font-weight:800;color:#10253c;line-height:1.2;margin-top:3px;}
+              .match-demo-stat-sub{font-size:12px;color:#3d4f62;margin-top:3px;font-weight:600;}
+              .match-demo-table-wrap{overflow:auto;border:1px solid #dce4ee;border-radius:12px;background:#fff;}
+              .match-demo-table{width:100%;border-collapse:collapse;min-width:920px;}
+              .match-demo-table th,.match-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
+              .match-demo-table th{background:#f6f8fb;color:#1f2f44;font-weight:700;}
+              .match-demo-var{font-weight:800;vertical-align:top;background:#fafbfc;border-top:2px solid #9aa7b4 !important;}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         cards = result.get("demo_cards") or []
+        st.markdown("### 📌 Statystyczny profil demograficzny")
         if cards:
             cards_html = "".join(
                 f"""
-                <div class="match-card">
-                  <div class="match-card-label">{html.escape(str(c.get("label") or ""))}</div>
-                  <div class="match-card-main">{html.escape(str(c.get("top") or ""))}</div>
-                  <div class="match-card-pct">↑ {html.escape(str(c.get("pct") or ""))}</div>
+                <div class="match-demo-stat">
+                  <div class="match-demo-stat-label">{html.escape(str(c.get("label") or ""))}</div>
+                  <div class="match-demo-stat-main">{html.escape(str(c.get("emoji") or ""))} {html.escape(str(c.get("top") or ""))}</div>
+                  <div class="match-demo-stat-sub">{float(c.get("pct") or 0.0):.1f}% • {float(c.get("diff_pp") or 0.0):+,.1f} pp</div>
                 </div>
                 """
                 for c in cards
             )
             st.markdown(
                 f"""
-                <style>
-                  .match-cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:8px 0 14px;}}
-                  .match-card{{border:1px solid #dfe6ee;border-radius:10px;padding:10px 12px;background:#fff;}}
-                  .match-card-label{{font-size:12px;color:#5f6f80;font-weight:700;letter-spacing:.02em;text-transform:uppercase;}}
-                  .match-card-main{{font-size:18px;font-weight:700;color:#13263a;line-height:1.25;margin-top:2px;}}
-                  .match-card-pct{{font-size:18px;font-weight:700;color:#16a34a;margin-top:2px;}}
-                  .match-demo-wrap{{overflow:auto;border:1px solid #e1e8f0;border-radius:10px;background:#fff;}}
-                  .match-demo-table{{width:100%;border-collapse:separate;border-spacing:0;min-width:840px;}}
-                  .match-demo-table th,.match-demo-table td{{padding:8px 10px;border-bottom:1px solid #eef2f6;text-align:left;vertical-align:middle;}}
-                  .match-demo-table th{{background:#f7f9fc;color:#1f2f44;font-weight:700;position:sticky;top:0;z-index:1;}}
-                  .match-demo-table tr:last-child td{{border-bottom:none;}}
-                  .match-demo-bar-cell{{position:relative;min-width:220px;}}
-                  .match-demo-bar-bg{{height:14px;background:#edf2f7;border-radius:999px;overflow:hidden;}}
-                  .match-demo-bar-fill{{height:100%;background:#81c5df;}}
-                  .match-demo-pct{{margin-left:8px;font-weight:700;color:#1f2f44;white-space:nowrap;}}
-                  .match-demo-diff-pos{{color:#0f9d58;font-weight:700;}}
-                  .match-demo-diff-neg{{color:#d64545;font-weight:700;}}
-                </style>
-                <div class="match-cards">{cards_html}</div>
+                <div class="match-demo-cards">{cards_html}</div>
                 """,
                 unsafe_allow_html=True,
             )
@@ -2278,18 +2506,119 @@ def matching_view() -> None:
         if ddf.empty:
             st.caption("Brak danych demograficznych.")
         else:
-            ddf = ddf.copy().sort_values(["Zmienna", "% grupa dopasowana"], ascending=[True, False])
+            st.markdown("### 👥 Profil demograficzny")
+            ddf = ddf.copy()
             ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0).round(1)
             ddf["% ogół mieszkańców"] = pd.to_numeric(ddf["% ogół mieszkańców"], errors="coerce").fillna(0.0).round(1)
             ddf["Różnica pp"] = pd.to_numeric(ddf["Różnica pp"], errors="coerce").fillna(0.0).round(1)
-            ddf["% grupa dopasowana"] = ddf["% grupa dopasowana"].map(lambda v: f"{v:.1f}%")
-            ddf["% ogół mieszkańców"] = ddf["% ogół mieszkańców"].map(lambda v: f"{v:.1f}%")
-            ddf["Różnica pp"] = ddf["Różnica pp"].map(lambda v: f"{v:+.1f} pp")
-            st.dataframe(
-                ddf[["Zmienna", "Kategoria", "% grupa dopasowana", "% ogół mieszkańców", "Różnica pp"]],
-                use_container_width=True,
-                hide_index=True,
-                height=max(len(ddf) * 35 + 40, 240),
+
+            variable_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
+            category_order = {
+                "Płeć": ["kobieta", "mężczyzna"],
+                "Wiek": ["15-39", "40-59", "60+"],
+                "Wykształcenie": ["podst./gim./zaw.", "średnie", "wyższe"],
+                "Status zawodowy": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
+                "Sytuacja materialna": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
+            }
+            category_emoji = {
+                "kobieta": "👩",
+                "mężczyzna": "👨",
+                "15-39": "🧑",
+                "40-59": "🧑‍💼",
+                "60+": "🧓",
+                "podst./gim./zaw.": "🛠️",
+                "średnie": "📘",
+                "wyższe": "🎓",
+                "prac. umysłowy": "🧠",
+                "prac. fizyczny": "🛠️",
+                "własna firma": "🏢",
+                "student/uczeń": "🧑‍🎓",
+                "bezrobotny": "🔎",
+                "rencista/emeryt": "🌿",
+                "inna": "🧩",
+                "bardzo dobra": "😄",
+                "raczej dobra": "🙂",
+                "przeciętna": "😐",
+                "raczej zła": "🙁",
+                "bardzo zła": "😟",
+                "odmowa": "🤐",
+                "brak danych": "❔",
+            }
+
+            ddf["__var_order"] = ddf["Zmienna"].map(lambda v: variable_order.index(v) if v in variable_order else 999)
+            ddf["__cat_order"] = ddf.apply(
+                lambda row: (
+                    category_order.get(str(row["Zmienna"]), []).index(str(row["Kategoria"]))
+                    if str(row["Kategoria"]) in category_order.get(str(row["Zmienna"]), [])
+                    else 999
+                ),
+                axis=1,
+            )
+            ddf = ddf.sort_values(["__var_order", "__cat_order", "Kategoria"], ascending=[True, True, True])
+
+            table_rows: List[str] = []
+            for var_name in variable_order:
+                part = ddf[ddf["Zmienna"] == var_name].copy()
+                if part.empty:
+                    continue
+                top_idx = part["% grupa dopasowana"].idxmax()
+                rowspan = len(part.index)
+                for idx, (_, row) in enumerate(part.iterrows()):
+                    cat = str(row["Kategoria"])
+                    pct_sub = float(row["% grupa dopasowana"])
+                    pct_all = float(row["% ogół mieszkańców"])
+                    diff = float(row["Różnica pp"])
+                    is_top = bool(row.name == top_idx)
+                    bar_w = max(0.0, min(100.0, pct_sub))
+                    bar_alpha = "0.74" if is_top else "0.30"
+                    diff_color = "#15803d" if diff >= 0 else "#b91c1c"
+                    diff_text = f"{diff:+.1f} pp"
+                    cat_weight = "800" if is_top else "500"
+                    pct_weight = "900" if is_top else "600"
+                    first_col = (
+                        f"<td class='match-demo-var' rowspan='{rowspan}'>{html.escape(var_name)}</td>"
+                        if idx == 0
+                        else ""
+                    )
+                    table_rows.append(
+                        f"""
+                        <tr>
+                          {first_col}
+                          <td style="font-weight:{cat_weight};">{html.escape(category_emoji.get(cat, ""))} {html.escape(cat)}</td>
+                          <td style="padding:0; min-width:176px;">
+                            <div style="position:relative; height:34px; background:#fff;">
+                              <div style="position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:rgba(224,49,49,{bar_alpha});"></div>
+                              <span style="position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;">{pct_sub:.1f}%</span>
+                            </div>
+                          </td>
+                          <td style="text-align:right;">{pct_all:.1f}%</td>
+                          <td style="text-align:right; color:{diff_color}; font-weight:700;">{diff_text}</td>
+                        </tr>
+                        """
+                    )
+
+            st.markdown(
+                """
+                <div class="match-demo-table-wrap">
+                  <table class="match-demo-table">
+                    <thead>
+                      <tr>
+                        <th>Zmienna</th>
+                        <th>Kategoria</th>
+                        <th>% grupa dopasowana</th>
+                        <th>% ogół mieszkańców</th>
+                        <th>Różnica pp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                """
+                + "".join(table_rows)
+                + """
+                    </tbody>
+                  </table>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
     with tab_strategy:
@@ -3128,6 +3457,7 @@ if public_token:
     public_report_view(public_token)
 else:
     view = st.session_state["view"]
+    _set_view_scope(view)
     if view == "login":
         login_view()
     elif view == "home_root":
