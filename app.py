@@ -6,11 +6,13 @@ import warnings
 import re
 import html
 import json
+import subprocess
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 import pandas as pd
 import streamlit as st
+from zoneinfo import ZoneInfo
 
 from db_utils import (
     get_supabase,
@@ -100,11 +102,40 @@ def _app_build_signature() -> str:
         or os.getenv("COMMIT_SHA")
         or ""
     ).strip()
+    commit_date = ""
+    repo_root = str(Path(__file__).resolve().parent)
+    if not commit:
+        try:
+            commit = subprocess.run(
+                ["git", "-C", repo_root, "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=2.0,
+            ).stdout.strip()
+        except Exception:
+            commit = ""
+    try:
+        raw_commit_date = subprocess.run(
+            ["git", "-C", repo_root, "show", "-s", "--format=%cI", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2.0,
+        ).stdout.strip()
+        if raw_commit_date:
+            dt = datetime.fromisoformat(raw_commit_date.replace("Z", "+00:00"))
+            commit_date = dt.astimezone(ZoneInfo("Europe/Warsaw")).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        commit_date = ""
+
     commit_short = commit[:8] if commit else "local"
     try:
         src_mtime = datetime.fromtimestamp(os.path.getmtime(__file__)).strftime("%Y-%m-%d %H:%M")
     except Exception:
         src_mtime = "unknown-time"
+    if commit_date:
+        return f"build: {src_mtime} | commit: {commit_short} ({commit_date})"
     return f"build: {src_mtime} | commit: {commit_short}"
 
 

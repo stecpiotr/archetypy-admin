@@ -291,6 +291,27 @@ def _looks_like_default_sms_body(body: str) -> bool:
     return "zwracamy sie z prosba o wypelnienie ankiety" in norm and "link do ankiety" in norm
 
 
+def _looks_like_default_email_body(body: str) -> bool:
+    norm = _strip_pl_diacritics(str(body or "").strip().lower())
+    return (
+        "zwracamy sie z prosba o wypelnienie ankiety" in norm
+        and "w tym badaniu chcemy przekonac sie" in norm
+        and "link do ankiety" in norm
+    )
+
+
+def _looks_like_default_email_subject(subject: str) -> bool:
+    norm = _strip_pl_diacritics(str(subject or "").strip().lower())
+    return norm.startswith("prosba o wypelnienie ankiety dla mieszkancow")
+
+
+def _default_email_subject(jst_full_gen: str) -> str:
+    jst = str(jst_full_gen or "").strip()
+    if jst:
+        return f"Prośba o wypełnienie ankiety dla mieszkańców {jst}"
+    return "Prośba o wypełnienie ankiety"
+
+
 def _inject_link_into_message(body: str, expected_link: str, token: str) -> str:
     text = str(body or "").strip()
     if not text:
@@ -355,24 +376,40 @@ def _resend_sms_row(sb, row: Dict[str, Any], selected_study: Dict[str, Any]) -> 
     return False, str(err or "unknown error")
 
 
-def _resend_email_row(sb, row: Dict[str, Any], slug: str) -> Tuple[bool, str]:
+def _resend_email_row(sb, row: Dict[str, Any], selected_study: Dict[str, Any]) -> Tuple[bool, str]:
     email_id = str(row.get("id") or "").strip()
     to_email = str(row.get("email") or "").strip()
     token = str(row.get("token") or "").strip()
     subject = str(row.get("subject") or "").strip()
     text = str(row.get("text") or "").strip()
+    row_study_id = str(row.get("study_id") or "").strip()
+    selected_study_id = str((selected_study or {}).get("id") or "").strip()
     if not email_id or not to_email or not token:
         return False, "Brak danych rekordu (id/e-mail/token)."
+    if row_study_id and selected_study_id and row_study_id != selected_study_id:
+        return False, "Wybrany rekord należy do innego badania JST. Odśwież listę i wybierz właściwy rekord."
 
     try:
         host, port, user, pwd, secure, from_email, from_name, base_url = _email_env()
     except Exception as e:
         return False, str(e)
 
-    if not text:
-        text = _default_email_text("", "", "", _build_link(base_url, slug, token))
-    if not subject:
-        subject = "Prośba o wypełnienie ankiety"
+    study_ctx = _fetch_jst_study_context(sb, row_study_id) or (selected_study or {})
+    slug = str(study_ctx.get("slug") or (selected_study or {}).get("slug") or "").strip()
+    jst_type = str(study_ctx.get("jst_type") or "miasto").strip().lower()
+    jst_full_gen = str(study_ctx.get("jst_full_gen") or "").strip()
+    jst_full_nom = str(study_ctx.get("jst_full_nom") or "").strip()
+    if not slug:
+        return False, "Nie udało się ustalić slugu JST dla wybranego rekordu."
+
+    expected_link = _build_link(base_url, slug, token)
+    if not text or _looks_like_default_email_body(text):
+        text = _default_email_text(jst_type, jst_full_gen, jst_full_nom, expected_link)
+    else:
+        text = _inject_link_into_message(text, expected_link=expected_link, token=token)
+
+    if not subject or _looks_like_default_email_subject(subject):
+        subject = _default_email_subject(jst_full_gen)
     ok, provider_mid, err = send_email(
         host=host,
         port=port,
@@ -964,12 +1001,17 @@ def render(back_btn: Callable[[], None]) -> None:
             st.success(f"Wysłano {sent_ok} / {len(recipients_list)}.")
         else:
             host, port, user, pwd, secure, from_email, from_name, base = _email_env()
-            subject = str(st.session_state.get("jst_send_subject") or "").strip() or "Prośba o wypełnienie ankiety"
+            subject_tpl = str(st.session_state.get("jst_send_subject") or "").strip() or _default_email_subject(jst_full_gen)
             sent_ok = 0
             for email in recipients_list:
                 token = make_token(8)
                 final_link = _build_link(base, slug, token)
                 msg = body_tpl.replace(link_preview, final_link)
+                if _looks_like_default_email_body(msg):
+                    msg = _default_email_text(jst_type, jst_full_gen, jst_full_nom, final_link)
+                else:
+                    msg = _inject_link_into_message(msg, expected_link=final_link, token=token)
+                subject = _default_email_subject(jst_full_gen) if _looks_like_default_email_subject(subject_tpl) else subject_tpl
                 for _ in range(5):
                     try:
                         rec = _create_jst_email_record(
@@ -985,6 +1027,10 @@ def render(back_btn: Callable[[], None]) -> None:
                         token = make_token(8)
                         final_link = _build_link(base, slug, token)
                         msg = body_tpl.replace(link_preview, final_link)
+                        if _looks_like_default_email_body(msg):
+                            msg = _default_email_text(jst_type, jst_full_gen, jst_full_nom, final_link)
+                        else:
+                            msg = _inject_link_into_message(msg, expected_link=final_link, token=token)
                 else:
                     st.error(f"Nie udało się wygenerować unikalnego tokena dla {email}.")
                     continue
@@ -1107,7 +1153,7 @@ def render(back_btn: Callable[[], None]) -> None:
                 if mode == "sms":
                     ok, err = _resend_sms_row(sb, picked, selected_study=study)
                 else:
-                    ok, err = _resend_email_row(sb, picked, slug=slug)
+                    ok, err = _resend_email_row(sb, picked, selected_study=study)
                 if ok:
                     st.success("Ponowiono wysyłkę dla wybranego rekordu.")
                     st.rerun()
