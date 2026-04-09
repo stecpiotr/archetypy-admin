@@ -2639,15 +2639,18 @@ def matching_view() -> None:
         st.markdown(
             """
             <style>
+              .match-demo-box{border:1px solid #dbe4ef;border-radius:12px;background:#fff;padding:10px 12px;margin:0 0 10px 0;}
+              .match-demo-box-label{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;color:#334155;display:flex;align-items:center;gap:6px;}
+              .match-demo-box-note{color:#5f6b7a;font-size:12px;margin:2px 0 6px 0;}
               .match-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin:10px 0 12px 0;}
               .match-demo-stat{border:1px solid #dbe4ef;border-radius:10px;background:#fff;padding:8px 10px;}
               .match-demo-stat-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5f6b7a;}
               .match-demo-stat-main{margin-top:2px;font-size:14px;font-weight:900;color:#111827;line-height:1.2;}
               .match-demo-stat-sub{margin-top:2px;font-size:12px;color:#3f4954;}
-              .match-demo-table-wrap{overflow-x:auto;max-width:100%;}
-              .match-demo-table{margin-top:0;width:100%;min-width:760px;max-width:100%;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;}
+              .match-demo-table-wrap{overflow-x:auto;max-width:940px;}
+              .match-demo-table{margin-top:0;width:100%;min-width:720px;max-width:940px;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;font-size:13px;color:#334155;}
               .match-demo-table th,.match-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
-              .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;}
+              .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;font-size:13px;}
             </style>
             """,
             unsafe_allow_html=True,
@@ -2660,7 +2663,6 @@ def matching_view() -> None:
             "Sytuacja materialna": "💰",
         }
         cards = result.get("demo_cards") or []
-        st.markdown("### 📌 Statystyczny profil demograficzny")
         if cards:
             cards_html = "".join(
                 f"""
@@ -2674,7 +2676,10 @@ def matching_view() -> None:
             )
             st.markdown(
                 f"""
-                <div class="match-demo-cards">{cards_html}</div>
+                <div class="match-demo-box">
+                  <div class="match-demo-box-label">📌 STATYSTYCZNY PROFIL DEMOGRAFICZNY</div>
+                  <div class="match-demo-cards">{cards_html}</div>
+                </div>
                 """,
                 unsafe_allow_html=True,
             )
@@ -2682,8 +2687,6 @@ def matching_view() -> None:
         if ddf.empty:
             st.caption("Brak danych demograficznych.")
         else:
-            st.markdown("### 👥 Profil demograficzny")
-            st.caption("W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.")
             ddf = ddf.copy()
             ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0).round(1)
             ddf["% ogół mieszkańców"] = pd.to_numeric(ddf["% ogół mieszkańców"], errors="coerce").fillna(0.0).round(1)
@@ -2769,7 +2772,7 @@ def matching_view() -> None:
                     table_rows.append(
                         "<tr>"
                         f"{first_col}"
-                        f"<td style=\"font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
+                        f"<td style=\"font-size:13px; font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
                         "<span style='display:inline-flex; align-items:center; gap:6px;'>"
                         f"<span>{html.escape(category_emoji.get(cat, '📌'))}</span>"
                         f"<span>{html.escape(cat)}</span>"
@@ -2781,8 +2784,8 @@ def matching_view() -> None:
                         f"<span style=\"position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
                         "</div>"
                         "</td>"
-                        f"<td style=\"text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
-                        f"<td style=\"text-align:right; color:{diff_color}; {top_border if idx == 0 else ''}\">{diff_text}</td>"
+                        f"<td style=\"font-size:13px; text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
+                        f"<td style=\"font-size:13px; text-align:right; color:{diff_color}; font-weight:700; border-right:3px solid #b8c2cc; {top_border if idx == 0 else ''}\">{diff_text}</td>"
                         "</tr>"
                     )
 
@@ -2790,16 +2793,25 @@ def matching_view() -> None:
                 "<div class='match-demo-table-wrap'>"
                 "<table class='match-demo-table'>"
                 "<thead><tr>"
-                "<th style='min-width:150px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
-                "<th style='min-width:220px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
+                "<th style='min-width:150px; font-size:13px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
+                "<th style='min-width:220px; font-size:13px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
                 "<th style='min-width:176px; text-align:center; border-top:3px solid #b8c2cc;'>% grupa dopasowana</th>"
                 "<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>% ogół mieszkańców</th>"
-                "<th style='min-width:110px; text-align:center; border-top:3px solid #b8c2cc;'>Różnica pp</th>"
+                "<th style='min-width:110px; text-align:center; border-top:3px solid #b8c2cc; border-right:3px solid #b8c2cc;'>Różnica pp</th>"
                 "</tr></thead><tbody>"
                 + "".join(table_rows)
                 + "</tbody></table></div>"
             )
-            st.markdown(table_html, unsafe_allow_html=True)
+            st.markdown(
+                f"""
+                <div class="match-demo-box">
+                  <div class="match-demo-box-label">👥 PROFIL DEMOGRAFICZNY</div>
+                  <div class="match-demo-box-note">W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.</div>
+                  {table_html}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     with tab_strategy:
         st.markdown("**Rekomendacje komunikacyjne (automatyczne):**")
