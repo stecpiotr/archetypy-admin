@@ -2687,11 +2687,13 @@ def matching_view() -> None:
                 for a in JST_ARCHETYPES
             ]
         ).sort_values("Różnica |Δ|", ascending=True)
+        cmp_rows = len(df_cmp.index)
+        cmp_height = max(92, min(760, 40 + cmp_rows * 35))
         st.dataframe(
             df_cmp,
             use_container_width=True,
             hide_index=True,
-            height=max(240, min(760, 92 + len(df_cmp) * 38)),
+            height=cmp_height,
         )
         st.caption(
             "„Oczekiwania mieszkańców (%)” liczymy łącząc komponent A (40%), B1 (20%), B2 (25%) i D13 (15%) "
@@ -2715,13 +2717,13 @@ def matching_view() -> None:
               .match-demo-box-note{color:#5f6b7a;font-size:12px;margin:2px 0 6px 0;}
               .match-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin:10px 0 12px 0;}
               .match-demo-stat{border:1px solid #dbe4ef;border-radius:10px;background:#fff;padding:8px 10px;}
-              .match-demo-stat-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5f6b7a;}
+              .match-demo-stat-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5f6b7a;}
               .match-demo-stat-main{margin-top:2px;font-size:14px;font-weight:900;color:#111827;line-height:1.2;}
-              .match-demo-stat-sub{margin-top:2px;font-size:12px;color:#3f4954;}
+              .match-demo-stat-sub{margin-top:2px;font-size:12.5px;color:#3f4954;}
               .match-demo-table-wrap{overflow-x:auto;max-width:940px;}
-              .match-demo-table{margin-top:0;width:100%;min-width:720px;max-width:940px;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;font-size:13px;color:#334155;}
+              .match-demo-table{margin-top:0;width:100%;min-width:720px;max-width:940px;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;font-size:13.5px;color:#334155;}
               .match-demo-table th,.match-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
-              .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;font-size:13px;}
+              .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;font-size:13.5px;}
             </style>
             """,
             unsafe_allow_html=True,
@@ -2844,7 +2846,7 @@ def matching_view() -> None:
                     table_rows.append(
                         "<tr>"
                         f"{first_col}"
-                        f"<td style=\"font-size:13px; font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
+                        f"<td style=\"font-size:13.5px; font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
                         "<span style='display:inline-flex; align-items:center; gap:6px;'>"
                         f"<span>{html.escape(category_emoji.get(cat, '📌'))}</span>"
                         f"<span>{html.escape(cat)}</span>"
@@ -2856,8 +2858,8 @@ def matching_view() -> None:
                         f"<span style=\"position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
                         "</div>"
                         "</td>"
-                        f"<td style=\"font-size:13px; text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
-                        f"<td style=\"font-size:13px; text-align:right; color:{diff_color}; font-weight:400; border-right:3px solid #b8c2cc; {top_border if idx == 0 else ''}\">{diff_text}</td>"
+                        f"<td style=\"font-size:13.5px; text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
+                        f"<td style=\"font-size:13.5px; text-align:right; color:{diff_color}; font-weight:400; border-right:3px solid #b8c2cc; {top_border if idx == 0 else ''}\">{diff_text}</td>"
                         "</tr>"
                     )
 
@@ -2866,8 +2868,8 @@ def matching_view() -> None:
                 "<div class='match-demo-table-wrap'>"
                 "<table class='match-demo-table'>"
                 "<thead><tr>"
-                "<th style='min-width:150px; font-size:13px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
-                "<th style='min-width:220px; font-size:13px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
+                "<th style='min-width:150px; font-size:13.5px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
+                "<th style='min-width:220px; font-size:13.5px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
                 "<th style='min-width:176px; text-align:center; border-top:3px solid #b8c2cc;'>% grupa dopasowana</th>"
                 f"<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>{jst_weighted_header_html}</th>"
                 "<th style='min-width:120px; text-align:center; border-top:3px solid #b8c2cc; border-right:3px solid #b8c2cc;'>Róznica (w pp.)</th>"
@@ -3129,11 +3131,12 @@ def jst_stats_panel(studies: List[Dict[str, Any]], rows: List[Dict[str, Any]], t
                 sort_idx = pd.to_datetime(df["Data utworzenia"], errors="coerce", format="%Y-%m-%d %H:%M")
                 df = df.assign(_sort=sort_idx).sort_values("_sort", ascending=False).drop(columns="_sort")
                 rows_count = len(df)
+                jst_height = max(96, min(640, 42 + rows_count * 35))
                 st.dataframe(
                     df,
                     use_container_width=True,
                     hide_index=True,
-                    height=max(rows_count * 36 + 72, 220),
+                    height=jst_height,
                 )
             else:
                 st.caption("Brak badań JST.")
