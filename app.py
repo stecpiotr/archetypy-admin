@@ -2639,27 +2639,33 @@ def matching_view() -> None:
         st.markdown(
             """
             <style>
-              .match-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:6px 0 14px;}
-              .match-demo-stat{border:1px solid #dfe6ee;border-radius:12px;padding:10px 12px;background:#fff;box-shadow:0 4px 12px rgba(15,23,42,.04);}
-              .match-demo-stat-label{font-size:11px;color:#6b7a89;font-weight:800;text-transform:uppercase;letter-spacing:.03em;}
-              .match-demo-stat-main{font-size:24px;font-weight:900;color:#10253c;line-height:1.15;margin-top:3px;}
-              .match-demo-stat-sub{font-size:12px;color:#3d4f62;margin-top:3px;font-weight:700;}
-              .match-demo-table-wrap{overflow:auto;border:1px solid #dce4ee;border-radius:12px;background:#fff;max-width:940px;}
-              .match-demo-table{width:100%;border-collapse:collapse;min-width:860px;border:2px solid #b8c2cc;}
+              .match-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin:10px 0 12px 0;}
+              .match-demo-stat{border:1px solid #dbe4ef;border-radius:10px;background:#fff;padding:8px 10px;}
+              .match-demo-stat-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5f6b7a;}
+              .match-demo-stat-main{margin-top:2px;font-size:14px;font-weight:900;color:#111827;line-height:1.2;}
+              .match-demo-stat-sub{margin-top:2px;font-size:12px;color:#3f4954;}
+              .match-demo-table-wrap{overflow-x:auto;max-width:100%;}
+              .match-demo-table{margin-top:0;width:100%;min-width:760px;max-width:100%;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;}
               .match-demo-table th,.match-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
               .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;}
-              .match-demo-var{font-weight:800;vertical-align:top;background:#fafbfc;border-top:2px solid #9aa7b4 !important;}
             </style>
             """,
             unsafe_allow_html=True,
         )
+        variable_emoji = {
+            "Płeć": "👫",
+            "Wiek": "🧭",
+            "Wykształcenie": "🎓",
+            "Status zawodowy": "💼",
+            "Sytuacja materialna": "💰",
+        }
         cards = result.get("demo_cards") or []
         st.markdown("### 📌 Statystyczny profil demograficzny")
         if cards:
             cards_html = "".join(
                 f"""
                 <div class="match-demo-stat">
-                  <div class="match-demo-stat-label">{html.escape(str(c.get("label") or ""))}</div>
+                  <div class="match-demo-stat-label">{html.escape(str(variable_emoji.get(str(c.get("label") or ""), "📌")))} {html.escape(str(c.get("label") or "").upper())}</div>
                   <div class="match-demo-stat-main">{html.escape(str(c.get("emoji") or ""))} {html.escape(str(c.get("top") or ""))}</div>
                   <div class="match-demo-stat-sub">{float(c.get("pct") or 0.0):.1f}% • {float(c.get("diff_pp") or 0.0):+,.1f} pp</div>
                 </div>
@@ -2741,28 +2747,42 @@ def matching_view() -> None:
                     diff = float(row["Różnica pp"])
                     is_top = bool(row.name == top_idx)
                     bar_w = max(0.0, min(100.0, pct_sub))
-                    bar_alpha = "0.82" if is_top else "0.32"
-                    diff_color = "#15803d" if diff >= 0 else "#b91c1c"
+                    var_icon = variable_emoji.get(var_name, "📌")
+                    fill_color = "#8ecae6" if is_top else "#d8e5f1"
+                    top_border = "border-top:3px solid #b8c2cc;"
+                    diff_color = "#0f766e" if diff >= 0 else "#9a3412"
                     diff_text = f"{diff:+.1f} pp"
                     cat_weight = "800" if is_top else "500"
                     pct_weight = "900" if is_top else "600"
                     first_col = (
-                        f"<td class='match-demo-var' rowspan='{rowspan}'>{html.escape(var_name)}</td>"
+                        "<td "
+                        f"rowspan='{rowspan}' "
+                        f"style=\"font-weight:800; text-transform:uppercase; vertical-align:middle; background:#fafafa; border-left:3px solid #b8c2cc; {top_border}\">"
+                        "<span style='display:inline-flex; align-items:center; gap:6px;'>"
+                        f"<span>{html.escape(var_icon)}</span>"
+                        f"<span>{html.escape(var_name)}</span>"
+                        "</span>"
+                        "</td>"
                         if idx == 0
                         else ""
                     )
                     table_rows.append(
                         "<tr>"
                         f"{first_col}"
-                        f"<td style=\"font-weight:{cat_weight};\">{html.escape(category_emoji.get(cat, ''))} {html.escape(cat)}</td>"
-                        "<td style=\"padding:0; min-width:176px;\">"
+                        f"<td style=\"font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
+                        "<span style='display:inline-flex; align-items:center; gap:6px;'>"
+                        f"<span>{html.escape(category_emoji.get(cat, '📌'))}</span>"
+                        f"<span>{html.escape(cat)}</span>"
+                        "</span>"
+                        "</td>"
+                        f"<td style=\"padding:0; min-width:176px; border:1px solid #dfe4ea; {top_border if idx == 0 else ''}\">"
                         "<div style=\"position:relative; height:34px; background:#fff;\">"
-                        f"<div style=\"position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:rgba(64,145,214,{bar_alpha});\"></div>"
-                        f"<span style=\"position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.90); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
+                        f"<div style=\"position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:{fill_color}; opacity:0.96;\"></div>"
+                        f"<span style=\"position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
                         "</div>"
                         "</td>"
-                        f"<td style=\"text-align:right;\">{pct_all:.1f}%</td>"
-                        f"<td style=\"text-align:right; color:{diff_color}; font-weight:700;\">{diff_text}</td>"
+                        f"<td style=\"text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
+                        f"<td style=\"text-align:right; color:{diff_color}; {top_border if idx == 0 else ''}\">{diff_text}</td>"
                         "</tr>"
                     )
 
@@ -2770,11 +2790,11 @@ def matching_view() -> None:
                 "<div class='match-demo-table-wrap'>"
                 "<table class='match-demo-table'>"
                 "<thead><tr>"
-                "<th>Zmienna</th>"
-                "<th>Kategoria</th>"
-                "<th>% grupa dopasowana</th>"
-                "<th>% ogół mieszkańców</th>"
-                "<th>Różnica pp</th>"
+                "<th style='min-width:150px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
+                "<th style='min-width:220px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
+                "<th style='min-width:176px; text-align:center; border-top:3px solid #b8c2cc;'>% grupa dopasowana</th>"
+                "<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>% ogół mieszkańców</th>"
+                "<th style='min-width:110px; text-align:center; border-top:3px solid #b8c2cc;'>Różnica pp</th>"
                 "</tr></thead><tbody>"
                 + "".join(table_rows)
                 + "</tbody></table></div>"

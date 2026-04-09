@@ -33,3 +33,5 @@ supabase-auth==2.12.3
 storage3==0.12.1
 supabase-functions==0.10.1
 # postgrest i realtime dobiorą się automatycznie: postgrest==1.1.1, realtime==2.7.0
+
+scipy
