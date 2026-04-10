@@ -138,7 +138,7 @@ def _to_warsaw_time(raw: str) -> str:
         return ""
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_github_head_commit(repo: str, branch: str, token: str = "") -> Tuple[str, str]:
     repo_slug = str(repo or "").strip().strip("/")
     branch_name = str(branch or "").strip() or "main"
@@ -2122,11 +2122,62 @@ def _save_segment_threshold_overrides(run_base: Path, study_id: str, overrides: 
 
 
 def _parse_segment_threshold_overrides_text(text: str) -> Dict[str, float]:
-    src = (text or "").strip() or "{}"
-    raw = json.loads(src)
-    if not isinstance(raw, dict):
-        raise ValueError("Wpisz poprawny JSON obiektowy (np. {\"2 z 2 · #1\": 3.94}).")
-    return _normalize_segment_threshold_overrides(raw)
+    src = (text or "").strip()
+    if not src:
+        return {}
+
+    # Użytkownicy często wklejają „smart quotes” albo format listy `klucz: wartość`.
+    normalized = (
+        src.replace("\u201e", '"')
+        .replace("\u201d", '"')
+        .replace("\u201c", '"')
+        .replace("\u2019", "'")
+        .replace("\xa0", " ")
+    )
+
+    try:
+        raw = json.loads(normalized)
+        if not isinstance(raw, dict):
+            raise ValueError("Wpisz poprawny JSON obiektowy (np. {\"2 z 2 · #1\": 3.94}).")
+        return _normalize_segment_threshold_overrides(raw)
+    except Exception:
+        pass
+
+    # Fallback: format linia-po-linii:
+    # 0 z 2 · #2: 4.0
+    # "0 z 2 · #3": 4.0,
+    # 1 z 4 · #4 = 2.1
+    parsed: Dict[str, float] = {}
+    bad_lines: List[str] = []
+    for raw_line in normalized.splitlines():
+        line = (raw_line or "").strip().rstrip(",")
+        if not line or line in {"{", "}"}:
+            continue
+        m = re.match(r'^\s*"?([^"]+?)"?\s*[:=]\s*([-+]?\d+(?:[.,]\d+)?)\s*$', line)
+        if not m:
+            bad_lines.append(line)
+            continue
+        key = str(m.group(1) or "").strip()
+        if not key:
+            bad_lines.append(line)
+            continue
+        try:
+            value = float(str(m.group(2) or "").replace(",", "."))
+        except Exception:
+            bad_lines.append(line)
+            continue
+        parsed[key] = value
+
+    if bad_lines:
+        example = bad_lines[0]
+        raise ValueError(
+            "Nie udało się odczytać części linii. Użyj formatu `\"segment\": liczba` lub `segment: liczba`. "
+            f"Przykładowa problematyczna linia: {example}"
+        )
+    if not parsed:
+        raise ValueError("Nie wykryto żadnych progów. Wklej JSON lub listę linii `segment: wartość`.")
+
+    return _normalize_segment_threshold_overrides(parsed)
 
 
 def jst_analysis_view() -> None:
@@ -2195,11 +2246,20 @@ def jst_analysis_view() -> None:
         return
 
     overrides_editor_key = f"jst_segment_threshold_editor_{sid}"
+    overrides_editor_pending_key = f"{overrides_editor_key}__pending_value"
+    overrides_editor_notice_key = f"{overrides_editor_key}__notice"
     saved_overrides = _load_segment_threshold_overrides(template_root, run_base, sid, study or {})
+    if overrides_editor_pending_key in st.session_state:
+        st.session_state[overrides_editor_key] = str(st.session_state.pop(overrides_editor_pending_key) or "{}")
     if overrides_editor_key not in st.session_state:
         st.session_state[overrides_editor_key] = json.dumps(saved_overrides, ensure_ascii=False, indent=2)
 
     with st.expander("⚙️ segment_hit_threshold_overrides", expanded=False):
+        notice = st.session_state.pop(overrides_editor_notice_key, "")
+        if notice == "saved":
+            st.success("Zapisano progi segmentów dla tego badania.")
+        elif notice == "reset":
+            st.success("Przywrócono domyślne progi segmentów.")
         st.caption(
             "Możesz tutaj zmieniać i dodawać progi segmentów. "
             "Zmiana zostanie uwzględniona przy generowaniu nowego raportu."
@@ -2216,14 +2276,18 @@ def jst_analysis_view() -> None:
                 try:
                     parsed = _parse_segment_threshold_overrides_text(str(st.session_state.get(overrides_editor_key) or "{}"))
                     _save_segment_threshold_overrides(run_base, sid, parsed)
-                    st.success("Zapisano progi segmentów dla tego badania.")
+                    st.session_state[overrides_editor_pending_key] = json.dumps(parsed, ensure_ascii=False, indent=2)
+                    st.session_state[overrides_editor_notice_key] = "saved"
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Niepoprawny JSON progów: {e}")
         with cset2:
             if st.button("↩ Przywróć domyślne", key=f"reset_segment_overrides_{sid}", use_container_width=True):
-                st.session_state[overrides_editor_key] = json.dumps(_SEGMENT_HIT_THRESHOLD_DEFAULTS, ensure_ascii=False, indent=2)
+                reset_text = json.dumps(_SEGMENT_HIT_THRESHOLD_DEFAULTS, ensure_ascii=False, indent=2)
+                st.session_state[overrides_editor_pending_key] = reset_text
                 _save_segment_threshold_overrides(run_base, sid, dict(_SEGMENT_HIT_THRESHOLD_DEFAULTS))
-                st.success("Przywrócono domyślne progi segmentów.")
+                st.session_state[overrides_editor_notice_key] = "reset"
+                st.rerun()
 
     if generate_now or regenerate_now:
         try:
@@ -2527,6 +2591,13 @@ JST_A_PAIRS: List[Tuple[str, str, str]] = [
 JST_A_PAIR_COUNTS: Dict[str, int] = {
     a: sum(1 for _, left, right in JST_A_PAIRS if left == a or right == a) for a in JST_ARCHETYPES
 }
+JST_EXPECTATION_COMPONENT_WEIGHTS: Dict[str, float] = {
+    "A": 1.0,
+    "B1": 1.0,
+    "B2": 2.0,   # bonus za TOP1 mieszkańców
+    "D13": 2.0,  # bonus za TOP1 w pytaniu D13
+}
+JST_EXPECTATION_WEIGHT_SUM: float = float(sum(JST_EXPECTATION_COMPONENT_WEIGHTS.values()) or 1.0)
 
 
 def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, float], List[Dict[str, Any]], Dict[str, Any]]:
@@ -2559,8 +2630,8 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
         # Oczekiwania mieszkańców z komponentów A/B1/B2/D13:
         # - A: pełny % społecznego oczekiwania archetypu z par A1..A18 (0..100),
         # - B1/B2/D13: pełne % trafień archetypu w tych pytaniach (0..100).
-        # Finalny wynik archetypu to średnia arytmetyczna 4 pełnych składowych:
-        # score = (A_pct + B1_pct + B2_pct + D13_pct) / 4
+        # Finalny wynik archetypu to średnia ważona z premią TOP1:
+        # score = (1*A_pct + 1*B1_pct + 2*B2_pct + 2*D13_pct) / 6
         # Skala nie jest sztucznie zamykana do 100% sumarycznie między archetypami.
         a_acc = {a: 0.0 for a in JST_ARCHETYPES}
         for qid, left_arch, right_arch in JST_A_PAIRS:
@@ -2603,7 +2674,12 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
             b1_component = b1_hit * 100.0
             b2_component = b2_hit * 100.0
             d13_component = d13_hit * 100.0
-            score = (a_component + b1_component + b2_component + d13_component) / 4.0
+            score = (
+                JST_EXPECTATION_COMPONENT_WEIGHTS["A"] * a_component
+                + JST_EXPECTATION_COMPONENT_WEIGHTS["B1"] * b1_component
+                + JST_EXPECTATION_COMPONENT_WEIGHTS["B2"] * b2_component
+                + JST_EXPECTATION_COMPONENT_WEIGHTS["D13"] * d13_component
+            ) / JST_EXPECTATION_WEIGHT_SUM
             vec[a] = score
             component_sums[a]["A"] += a_component
             component_sums[a]["B1"] += b1_component
@@ -2638,6 +2714,7 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
         "b2_valid_rate_pct": round((100.0 * b2_valid_total / max(1, rows_n)), 1),
         "d13_valid_rate_pct": round((100.0 * d13_valid_total / max(1, rows_n)), 1),
         "component_means_by_archetype": component_means,
+        "component_weights": dict(JST_EXPECTATION_COMPONENT_WEIGHTS),
     }
     return profile, respondent_vectors, audit
 
@@ -3010,7 +3087,8 @@ def matching_view() -> None:
                 "match_formula": (
                     "match = clamp(0,100, 0.40*(100 - MAE) + 0.25*(100 - RMSE) + 0.35*(100 - TOP3_MAE)); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
-                    "TOP3_MAE = średnia z 3 największych |Δ|."
+                    "TOP3_MAE = średnia z 3 największych |Δ|. "
+                    "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania."
                 ),
             }
             st.success("Wynik dopasowania został obliczony.")
@@ -3099,8 +3177,9 @@ def matching_view() -> None:
             height=cmp_height,
         )
         st.caption(
-            "„Oczekiwania mieszkańców (%)” liczymy jako średnią z pełnych wartości komponentów A, B1, B2 i D13 "
-            "dla każdego archetypu. Skala nie jest sztucznie zamykana do 100% sumarycznie."
+            "„Oczekiwania mieszkańców (%)” liczymy z pełnych wartości A, B1, B2 i D13, "
+            "z premią dla TOP1: `B2` i `D13` mają mnożnik x2 "
+            "(wzór: `(A + B1 + 2*B2 + 2*D13) / 6`)."
         )
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
             st.markdown(result.get("match_formula", ""))
@@ -3125,7 +3204,8 @@ def matching_view() -> None:
                 "- Wzór dla pary: `p_prawy = (wartość_A - 1) / 6`, `p_lewy = 1 - p_prawy`.\n"
                 "- Dla archetypu sumujemy wkłady z jego par i dzielimy przez liczbę par, w których występuje (`A_norm` 0–1).\n"
                 "- Komponenty B1/B2/D13 liczymy jako pełne trafienie `%` archetypu (0 albo 100 na respondenta).\n"
-                "- Składanie wyniku archetypu: `score = (A_pct + B1_pct + B2_pct + D13_pct) / 4`."
+                "- Składanie wyniku archetypu: `score = (A_pct + B1_pct + 2*B2_pct + 2*D13_pct) / 6`.\n"
+                "- `B2` i `D13` mają wagę x2, bo są pytaniami TOP1 i mocniej rozróżniają profil oczekiwań."
             )
             audit = result.get("target_audit") or {}
             if audit:
@@ -3147,7 +3227,7 @@ def matching_view() -> None:
                                 "B1 (pełne %)": f"{float(row.get('B1', 0.0)):.1f}",
                                 "B2 (pełne %)": f"{float(row.get('B2', 0.0)):.1f}",
                                 "D13 (pełne %)": f"{float(row.get('D13', 0.0)):.1f}",
-                                "Średnia 4 komponentów": f"{float(row.get('TOTAL', 0.0)):.1f}",
+                                "Wynik ważony (A+B1+2*B2+2*D13)/6": f"{float(row.get('TOTAL', 0.0)):.1f}",
                             }
                         )
                     st.dataframe(
@@ -3202,16 +3282,17 @@ def matching_view() -> None:
             """
             <style>
               .match-section-header{
-                border:1px solid #d9e2ef;
-                border-radius:12px;
-                background:linear-gradient(180deg,#f8fbff 0%,#ffffff 100%);
-                padding:10px 12px;
+                border:none;
+                border-bottom:1px solid #d9e2ef;
+                border-radius:0;
+                background:transparent;
+                padding:0 0 8px 0;
                 margin:16px 0 10px 0;
               }
               .match-section-header h3{
                 margin:0;
                 font-size:17px;
-                font-weight:900;
+                font-weight:800;
                 color:#1f2f44;
               }
               .match-profile-title{
@@ -3373,10 +3454,6 @@ def matching_view() -> None:
                 unsafe_allow_html=True,
             )
 
-        st.markdown(
-            "<div style='border-top:1px solid #d9e2ef;margin:14px 0 12px 0;'></div>",
-            unsafe_allow_html=True,
-        )
         st.markdown(
             "<div class='match-section-header'><h3>Profile archetypowe 0-100 (siła archetypu, skala: 0-100)</h3></div>",
             unsafe_allow_html=True,
