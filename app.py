@@ -7,6 +7,7 @@ import re
 import html
 import math
 import json
+import inspect
 import subprocess
 from io import BytesIO
 from pathlib import Path
@@ -829,6 +830,30 @@ def _fmt_local_ts(ts) -> str:
         return val.tz_convert("Europe/Warsaw").strftime("%Y-%m-%d %H:%M")
     except Exception:
         return str(ts)
+
+
+def _download_button_supports_ignore() -> bool:
+    try:
+        sig = inspect.signature(st.download_button)
+        param = sig.parameters.get("on_click")
+        if not param:
+            return False
+        ann = str(param.annotation or "")
+        default = str(param.default or "")
+        joined = (ann + " " + default).lower()
+        return ("ignore" in joined) and ("rerun" in joined)
+    except Exception:
+        return False
+
+
+def _download_button_compat(*args, **kwargs):
+    # Starsze wersje Streamlit nie wspierają on_click="ignore" i traktują string jak callback,
+    # co kończy się błędem "str object is not callable" podczas rerunu.
+    if _download_button_supports_ignore():
+        kwargs.setdefault("on_click", "ignore")
+    else:
+        kwargs.pop("on_click", None)
+    return st.download_button(*args, **kwargs)
 
 
 def _sanitize_base_url(raw: str) -> str:
@@ -1944,22 +1969,20 @@ def jst_io_view() -> None:
 
     c1, c2 = st.columns(2)
     with c1:
-        st.download_button(
+        _download_button_compat(
             "Pobierz CSV",
             data=out_df.to_csv(index=False, encoding="utf-8-sig"),
             file_name=f"baza-odpowiedzi-{safe_name}.csv",
             mime="text/csv",
             use_container_width=True,
-            on_click="ignore",
         )
     with c2:
-        st.download_button(
+        _download_button_compat(
             "Pobierz XLSX",
             data=_xlsx_bytes_from_df(out_df, sheet_name="Odpowiedzi"),
             file_name=f"baza-odpowiedzi-{safe_name}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
-            on_click="ignore",
         )
 
     st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
@@ -2303,13 +2326,12 @@ def jst_analysis_view() -> None:
         report_zip = bundle_report_dir_zip(report_path.parent)
         d1, d2 = st.columns(2)
         with d1:
-            st.download_button(
+            _download_button_compat(
                 "📥 Pobierz raport HTML (pełny)",
                 data=(full_report or ""),
                 file_name=f"{report_slug}.html",
                 mime="text/html",
                 use_container_width=True,
-                on_click="ignore",
                 disabled=not full_report_available,
                 help=(
                     "Jednoplikowy HTML z osadzonymi zasobami (działa samodzielnie offline)."
@@ -2319,13 +2341,12 @@ def jst_analysis_view() -> None:
             )
         with d2:
             if report_zip:
-                st.download_button(
+                _download_button_compat(
                     "🧳 Pobierz raport ZIP (WYNIKI)",
                     data=report_zip,
                     file_name=f"{report_slug}-WYNIKI.zip",
                     mime="application/zip",
                     use_container_width=True,
-                    on_click="ignore",
                 )
             else:
                 st.caption("Nie udało się przygotować paczki ZIP raportu.")
@@ -2334,8 +2355,9 @@ def jst_analysis_view() -> None:
                 "HTML (pełny) jest samowystarczalny: wszystkie obrazy, style i skrypty są osadzone w jednym pliku."
             )
         elif full_report_error:
-            st.warning(
-                f"{full_report_error} Pobierz paczkę ZIP (WYNIKI) i otwórz lokalnie plik `raport.html` z tego folderu."
+            st.info(
+                f"To nie jest błąd generowania raportu. {full_report_error} "
+                "Pobierz paczkę ZIP (WYNIKI) i otwórz lokalnie plik `raport.html` z tego folderu."
             )
 
     preview_enabled = st.toggle(
@@ -2528,13 +2550,12 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
         if not isinstance(payload, dict):
             payload = {}
 
-        # Oczekiwania mieszkańców z komponentem A:
-        # A = 40% (średnia preferencja z par A1..A18),
-        # B1 = 20% (czy archetyp jest w TOP3),
-        # B2 = 25% (czy archetyp jest TOP1),
-        # D13 = 15% (archetyp preferowany w pytaniu D13).
-        # Każdy archetyp kończy ze skalą 0..100 i nie jest sztucznie
-        # normalizowany do sumy 100%.
+        # Oczekiwania mieszkańców z komponentów A/B1/B2/D13:
+        # - A: pełny % społecznego oczekiwania archetypu z par A1..A18 (0..100),
+        # - B1/B2/D13: pełne % trafień archetypu w tych pytaniach (0..100).
+        # Finalny wynik archetypu to średnia arytmetyczna 4 pełnych składowych:
+        # score = (A_pct + B1_pct + B2_pct + D13_pct) / 4
+        # Skala nie jest sztucznie zamykana do 100% sumarycznie między archetypami.
         a_acc = {a: 0.0 for a in JST_ARCHETYPES}
         for qid, left_arch, right_arch in JST_A_PAIRS:
             val = _parse_a_value(payload.get(qid))
@@ -2572,11 +2593,11 @@ def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, floa
             b1_hit = 1.0 if a in selected_b1 else 0.0
             b2_hit = 1.0 if b2 == a else 0.0
             d13_hit = 1.0 if d13 == a else 0.0
-            a_component = 0.40 * a_norm * 100.0
-            b1_component = 0.20 * b1_hit * 100.0
-            b2_component = 0.25 * b2_hit * 100.0
-            d13_component = 0.15 * d13_hit * 100.0
-            score = a_component + b1_component + b2_component + d13_component
+            a_component = a_norm * 100.0
+            b1_component = b1_hit * 100.0
+            b2_component = b2_hit * 100.0
+            d13_component = d13_hit * 100.0
+            score = (a_component + b1_component + b2_component + d13_component) / 4.0
             vec[a] = score
             component_sums[a]["A"] += a_component
             component_sums[a]["B1"] += b1_component
@@ -3002,10 +3023,46 @@ def matching_view() -> None:
         st.markdown(f"**Badanie personalne:** {result['person_label']}")
         st.markdown(f"**Badanie mieszkańców:** {result['jst_label']}")
         metrics = result.get("match_metrics") or {}
-        st.progress(min(100, max(0, int(round(result["match_score"])))))
-        st.metric("Poziom dopasowania", f"{result['match_score']}%")
+        score_pct = float(result.get("match_score") or 0.0)
+        score_pct = max(0.0, min(100.0, score_pct))
+        band_label = str(metrics.get("band_label") or "")
+        band_desc = str(metrics.get("band_desc") or "")
+        if score_pct >= 85:
+            score_color = "#0f766e"
+            score_bg = "#ecfeff"
+        elif score_pct >= 70:
+            score_color = "#1d4ed8"
+            score_bg = "#eff6ff"
+        elif score_pct >= 55:
+            score_color = "#b45309"
+            score_bg = "#fffbeb"
+        else:
+            score_color = "#b91c1c"
+            score_bg = "#fef2f2"
+        st.markdown(
+            f"""
+            <style>
+              .match-score-card{{border:1px solid #d5dfec;border-radius:12px;background:#ffffff;padding:12px 14px;margin:8px 0 10px 0;}}
+              .match-score-title{{font-size:15px;font-weight:800;color:#334155;margin:0 0 4px 0;}}
+              .match-score-value{{font-size:46px;line-height:1;font-weight:900;color:#0f172a;margin:0 0 8px 0;}}
+              .match-score-badge{{display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid {score_color};background:{score_bg};color:{score_color};font-weight:900;font-size:15px;}}
+              .match-score-desc{{margin:8px 0 10px 0;color:#475569;font-size:14px;font-weight:600;}}
+              .match-score-track{{height:14px;border-radius:999px;background:#d5dde8;border:1px solid #aebfd3;overflow:hidden;}}
+              .match-score-fill{{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb 0%,#22c55e 100%);width:{score_pct:.1f}%;}}
+              .match-score-scale{{display:flex;justify-content:space-between;color:#64748b;font-size:11px;margin-top:6px;font-weight:700;}}
+            </style>
+            <div class="match-score-card">
+              <div class="match-score-title">Poziom dopasowania</div>
+              <div class="match-score-value">{score_pct:.1f}%</div>
+              <div class="match-score-badge">Ocena: {html.escape(band_label)}</div>
+              <div class="match-score-desc">{html.escape(band_desc)}</div>
+              <div class="match-score-track"><div class="match-score-fill"></div></div>
+              <div class="match-score-scale"><span>0%</span><span>100%</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         if metrics:
-            st.caption(f"Ocena: {str(metrics.get('band_label') or '')} · {str(metrics.get('band_desc') or '')}")
             mcol1, mcol2, mcol3 = st.columns(3)
             mcol1.metric("Średnia różnica (MAE)", f"{float(metrics.get('mae', 0.0)):.1f} pp")
             mcol2.metric("Różnica z karą za odchylenia (RMSE)", f"{float(metrics.get('rmse', 0.0)):.1f} pp")
@@ -3036,7 +3093,7 @@ def matching_view() -> None:
             height=cmp_height,
         )
         st.caption(
-            "„Oczekiwania mieszkańców (%)” liczymy łącząc komponent A (40%), B1 (20%), B2 (25%) i D13 (15%) "
+            "„Oczekiwania mieszkańców (%)” liczymy jako średnią z pełnych wartości komponentów A, B1, B2 i D13 "
             "dla każdego archetypu. Skala nie jest sztucznie zamykana do 100% sumarycznie."
         )
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
@@ -3052,12 +3109,13 @@ def matching_view() -> None:
                     f"RMSE `{float(metrics.get('rmse', 0.0)):.1f} pp`, "
                     f"TOP3_MAE `{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp`."
                 )
-            st.markdown("**Jak dokładnie liczony jest komponent `A` (40%)?**")
+            st.markdown("**Jak dokładnie liczony jest komponent `A` (pełna wartość %)?**")
             st.markdown(
                 "- Dla każdej pary `A1..A18` odpowiedź 1–7 jest przeliczana liniowo na udział lewego/prawego archetypu.\n"
                 "- Wzór dla pary: `p_prawy = (wartość_A - 1) / 6`, `p_lewy = 1 - p_prawy`.\n"
                 "- Dla archetypu sumujemy wkłady z jego par i dzielimy przez liczbę par, w których występuje (`A_norm` 0–1).\n"
-                "- Składanie wyniku archetypu: `score = 100 * (0.40*A_norm + 0.20*B1_hit + 0.25*B2_hit + 0.15*D13_hit)`."
+                "- Komponenty B1/B2/D13 liczymy jako pełne trafienie `%` archetypu (0 albo 100 na respondenta).\n"
+                "- Składanie wyniku archetypu: `score = (A_pct + B1_pct + B2_pct + D13_pct) / 4`."
             )
             audit = result.get("target_audit") or {}
             if audit:
@@ -3075,11 +3133,11 @@ def matching_view() -> None:
                         comp_rows.append(
                             {
                                 "Archetyp": a,
-                                "A (40%)": f"{float(row.get('A', 0.0)):.1f}",
-                                "B1 (20%)": f"{float(row.get('B1', 0.0)):.1f}",
-                                "B2 (25%)": f"{float(row.get('B2', 0.0)):.1f}",
-                                "D13 (15%)": f"{float(row.get('D13', 0.0)):.1f}",
-                                "Suma": f"{float(row.get('TOTAL', 0.0)):.1f}",
+                                "A (pełne %)": f"{float(row.get('A', 0.0)):.1f}",
+                                "B1 (pełne %)": f"{float(row.get('B1', 0.0)):.1f}",
+                                "B2 (pełne %)": f"{float(row.get('B2', 0.0)):.1f}",
+                                "D13 (pełne %)": f"{float(row.get('D13', 0.0)):.1f}",
+                                "Średnia 4 komponentów": f"{float(row.get('TOTAL', 0.0)):.1f}",
                             }
                         )
                     st.dataframe(
@@ -3130,8 +3188,27 @@ def matching_view() -> None:
             unsafe_allow_html=True,
         )
 
-        st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
-        st.markdown("### Porównanie profili archetypowych")
+        st.markdown(
+            """
+            <style>
+              .match-section-header{
+                border:1px solid #d9e2ef;
+                border-radius:12px;
+                background:linear-gradient(180deg,#f8fbff 0%,#ffffff 100%);
+                padding:10px 12px;
+                margin:16px 0 10px 0;
+              }
+              .match-section-header h3{
+                margin:0;
+                font-size:28px;
+                font-weight:900;
+                color:#1f2f44;
+              }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div class='match-section-header'><h3>Porównanie profili archetypowych</h3></div>", unsafe_allow_html=True)
 
         person_name = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
         jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "JST")
@@ -3227,19 +3304,19 @@ def matching_view() -> None:
         )
         fig_cmp.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
-            height=560,
+            height=640,
             polar=dict(
                 bgcolor="rgba(0,0,0,0)",
                 radialaxis=dict(visible=True, range=[0, 20]),
                 angularaxis=dict(
-                    tickfont=dict(size=14),
+                    tickfont=dict(size=13),
                     tickvals=radar_order,
                     ticktext=radar_order,
                     rotation=90,
                     direction="clockwise",
                 ),
             ),
-            margin=dict(l=20, r=20, t=26, b=20),
+            margin=dict(l=28, r=28, t=36, b=86),
             showlegend=False,
             legend=dict(
                 orientation="h",
@@ -3278,8 +3355,14 @@ def matching_view() -> None:
                 unsafe_allow_html=True,
             )
 
-        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-        st.markdown("#### Profile archetypowe 0-100 (siła archetypu, skala: 0-100)")
+        st.markdown(
+            "<div style='border-top:1px solid #d9e2ef;margin:14px 0 12px 0;'></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div class='match-section-header'><h3>Profile archetypowe 0-100 (siła archetypu, skala: 0-100)</h3></div>",
+            unsafe_allow_html=True,
+        )
         left_profile_col, right_profile_col = st.columns(2, gap="large")
         try:
             import admin_dashboard as AD
@@ -3296,18 +3379,28 @@ def matching_view() -> None:
 
             def _show_image_compat(img_path: str, max_width_px: int = 520) -> None:
                 try:
-                    st.image(img_path, width=max_width_px)
+                    st.image(img_path, use_container_width=True)
                 except TypeError:
                     try:
                         st.image(img_path, use_column_width=True)
                     except Exception:
-                        st.image(img_path)
+                        st.image(img_path, width=max_width_px)
 
             with left_profile_col:
-                st.markdown(f"**Profil archetypowy {person_name_gen}**")
+                st.markdown(
+                    f"<div style='text-align:center;font-weight:800;font-size:28px;line-height:1.25;'>"
+                    f"Profil archetypowy {html.escape(str(person_name_gen or ''))}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
                 _show_image_compat(person_profile_img, max_width_px=520)
             with right_profile_col:
-                st.markdown(f"**Profil archetypowy mieszkańców {jst_name_gen}**")
+                st.markdown(
+                    f"<div style='text-align:center;font-weight:800;font-size:28px;line-height:1.25;'>"
+                    f"Profil archetypowy mieszkańców {html.escape(str(jst_name_gen or ''))}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
                 _show_image_compat(jst_profile_img, max_width_px=520)
         except Exception as e:
             st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")

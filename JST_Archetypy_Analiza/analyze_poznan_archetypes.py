@@ -107,6 +107,7 @@ def set_global_fonts() -> None:
     # Wybierz deterministycznie font bazowy (repo -> system), żeby raporty były
     # wizualnie spójne także po wygenerowaniu na innym serwerze.
     base_font = _pick_base_font()
+    print(f"[fonts] matplotlib base font: {base_font}")
 
     matplotlib.rcParams.update({
         "font.family": [base_font],

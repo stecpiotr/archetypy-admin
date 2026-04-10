@@ -102,6 +102,29 @@ def _write_settings(path: Path, study: Dict[str, Any]) -> None:
 
 
 def _prepare_tool_run_dir(template_root: Path, run_root: Path) -> None:
+    def _sync_report_fonts() -> None:
+        repo_root = template_root.parent
+        src_fonts_dir = repo_root / "assets" / "fonts"
+        if not src_fonts_dir.exists() or not src_fonts_dir.is_dir():
+            return
+        dst_fonts_dir = run_root / "assets" / "fonts"
+        dst_fonts_dir.mkdir(parents=True, exist_ok=True)
+        preferred = [
+            "segoeui.ttf",
+            "segoeuib.ttf",
+            "ArialNova.ttf",
+            "ArialNova-Bold.ttf",
+            "DejaVuSans.ttf",
+            "DejaVuSans-Bold.ttf",
+        ]
+        for fname in preferred:
+            src = src_fonts_dir / fname
+            if src.exists() and src.is_file():
+                try:
+                    shutil.copy2(src, dst_fonts_dir / fname)
+                except Exception:
+                    continue
+
     if run_root.exists() and (run_root / "analyze_poznan_archetypes.py").exists():
         # Synchronizujemy silnik raportu także dla istniejących runów,
         # aby poprawki generatora działały bez ręcznego czyszczenia katalogu _runs.
@@ -115,6 +138,7 @@ def _prepare_tool_run_dir(template_root: Path, run_root: Path) -> None:
             dst = run_root / rel
             if src.exists() and not dst.exists():
                 shutil.copy2(src, dst)
+        _sync_report_fonts()
         return
 
     ignore = shutil.ignore_patterns(
@@ -128,6 +152,7 @@ def _prepare_tool_run_dir(template_root: Path, run_root: Path) -> None:
         "WYNIKI",
     )
     shutil.copytree(template_root, run_root, dirs_exist_ok=True, ignore=ignore)
+    _sync_report_fonts()
 
 
 def _python_exec(run_root: Path) -> str:
