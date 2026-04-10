@@ -496,3 +496,53 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-012 [DONE]
+Temat: Korekta ISOA/ISOW do modelu zakotwiczonego w A + przywrocenie sekcji A jako PPP + domkniecie C:/D: oraz stabilizacja pelnego podgladu.
+Kryteria ukonczenia:
+1. ISOA/ISOW nie uzywa finalnego min-max; wynik koncowy to:
+   - `P = 0.35*z(B1) + 0.65*z(B2)`,
+   - `D = 0.70*z(N) + 0.30*z(MBAL)`,
+   - `P_adj = 8*tanh(P/1.5)`,
+   - `D_adj = 4*tanh(D/1.5)`,
+   - `SEI_raw = A + P_adj + D_adj`,
+   - `SEI_100 = clamp(SEI_raw, 0..100)`.
+2. W raporcie jest ponownie osobna zakladka sekcji A (bez usuwania), ale pod nazwa `PPP` (`Profil Preferencji Przywodztwa`), bez zmiany logiki A.
+3. W `🧭 Matching` tryb `Wartości` pokazuje etykiety wartosci na wykresach 0-100 i radarze.
+4. `raport.html` w obu lokalizacjach (`D:` i `C:`) zawiera zakladke `ISOA/ISOW` oraz `PPP`.
+5. Sekcja metadanych raportu pokazuje `Data wygenerowania raportu: ...` zamiast `Folder wyników: WYNIKI`.
+6. Pelny podglad raportu jest stabilniejszy:
+   - kompresja obrazow przy osadzaniu inline,
+   - limity podgladu zsynchronizowane z `server.maxMessageSize`,
+   - blokada wymuszenia, gdy przekroczony jest twardy limit panelu.
+Pierwszy krok wykonawczy:
+- przejsc po `app.py`, `admin_dashboard.py`, `jst_analysis.py`, `JST_Archetypy_Analiza/analyze_poznan_archetypes.py` i domknac tylko zgłoszone regresje bez restartu analizy repo.
+Wynik:
+- `app.py`:
+  - ISOA/ISOW przeliczone na model zakotwiczony w `A` z ograniczonymi korektami `P_adj` i `D_adj`,
+  - usuniety finalny min-max,
+  - sekcja metodologii i tabela audytu zsynchronizowane z nowymi wzorami,
+  - dynamiczne podpisy radaru i kol 0-100 dla trybu `Archetypy/Wartości`,
+  - profile 0-100 w trybie `Wartości` maja etykiety wartosci (przez `label_mode="values"`),
+  - limity podgladu raportu oparte o realne `server.maxMessageSize`.
+- `admin_dashboard.py`:
+  - `_plot_segment_profile_wheel_from_scores(...)` oraz `make_segment_profile_wheel_png(...)` wspieraja `label_mode`,
+  - podpisy na pierscieniu kola sa dynamiczne (archetypy vs wartosci).
+- `jst_analysis.py`:
+  - `_to_data_uri(...)` kompresuje i w razie potrzeby delikatnie skaluje duze obrazy przy osadzaniu inline.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - ISOA/ISOW liczone wg modelu zakotwiczonego w A (bez min-max),
+  - dodana legenda osi pod glownym wykresem ISOA/ISOW,
+  - przywrocona osobna zakladka sekcji A jako `PPP`,
+  - podmienione widoczne etykiety `IOA/IOW` -> `PPP`,
+  - pod tytulem raportu: `Data wygenerowania raportu: dzien miesiac rok, godzina HH:MM`,
+  - zmniejszona typografia naglowka w zakladce ISOA/ISOW.
+- Synchronizacja:
+  - `D:\PythonProject\archetypy\archetypy-admin\JST_Archetypy_Analiza\analyze_poznan_archetypes.py`
+  - `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`
+- Rebuild raportow:
+  - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (D:)
+  - `python analyze_poznan_archetypes.py` (C:)
+- Smoke-check:
+  - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

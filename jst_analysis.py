@@ -512,6 +512,61 @@ def _to_data_uri(path: Path) -> Optional[str]:
         mime = "application/octet-stream"
     try:
         blob = path.read_bytes()
+        if mime in {"image/png", "image/jpeg", "image/webp"} and len(blob) >= 120_000:
+            try:
+                from PIL import Image
+            except Exception:
+                Image = None
+            if Image is not None:
+                try:
+                    with Image.open(BytesIO(blob)) as im:
+                        has_alpha = "A" in (im.getbands() or ())
+                        resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS", Image.LANCZOS)
+                        max_edge = max(im.size or (0, 0))
+                        if max_edge > 1900:
+                            scale = 1900.0 / float(max_edge)
+                            new_w = max(1, int(im.size[0] * scale))
+                            new_h = max(1, int(im.size[1] * scale))
+                            im = im.resize((new_w, new_h), resample=resample)
+
+                        candidates: List[Tuple[str, bytes]] = []
+
+                        def _encode_candidate(fmt: str, out_mime: str, **kwargs: Any) -> None:
+                            try:
+                                im_out = im
+                                if fmt == "JPEG" and im_out.mode not in {"RGB", "L"}:
+                                    im_out = im_out.convert("RGB")
+                                buf = BytesIO()
+                                if fmt == "JPEG":
+                                    im_out.save(buf, format=fmt, optimize=True, progressive=True, **kwargs)
+                                else:
+                                    im_out.save(buf, format=fmt, **kwargs)
+                                candidates.append((out_mime, buf.getvalue()))
+                            except Exception:
+                                return
+
+                        if mime == "image/png":
+                            _encode_candidate("WEBP", "image/webp", quality=78, method=6)
+                            _encode_candidate("WEBP", "image/webp", quality=70, method=6)
+                            if not has_alpha:
+                                _encode_candidate("JPEG", "image/jpeg", quality=76)
+                        elif mime == "image/webp":
+                            _encode_candidate("WEBP", "image/webp", quality=76, method=6)
+                            if not has_alpha:
+                                _encode_candidate("JPEG", "image/jpeg", quality=76)
+                                _encode_candidate("JPEG", "image/jpeg", quality=70)
+                        else:  # image/jpeg
+                            _encode_candidate("JPEG", "image/jpeg", quality=78)
+                            _encode_candidate("JPEG", "image/jpeg", quality=70)
+                            _encode_candidate("WEBP", "image/webp", quality=74, method=6)
+
+                        if candidates:
+                            best_mime, best_blob = min(candidates, key=lambda x: len(x[1]))
+                            if len(best_blob) + 24_000 < len(blob):
+                                blob = best_blob
+                                mime = best_mime
+                except Exception:
+                    pass
         b64 = base64.b64encode(blob).decode("ascii")
         return f"data:{mime};base64,{b64}"
     except Exception:

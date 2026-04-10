@@ -16,6 +16,8 @@ import textwrap
 import webbrowser
 import html as _html
 import unicodedata
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # Alias zgodnościowy: część helperów używa html.escape(...),
 # a część _html / _html_escape.
@@ -1835,13 +1837,12 @@ def safe_zscore_by_archetype(
 
 
 def build_social_expectation_core(
-        z_a: Dict[str, float],
         z_b1: Dict[str, float],
         z_b2: Dict[str, float],
         arch_names: List[str] = ARCHETYPES
 ) -> Dict[str, float]:
     return {
-        str(a): float(0.50 * float(z_a.get(str(a), 0.0)) + 0.20 * float(z_b1.get(str(a), 0.0)) + 0.30 * float(z_b2.get(str(a), 0.0)))
+        str(a): float(0.35 * float(z_b1.get(str(a), 0.0)) + 0.65 * float(z_b2.get(str(a), 0.0)))
         for a in arch_names
     }
 
@@ -1865,32 +1866,33 @@ def compute_social_expectation_index(
         mbal_pp: Dict[str, float],
         arch_names: List[str] = ARCHETYPES
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    z_a, mean_a, std_a = safe_zscore_by_archetype(a_pct, arch_names=arch_names)
     z_b1, mean_b1, std_b1 = safe_zscore_by_archetype(b1_pct, arch_names=arch_names)
     z_b2, mean_b2, std_b2 = safe_zscore_by_archetype(b2_pct, arch_names=arch_names)
     z_n, mean_n, std_n = safe_zscore_by_archetype(n_pct, arch_names=arch_names)
     z_mbal, mean_mbal, std_mbal = safe_zscore_by_archetype(mbal_pp, arch_names=arch_names)
 
-    core = build_social_expectation_core(z_a, z_b1, z_b2, arch_names=arch_names)
+    core = build_social_expectation_core(z_b1, z_b2, arch_names=arch_names)
     pressure = build_experience_pressure(z_n, z_mbal, arch_names=arch_names)
-    raw = {
-        str(a): float(0.80 * float(core.get(str(a), 0.0)) + 0.20 * float(pressure.get(str(a), 0.0)))
+    priority_adj = {
+        str(a): float(8.0 * np.tanh(float(core.get(str(a), 0.0)) / 1.5))
         for a in arch_names
     }
-    raw_vals = np.asarray([float(raw[str(a)]) for a in arch_names if np.isfinite(float(raw[str(a)]))], dtype=float)
-    if raw_vals.size > 0:
-        raw_min = float(np.min(raw_vals))
-        raw_max = float(np.max(raw_vals))
-    else:
-        raw_min, raw_max = 0.0, 0.0
-
-    if raw_max > raw_min:
-        scaled = {
-            str(a): float(np.clip(100.0 * (float(raw[str(a)]) - raw_min) / (raw_max - raw_min), 0.0, 100.0))
-            for a in arch_names
-        }
-    else:
-        scaled = {str(a): 50.0 for a in arch_names}
+    experience_adj = {
+        str(a): float(4.0 * np.tanh(float(pressure.get(str(a), 0.0)) / 1.5))
+        for a in arch_names
+    }
+    raw = {}
+    scaled = {}
+    for a in arch_names:
+        key = str(a)
+        aval = float(a_pct.get(key, np.nan))
+        if np.isfinite(aval):
+            raw_val = float(aval + float(priority_adj.get(key, 0.0)) + float(experience_adj.get(key, 0.0)))
+            raw[key] = raw_val
+            scaled[key] = float(np.clip(raw_val, 0.0, 100.0))
+        else:
+            raw[key] = float("nan")
+            scaled[key] = float("nan")
 
     rows = []
     for a in arch_names:
@@ -1904,25 +1906,28 @@ def compute_social_expectation_index(
             "MBAL_pp": float(mbal_pp.get(key, np.nan)),
             "core_E": float(core.get(key, 0.0)),
             "pressure_D": float(pressure.get(key, 0.0)),
+            "priority_adj": float(priority_adj.get(key, 0.0)),
+            "experience_adj": float(experience_adj.get(key, 0.0)),
             "SEI_raw": float(raw.get(key, 0.0)),
-            "SEI_100": float(scaled.get(key, 50.0)),
+            "SEI_100": float(scaled.get(key, np.nan)),
         })
     out = pd.DataFrame(rows)
-    out = out.sort_values(["SEI_100", "SEI_raw"], ascending=[False, False], kind="mergesort").reset_index(drop=True)
+    out = out.sort_values(["SEI_100", "SEI_raw"], ascending=[False, False], kind="mergesort", na_position="last").reset_index(drop=True)
     out.insert(0, "position", np.arange(1, len(out) + 1, dtype=int))
 
     meta = {
         "z_stats": {
-            "A": {"mean": mean_a, "std": std_a},
             "B1": {"mean": mean_b1, "std": std_b1},
             "B2": {"mean": mean_b2, "std": std_b2},
             "N": {"mean": mean_n, "std": std_n},
             "MBAL": {"mean": mean_mbal, "std": std_mbal},
         },
-        "core_formula": "E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)",
+        "anchor_formula": "A_base = % oczekujących z pytania A",
+        "core_formula": "P = 0.35*z(B1) + 0.65*z(B2)",
         "pressure_formula": "D = 0.70*z(N) + 0.30*z(MBAL)",
-        "raw_formula": "SEI_raw = 0.80*E + 0.20*D",
-        "scale_formula": "SEI_100 = min-max(0..100), fallback=50",
+        "adjust_formula": "P_adj = 8*tanh(P/1.5), D_adj = 4*tanh(D/1.5)",
+        "raw_formula": "SEI_raw = A_base + P_adj + D_adj",
+        "scale_formula": "SEI_100 = clamp(SEI_raw, 0..100)",
     }
     return out, meta
 
@@ -2068,8 +2073,8 @@ def render_archetype_expectation_section(
         )
 
     return f"""
-  <div class="panel pW">
-    <h2><span class="mode-arche">IOA - Oczekiwanie archetypów (% mieszkańców)</span><span class="mode-values">IOW - Oczekiwanie wartości (% mieszkańców)</span></h2>
+  <div class="panel pI">
+    <h2><span class="mode-arche">Profil Preferencji Przywództwa (PPP)</span><span class="mode-values">Profil Preferencji Przywództwa (PPP)</span></h2>
     <div class="small">
       <span class="mode-arche">{_html_escape(methodology_text_arche)}</span><span class="mode-values">{_html_escape(methodology_text_values)}</span>
     </div>
@@ -2085,7 +2090,7 @@ def render_archetype_expectation_section(
         {expected_chart_html}
       </div>
       <div class="card" style="margin-top:0;">
-        <h3><span class="mode-arche">IOA 0-100</span><span class="mode-values">IOW 0-100</span></h3>
+        <h3><span class="mode-arche">PPP 0-100</span><span class="mode-values">PPP 0-100</span></h3>
         {ioa_chart_html}
       </div>
     </div>
@@ -2171,6 +2176,12 @@ def render_isoa_isow_report_tab(
     <div class="card chart-half" style="margin-top:16px;">
       <h3><span class="mode-arche">Wykres główny ISOA (0-100)</span><span class="mode-values">Wykres główny ISOW (0-100)</span></h3>
       {chart_html}
+      <div class="isoa-axis-legend">
+        <span><i style="background:#e53935"></i>Zmiana</span>
+        <span><i style="background:#1e88e5"></i>Ludzie</span>
+        <span><i style="background:#2e7d32"></i>Porządek</span>
+        <span><i style="background:#7e57c2"></i>Niezależność</span>
+      </div>
     </div>
 
     <div class="card ioa-summary-card" style="margin-top:16px;">
@@ -7861,8 +7872,8 @@ CHART_NOTES = {
     "A_versusy_liniowy.png": "Versus (18 par): średnia pozycja odpowiedzi na skali 1–7 dla każdej pary. 1 = lewa strona, 4 = środek, 7 = prawa strona.",
     "A_expectation_expected_pct.png": "Wynik główny: odsetek mieszkańców, którzy netto oczekują danego archetypu po zbilansowaniu 3 porównań (score_mean > 0).",
     "A_expectation_expected_pct_values.png": "Wynik główny: odsetek mieszkańców, którzy netto oczekują danej wartości po zbilansowaniu 3 porównań (score_mean > 0).",
-    "A_expectation_ioa_100.png": "IOA 0-100 (Indeks Oczekiwania Archetypu): wskaźnik siły oczekiwania (nie jest procentem mieszkańców). Linia odniesienia: 50.",
-    "A_expectation_ioa_100_values.png": "IOW 0-100 (Indeks Oczekiwania Wartości): wskaźnik siły oczekiwania (nie jest procentem mieszkańców). Linia odniesienia: 50.",
+    "A_expectation_ioa_100.png": "PPP 0-100 (Profil Preferencji Przywództwa): wskaźnik siły preferencji przywództwa (nie jest procentem mieszkańców). Linia odniesienia: 50.",
+    "A_expectation_ioa_100_values.png": "PPP 0-100 (Profil Preferencji Przywództwa): wskaźnik siły preferencji przywództwa (nie jest procentem mieszkańców). Linia odniesienia: 50.",
     "ISOA_ISOW_wheel.png": "ISOA 0-100: syntetyczny indeks społecznego oczekiwania archetypu (A, B1, B2, C13/D13), nie jest procentem mieszkańców.",
     "ISOA_ISOW_wheel_values.png": "ISOW 0-100: syntetyczny indeks społecznego oczekiwania wartości (A, B1, B2, C13/D13), nie jest procentem mieszkańców.",
     "B1_top3.png": "Odsetek osób, które umieściły archetyp w swojej „trójce” (maks. 3 wybory).",
@@ -8222,10 +8233,20 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 .dot-legend { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
 .dot-legend span { display:inline-flex; align-items:center; gap:6px; font-size:13px; }
 
-/* IOA section */
+/* PPP / ISOA section */
 .ioa-status-card {
   border-left: 6px solid #2b6cb0;
   background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+.panel.pW h2 {
+  font-size: 22px;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.panel.pI h2 {
+  font-size: 21px;
+  line-height: 1.2;
+  margin-bottom: 6px;
 }
 .ioa-balance-legend {
   margin-top: 12px;
@@ -8267,7 +8288,7 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 }
 .ioa-summary-item h4 {
   margin: 0 0 8px 0;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.28;
 }
 .ioa-list {
@@ -8297,6 +8318,26 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 .ioa-main-table td:nth-child(8) {
   color: #556070;
 }
+.isoa-axis-legend {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  font-size: 13px;
+  color: #334155;
+}
+.isoa-axis-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.isoa-axis-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
 
 /* tabs (pure CSS) */
 .tabs { margin-top: 14px; }
@@ -8314,6 +8355,7 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 #tab0:checked ~ .labels label[for="tab0"],
 #tabW:checked ~ .labels label[for="tabW"],
 #tabA:checked ~ .labels label[for="tabA"],
+#tabI:checked ~ .labels label[for="tabI"],
 #tabB:checked ~ .labels label[for="tabB"],
 #tabD:checked ~ .labels label[for="tabD"],
 #tabK:checked ~ .labels label[for="tabK"],
@@ -8329,6 +8371,7 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 #tab0:checked ~ .p0,
 #tabW:checked ~ .pW,
 #tabA:checked ~ .pA,
+#tabI:checked ~ .pI,
 #tabB:checked ~ .pB,
 #tabD:checked ~ .pD,
 #tabK:checked ~ .pK,
@@ -9525,14 +9568,14 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         )
 
     isoa_methodology_text_arche = (
-        "ISOA łączy 4 źródła: A (% oczekujących z versusów), B1 (TOP3), B2 (TOP1) i C13/D13 (doświadczenia). "
-        "Najpierw liczony jest rdzeń oczekiwania E z A/B1/B2, potem presja doświadczenia D z C13/D13, "
-        "a na końcu wynik syntetyczny jest skalowany do 0-100."
+        "ISOA jest zakotwiczony w A (% oczekujących z versusów). "
+        "B1/B2 tworzą ograniczoną korektę priorytetu, a C13/D13 ograniczoną korektę doświadczeniową. "
+        "Wynik końcowy to A + korekty, ucięty do zakresu 0-100 (bez min-max)."
     )
     isoa_methodology_text_values = (
-        "ISOW łączy 4 źródła: A (% oczekujących z versusów), B1 (TOP3), B2 (TOP1) i C13/D13 (doświadczenia). "
-        "Najpierw liczony jest rdzeń oczekiwania E z A/B1/B2, potem presja doświadczenia D z C13/D13, "
-        "a na końcu wynik syntetyczny jest skalowany do 0-100."
+        "ISOW jest zakotwiczony w A (% oczekujących z versusów). "
+        "B1/B2 tworzą ograniczoną korektę priorytetu, a C13/D13 ograniczoną korektę doświadczeniową. "
+        "Wynik końcowy to A + korekty, ucięty do zakresu 0-100 (bez min-max)."
     )
 
     def _fmt_cell(v: Any, digits: int) -> str:
@@ -9557,7 +9600,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             "B2: TOP1 (%)",
             "C13/D13: negatywne doświadczenie (%)",
             "C13/D13: bilans najważniejszego doświadczenia",
-            "Rdzeń oczekiwania",
+            "Korekta priorytetu",
             "Presja doświadczenia",
         ]
         d_a = df_main.copy()
@@ -9571,7 +9614,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             ("B2: TOP1 (%)", 1),
             ("C13/D13: negatywne doświadczenie (%)", 1),
             ("C13/D13: bilans najważniejszego doświadczenia", 1),
-            ("Rdzeń oczekiwania", 2),
+            ("Korekta priorytetu", 2),
             ("Presja doświadczenia", 2),
         ]:
             if col in d_a.columns:
@@ -9591,7 +9634,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             ("B2: TOP1 (%)", 1),
             ("C13/D13: negatywne doświadczenie (%)", 1),
             ("C13/D13: bilans najważniejszego doświadczenia", 1),
-            ("Rdzeń oczekiwania", 2),
+            ("Korekta priorytetu", 2),
             ("Presja doświadczenia", 2),
         ]:
             if col in d_v.columns:
@@ -9645,6 +9688,66 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             + "</div></div></div>"
         )
 
+    def _ppp_summary_block_dual(payload: Dict[str, List[str]]) -> str:
+        data = payload or {}
+        top_expected = [str(x) for x in (data.get("top_expected") or []) if str(x).strip()]
+        bottom_expected = [str(x) for x in (data.get("bottom_expected") or []) if str(x).strip()]
+        top_ppp = [str(x) for x in (data.get("top_ioa") or []) if str(x).strip()]
+
+        def _list_html(items: List[str], values_mode: bool) -> str:
+            if not items:
+                return "<div class='small'>Brak danych.</div>"
+            out = ["<ol class='ioa-list'>"]
+            for a in items:
+                lbl = str(brand_values.get(a, a)) if values_mode else str(a)
+                out.append(f"<li>{_icon_cell(a, lbl)}</li>")
+            out.append("</ol>")
+            return "".join(out)
+
+        return (
+            '<div class="label-arche"><div class="ioa-summary-grid">'
+            '<div class="ioa-summary-item"><h4>Top 3 oczekiwane archetypy</h4>'
+            + _list_html(top_expected, values_mode=False)
+            + "</div>"
+            '<div class="ioa-summary-item"><h4>Bottom 3 oczekiwane archetypy</h4>'
+            + _list_html(bottom_expected, values_mode=False)
+            + "</div>"
+            '<div class="ioa-summary-item"><h4>Top 3 archetypy (PPP)</h4>'
+            + _list_html(top_ppp, values_mode=False)
+            + "</div></div></div>"
+            '<div class="label-values"><div class="ioa-summary-grid">'
+            '<div class="ioa-summary-item"><h4>Top 3 oczekiwane wartości</h4>'
+            + _list_html(top_expected, values_mode=True)
+            + "</div>"
+            '<div class="ioa-summary-item"><h4>Bottom 3 oczekiwane wartości</h4>'
+            + _list_html(bottom_expected, values_mode=True)
+            + "</div>"
+            '<div class="ioa-summary-item"><h4>Top 3 wartości (PPP)</h4>'
+            + _list_html(top_ppp, values_mode=True)
+            + "</div></div></div>"
+        )
+
+    ppp_methodology_text_arche = (
+        "PPP opisuje model preferencji przywództwa na podstawie pytania A: "
+        "bilansu odpowiedzi w parach oraz odsetka mieszkańców oczekujących archetypu."
+    )
+    ppp_methodology_text_values = (
+        "PPP opisuje model preferencji przywództwa na podstawie pytania A: "
+        "bilansu odpowiedzi w parach oraz odsetka mieszkańców oczekujących wartości."
+    )
+    ppp_panel_html = render_archetype_expectation_section(
+        methodology_text_arche=ppp_methodology_text_arche,
+        methodology_text_values=ppp_methodology_text_values,
+        data_basis_message=get_weighting_status_message(expectation_weighting_meta),
+        data_basis_reason=str(expectation_weighting_meta.get("data_basis_reason", "")),
+        summary_block_html=_ppp_summary_block_dual(expectation_summary_payload),
+        main_table_html=df_to_html_dual(df_A_expectation_main, max_rows=24),
+        pair_detail_table_html=df_to_html_dual(df_A_expectation_pair_detail, max_rows=60),
+        balance_chart_html=img_tag_dual("A_expectation_balance_distribution.png"),
+        expected_chart_html=img_tag_dual("A_expectation_expected_pct.png"),
+        ioa_chart_html=img_tag_dual("A_expectation_ioa_100.png"),
+    )
+
     isoa_isow_panel_html = render_isoa_isow_report_tab(
         data_basis_message=get_weighting_status_message(expectation_weighting_meta),
         data_basis_reason=str(expectation_weighting_meta.get("data_basis_reason", "")),
@@ -9655,10 +9758,23 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         top_bottom_html=_top_bottom_dual(df_social_expectation_index),
     )
 
+    _months_pl = {
+        1: "stycznia", 2: "lutego", 3: "marca", 4: "kwietnia", 5: "maja", 6: "czerwca",
+        7: "lipca", 8: "sierpnia", 9: "września", 10: "października", 11: "listopada", 12: "grudnia",
+    }
+    try:
+        _dt_report = datetime.now(ZoneInfo("Europe/Warsaw"))
+    except Exception:
+        _dt_report = datetime.now()
+    report_generated_at = (
+        f"{_dt_report.day} {_months_pl.get(int(_dt_report.month), str(_dt_report.month))} "
+        f"{_dt_report.year}, godzina {_dt_report.strftime('%H:%M')}"
+    )
+
     html_doc = f"""<html><head><meta charset="utf-8">{css}</head><body>
 <h1><span class="mode-arche">Raport: Archetypy</span><span class="mode-values">Raport: Wartości</span> – {_html_escape(settings.city_label)} (N={n_respondents_total})</h1>
 <div class="small">
-Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class="mono">WYNIKI</span>.
+Plik autorski Badania.pro (narzędzie analityczne). Data wygenerowania raportu: {_html_escape(report_generated_at)}.
 </div>
 
 <div class="card" style="margin-bottom:14px;">
@@ -9672,6 +9788,7 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
   <input type="radio" name="tabs" id="tab0" checked>
   <input type="radio" name="tabs" id="tabW">
   <input type="radio" name="tabs" id="tabA">
+  <input type="radio" name="tabs" id="tabI">
   <input type="radio" name="tabs" id="tabB">
   <input type="radio" name="tabs" id="tabD">
   <input type="radio" name="tabs" id="tabK">
@@ -9688,6 +9805,7 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
     <label for="tab0">Podsumowanie</label>
     <label for="tabW"><span class="mode-arche">ISOA</span><span class="mode-values">ISOW</span></label>
     <label for="tabA">Przywództwo</label>
+    <label for="tabI">PPP</label>
     <label for="tabB">Oczekiwania</label>
     <label for="tabD">Doświadczenia</label>
     <label for="tabS">Segmenty</label>
@@ -9776,6 +9894,8 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
       {img_tag_dual("A_bilans_starc.png")}
     </div>
   </div>
+
+  {ppp_panel_html}
 
   <div class="panel pB">
     <h2>Oczekiwania wobec miasta (TOP3 i TOP1)</h2>
@@ -10015,7 +10135,7 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
         Po wyborze <span class="mode-arche">archetypu</span><span class="mode-values">wartości</span> pokazujemy:
         (1) <b>%</b> tego <span class="mode-arche">archetypu</span><span class="mode-values">wartości</span> w blokach A, B1, B2, D13 (oś Y stała 0–100%),
         (2) <b>miejsce</b> (ranking 1–12) w tych samych blokach (oś Y stała 1–12).
-        W bloku A pokazujemy <b>% oczekujących</b> z sekcji IOA (netto: score_mean > 0 po zbilansowaniu 3 porównań).
+        W bloku A pokazujemy <b>% oczekujących</b> z sekcji PPP (netto: score_mean > 0 po zbilansowaniu 3 porównań).
         W blokach B1/B2/D13 pokazujemy % wskazań respondentów.
       </div>
     </div>
@@ -10036,7 +10156,7 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
     <h2>TOP5</h2>
     <div class="small">
       TOP5 w blokach A / B1 / B2 / D13. Wszędzie pokazujemy tylko % (bez liczebności).
-      A liczone jako <b>% oczekujących</b> z sekcji IOA.
+      A liczone jako <b>% oczekujących</b> z sekcji PPP.
       B1/B2/D13 jako % respondentów.
     </div>
 
@@ -16357,17 +16477,17 @@ def main() -> None:
         "neutral_pct": "% neutralnych",
         "not_expected_pct": "% nieoczekujących",
         "strong_expected_pct": "% silnie oczekujących",
-        "ioa_100": "IOA 0-100",
-        "ioa_raw": "IOA raw (-3 do +3)",
+        "ioa_100": "PPP 0-100",
+        "ioa_raw": "PPP raw (-3 do +3)",
         "n_respondents_valid": "Liczba respondentów",
     }).copy()
 
-    for c in ["% oczekujących", "% neutralnych", "% nieoczekujących", "% silnie oczekujących", "IOA 0-100"]:
+    for c in ["% oczekujących", "% neutralnych", "% nieoczekujących", "% silnie oczekujących", "PPP 0-100"]:
         if c in df_A_expectation_main_out.columns:
             df_A_expectation_main_out[c] = pd.to_numeric(df_A_expectation_main_out[c], errors="coerce").round(1)
-    if "IOA raw (-3 do +3)" in df_A_expectation_main_out.columns:
-        df_A_expectation_main_out["IOA raw (-3 do +3)"] = pd.to_numeric(
-            df_A_expectation_main_out["IOA raw (-3 do +3)"], errors="coerce"
+    if "PPP raw (-3 do +3)" in df_A_expectation_main_out.columns:
+        df_A_expectation_main_out["PPP raw (-3 do +3)"] = pd.to_numeric(
+            df_A_expectation_main_out["PPP raw (-3 do +3)"], errors="coerce"
         ).round(2)
     if "Liczba respondentów" in df_A_expectation_main_out.columns:
         df_A_expectation_main_out["Liczba respondentów"] = pd.to_numeric(
@@ -16459,8 +16579,8 @@ def main() -> None:
         plot_horizontal_metric_chart(
             s_ioa_100,
             outdir / "A_expectation_ioa_100.png",
-            "Indeks Oczekiwania Archetypu (IOA)",
-            xlabel="IOA 0-100",
+            "Profil Preferencji Przywództwa (PPP)",
+            xlabel="PPP 0-100",
             x_min=0.0,
             x_max=100.0,
             value_fmt="{:.1f}",
@@ -16469,8 +16589,8 @@ def main() -> None:
         plot_horizontal_metric_chart(
             series_with_value_index(s_ioa_100, brand_values),
             outdir / "A_expectation_ioa_100_values.png",
-            "Indeks Oczekiwania Wartości (IOW)",
-            xlabel="IOW 0-100",
+            "Profil Preferencji Przywództwa (PPP)",
+            xlabel="PPP 0-100",
             x_min=0.0,
             x_max=100.0,
             value_fmt="{:.1f}",
@@ -16664,7 +16784,7 @@ def main() -> None:
         "B2_pct": "B2: TOP1 (%)",
         "N_pct": "C13/D13: negatywne doświadczenie (%)",
         "MBAL_pp": "C13/D13: bilans najważniejszego doświadczenia",
-        "core_E": "Rdzeń oczekiwania",
+        "core_E": "Korekta priorytetu",
         "pressure_D": "Presja doświadczenia",
     }).copy()
     for col, digits in [
@@ -16674,7 +16794,7 @@ def main() -> None:
         ("B2: TOP1 (%)", 1),
         ("C13/D13: negatywne doświadczenie (%)", 1),
         ("C13/D13: bilans najważniejszego doświadczenia", 1),
-        ("Rdzeń oczekiwania", 2),
+        ("Korekta priorytetu", 2),
         ("Presja doświadczenia", 2),
     ]:
         if col in df_social_expectation_index.columns:

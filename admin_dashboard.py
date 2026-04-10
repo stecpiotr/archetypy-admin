@@ -2669,7 +2669,11 @@ SEGMENT_PROFILE_ITEMS = [
 ]
 
 
-def _plot_segment_profile_wheel_from_scores(outpath: Path, mean_scores: dict[str, float]) -> None:
+def _plot_segment_profile_wheel_from_scores(
+    outpath: Path,
+    mean_scores: dict[str, float],
+    label_mode: str = "arche",
+) -> None:
     from matplotlib.patches import Wedge, Circle
     import math
 
@@ -2763,6 +2767,8 @@ def _plot_segment_profile_wheel_from_scores(outpath: Path, mean_scores: dict[str
             zorder=0,
         )
 
+    mode_norm = str(label_mode or "arche").strip().lower()
+
     for i, (arch, value_label, _icon_file, color) in enumerate(SEGMENT_PROFILE_ITEMS):
         center = 75 - i * 30
         theta1 = center - 15
@@ -2822,7 +2828,8 @@ def _plot_segment_profile_wheel_from_scores(outpath: Path, mean_scores: dict[str
             )
         )
 
-        _draw_text_on_arc(ax=ax, text=arch, center_deg=center, radius=(r_label_inner + r_label_outer) / 2)
+        ring_label = str(value_label) if mode_norm.startswith("val") else str(arch)
+        _draw_text_on_arc(ax=ax, text=ring_label, center_deg=center, radius=(r_label_inner + r_label_outer) / 2)
 
         ang = math.radians(center)
         if arch in icon_cache:
@@ -2866,8 +2873,12 @@ def _plot_segment_profile_wheel_from_scores(outpath: Path, mean_scores: dict[str
     plt.close(fig)
 
 
-def make_segment_profile_wheel_png(mean_scores: dict[str, float], out_path: str = "segment_profile_wheel.png") -> str:
-    _plot_segment_profile_wheel_from_scores(Path(out_path), mean_scores or {})
+def make_segment_profile_wheel_png(
+    mean_scores: dict[str, float],
+    out_path: str = "segment_profile_wheel.png",
+    label_mode: str = "arche",
+) -> str:
+    _plot_segment_profile_wheel_from_scores(Path(out_path), mean_scores or {}, label_mode=label_mode)
     return out_path
 
 

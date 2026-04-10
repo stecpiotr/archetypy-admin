@@ -433,6 +433,40 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-012 (ISOA/ISOW anchored + PPP + C:/D: + podglad)
+- `app.py`:
+  - ISOA/ISOW przeliczone bez min-max:
+    - `P = 0.35*z(B1) + 0.65*z(B2)`,
+    - `D = 0.70*z(N) + 0.30*z(MBAL)`,
+    - `P_adj = 8*tanh(P/1.5)`,
+    - `D_adj = 4*tanh(D/1.5)`,
+    - `SEI_raw = A + P_adj + D_adj`,
+    - `SEI_100 = clamp(SEI_raw, 0..100)`.
+  - opisy metodologii i audyt skladnikow zaktualizowane do modelu zakotwiczonego w A.
+  - porownanie i profile 0-100 sa dynamiczne dla `Archetypy/Wartości` (tytuly + etykiety osi).
+  - limity podgladu raportu sa spinane z realnym `server.maxMessageSize` i nie przepuszczaja wymuszenia ponad twardy limit.
+- `admin_dashboard.py`:
+  - wykres kola 0-100 obsluguje `label_mode` (`arche` / `values`), wiec w Matching tryb `Wartości` ma podpisy wartosci.
+- `jst_analysis.py`:
+  - osadzanie assetow do podgladu inline kompresuje obrazy (i delikatnie skaluje duze grafiki), co znaczaco zmniejsza payload.
+  - pomiar po zmianie: dla raportu Poznania `inlined_bytes` spadlo do ~34.7 MB (zamiast >200 MB).
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - ISOA/ISOW w raporcie liczone modelem zakotwiczonym w A (bez min-max),
+  - dodana legenda osi pod glownym wykresem ISOA/ISOW,
+  - przywrocona osobna zakladka sekcji A jako `PPP`,
+  - widoczne etykiety `IOA/IOW` podmienione na `PPP`,
+  - podtytul raportu: `Data wygenerowania raportu: ...`,
+  - zmniejszona czcionka glownego naglowka zakladki ISOA/ISOW.
+- C:/D: synchronizacja i rebuild:
+  - generator zsynchronizowany do `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`,
+  - wygenerowane nowe raporty:
+    - `D:\PythonProject\archetypy\archetypy-admin\JST_Archetypy_Analiza\WYNIKI\raport.html`,
+    - `C:\Poznan_Archetypy_Analiza\WYNIKI\raport.html`,
+  - oba raporty zawieraja taby `ISOA/ISOW` oraz `PPP` i date generacji.
+- Test techniczny:
+  - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -442,6 +476,6 @@
 
 ### Nastepny konkretny krok wykonawczy
 - Zweryfikowac E2E na deployu:
-  1) czy stopka po odswiezeniu pokazuje najnowszy commit z `main`,
-  2) czy nowe sekcje w `🧭 Matching` wizualnie pasuja do reszty panelu,
-  3) czy nowa formula `Oczekiwań mieszkańców (%)` daje bardziej rozroznialny profil.
+  1) `🧭 Matching` w trybie `Wartości`: czy radar i kola 0-100 pokazuja nazwy wartosci,
+  2) raport `C:\Poznan_Archetypy_Analiza\WYNIKI\raport.html`: czy widac taby `ISOA/ISOW` i `PPP`,
+  3) podglad online panelu dla ciezkiego raportu: czy nie pojawia sie `MessageSizeError`.

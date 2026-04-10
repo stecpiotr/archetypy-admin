@@ -17,6 +17,7 @@ import urllib.request
 import urllib.error
 import pandas as pd
 import streamlit as st
+from streamlit import config as st_config
 import plotly.graph_objects as go
 from zoneinfo import ZoneInfo
 
@@ -2220,9 +2221,16 @@ def jst_analysis_view() -> None:
     preview_inline_meta_key = f"jst_report_inline_preview_meta_v1_{sid}"
     inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 45_000_000) or 45_000_000)
     inline_source_limit = int(st.secrets.get("JST_REPORT_INLINE_SOURCE_LIMIT_BYTES", 70_000_000) or 70_000_000)
-    safe_message_limit = int(st.secrets.get("JST_REPORT_SAFE_MESSAGE_LIMIT_BYTES", 185_000_000) or 185_000_000)
+    try:
+        max_message_mb = float(st_config.get_option("server.maxMessageSize") or 200.0)
+    except Exception:
+        max_message_mb = 200.0
+    max_message_bytes = int(max(1.0, max_message_mb) * 1024 * 1024)
+    safe_limit_default = int(max(64_000_000, max_message_bytes * 0.88))
+    safe_message_limit = int(st.secrets.get("JST_REPORT_SAFE_MESSAGE_LIMIT_BYTES", safe_limit_default) or safe_limit_default)
+    safe_message_limit = int(min(safe_message_limit, max(32_000_000, int(max_message_bytes * 0.94))))
     hard_limit_cfg = int(st.secrets.get("JST_REPORT_PANEL_HARD_LIMIT_BYTES", 0) or 0)
-    panel_hard_limit = int(max(hard_limit_cfg, safe_message_limit, 260_000_000))
+    panel_hard_limit = int(min(max(40_000_000, int(max_message_bytes * 0.98)), max(hard_limit_cfg, safe_message_limit)))
     standalone_html_limit = int(
         st.secrets.get("JST_REPORT_STANDALONE_HTML_LIMIT_BYTES", 85_000_000) or 85_000_000
     )
@@ -2515,6 +2523,14 @@ def jst_analysis_view() -> None:
             elif status == "too_large":
                 sz = _fmt_bytes_compact(int(cached_meta.get("bytes") or 0))
                 lim = _fmt_bytes_compact(safe_limit)
+                hlim = _fmt_bytes_compact(hard_limit)
+                if int(cached_meta.get("bytes") or 0) > hard_limit:
+                    st.error(
+                        "Pełny podgląd przekracza techniczny limit panelu: "
+                        f"{sz} > {hlim}."
+                    )
+                    st.info("Włącz „Tryb lekki renderowania” albo pobierz raport ZIP (WYNIKI) i otwórz lokalnie.")
+                    return
                 st.warning(
                     "Pełny podgląd jest duży dla panelu, ale możesz go uruchomić: "
                     f"{sz} (zalecany bezpieczny limit: {lim})."
@@ -2798,12 +2814,11 @@ def safe_zscore_by_archetype(values: Dict[str, float]) -> Tuple[Dict[str, float]
 
 
 def build_social_expectation_core(
-    z_a: Dict[str, float],
     z_b1: Dict[str, float],
     z_b2: Dict[str, float],
 ) -> Dict[str, float]:
     return {
-        a: float(0.50 * float(z_a.get(a, 0.0)) + 0.20 * float(z_b1.get(a, 0.0)) + 0.30 * float(z_b2.get(a, 0.0)))
+        a: float(0.35 * float(z_b1.get(a, 0.0)) + 0.65 * float(z_b2.get(a, 0.0)))
         for a in JST_ARCHETYPES
     }
 
@@ -2819,33 +2834,38 @@ def build_experience_pressure(
 
 
 def compute_social_expectation_index(
+    a_pct: Dict[str, float],
     core: Dict[str, float],
     pressure: Dict[str, float],
-) -> Tuple[Dict[str, float], Dict[str, float]]:
-    raw = {
-        a: float(0.80 * float(core.get(a, 0.0)) + 0.20 * float(pressure.get(a, 0.0)))
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, float]]:
+    priority_adj = {
+        a: float(8.0 * math.tanh(float(core.get(a, 0.0)) / 1.5))
         for a in JST_ARCHETYPES
     }
-    raw_vals = [float(raw[a]) for a in JST_ARCHETYPES if math.isfinite(float(raw[a]))]
-    if raw_vals:
-        r_min = min(raw_vals)
-        r_max = max(raw_vals)
-    else:
-        r_min, r_max = 0.0, 0.0
-    if r_max > r_min:
-        scaled = {
-            a: float(max(0.0, min(100.0, 100.0 * (float(raw[a]) - r_min) / (r_max - r_min))))
-            for a in JST_ARCHETYPES
-        }
-    else:
-        scaled = {a: 50.0 for a in JST_ARCHETYPES}
-    return raw, scaled
+    experience_adj = {
+        a: float(4.0 * math.tanh(float(pressure.get(a, 0.0)) / 1.5))
+        for a in JST_ARCHETYPES
+    }
+    raw = {
+        a: (
+            float(a_pct.get(a, float("nan"))) + float(priority_adj.get(a, 0.0)) + float(experience_adj.get(a, 0.0))
+            if math.isfinite(float(a_pct.get(a, float("nan"))))
+            else float("nan")
+        )
+        for a in JST_ARCHETYPES
+    }
+    scaled = {
+        a: float(max(0.0, min(100.0, float(raw[a])))) if math.isfinite(float(raw[a])) else float("nan")
+        for a in JST_ARCHETYPES
+    }
+    return raw, scaled, priority_adj, experience_adj
 
 
 def update_matching_summary_description(sei_short: str, sei_full: str, data_basis: str) -> str:
     return (
         f"Kolumna `Oczekiwania mieszkańców ({sei_short})` pokazuje `{sei_full}` w skali 0–100 "
         f"(to indeks syntetyczny, nie procent mieszkańców). "
+        "Wskaźnik jest zakotwiczony w `% oczekujących` z pytania A i korygowany przez priorytet (B1/B2) oraz doświadczenia (C13/D13). "
         f"Podstawa danych: {data_basis}."
     )
 
@@ -2984,17 +3004,19 @@ def _calc_jst_target_profile(
         for comp in (comp_A, comp_B1, comp_B2, comp_N, comp_MBAL)
     )
 
-    z_A, z_meta_A = safe_zscore_by_archetype(comp_A)
     z_B1, z_meta_B1 = safe_zscore_by_archetype(comp_B1)
     z_B2, z_meta_B2 = safe_zscore_by_archetype(comp_B2)
     z_N, z_meta_N = safe_zscore_by_archetype(comp_N)
     z_MBAL, z_meta_MBAL = safe_zscore_by_archetype(comp_MBAL)
 
-    core_E = build_social_expectation_core(z_A, z_B1, z_B2)
+    core_P = build_social_expectation_core(z_B1, z_B2)
     press_D = build_experience_pressure(z_N, z_MBAL)
-    sei_raw, sei_100 = compute_social_expectation_index(core_E, press_D)
+    sei_raw, sei_100, p_adj, d_adj = compute_social_expectation_index(comp_A, core_P, press_D)
 
-    profile = {a: round(float(sei_100[a]), 2) for a in JST_ARCHETYPES}
+    profile = {
+        a: (round(float(sei_100[a]), 2) if math.isfinite(float(sei_100.get(a, float("nan")))) else float("nan"))
+        for a in JST_ARCHETYPES
+    }
     component_rows = {
         a: {
             "A": round(float(comp_A.get(a, float("nan"))), 3) if math.isfinite(float(comp_A.get(a, float("nan")))) else float("nan"),
@@ -3002,10 +3024,16 @@ def _calc_jst_target_profile(
             "B2": round(float(comp_B2.get(a, float("nan"))), 3) if math.isfinite(float(comp_B2.get(a, float("nan")))) else float("nan"),
             "N": round(float(comp_N.get(a, float("nan"))), 3) if math.isfinite(float(comp_N.get(a, float("nan")))) else float("nan"),
             "MBAL": round(float(comp_MBAL.get(a, float("nan"))), 3) if math.isfinite(float(comp_MBAL.get(a, float("nan")))) else float("nan"),
-            "E": round(float(core_E.get(a, 0.0)), 4),
+            "P": round(float(core_P.get(a, 0.0)), 4),
             "D": round(float(press_D.get(a, 0.0)), 4),
+            "P_adj": round(float(p_adj.get(a, 0.0)), 4),
+            "D_adj": round(float(d_adj.get(a, 0.0)), 4),
             "SEI_raw": round(float(sei_raw.get(a, 0.0)), 4),
-            "SEI_100": round(float(sei_100.get(a, 50.0)), 3),
+            "SEI_100": (
+                round(float(sei_100.get(a, float("nan"))), 3)
+                if math.isfinite(float(sei_100.get(a, float("nan"))))
+                else float("nan")
+            ),
         }
         for a in JST_ARCHETYPES
     }
@@ -3038,17 +3066,18 @@ def _calc_jst_target_profile(
         "components_aligned": bool(components_aligned),
         "component_missing_counts": component_missing_counts,
         "z_meta": {
-            "A": z_meta_A,
             "B1": z_meta_B1,
             "B2": z_meta_B2,
             "N": z_meta_N,
             "MBAL": z_meta_MBAL,
         },
         "methodology": {
-            "core_formula": "E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)",
+            "anchor_formula": "A_base = % oczekujących z pytania A",
+            "core_formula": "P = 0.35*z(B1) + 0.65*z(B2)",
             "pressure_formula": "D = 0.70*z(N) + 0.30*z(MBAL)",
-            "raw_formula": "SEI_raw = 0.80*E + 0.20*D",
-            "scale_formula": "SEI_100 = min-max(0..100), fallback=50",
+            "adjust_formula": "P_adj = 8*tanh(P/1.5), D_adj = 4*tanh(D/1.5)",
+            "raw_formula": "SEI_raw = A_base + P_adj + D_adj",
+            "scale_formula": "SEI_100 = clamp(SEI_raw, 0..100)",
         },
     }
     return profile, respondent_vectors, audit
@@ -3641,18 +3670,20 @@ def matching_view() -> None:
                     f"RMSE `{float(metrics.get('rmse', 0.0)):.1f} pp`, "
                     f"TOP3_MAE `{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp`."
                 )
+            axis_entity_gen = "wartości" if current_axis_label == "Wartość" else "archetypu"
             st.markdown(f"**Jak liczony jest `{sei_full}`?**")
             st.markdown(
-                "- `A`: odsetek respondentów z dodatnim bilansem oczekiwania dla archetypu (`score_mean > 0`) w versusach A.\n"
-                "- `B1`: odsetek osób, które wskazały archetyp w TOP3.\n"
-                "- `B2`: odsetek osób, które wskazały archetyp jako TOP1.\n"
-                "- `N`: odsetek negatywnych doświadczeń dla archetypu (C13/D13).\n"
+                f"- `A`: odsetek respondentów z dodatnim bilansem oczekiwania dla {axis_entity_gen} (`score_mean > 0`) w versusach A.\n"
+                f"- `B1`: odsetek osób, które wskazały {axis_entity_gen} w TOP3.\n"
+                f"- `B2`: odsetek osób, które wskazały {axis_entity_gen} jako TOP1.\n"
+                f"- `N`: odsetek negatywnych doświadczeń dla {axis_entity_gen} (C13/D13).\n"
                 "- `MBAL`: bilans najważniejszego doświadczenia (C13/D13), liczony jako `Mneg - Mpos`.\n"
                 "- Standaryzacja: `z(x) = (x - średnia) / odchylenie` po 12 archetypach (gdy odchylenie=0, przyjmujemy `z=0`).\n"
-                "- Rdzeń oczekiwania: `E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)`.\n"
+                "- Korekta priorytetu: `P = 0.35*z(B1) + 0.65*z(B2)`.\n"
                 "- Presja doświadczenia: `D = 0.70*z(N) + 0.30*z(MBAL)`.\n"
-                "- Wynik surowy: `SEI_raw = 0.80*E + 0.20*D`.\n"
-                "- Skala końcowa: min-max do 0–100 (`SEI_100`), a przy braku rozstępu każdy archetyp dostaje `50`."
+                "- Ograniczone korekty: `P_adj = 8*tanh(P/1.5)` oraz `D_adj = 4*tanh(D/1.5)`.\n"
+                "- Wynik końcowy: `SEI_raw = A + P_adj + D_adj`.\n"
+                "- Skala końcowa: `SEI_100 = clamp(SEI_raw, 0..100)` (bez min-max)."
             )
             audit = result.get("target_audit") or {}
             if audit:
@@ -3689,8 +3720,10 @@ def matching_view() -> None:
                                 "B2: TOP1 (%)": _fmt_cell(row.get("B2"), 1),
                                 "C13/D13: negatywne doświadczenie (%)": _fmt_cell(row.get("N"), 1),
                                 "C13/D13: bilans najważniejszego doświadczenia": _fmt_cell(row.get("MBAL"), 1),
-                                "Rdzeń oczekiwania": _fmt_cell(row.get("E"), 2),
+                                "Korekta priorytetu": _fmt_cell(row.get("P"), 2),
                                 "Presja doświadczenia": _fmt_cell(row.get("D"), 2),
+                                "P_adj": _fmt_cell(row.get("P_adj"), 2),
+                                "D_adj": _fmt_cell(row.get("D_adj"), 2),
                                 "SEI_raw": _fmt_cell(row.get("SEI_raw"), 2),
                                 f"{sei_short} 0-100": _fmt_cell(row.get("SEI_100"), 1),
                             }
@@ -3785,7 +3818,8 @@ def matching_view() -> None:
             """,
             unsafe_allow_html=True,
         )
-        st.markdown("<div class='match-section-header'><h3>Porównanie profili archetypowych</h3></div>", unsafe_allow_html=True)
+        compare_title = "Porównanie profili archetypowych" if current_axis_label == "Archetyp" else "Porównanie profili wartości"
+        st.markdown(f"<div class='match-section-header'><h3>{html.escape(compare_title)}</h3></div>", unsafe_allow_html=True)
 
         person_name = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
         jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "JST")
@@ -3801,6 +3835,7 @@ def matching_view() -> None:
             "Buntownik", "Błazen", "Kochanek", "Opiekun", "Towarzysz", "Niewinny",
             "Władca", "Mędrzec", "Czarodziej", "Bohater", "Twórca", "Odkrywca",
         ]
+        radar_tick_labels: List[str] = [_matching_entity_name(a, current_axis_label) for a in radar_order]
         person_profile_20 = {a: float(person_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
         jst_profile_20 = {a: float(jst_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
 
@@ -3839,7 +3874,7 @@ def matching_view() -> None:
             data=[
                 go.Scatterpolar(
                     r=person_vals + [person_vals[0]],
-                    theta=radar_order + [radar_order[0]],
+                    theta=radar_tick_labels + [radar_tick_labels[0]],
                     fill="toself",
                     fillcolor="rgba(37,99,235,0.18)",
                     line=dict(color="#2563eb", width=3),
@@ -3850,7 +3885,7 @@ def matching_view() -> None:
                 ),
                 go.Scatterpolar(
                     r=jst_vals + [jst_vals[0]],
-                    theta=radar_order + [radar_order[0]],
+                    theta=radar_tick_labels + [radar_tick_labels[0]],
                     fill="toself",
                     fillcolor="rgba(15,118,110,0.16)",
                     line=dict(color="#0f766e", width=3, dash="dot"),
@@ -3861,7 +3896,7 @@ def matching_view() -> None:
                 ),
                 go.Scatterpolar(
                     r=p_marker_r,
-                    theta=radar_order,
+                    theta=radar_tick_labels,
                     mode="markers",
                     marker=dict(size=16, color=p_marker_c, opacity=0.92, line=dict(color="black", width=2.6)),
                     name="TOP3 polityka",
@@ -3870,7 +3905,7 @@ def matching_view() -> None:
                 ),
                 go.Scatterpolar(
                     r=j_marker_r,
-                    theta=radar_order,
+                    theta=radar_tick_labels,
                     mode="markers",
                     marker=dict(size=14, color=j_marker_c, opacity=0.94, line=dict(color="#0f172a", width=2.0)),
                     name="TOP3 mieszkańców",
@@ -3887,8 +3922,8 @@ def matching_view() -> None:
                 radialaxis=dict(visible=True, range=[0, 20]),
                 angularaxis=dict(
                     tickfont=dict(size=13),
-                    tickvals=radar_order,
-                    ticktext=radar_order,
+                    tickvals=radar_tick_labels,
+                    ticktext=radar_tick_labels,
                     rotation=90,
                     direction="clockwise",
                 ),
@@ -3932,10 +3967,12 @@ def matching_view() -> None:
                 unsafe_allow_html=True,
             )
 
-        st.markdown(
-            "<div class='match-section-header'><h3>Profile archetypowe 0-100 (siła archetypu, skala: 0-100)</h3></div>",
-            unsafe_allow_html=True,
+        profile_title = (
+            "Profile archetypowe 0-100 (siła archetypu, skala: 0-100)"
+            if current_axis_label == "Archetyp"
+            else "Profile wartości 0-100 (siła wartości, skala: 0-100)"
         )
+        st.markdown(f"<div class='match-section-header'><h3>{html.escape(profile_title)}</h3></div>", unsafe_allow_html=True)
         left_profile_col, right_profile_col = st.columns(2, gap="large")
         try:
             import admin_dashboard as AD
@@ -3944,10 +3981,12 @@ def matching_view() -> None:
             person_profile_img = AD.make_segment_profile_wheel_png(
                 mean_scores=person_profile_100,
                 out_path=f"matching_profile_person_{p_key}_{j_key}.png",
+                label_mode=("values" if current_axis_label == "Wartość" else "arche"),
             )
             jst_profile_img = AD.make_segment_profile_wheel_png(
                 mean_scores=jst_profile_100,
                 out_path=f"matching_profile_jst_{j_key}_{p_key}.png",
+                label_mode=("values" if current_axis_label == "Wartość" else "arche"),
             )
 
             def _show_image_compat(img_path: str, max_width_px: int = 520) -> None:
@@ -3962,7 +4001,7 @@ def matching_view() -> None:
             with left_profile_col:
                 st.markdown(
                     f"<div class='match-profile-title'>"
-                    f"Profil archetypowy {html.escape(str(person_name_gen or ''))}"
+                    f"{'Profil archetypowy' if current_axis_label == 'Archetyp' else 'Profil wartości'} {html.escape(str(person_name_gen or ''))}"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -3970,7 +4009,7 @@ def matching_view() -> None:
             with right_profile_col:
                 st.markdown(
                     f"<div class='match-profile-title'>"
-                    f"Profil archetypowy mieszkańców {html.escape(str(jst_name_gen or ''))}"
+                    f"{'Profil archetypowy mieszkańców' if current_axis_label == 'Archetyp' else 'Profil wartości mieszkańców'} {html.escape(str(jst_name_gen or ''))}"
                     f"</div>",
                     unsafe_allow_html=True,
                 )

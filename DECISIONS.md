@@ -426,3 +426,48 @@ Decyzja:
 - Dla podglądu oznaczonego jako `too_large` domyślnie włączamy opcję uruchomienia pełnej wersji (z ostrzeżeniem o wydajności), zamiast prezentować to jako „niedziałający podgląd”.
 Uzasadnienie:
 - User zgłosił realny przypadek, w którym raport był poprawny, ale panel odrzucał podgląd przez zbyt niski limit konfiguracyjny.
+
+### D-051: ISOA/ISOW ma byc zakotwiczony w A, bez finalnego min-max
+Decyzja:
+- Finalny indeks ISOA/ISOW liczymy tak:
+  - `P = 0.35*z(B1) + 0.65*z(B2)`,
+  - `D = 0.70*z(N) + 0.30*z(MBAL)`,
+  - `P_adj = 8*tanh(P/1.5)`,
+  - `D_adj = 4*tanh(D/1.5)`,
+  - `SEI_raw = A + P_adj + D_adj`,
+  - `SEI_100 = clamp(SEI_raw, 0..100)`.
+- Rezygnujemy z koncowego min-max po 12 pozycjach.
+Uzasadnienie:
+- Min-max wymuszal sztuczne skrajnosci (100/0) niezaleznie od realnego poziomu oczekiwania.
+- User wymaga indeksu bardziej "realnego", zakotwiczonego w `% oczekujacych` z pytania A.
+
+### D-052: Sekcja A wraca jako osobna zakladka, ale pod nazwa PPP
+Decyzja:
+- Nie usuwamy osobnej zakladki dla sekcji A.
+- Widoczne nazwy `IOA/IOW` podmieniamy na:
+  - `Profil Preferencji Przywodztwa (PPP)`,
+  - skrót `PPP`.
+- ISOA/ISOW zostaje bez zmian (to oddzielny indeks syntetyczny).
+Uzasadnienie:
+- User zgłosił, ze usuniecie zakladki bylo niezgodne z oczekiwaniem.
+- Jednoczesnie user wymagal unikniecia mylenia IOA z ISOA/ISOW.
+
+### D-053: Limity podgladu online musza respektowac realny limit Streamlit
+Decyzja:
+- D-050 zostaje uszczelnione:
+  - limity `safe` i `hard` sa wyliczane wzgledem `server.maxMessageSize`,
+  - nie pozwalamy wymusic pelnego podgladu ponad `hard_limit`,
+  - full preview jest blokowany wczesniej z jasnym komunikatem.
+Uzasadnienie:
+- User nadal dostawal `MessageSizeError` przy wymuszonym podgladzie.
+- Sekretowy limit nie moze byc wyzszy niz realny limit serwera.
+
+### D-054: Inline assets kompresujemy przy osadzaniu, z delikatnym downscale
+Decyzja:
+- W `jst_analysis.py` podczas zamiany obrazow na data URI:
+  - stosujemy kompresje (JPEG/WEBP),
+  - dla bardzo duzych obrazow delikatnie zmniejszamy rozdzielczosc (long edge max ~1900 px),
+  - wybieramy mniejszy wariant tylko, gdy daje realny zysk.
+Uzasadnienie:
+- Redukuje rozmiar payloadu do przegladarki bez zmiany logiki raportu.
+- Ogranicza ryzyko przekroczenia limitu komunikatu przy pelnym podgladzie.
