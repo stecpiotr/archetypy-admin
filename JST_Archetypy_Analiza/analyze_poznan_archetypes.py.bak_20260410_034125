@@ -210,28 +210,6 @@ A_PAIRS = [
     ("A18", "Błazen", "Twórca"),
 ]
 
-# Jawna mapa 18 par (jedno źródło prawdy dla nowej sekcji oczekiwań mieszkańców).
-PAIR_MAP = [
-    {"id": "A1", "col": "A1", "left": "Opiekun", "right": "Odkrywca"},
-    {"id": "A2", "col": "A2", "left": "Towarzysz", "right": "Władca"},
-    {"id": "A3", "col": "A3", "left": "Opiekun", "right": "Twórca"},
-    {"id": "A4", "col": "A4", "left": "Mędrzec", "right": "Bohater"},
-    {"id": "A5", "col": "A5", "left": "Władca", "right": "Buntownik"},
-    {"id": "A6", "col": "A6", "left": "Niewinny", "right": "Odkrywca"},
-    {"id": "A7", "col": "A7", "left": "Buntownik", "right": "Kochanek"},
-    {"id": "A8", "col": "A8", "left": "Opiekun", "right": "Bohater"},
-    {"id": "A9", "col": "A9", "left": "Towarzysz", "right": "Czarodziej"},
-    {"id": "A10", "col": "A10", "left": "Kochanek", "right": "Bohater"},
-    {"id": "A11", "col": "A11", "left": "Władca", "right": "Błazen"},
-    {"id": "A12", "col": "A12", "left": "Niewinny", "right": "Czarodziej"},
-    {"id": "A13", "col": "A13", "left": "Czarodziej", "right": "Mędrzec"},
-    {"id": "A14", "col": "A14", "left": "Towarzysz", "right": "Twórca"},
-    {"id": "A15", "col": "A15", "left": "Błazen", "right": "Niewinny"},
-    {"id": "A16", "col": "A16", "left": "Odkrywca", "right": "Mędrzec"},
-    {"id": "A17", "col": "A17", "left": "Kochanek", "right": "Buntownik"},
-    {"id": "A18", "col": "A18", "left": "Błazen", "right": "Twórca"},
-]
-
 # D: 12 par (+/-) + D13 top1
 
 D_ITEMS = [
@@ -1336,631 +1314,6 @@ def apply_poststrat_weights_from_targets(
 
     return w, diag
 
-
-def encode_pair_response(response_value: Any, side: str) -> float:
-    """
-    Kodowanie odpowiedzi 1-7 do punktów po stronie archetypu.
-    left:  points_left  = 4 - r
-    right: points_right = r - 4
-    """
-    v = _safe_float(response_value)
-    if v is None:
-        return float("nan")
-    v = float(v)
-    if not np.isfinite(v):
-        return float("nan")
-    if v < float(A_SCALE_MIN) or v > float(A_SCALE_MAX):
-        return float("nan")
-
-    side_norm = str(side or "").strip().lower()
-    if side_norm == "left":
-        return float(A_SCALE_CENTER - v)
-    if side_norm == "right":
-        return float(v - A_SCALE_CENTER)
-    raise ValueError(f"Nieznana strona pary: {side}")
-
-
-def _map_poststrat_error_reason(raw_error: str) -> str:
-    txt = str(raw_error or "").strip().lower()
-    if not txt:
-        return "Nie udało się stabilnie wyznaczyć wag"
-    if ("targets_poststrat.csv musi zawierać kolumny" in txt) or ("brakuje kolumn" in txt):
-        return "Brak wymaganych zmiennych do wagowania"
-    if "brak poprawnie rozpoznanej płci / wieku" in txt:
-        return "Brak wymaganych zmiennych do wagowania"
-    if "brakuje komórek płeć × wiek" in txt:
-        return "Zbyt mała liczebność próby"
-    if ("nie zawiera poprawnych" in txt) or ("suma udziałów" in txt):
-        return "Brak targetów do wagowania"
-    if "stabil" in txt:
-        return "Nie udało się stabilnie wyznaczyć wag"
-    return "Nie udało się stabilnie wyznaczyć wag"
-
-
-def resolve_active_weighting_basis(
-        root: Path,
-        n_rows: int,
-        weights: np.ndarray,
-        poststrat_diag: Optional[pd.DataFrame],
-        poststrat_error: str = ""
-) -> Dict[str, Any]:
-    """
-    Ustala aktywną podstawę danych dla nowej sekcji:
-    - weighted_poststrat (gdy poststratyfikacja działa i jest stabilna)
-    - raw_unweighted (fallback)
-    """
-    n = int(max(0, n_rows))
-    w = np.asarray(weights, dtype=float).reshape(-1)
-    has_poststrat = poststrat_diag is not None and len(poststrat_diag) > 0
-    target_exists = (Path(root) / "targets_poststrat.csv").exists()
-    invalid_weight_mask = (~np.isfinite(w)) | (w <= 0)
-
-    if (
-            has_poststrat
-            and len(w) == n
-            and (not np.any(invalid_weight_mask))
-            and float(np.sum(w)) > 0
-    ):
-        return {
-            "weighting_applied_flag": True,
-            "data_basis_status": "weighted_poststrat",
-            "data_basis_label": "Podstawa prezentacji wyników: dane ważone poststratyfikacyjnie.",
-            "data_basis_reason": "",
-            "active_weight_col": "__active_weight_poststrat__",
-            "weighted": True,
-            "active_weights": w.copy(),
-        }
-
-    if has_poststrat and len(w) != n:
-        reason = "Nie udało się stabilnie wyznaczyć wag (niezgodna długość wektora wag)."
-    elif has_poststrat and np.any(invalid_weight_mask):
-        reason = "Nie udało się stabilnie wyznaczyć wag (wykryto wagi <= 0 lub NaN)."
-    elif str(poststrat_error or "").strip():
-        reason = _map_poststrat_error_reason(poststrat_error)
-    elif not target_exists:
-        reason = "Brak targetów do wagowania"
-    else:
-        reason = "Wagowanie poststratyfikacyjne nie zostało zastosowane"
-
-    return {
-        "weighting_applied_flag": False,
-        "data_basis_status": "raw_unweighted",
-        "data_basis_label": (
-            "Podstawa prezentacji wyników: dane surowe. "
-            "Wagowanie poststratyfikacyjne nie zostało zastosowane."
-        ),
-        "data_basis_reason": reason,
-        "active_weight_col": "",
-        "weighted": False,
-        "active_weights": np.ones(n, dtype=float),
-    }
-
-
-def get_weighting_status_message(weighting_meta: Dict[str, Any]) -> str:
-    d = weighting_meta or {}
-    label = str(d.get("data_basis_label", "")).strip()
-    if label:
-        return label
-    status = str(d.get("data_basis_status", "raw_unweighted")).strip()
-    if status == "weighted_poststrat":
-        return "Podstawa prezentacji wyników: dane ważone poststratyfikacyjnie."
-    return "Podstawa prezentacji wyników: dane surowe. Wagowanie poststratyfikacyjne nie zostało zastosowane."
-
-
-def _strict_positive_weights(weights_arr: np.ndarray, *, context: str) -> np.ndarray:
-    w = np.asarray(weights_arr, dtype=float).reshape(-1)
-    bad = (~np.isfinite(w)) | (w <= 0)
-    if np.any(bad):
-        bad_n = int(np.sum(bad))
-        raise ValueError(
-            f"Niepoprawne wagi w kontekście '{context}': {bad_n} rekordów ma wagę <= 0 lub NaN."
-        )
-    return w
-
-
-def _validate_pair_map(pair_map: List[Dict[str, str]]) -> None:
-    if len(pair_map) != 18:
-        raise ValueError("PAIR_MAP musi zawierać dokładnie 18 par.")
-    required_keys = {"id", "col", "left", "right"}
-    counts: Dict[str, int] = {}
-    seen_ids: set = set()
-    for row in pair_map:
-        if set(row.keys()) != required_keys:
-            raise ValueError("Każdy wpis PAIR_MAP musi mieć klucze: id, col, left, right.")
-        pid = str(row["id"])
-        if pid in seen_ids:
-            raise ValueError(f"Duplikat ID pary w PAIR_MAP: {pid}")
-        seen_ids.add(pid)
-        left = str(row["left"])
-        right = str(row["right"])
-        counts[left] = int(counts.get(left, 0)) + 1
-        counts[right] = int(counts.get(right, 0)) + 1
-
-    bad = {k: v for k, v in counts.items() if int(v) != 3}
-    if bad:
-        raise ValueError(f"Każdy archetyp musi występować 3 razy w PAIR_MAP. Błędne: {bad}")
-
-
-def build_pair_long_table(
-        df: pd.DataFrame,
-        pair_map: List[Dict[str, str]],
-        respondent_id_col: str,
-        weight_col: Optional[str] = None
-) -> pd.DataFrame:
-    _validate_pair_map(pair_map)
-
-    if respondent_id_col not in df.columns:
-        raise ValueError(f"Brak kolumny respondent_id: {respondent_id_col}")
-
-    n = int(len(df))
-    respondent_ids = df[respondent_id_col].copy()
-    respondent_row_index = np.arange(n, dtype=int)
-
-    if weight_col and (weight_col in df.columns):
-        w_raw = pd.to_numeric(df[weight_col], errors="coerce").to_numpy(dtype=float)
-        w = _strict_positive_weights(w_raw, context=f"build_pair_long_table:{weight_col}")
-    else:
-        w = np.ones(n, dtype=float)
-
-    parts: List[pd.DataFrame] = []
-    for p in pair_map:
-        pair_id = str(p["id"])
-        source_col = str(p["col"])
-        left_arch = str(p["left"])
-        right_arch = str(p["right"])
-
-        if source_col in df.columns:
-            responses = pd.to_numeric(df[source_col], errors="coerce").to_numpy(dtype=float)
-        else:
-            responses = np.full(n, np.nan, dtype=float)
-
-        valid_mask = np.isfinite(responses) & (responses >= float(A_SCALE_MIN)) & (responses <= float(A_SCALE_MAX))
-        points_left = np.array([encode_pair_response(v, "left") for v in responses], dtype=float)
-        points_right = np.array([encode_pair_response(v, "right") for v in responses], dtype=float)
-
-        part_left = pd.DataFrame({
-            "respondent_id": respondent_ids.values,
-            "respondent_row_index": respondent_row_index,
-            "pair_id": pair_id,
-            "source_column": source_col,
-            "archetype": left_arch,
-            "side": "left",
-            "response_1_7": responses,
-            "points": points_left,
-            "valid_flag": valid_mask.astype(bool),
-            "weight": w,
-        })
-        part_right = pd.DataFrame({
-            "respondent_id": respondent_ids.values,
-            "respondent_row_index": respondent_row_index,
-            "pair_id": pair_id,
-            "source_column": source_col,
-            "archetype": right_arch,
-            "side": "right",
-            "response_1_7": responses,
-            "points": points_right,
-            "valid_flag": valid_mask.astype(bool),
-            "weight": w,
-        })
-        parts.extend([part_left, part_right])
-
-    if not parts:
-        return pd.DataFrame(columns=[
-            "respondent_id", "respondent_row_index", "pair_id", "source_column", "archetype",
-            "side", "response_1_7", "points", "valid_flag", "weight"
-        ])
-
-    long_df = pd.concat(parts, axis=0, ignore_index=True)
-
-    # Kontrola 1: points_left + points_right == 0 dla każdej ważnej odpowiedzi
-    m_valid = long_df["valid_flag"].astype(bool).values
-    if np.any(m_valid):
-        chk = (
-            long_df.loc[m_valid]
-            .groupby(["respondent_row_index", "pair_id"], dropna=False)["points"]
-            .sum()
-            .astype(float)
-            .values
-        )
-        if chk.size and (not np.allclose(chk, 0.0, atol=1e-9, rtol=0.0)):
-            raise ValueError("Walidacja nie przeszła: dla części odpowiedzi points_left + points_right != 0.")
-
-    return long_df
-
-
-def compute_respondent_archetype_scores(long_table: pd.DataFrame) -> pd.DataFrame:
-    if long_table is None or len(long_table) == 0:
-        return pd.DataFrame(columns=[
-            "respondent_row_index", "respondent_id", "archetype",
-            "n_valid_pairs", "score_sum", "score_mean", "weight"
-        ])
-
-    valid = long_table[long_table["valid_flag"].astype(bool)].copy()
-    if valid.empty:
-        return pd.DataFrame(columns=[
-            "respondent_row_index", "respondent_id", "archetype",
-            "n_valid_pairs", "score_sum", "score_mean", "weight"
-        ])
-
-    grp = (
-        valid
-        .groupby(["respondent_row_index", "respondent_id", "archetype"], as_index=False)
-        .agg(
-            n_valid_pairs=("points", "count"),
-            score_sum=("points", "sum"),
-            weight=("weight", "first"),
-        )
-    )
-
-    grp["n_valid_pairs"] = grp["n_valid_pairs"].astype(int)
-    grp["score_sum"] = grp["score_sum"].astype(float)
-    grp["score_mean"] = np.where(
-        grp["n_valid_pairs"].values > 0,
-        grp["score_sum"].values / grp["n_valid_pairs"].values,
-        np.nan
-    )
-
-    return grp
-
-
-def classify_respondent_archetype_support(scores_table: pd.DataFrame) -> pd.DataFrame:
-    if scores_table is None or len(scores_table) == 0:
-        return pd.DataFrame(columns=[
-            "respondent_row_index", "respondent_id", "archetype", "n_valid_pairs",
-            "score_sum", "score_mean", "weight",
-            "expected_flag", "neutral_flag", "not_expected_flag", "strong_expected_flag"
-        ])
-
-    d = scores_table.copy()
-    s = pd.to_numeric(d["score_mean"], errors="coerce").astype(float)
-    d["expected_flag"] = (s > 0).astype(int)
-    d["neutral_flag"] = (s == 0).astype(int)
-    d["not_expected_flag"] = (s < 0).astype(int)
-    d["strong_expected_flag"] = (s >= 1).astype(int)
-    return d
-
-
-def _weighted_or_unweighted_mean(values: np.ndarray, weights: np.ndarray, weighted: bool) -> float:
-    v = np.asarray(values, dtype=float).reshape(-1)
-    if v.size == 0:
-        return float("nan")
-    m = np.isfinite(v)
-    if not np.any(m):
-        return float("nan")
-    if weighted:
-        w = np.asarray(weights, dtype=float).reshape(-1)
-        if len(w) != len(v):
-            raise ValueError("Niezgodna długość wag i wartości w średniej ważonej.")
-        w = _strict_positive_weights(w, context="_weighted_or_unweighted_mean")
-        return float(np.average(v[m], weights=w[m]))
-    return float(np.mean(v[m]))
-
-
-def aggregate_archetype_support(
-        scores_table: pd.DataFrame,
-        weight_col: Optional[str] = None,
-        weighted: bool = False
-) -> pd.DataFrame:
-    if scores_table is None or len(scores_table) == 0:
-        return pd.DataFrame(columns=[
-            "archetype", "expected_pct", "neutral_pct", "not_expected_pct", "strong_expected_pct",
-            "n_respondents_valid", "avg_n_valid_pairs", "weighted_base"
-        ])
-
-    rows: List[Dict[str, Any]] = []
-    for archetype, grp in scores_table.groupby("archetype", dropna=False):
-        n_resp = int(len(grp))
-        if n_resp <= 0:
-            continue
-
-        if weighted and weight_col and (weight_col in grp.columns):
-            w_raw = pd.to_numeric(grp[weight_col], errors="coerce").to_numpy(dtype=float)
-            w = _strict_positive_weights(w_raw, context=f"aggregate_archetype_support:{archetype}")
-        else:
-            w = np.ones(n_resp, dtype=float)
-
-        denom = float(np.sum(w)) if weighted else float(n_resp)
-        if denom <= 0:
-            continue
-
-        exp = float(np.sum(w * grp["expected_flag"].to_numpy(dtype=float)) / denom * 100.0)
-        neu = float(np.sum(w * grp["neutral_flag"].to_numpy(dtype=float)) / denom * 100.0)
-        not_exp = float(np.sum(w * grp["not_expected_flag"].to_numpy(dtype=float)) / denom * 100.0)
-        strong = float(np.sum(w * grp["strong_expected_flag"].to_numpy(dtype=float)) / denom * 100.0)
-
-        rows.append({
-            "archetype": str(archetype),
-            "expected_pct": exp,
-            "neutral_pct": neu,
-            "not_expected_pct": not_exp,
-            "strong_expected_pct": strong,
-            "n_respondents_valid": n_resp,
-            "avg_n_valid_pairs": float(np.mean(pd.to_numeric(grp["n_valid_pairs"], errors="coerce").fillna(0.0))),
-            "weighted_base": float(np.sum(w)),
-        })
-
-    out = pd.DataFrame(rows)
-    if out.empty:
-        return out
-
-    # Kontrola 2: expected + neutral + not_expected = 100
-    check_sum = (
-        out["expected_pct"].astype(float)
-        + out["neutral_pct"].astype(float)
-        + out["not_expected_pct"].astype(float)
-    )
-    if not np.allclose(check_sum.values, 100.0, atol=1e-8, rtol=0.0):
-        raise ValueError("Walidacja nie przeszła: expected_pct + neutral_pct + not_expected_pct != 100.")
-
-    return out
-
-
-def compute_ioa(
-        scores_table: pd.DataFrame,
-        weight_col: Optional[str] = None,
-        weighted: bool = False
-) -> pd.DataFrame:
-    if scores_table is None or len(scores_table) == 0:
-        return pd.DataFrame(columns=["archetype", "ioa_raw", "ioa_100"])
-
-    rows: List[Dict[str, Any]] = []
-    for archetype, grp in scores_table.groupby("archetype", dropna=False):
-        if len(grp) <= 0:
-            continue
-        s = pd.to_numeric(grp["score_mean"], errors="coerce").to_numpy(dtype=float)
-
-        if weighted and weight_col and (weight_col in grp.columns):
-            w_raw = pd.to_numeric(grp[weight_col], errors="coerce").to_numpy(dtype=float)
-            w = _strict_positive_weights(w_raw, context=f"compute_ioa:{archetype}")
-        else:
-            w = np.ones(len(grp), dtype=float)
-
-        ioa_raw = _weighted_or_unweighted_mean(s, w, weighted=weighted)
-        ioa_100 = float(((ioa_raw + 3.0) / 6.0) * 100.0) if np.isfinite(ioa_raw) else float("nan")
-
-        rows.append({
-            "archetype": str(archetype),
-            "ioa_raw": float(ioa_raw) if np.isfinite(ioa_raw) else float("nan"),
-            "ioa_100": float(ioa_100) if np.isfinite(ioa_100) else float("nan"),
-        })
-
-    return pd.DataFrame(rows)
-
-
-def build_main_expectation_table(summary_table: pd.DataFrame) -> pd.DataFrame:
-    if summary_table is None or len(summary_table) == 0:
-        return pd.DataFrame(columns=[
-            "position", "archetype", "expected_pct", "neutral_pct", "not_expected_pct",
-            "strong_expected_pct", "ioa_100", "ioa_raw", "n_respondents_valid", "avg_n_valid_pairs"
-        ])
-
-    d = summary_table.copy()
-    d = d[pd.to_numeric(d["n_respondents_valid"], errors="coerce").fillna(0).astype(int) > 0].copy()
-    if d.empty:
-        return d
-
-    d = d.sort_values(
-        ["expected_pct", "ioa_100", "ioa_raw"],
-        ascending=[False, False, False],
-        kind="mergesort"
-    ).reset_index(drop=True)
-    d.insert(0, "position", np.arange(1, len(d) + 1, dtype=int))
-    return d
-
-
-def build_pair_detail_table(
-        long_table: pd.DataFrame,
-        weighted: bool = False,
-        weight_col: Optional[str] = None
-) -> pd.DataFrame:
-    _ = weight_col  # long_table zawiera już gotową kolumnę "weight"
-
-    if long_table is None or len(long_table) == 0:
-        return pd.DataFrame(columns=[
-            "pair_id", "left_archetype", "right_archetype", "mean_response_1_7",
-            "pct_response_1_3", "pct_response_4", "pct_response_5_7",
-            "mean_points_left", "mean_points_right", "n"
-        ])
-
-    valid = long_table[long_table["valid_flag"].astype(bool)].copy()
-    if valid.empty:
-        return pd.DataFrame(columns=[
-            "pair_id", "left_archetype", "right_archetype", "mean_response_1_7",
-            "pct_response_1_3", "pct_response_4", "pct_response_5_7",
-            "mean_points_left", "mean_points_right", "n"
-        ])
-
-    left = valid.loc[valid["side"] == "left", [
-        "respondent_row_index", "pair_id", "source_column", "archetype", "response_1_7", "points", "weight"
-    ]].rename(columns={"archetype": "left_archetype", "points": "points_left"})
-    right = valid.loc[valid["side"] == "right", [
-        "respondent_row_index", "pair_id", "archetype", "points"
-    ]].rename(columns={"archetype": "right_archetype", "points": "points_right"})
-
-    pair_resp = left.merge(
-        right,
-        how="inner",
-        on=["respondent_row_index", "pair_id"],
-    )
-
-    rows: List[Dict[str, Any]] = []
-    for p in PAIR_MAP:
-        pid = str(p["id"])
-        g = pair_resp[pair_resp["pair_id"] == pid].copy()
-
-        n_valid = int(len(g))
-        if n_valid <= 0:
-            rows.append({
-                "pair_id": pid,
-                "left_archetype": str(p["left"]),
-                "right_archetype": str(p["right"]),
-                "mean_response_1_7": np.nan,
-                "pct_response_1_3": np.nan,
-                "pct_response_4": np.nan,
-                "pct_response_5_7": np.nan,
-                "mean_points_left": np.nan,
-                "mean_points_right": np.nan,
-                "n": 0,
-            })
-            continue
-
-        r = pd.to_numeric(g["response_1_7"], errors="coerce").to_numpy(dtype=float)
-        pl = pd.to_numeric(g["points_left"], errors="coerce").to_numpy(dtype=float)
-        pr = pd.to_numeric(g["points_right"], errors="coerce").to_numpy(dtype=float)
-        if weighted:
-            w_raw = pd.to_numeric(g["weight"], errors="coerce").to_numpy(dtype=float)
-            w = _strict_positive_weights(w_raw, context=f"build_pair_detail_table:{pid}")
-        else:
-            w = np.ones(n_valid, dtype=float)
-
-        denom = float(np.sum(w)) if weighted else float(n_valid)
-        if denom <= 0:
-            raise ValueError(f"Niepoprawna podstawa wag dla pary {pid}: suma wag <= 0.")
-
-        pct_1_3 = float(np.sum(w[(r >= 1.0) & (r <= 3.0)]) / denom * 100.0)
-        pct_4 = float(np.sum(w[r == 4.0]) / denom * 100.0)
-        pct_5_7 = float(np.sum(w[(r >= 5.0) & (r <= 7.0)]) / denom * 100.0)
-
-        mean_r = float(np.average(r, weights=w))
-        mean_pl = float(np.average(pl, weights=w))
-        mean_pr = float(np.average(pr, weights=w))
-
-        rows.append({
-            "pair_id": pid,
-            "left_archetype": str(p["left"]),
-            "right_archetype": str(p["right"]),
-            "mean_response_1_7": mean_r,
-            "pct_response_1_3": pct_1_3,
-            "pct_response_4": pct_4,
-            "pct_response_5_7": pct_5_7,
-            "mean_points_left": mean_pl,
-            "mean_points_right": mean_pr,
-            "n": n_valid,
-        })
-
-    out = pd.DataFrame(rows)
-    if out.empty:
-        return out
-    out["_pair_ord"] = out["pair_id"].astype(str).str.extract(r"(\d+)").astype(float)
-    out = out.sort_values("_pair_ord", ascending=True).drop(columns=["_pair_ord"]).reset_index(drop=True)
-    return out
-
-
-def render_archetype_expectation_section(
-        *,
-        methodology_text_arche: str,
-        methodology_text_values: str,
-        data_basis_message: str,
-        data_basis_reason: str,
-        summary_block_html: str,
-        main_table_html: str,
-        pair_detail_table_html: str,
-        balance_chart_html: str,
-        expected_chart_html: str,
-        ioa_chart_html: str
-) -> str:
-    reason_html = ""
-    if str(data_basis_reason or "").strip():
-        reason_html = (
-            "<div class='small' style='margin-top:6px;'>"
-            f"Powód fallbacku: {_html_escape(str(data_basis_reason).strip())}"
-            "</div>"
-        )
-
-    return f"""
-  <div class="panel pW">
-    <h2><span class="mode-arche">IOA - Oczekiwanie archetypów (% mieszkańców)</span><span class="mode-values">IOW - Oczekiwanie wartości (% mieszkańców)</span></h2>
-    <div class="small">
-      <span class="mode-arche">{_html_escape(methodology_text_arche)}</span><span class="mode-values">{_html_escape(methodology_text_values)}</span>
-    </div>
-
-    <div class="card ioa-status-card">
-      <div><b>{_html_escape(data_basis_message)}</b></div>
-      {reason_html}
-    </div>
-
-    <div class="chart-pair" style="margin-top:16px;">
-      <div class="card" style="margin-top:0;">
-        <h3><span class="mode-arche">Społeczne oczekiwanie archetypu (%)</span><span class="mode-values">Społeczne oczekiwanie wartości (%)</span></h3>
-        {expected_chart_html}
-      </div>
-      <div class="card" style="margin-top:0;">
-        <h3><span class="mode-arche">IOA 0-100</span><span class="mode-values">IOW 0-100</span></h3>
-        {ioa_chart_html}
-      </div>
-    </div>
-
-    <div class="card ioa-summary-card" style="margin-top:16px;">
-      <h3>Podsumowanie</h3>
-      {summary_block_html}
-    </div>
-
-    <div class="card chart-half ioa-balance-legend" style="margin-top:16px;">
-      <div class="small" style="margin-bottom:6px;"><b><span class="mode-arche">Interpretacja bilansu respondenta dla archetypu</span><span class="mode-values">Interpretacja bilansu respondenta dla wartości</span></b></div>
-      <div class="ioa-balance-row">
-        <span class="ioa-pill ioa-pill-pos"><span class="mode-arche">Dodatni bilans → oczekiwanie archetypu</span><span class="mode-values">Dodatni bilans → oczekiwanie wartości</span></span>
-        <span class="ioa-pill ioa-pill-neu">Bilans zerowy → neutralność</span>
-        <span class="ioa-pill ioa-pill-neg"><span class="mode-arche">Ujemny bilans → relatywny brak oczekiwania archetypu</span><span class="mode-values">Ujemny bilans → relatywny brak oczekiwania wartości</span></span>
-      </div>
-      <div class="small" style="margin-top:8px;">
-        <span class="mode-arche">Interpretacja dotyczy rozkładu respondentów w kategoriach: oczekujący / neutralni / nieoczekujący dla archetypu.</span><span class="mode-values">Interpretacja dotyczy rozkładu respondentów w kategoriach: oczekujący / neutralni / nieoczekujący dla wartości.</span>
-      </div>
-    </div>
-
-    <div class="card chart-half ioa-balance-card" style="margin-top:16px;">
-      <h3 style="margin-top:10px;"><span class="mode-arche">Bilans respondentów (oczekujący / neutralni / nieoczekujący)</span><span class="mode-values">Bilans respondentów (oczekujący / neutralni / nieoczekujący)</span></h3>
-      {balance_chart_html}
-    </div>
-
-    <div class="card ioa-main-card" style="margin-top:16px;">
-      <h3><span class="mode-arche">Tabela główna: oczekiwanie archetypów</span><span class="mode-values">Tabela główna: oczekiwanie wartości</span></h3>
-      {main_table_html}
-    </div>
-
-    <div class="card" style="margin-top:16px;">
-      <h3>Tabela szczegółowa par (18 porównań)</h3>
-      {pair_detail_table_html}
-    </div>
-  </div>
-"""
-
-
-def _run_manual_expectation_examples_validation() -> pd.DataFrame:
-    examples = [
-        ("Przykład A", [3, 2, 1], {"expected_flag": 1, "neutral_flag": 0, "not_expected_flag": 0, "strong_expected_flag": 1}),
-        ("Przykład B", [-3, 0, 3], {"expected_flag": 0, "neutral_flag": 1, "not_expected_flag": 0, "strong_expected_flag": 0}),
-        ("Przykład C", [-1, -2, 0], {"expected_flag": 0, "neutral_flag": 0, "not_expected_flag": 1, "strong_expected_flag": 0}),
-        ("Przykład D", [1, 1, 1], {"expected_flag": 1, "neutral_flag": 0, "not_expected_flag": 0, "strong_expected_flag": 1}),
-    ]
-
-    rows: List[Dict[str, Any]] = []
-    for case_name, pts, expected in examples:
-        arr = np.asarray(pts, dtype=float).reshape(-1)
-        score_mean = float(np.mean(arr)) if arr.size else float("nan")
-        got = {
-            "expected_flag": int(score_mean > 0),
-            "neutral_flag": int(score_mean == 0),
-            "not_expected_flag": int(score_mean < 0),
-            "strong_expected_flag": int(score_mean >= 1),
-        }
-        ok = all(int(got[k]) == int(v) for k, v in expected.items())
-        rows.append({
-            "przyklad": case_name,
-            "punkty": ", ".join(str(int(x)) for x in pts),
-            "score_mean": score_mean,
-            "expected_flag": got["expected_flag"],
-            "neutral_flag": got["neutral_flag"],
-            "not_expected_flag": got["not_expected_flag"],
-            "strong_expected_flag": got["strong_expected_flag"],
-            "walidacja_ok": bool(ok),
-        })
-
-    out = pd.DataFrame(rows)
-    if not out.empty and not bool(out["walidacja_ok"].all()):
-        raise ValueError("Walidacja ręcznych przykładów sekcji oczekiwań nie przeszła.")
-    return out
-
-
 def A_pair_stats(A: np.ndarray, weights: np.ndarray) -> pd.DataFrame:
     rows = []
     for j, (qid, left_arch, right_arch) in enumerate(A_PAIRS):
@@ -2185,19 +1538,16 @@ def A_raw_vote_balance(A: np.ndarray) -> pd.DataFrame:
 def B_rankings(b1: np.ndarray, b2: np.ndarray, weights: np.ndarray) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     # B1: archetyp w trójce
     w = np.asarray(weights, dtype=float).reshape(-1)
-    b1_f = np.nan_to_num(np.asarray(b1, dtype=float), nan=0.0)
-    if b1_f.shape[0] != len(w):
-        raise ValueError("Niezgodna długość B1 i wag.")
-
-    sel_counts_w = (b1_f * w.reshape(-1, 1)).sum(axis=0)
-    sel_counts_raw = (b1_f > 0.5).sum(axis=0).astype(int)
-    answered_b1 = np.isfinite(np.asarray(b1, dtype=float)).any(axis=1)
-    denom_b1_w = float(w[answered_b1].sum()) if np.any(answered_b1) else float(w.sum())
-
+    w_col = w.reshape(-1, 1)
+    b1_flag = (np.nan_to_num(b1, nan=0.0) > 0.5).astype(float)
+    sel_counts_w = (b1_flag * w_col).sum(axis=0)
+    sel_counts_raw = (b1_flag > 0.5).sum(axis=0).astype(int)
+    answered_b1 = (b1_flag > 0.5).any(axis=1)
+    total_w_b1 = float(w[answered_b1].sum()) if np.any(answered_b1) else float(w.sum())
     df_b1 = pd.DataFrame({
         "archetyp": ARCHETYPES,
         "liczba": sel_counts_raw,
-        "%": np.where(denom_b1_w > 0, (sel_counts_w / denom_b1_w) * 100.0, np.nan),
+        "%": np.where(total_w_b1 > 0, (sel_counts_w / total_w_b1) * 100.0, np.nan)
     }).sort_values("%", ascending=False).reset_index(drop=True)
 
     if "%" in df_b1.columns:
@@ -2205,22 +1555,25 @@ def B_rankings(b1: np.ndarray, b2: np.ndarray, weights: np.ndarray) -> Tuple[pd.
 
     # B1: ranking trójek (kombinacje)
     combos_w: Dict[str, float] = {}
-    combos_raw: Dict[str, int] = {}
-    total_w = float(w.sum())
+    combos_n: Dict[str, int] = {}
     for i in range(b1.shape[0]):
-        picked = [ARCHETYPES[j] for j in range(len(ARCHETYPES)) if b1[i, j] > 0.5]
+        picked = [ARCHETYPES[j] for j in range(len(ARCHETYPES)) if b1_flag[i, j] > 0.5]
         if len(picked) == 0:
             continue
         picked = sorted(picked)
         key = " + ".join(picked)
         combos_w[key] = combos_w.get(key, 0.0) + float(w[i])
-        combos_raw[key] = int(combos_raw.get(key, 0)) + 1
+        combos_n[key] = combos_n.get(key, 0) + 1
+    total_w_combo = float(w[(b1_flag > 0.5).any(axis=1)].sum()) if np.any((b1_flag > 0.5).any(axis=1)) else float(w.sum())
     df_tr = pd.DataFrame(
-        [{
-            "trójka": k,
-            "liczba": int(combos_raw.get(k, 0)),
-            "%": ((float(v) / total_w) * 100.0) if total_w > 0 else np.nan
-        } for k, v in combos_w.items()]
+        [
+            {
+                "trójka": k,
+                "liczba": int(combos_n.get(k, 0)),
+                "%": ((float(combos_w.get(k, 0.0)) / total_w_combo) * 100.0) if total_w_combo > 0 else np.nan,
+            }
+            for k in combos_w.keys()
+        ]
     )
     if len(df_tr) == 0:
         df_tr = pd.DataFrame(columns=["trójka", "liczba", "%"])
@@ -2230,18 +1583,19 @@ def B_rankings(b1: np.ndarray, b2: np.ndarray, weights: np.ndarray) -> Tuple[pd.
 
     # B2: najważniejszy
     counts2_w = np.zeros(len(ARCHETYPES), dtype=float)
-    counts2_raw = np.zeros(len(ARCHETYPES), dtype=int)
+    counts2_n = np.zeros(len(ARCHETYPES), dtype=int)
     m = (b2 >= 0)
     idxs = np.where(m)[0]
-    denom_b2_w = float(w[m].sum()) if np.any(m) else float("nan")
+    total_w_b2 = float(w[m].sum()) if np.any(m) else float(w.sum())
 
     for i in idxs:
-        counts2_w[b2[i]] += float(w[i])
-        counts2_raw[b2[i]] += 1
+        idx = int(b2[i])
+        counts2_w[idx] += float(w[i])
+        counts2_n[idx] += 1
     df_b2 = pd.DataFrame({
         "archetyp": ARCHETYPES,
-        "liczba": counts2_raw,
-        "%": np.where(denom_b2_w > 0, (counts2_w / denom_b2_w) * 100.0, np.nan),
+        "liczba": counts2_n.astype(int),
+        "%": np.where(total_w_b2 > 0, (counts2_w / total_w_b2) * 100.0, np.nan),
     }).sort_values("%", ascending=False).reset_index(drop=True)
 
     if "%" in df_b2.columns:
@@ -5449,175 +4803,6 @@ def bar_chart(values: pd.Series, outpath: Path, title: str, xlabel: str = "", co
     fig.savefig(outpath, dpi=PLOT_SAVE_DPI)
     plt.close(fig)
 
-
-def plot_horizontal_metric_chart(
-        values: pd.Series,
-        outpath: Path,
-        title: str,
-        xlabel: str = "",
-        x_min: float = 0.0,
-        x_max: float = 100.0,
-        value_fmt: str = "{:.1f}",
-        value_suffix: str = "",
-        reference_line: Optional[float] = None
-) -> None:
-    s = pd.to_numeric(values.copy(), errors="coerce")
-    s = s.dropna()
-    if s.empty:
-        return
-
-    n = max(int(len(s)), 1)
-    # Zachowujemy standardowe proporcje wykresów; tylko lekko dociągamy obszar w lewo.
-    fig_w = min(max(6.2, 0.50 * n + 2.2), 8.8)
-    fig_h = min(max(PLOT_BAR_FIG_H + 0.35, 0.38 * n + 1.8), 8.2)
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
-    ax.set_facecolor("#fbfcfe")
-
-    y = np.arange(len(s))
-    vals = s.to_numpy(dtype=float)
-    labels = [str(x) for x in s.index.tolist()]
-    bars = ax.barh(y, vals, color="#2b6cb0", edgecolor="white", linewidth=0.9, height=0.72)
-
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=PLOT_X_TICK_FONTSIZE)
-    ax.invert_yaxis()
-    ax.tick_params(axis="y", pad=1.5)
-    ax.tick_params(axis="x", labelsize=PLOT_Y_TICK_FONTSIZE)
-    ax.grid(axis="x", color=PLOT_GRID_COLOR, linewidth=PLOT_GRID_LINEWIDTH)
-    ax.set_axisbelow(True)
-    ax.set_xlim(float(x_min), float(x_max))
-    if xlabel:
-        ax.set_xlabel(xlabel, fontsize=PLOT_AXIS_LABEL_FONTSIZE, labelpad=PLOT_XLABEL_PAD)
-
-    set_plot_title(ax, title)
-
-    if reference_line is not None and np.isfinite(reference_line):
-        ax.axvline(float(reference_line), color="#cc2f2f", linestyle="--", linewidth=1.3, alpha=0.95)
-
-    for spine in ax.spines.values():
-        spine.set_color(PLOT_FRAME_COLOR)
-        spine.set_linewidth(PLOT_FRAME_LINEWIDTH)
-
-    rng = max(float(x_max) - float(x_min), 1.0)
-    pad = 0.012 * rng
-    for rect, v in zip(bars, vals):
-        if not np.isfinite(v):
-            continue
-        x_text = min(float(v) + pad, float(x_max) - (0.02 * rng))
-        ax.text(
-            x_text,
-            rect.get_y() + rect.get_height() / 2.0,
-            f"{value_fmt.format(float(v))}{value_suffix}",
-            ha="left",
-            va="center",
-            fontsize=PLOT_VALUE_FONTSIZE,
-            fontweight="700",
-            color="#111111",
-        )
-
-    max_label_len = max(len(str(lbl)) for lbl in labels) if labels else 8
-    # Tylko lekkie dociągnięcie wykresu w lewo względem standardu; prawa strona bez poszerzania.
-    left_margin = min(max(0.052, 0.034 + 0.0068 * float(max_label_len)), 0.145)
-    fig.subplots_adjust(left=left_margin, right=0.972, bottom=0.13, top=0.90)
-    fig.savefig(outpath, dpi=PLOT_SAVE_DPI)
-    plt.close(fig)
-
-
-def plot_expectation_balance_stacked(
-        df_main: pd.DataFrame,
-        outpath: Path,
-        title: str,
-) -> None:
-    if df_main is None or len(df_main) == 0:
-        return
-    req = {"archetype", "expected_pct", "neutral_pct", "not_expected_pct"}
-    if not req.issubset(set(df_main.columns)):
-        return
-
-    d = df_main.copy()
-    d = d.sort_values(["expected_pct", "ioa_100"], ascending=[False, False], kind="mergesort")
-    d = d.dropna(subset=["expected_pct", "neutral_pct", "not_expected_pct"])
-    if d.empty:
-        return
-
-    n = len(d)
-    fig_w = 7.8
-    # Lekko wyższy wykres dla czytelności, ale z ograniczeniem wysokości.
-    fig_h = min(max(4.9, 0.28 * n + 1.85), 6.0)
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
-    ax.set_facecolor("#fbfcfe")
-
-    y = np.arange(n)
-    labels = [str(x) for x in d["archetype"].astype(str).tolist()]
-    exp = pd.to_numeric(d["expected_pct"], errors="coerce").to_numpy(dtype=float)
-    neu = pd.to_numeric(d["neutral_pct"], errors="coerce").to_numpy(dtype=float)
-    not_exp = pd.to_numeric(d["not_expected_pct"], errors="coerce").to_numpy(dtype=float)
-
-    ax.barh(y, exp, color="#2f7d32", edgecolor="white", linewidth=0.8, height=0.72, label="Oczekujący")
-    ax.barh(y, neu, left=exp, color="#7b8a97", edgecolor="white", linewidth=0.8, height=0.72, label="Neutralni")
-    ax.barh(
-        y,
-        not_exp,
-        left=(exp + neu),
-        color="#b42318",
-        edgecolor="white",
-        linewidth=0.8,
-        height=0.72,
-        label="Nieoczekujący",
-    )
-
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=PLOT_X_TICK_FONTSIZE)
-    ax.invert_yaxis()
-    ax.tick_params(axis="y", pad=1.5)
-    ax.tick_params(axis="x", labelsize=PLOT_Y_TICK_FONTSIZE)
-    ax.set_xlim(0, 100)
-    ax.set_xlabel("% respondentów", fontsize=PLOT_AXIS_LABEL_FONTSIZE, labelpad=8)
-    ax.grid(axis="x", color=PLOT_GRID_COLOR, linewidth=PLOT_GRID_LINEWIDTH)
-    ax.set_axisbelow(True)
-    set_plot_title(ax, title)
-
-    for spine in ax.spines.values():
-        spine.set_color(PLOT_FRAME_COLOR)
-        spine.set_linewidth(PLOT_FRAME_LINEWIDTH)
-
-    # etykiety % na segmentach (dla czytelności tylko segmenty >= 6 p.p.)
-    for yi in range(n):
-        segs = [
-            (exp[yi], 0.0),
-            (neu[yi], exp[yi]),
-            (not_exp[yi], exp[yi] + neu[yi]),
-        ]
-        for seg_w, seg_l in segs:
-            if (not np.isfinite(seg_w)) or (seg_w < 6.0):
-                continue
-            ax.text(
-                float(seg_l + seg_w / 2.0),
-                float(yi),
-                f"{float(seg_w):.1f}%",
-                ha="center",
-                va="center",
-                fontsize=7.2,
-                fontweight="700",
-                color="#ffffff",
-            )
-
-    max_label_len = max(len(str(lbl)) for lbl in labels) if labels else 8
-    left_margin = min(max(0.055, 0.034 + 0.0066 * float(max_label_len)), 0.135)
-    ax.legend(
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.145),
-        ncol=3,
-        fontsize=7.9,
-        frameon=False,
-        handlelength=1.4,
-        columnspacing=1.2,
-    )
-    fig.subplots_adjust(left=left_margin, right=0.972, bottom=0.215, top=0.90)
-    fig.savefig(outpath, dpi=PLOT_SAVE_DPI)
-    plt.close(fig)
-
-
 def plot_pair_outcome_balance(values: pd.Series, outpath: Path, title: str, xlabel: str = "Bilans par (+1 / -1)",
                               rotate: int = 45) -> None:
     s = values.copy()
@@ -5910,7 +5095,6 @@ def total_mentions_counts(
         b2: np.ndarray,
         d13: np.ndarray,
         weights: np.ndarray,
-        weighted_counts: bool = False,
 ) -> pd.DataFrame:
     """
     Zlicza „wskazania” archetypów w pytaniach wyboru (A, B1, B2, D13).
@@ -5918,10 +5102,7 @@ def total_mentions_counts(
     W A neutralne (środek skali) są pomijane (dla skali 1–7: neutral = 4).
     Zwraca tabelę z rozbiciem na bloki + kolumną Razem.
     """
-    if weighted_counts:
-        w = np.asarray(weights, dtype=float).reshape(-1)
-    else:
-        w = np.ones(len(weights), dtype=float)
+    w = np.asarray(weights, dtype=float)
 
     out = pd.DataFrame(index=ARCHETYPES)
     out["A"] = 0.0
@@ -5964,7 +5145,6 @@ def mentions_counts_by_question(
         d13: np.ndarray,
         weights: np.ndarray,
         as_int: bool = True,
-        weighted_counts: bool = False,
 ) -> pd.DataFrame:
     """
     Macierz: archetyp (wiersze) x pytanie (kolumny: A1–A18, B1, B2, D13).
@@ -5979,12 +5159,9 @@ def mentions_counts_by_question(
     - D13: TOP1 (1 wskazanie).
 
     Wynik: DataFrame, gdzie 1. kolumna to 'archetyp', a kolejne to pytania.
-    Wartości mogą być surowe (domyślnie) albo ważone.
+    Wartości są ważone (weights) i zaokrąglone do int.
     """
-    if weighted_counts:
-        w = np.asarray(weights, dtype=float).reshape(-1)
-    else:
-        w = np.ones(len(weights), dtype=float)
+    w = np.asarray(weights, dtype=float).reshape(-1)
     idx = {a: i for i, a in enumerate(ARCHETYPES)}
     n_arch = len(ARCHETYPES)
 
@@ -6029,52 +5206,6 @@ def mentions_counts_by_question(
             df[c] = mat[c].astype(float)
 
     return df
-
-
-def validate_mentions_by_question_counts(
-        df_mentions_q: pd.DataFrame,
-        A: np.ndarray,
-        b1: np.ndarray,
-        b2: np.ndarray,
-        d13: np.ndarray
-) -> pd.DataFrame:
-    """
-    Waliduje spójność liczebności tabeli A1..A18, B1, B2, D13 na poziomie surowych rekordów.
-    """
-    if df_mentions_q is None or len(df_mentions_q) == 0:
-        return pd.DataFrame(columns=["kolumna", "expected_count", "observed_count", "delta"])
-
-    rows: List[Dict[str, Any]] = []
-    for j, (pid, _left_arch, _right_arch) in enumerate(A_PAIRS):
-        v = np.asarray(A[:, j], dtype=float)
-        expected = int(np.sum(np.isfinite(v) & ((v <= (A_SCALE_CENTER - 1)) | (v >= (A_SCALE_CENTER + 1)))))
-        observed = int(pd.to_numeric(df_mentions_q.get(pid, pd.Series(dtype=float)), errors="coerce").fillna(0).sum())
-        rows.append({"kolumna": pid, "expected_count": expected, "observed_count": observed, "delta": observed - expected})
-
-    b1_f = np.nan_to_num(np.asarray(b1, dtype=float), nan=0.0)
-    expected_b1 = int(np.sum(b1_f > 0.5))
-    observed_b1 = int(pd.to_numeric(df_mentions_q.get("B1", pd.Series(dtype=float)), errors="coerce").fillna(0).sum())
-    rows.append({"kolumna": "B1", "expected_count": expected_b1, "observed_count": observed_b1, "delta": observed_b1 - expected_b1})
-
-    expected_b2 = int(np.sum(np.asarray(b2, dtype=int) >= 0))
-    observed_b2 = int(pd.to_numeric(df_mentions_q.get("B2", pd.Series(dtype=float)), errors="coerce").fillna(0).sum())
-    rows.append({"kolumna": "B2", "expected_count": expected_b2, "observed_count": observed_b2, "delta": observed_b2 - expected_b2})
-
-    expected_d13 = int(np.sum(np.asarray(d13, dtype=int) >= 0))
-    observed_d13 = int(pd.to_numeric(df_mentions_q.get("D13", pd.Series(dtype=float)), errors="coerce").fillna(0).sum())
-    rows.append({"kolumna": "D13", "expected_count": expected_d13, "observed_count": observed_d13, "delta": observed_d13 - expected_d13})
-
-    out = pd.DataFrame(rows)
-    if not out.empty and (out["delta"] != 0).any():
-        bad = out[out["delta"] != 0].copy()
-        raise ValueError(
-            "Walidacja tabeli wskazań nie przeszła. Rozjazdy: "
-            + "; ".join(
-                f"{r.kolumna}: expected={int(r.expected_count)} observed={int(r.observed_count)}"
-                for r in bad.itertuples(index=False)
-            )
-        )
-    return out
 
 
 def A_total_shares(
@@ -7598,10 +6729,6 @@ CHART_NOTES = {
     "A_bilans_starc.png": "Bilans starć (wygrane - przegrane): ważony bilans pojedynków archetypu / wartości w całej sieci A. Dodatnie = przewaga wygranych, ujemne = przewaga przegranych.",
     "A_zwyciestwa_przegrane.png": "Zwycięstwa vs przegrane: dla każdej pary wyznaczony końcowy zwycięzca. Zwycięzca dostaje +1, przegrany -1, remis = 0. Zakres wyniku: od -3 do +3.",
     "A_versusy_liniowy.png": "Versus (18 par): średnia pozycja odpowiedzi na skali 1–7 dla każdej pary. 1 = lewa strona, 4 = środek, 7 = prawa strona.",
-    "A_expectation_expected_pct.png": "Wynik główny: odsetek mieszkańców, którzy netto oczekują danego archetypu po zbilansowaniu 3 porównań (score_mean > 0).",
-    "A_expectation_expected_pct_values.png": "Wynik główny: odsetek mieszkańców, którzy netto oczekują danej wartości po zbilansowaniu 3 porównań (score_mean > 0).",
-    "A_expectation_ioa_100.png": "IOA 0-100 (Indeks Oczekiwania Archetypu): wskaźnik siły oczekiwania (nie jest procentem mieszkańców). Linia odniesienia: 50.",
-    "A_expectation_ioa_100_values.png": "IOW 0-100 (Indeks Oczekiwania Wartości): wskaźnik siły oczekiwania (nie jest procentem mieszkańców). Linia odniesienia: 50.",
     "B1_top3.png": "Odsetek osób, które umieściły archetyp w swojej „trójce” (maks. 3 wybory).",
     "B1_top3_values.png": "Odsetek osób, które umieściły wartość w swojej „trójce” (maks. 3 wybory).",
     "B2_top1.png": "Odsetek wskazań archetypu jako najważniejszego (TOP1).",
@@ -7710,10 +6837,6 @@ def save_report(outdir: Path, settings: Settings,
                 df_B1_pct: pd.DataFrame,
                 df_B2_pct: pd.DataFrame,
                 df_D13_pct: pd.DataFrame,
-                df_A_expectation_main: Optional[pd.DataFrame] = None,
-                df_A_expectation_pair_detail: Optional[pd.DataFrame] = None,
-                expectation_summary_payload: Optional[Dict[str, List[str]]] = None,
-                expectation_weighting_meta: Optional[Dict[str, Any]] = None,
                 filters_pct: Optional[Dict[str, Dict[str, float]]] = None,
                 brand_values: Optional[Dict[str, str]] = None,
                 seg_packs_render: Optional[Dict[str, Any]] = None,
@@ -7721,23 +6844,10 @@ def save_report(outdir: Path, settings: Settings,
                 b2_declared_demo_payload: Optional[Dict[str, Any]] = None,
                 top5_simulation_payload: Optional[Dict[str, Any]] = None,
                 cluster_pack: Optional[Dict[str, Any]] = None,
-                n_respondents_total: Optional[int] = None) -> None:
+                n_respondents: Optional[int] = None) -> None:
     brand_values = brand_values or dict(DEFAULT_BRAND_VALUES)
     filters_pct = filters_pct or {}
     cluster_pack = cluster_pack or {}
-    expectation_summary_payload = expectation_summary_payload or {}
-    expectation_weighting_meta = expectation_weighting_meta or {}
-    n_respondents_total = int(max(0, int(n_respondents_total or 0)))
-    df_A_expectation_main = (
-        df_A_expectation_main.copy()
-        if isinstance(df_A_expectation_main, pd.DataFrame)
-        else pd.DataFrame()
-    )
-    df_A_expectation_pair_detail = (
-        df_A_expectation_pair_detail.copy()
-        if isinstance(df_A_expectation_pair_detail, pd.DataFrame)
-        else pd.DataFrame()
-    )
     has_poststrat = poststrat_diag is not None and len(poststrat_diag) > 0
 
     import json
@@ -7918,7 +7028,6 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
   .seg-main-col { max-width:none; }
   .chart-pair { grid-template-columns:1fr; }
   .card.chart-half { width: 100%; max-width: 100%; }
-  .ioa-summary-grid { grid-template-columns: 1fr; }
 }
 
 /* icons in TOP5 tables */
@@ -7951,82 +7060,6 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 .dot-legend { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
 .dot-legend span { display:inline-flex; align-items:center; gap:6px; font-size:13px; }
 
-/* IOA section */
-.ioa-status-card {
-  border-left: 6px solid #2b6cb0;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
-}
-.ioa-balance-legend {
-  margin-top: 12px;
-  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
-  padding: 16px 18px;
-}
-.ioa-balance-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 8px;
-  margin-bottom: 10px;
-}
-.ioa-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 9px 13px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  border: 1px solid transparent;
-}
-.ioa-pill-pos { background:#e8f5ea; color:#1b5e20; border-color:#cce3d0; }
-.ioa-pill-neu { background:#f2f4f7; color:#475467; border-color:#d0d5dd; }
-.ioa-pill-neg { background:#fdecec; color:#a61e1e; border-color:#f3cccc; }
-.ioa-balance-legend .small { line-height: 1.58; margin-bottom: 0; }
-.ioa-balance-card { min-height: 620px; }
-
-.ioa-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 14px;
-}
-.ioa-summary-item {
-  border: 1px solid #dbe4ef;
-  border-radius: 12px;
-  padding: 12px 12px 10px 12px;
-  background: linear-gradient(180deg, #fbfcff 0%, #ffffff 100%);
-}
-.ioa-summary-item h4 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  line-height: 1.28;
-}
-.ioa-list {
-  margin: 0;
-  padding-left: 20px;
-}
-.ioa-list li {
-  margin: 6px 0;
-}
-
-.ioa-main-table td:nth-child(3) {
-  font-weight: 800;
-  color: #0f172a;
-}
-.ioa-main-table th:nth-child(1), .ioa-main-table td:nth-child(1) {
-  width: 64px;
-  max-width: 64px;
-  text-align: center;
-}
-.ioa-main-table th:nth-child(2), .ioa-main-table td:nth-child(2) {
-  min-width: 230px;
-}
-.ioa-main-table th:nth-child(3) { color:#2f7d32; }
-.ioa-main-table th:nth-child(4) { color:#475467; }
-.ioa-main-table th:nth-child(5) { color:#b42318; }
-.ioa-main-table th:nth-child(6) { color:#0b4f8a; }
-.ioa-main-table td:nth-child(8) {
-  color: #556070;
-}
-
 /* tabs (pure CSS) */
 .tabs { margin-top: 14px; }
 /* ukrywamy tylko radiobuttony od zakładek (żeby nie chować suwaków / inputów w panelach) */
@@ -8041,7 +7074,6 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
   padding:14px; background:#fff;
 }
 #tab0:checked ~ .labels label[for="tab0"],
-#tabW:checked ~ .labels label[for="tabW"],
 #tabA:checked ~ .labels label[for="tabA"],
 #tabB:checked ~ .labels label[for="tabB"],
 #tabD:checked ~ .labels label[for="tabD"],
@@ -8056,7 +7088,6 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 #tabY:checked ~ .labels label[for="tabY"] { background:#fff; border-bottom:1px solid #fff; }
 
 #tab0:checked ~ .p0,
-#tabW:checked ~ .pW,
 #tabA:checked ~ .pA,
 #tabB:checked ~ .pB,
 #tabD:checked ~ .pD,
@@ -8125,7 +7156,7 @@ body[data-label-mode="values"] .mode-values { display:inline; }
       /* ---------- helpers ---------- */
         function blockLabel(b){
           const m = {
-            "A": "oczekujący\\n(A)",
+            "A": "versus\\n(A)",
             "B1": "3 priorytety\\n(B1)",
             "B2": "najważniejszy\\n(B2)",
             "D13": "doświadczenie\\n(D13)",
@@ -8187,7 +7218,7 @@ body[data-label-mode="values"] .mode-values { display:inline; }
 
       function setChartTitles(a){
         const t1 = document.getElementById("filter_title_pct");
-        if (t1) t1.textContent = (getMode() === "values" ? "% oczekujących wartości " : "% oczekujących archetypu ") + labelForArche(a);
+        if (t1) t1.textContent = (getMode() === "values" ? "% wskazań wartości " : "% wskazań archetypu ") + labelForArche(a);
 
         const t2 = document.getElementById("filter_title_rank");
         if (t2) t2.textContent = (getMode() === "values" ? "Miejsce wartości " : "Miejsce archetypu ") + labelForArche(a);
@@ -8980,7 +8011,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             return mp
 
         blocks = [
-            ("A (% oczekujących)", _map_block(df_top5_A)),
+            ("A (versus)", _map_block(df_top5_A)),
             ("B1 (3 priorytety)", _map_block(df_B1_pct)),
             ("B2 (najważniejszy)", _map_block(df_B2_pct)),
             ("D13 (doświadczenie)", _map_block(df_D13_pct)),
@@ -9072,7 +8103,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             return mp
 
         blocks = [
-            ("A (% oczekujących)", _map_block(df_top5_A)),
+            ("A (versus)", _map_block(df_top5_A)),
             ("B1 (3 priorytety)", _map_block(df_B1_pct)),
             ("B2 (najważniejszy)", _map_block(df_B2_pct)),
             ("D13 (doświadczenie)", _map_block(df_D13_pct)),
@@ -9253,123 +8284,11 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             "</div>"
         )
 
-    expectation_methodology_text_arche = (
-        "Wynik główny pokazuje odsetek mieszkańców, którzy netto oczekują danego archetypu, "
-        "biorąc pod uwagę wszystkie trzy porównania, w których ten archetyp występował. "
-        "Dodatni bilans oznacza oczekiwanie archetypu, bilans zerowy — neutralność, "
-        "a ujemny — relatywny brak oczekiwania. Obok pokazano również indeks siły oczekiwania, "
-        "który nie jest procentem mieszkańców, lecz miarą intensywności preferencji."
-    )
-    expectation_methodology_text_values = (
-        "Wynik główny pokazuje odsetek mieszkańców, którzy netto oczekują danej wartości, "
-        "biorąc pod uwagę wszystkie trzy porównania, w których ta wartość występowała. "
-        "Dodatni bilans oznacza oczekiwanie wartości, bilans zerowy — neutralność, "
-        "a ujemny — relatywny brak oczekiwania. Obok pokazano również indeks siły oczekiwania, "
-        "który nie jest procentem mieszkańców, lecz miarą intensywności preferencji."
-    )
-
-    def _summary_list_html(arche_items: List[str], values_mode: bool) -> str:
-        vals = [str(x) for x in (arche_items or []) if str(x).strip()]
-        if not vals:
-            return "<div class='small'>Brak danych.</div>"
-        out = ["<ol class='ioa-list'>"]
-        for a in vals:
-            lbl = str(brand_values.get(a, a)) if values_mode else str(a)
-            out.append(f"<li>{_icon_cell(a, lbl)}</li>")
-        out.append("</ol>")
-        return "".join(out)
-
-    top_expected = [str(x) for x in (expectation_summary_payload.get("top_expected", []) or [])]
-    bottom_expected = [str(x) for x in (expectation_summary_payload.get("bottom_expected", []) or [])]
-    top_ioa = [str(x) for x in (expectation_summary_payload.get("top_ioa", []) or [])]
-
-    expectation_summary_html = (
-        '<div class="label-arche">'
-        '<div class="ioa-summary-grid">'
-        '<div class="ioa-summary-item"><h4>3 najbardziej oczekiwane archetypy (% oczekujących)</h4>'
-        + _summary_list_html(top_expected, values_mode=False)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najmniej oczekiwane archetypy (% oczekujących)</h4>'
-        + _summary_list_html(bottom_expected, values_mode=False)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najsilniej oczekiwane archetypy (IOA 0-100)</h4>'
-        + _summary_list_html(top_ioa, values_mode=False)
-        + '</div>'
-        '</div>'
-        '</div>'
-        '<div class="label-values">'
-        '<div class="ioa-summary-grid">'
-        '<div class="ioa-summary-item"><h4>3 najbardziej oczekiwane wartości (% oczekujących)</h4>'
-        + _summary_list_html(top_expected, values_mode=True)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najmniej oczekiwane wartości (% oczekujących)</h4>'
-        + _summary_list_html(bottom_expected, values_mode=True)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najsilniej oczekiwane wartości (IOW 0-100)</h4>'
-        + _summary_list_html(top_ioa, values_mode=True)
-        + '</div>'
-        '</div>'
-        '</div>'
-    )
-
-    def _ioa_main_table_dual(df_main: pd.DataFrame) -> str:
-        if df_main is None or len(df_main) == 0:
-            return '<div class="small">Brak danych dla tabeli głównej nowej sekcji.</div>'
-
-        d_a = df_main.copy()
-        if "Archetyp" in d_a.columns:
-            d_a["Archetyp"] = d_a["Archetyp"].astype(str).apply(lambda a: _icon_cell(a, a))
-        h_a = d_a.to_html(index=False, border=0, classes="tbl ioa-main-table", escape=False)
-
-        d_v = df_main.copy()
-        if "Archetyp" in d_v.columns:
-            d_v["Archetyp"] = d_v["Archetyp"].astype(str).apply(
-                lambda a: _icon_cell(a, brand_values.get(a, a))
-            )
-        d_v = d_v.rename(columns={
-            "IOA 0-100": "IOW 0-100",
-            "IOA raw (-3 do +3)": "IOW raw (-3 do +3)",
-        })
-        d_v = _values_mode_df(d_v)
-        h_v = d_v.to_html(index=False, border=0, classes="tbl ioa-main-table", escape=False)
-
-        note_arche = (
-            "<div class='small' style='margin-top:8px;'>"
-            "IOA raw = średni wynik score_mean w skali -3 do +3. "
-            "IOA 0-100 to przeskalowanie IOA raw do zakresu 0-100."
-            "</div>"
-        )
-        note_values = (
-            "<div class='small' style='margin-top:8px;'>"
-            "IOW raw = średni wynik score_mean w skali -3 do +3. "
-            "IOW 0-100 to przeskalowanie IOW raw do zakresu 0-100."
-            "</div>"
-        )
-        return f'<div class="label-arche">{h_a}{note_arche}</div><div class="label-values">{h_v}{note_values}</div>'
-
-    expectation_main_html = _ioa_main_table_dual(df_A_expectation_main)
-    expectation_pair_detail_html = (
-        df_to_html_dual(df_A_expectation_pair_detail, max_rows=60)
-        if len(df_A_expectation_pair_detail) > 0
-        else '<div class="small">Brak danych dla tabeli szczegółowej par.</div>'
-    )
-    expectation_balance_chart_html = img_tag_dual("A_expectation_balance_distribution.png")
-
-    expectation_panel_html = render_archetype_expectation_section(
-        methodology_text_arche=expectation_methodology_text_arche,
-        methodology_text_values=expectation_methodology_text_values,
-        data_basis_message=get_weighting_status_message(expectation_weighting_meta),
-        data_basis_reason=str(expectation_weighting_meta.get("data_basis_reason", "")),
-        summary_block_html=expectation_summary_html,
-        main_table_html=expectation_main_html,
-        pair_detail_table_html=expectation_pair_detail_html,
-        balance_chart_html=expectation_balance_chart_html,
-        expected_chart_html=img_tag_dual("A_expectation_expected_pct.png"),
-        ioa_chart_html=img_tag_dual("A_expectation_ioa_100.png"),
-    )
+    report_n = int(max(0, int(n_respondents or 0)))
+    report_n_suffix = f" (N={report_n})" if report_n > 0 else ""
 
     html_doc = f"""<html><head><meta charset="utf-8">{css}</head><body>
-<h1><span class="mode-arche">Raport: Archetypy</span><span class="mode-values">Raport: Wartości</span> – {_html_escape(settings.city_label)} (N={n_respondents_total})</h1>
+<h1><span class="mode-arche">Raport: Archetypy</span><span class="mode-values">Raport: Wartości</span> – {_html_escape(settings.city_label)}{_html_escape(report_n_suffix)}</h1>
 <div class="small">
 Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class="mono">WYNIKI</span>.
 </div>
@@ -9384,7 +8303,6 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
 <div class="tabs">
   <input type="radio" name="tabs" id="tab0" checked>
   <input type="radio" name="tabs" id="tabA">
-  <input type="radio" name="tabs" id="tabW">
   <input type="radio" name="tabs" id="tabB">
   <input type="radio" name="tabs" id="tabD">
   <input type="radio" name="tabs" id="tabK">
@@ -9400,7 +8318,6 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
   <div class="labels">
     <label for="tab0">Podsumowanie</label>
     <label for="tabA">Przywództwo</label>
-    <label for="tabW">IOA</label>
     <label for="tabB">Oczekiwania</label>
     <label for="tabD">Doświadczenia</label>
     <label for="tabS">Segmenty</label>
@@ -9448,6 +8365,7 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
     </div>
   </div>
 
+
   <div class="panel pA">
     <h2>Model preferowanego podejścia do spraw miasta</h2>
     <div class="small">
@@ -9487,8 +8405,6 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
       {img_tag_dual("A_bilans_starc.png")}
     </div>
   </div>
-
-  {expectation_panel_html}
 
   <div class="panel pB">
     <h2>Oczekiwania wobec miasta (TOP3 i TOP1)</h2>
@@ -9728,14 +8644,12 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
         Po wyborze <span class="mode-arche">archetypu</span><span class="mode-values">wartości</span> pokazujemy:
         (1) <b>%</b> tego <span class="mode-arche">archetypu</span><span class="mode-values">wartości</span> w blokach A, B1, B2, D13 (oś Y stała 0–100%),
         (2) <b>miejsce</b> (ranking 1–12) w tych samych blokach (oś Y stała 1–12).
-        W bloku A pokazujemy <b>% oczekujących</b> z sekcji IOA (netto: score_mean > 0 po zbilansowaniu 3 porównań).
-        W blokach B1/B2/D13 pokazujemy % wskazań respondentów.
       </div>
     </div>
 
     <div class="grid" style="margin-top:16px;">
       <div class="card">
-        <h3 id="filter_title_pct"><span class="mode-arche">% oczekujących archetypu</span><span class="mode-values">% oczekujących wartości</span></h3>
+        <h3 id="filter_title_pct"><span class="mode-arche">% wskazań archetypu</span><span class="mode-values">% wskazań wartości</span></h3>
         <svg id="chart_pct" viewBox="0 0 700 320" style="width:100%;max-width:1380px;"></svg>
       </div>
       <div class="card">
@@ -9749,7 +8663,7 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
     <h2>TOP5</h2>
     <div class="small">
       TOP5 w blokach A / B1 / B2 / D13. Wszędzie pokazujemy tylko % (bez liczebności).
-      A liczone jako <b>% oczekujących</b> z sekcji IOA.
+      A liczone „w ramach głosów dla <span class="mode-arche">archetypu</span><span class="mode-values">wartości</span>” (zgodnie z logiką par).
       B1/B2/D13 jako % respondentów.
     </div>
 
@@ -9767,7 +8681,7 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
 
     <div class="grid" style="margin-top:18px;">
       <div class="card">
-        <h3><span class="mode-arche">% oczekujących archetypu (A) – TOP5</span><span class="mode-values">% oczekujących wartości (A) – TOP5</span></h3>
+        <h3>versus – TOP5</h3>
         {top5_table_dual(df_top5_A, brand_values, max_rows=10)}
       </div>
       <div class="card">
@@ -15957,18 +14871,7 @@ def main() -> None:
     metry, metry_defs = parse_metryczka(df)
 
     base_weights = get_weights(df, settings.weight_column)
-    poststrat_error = ""
-    try:
-        weights, poststrat_diag = apply_poststrat_weights_from_targets(root, metry, base_weights)
-    except Exception as e:
-        poststrat_error = str(e)
-        print(
-            "[WARN] Nie udało się zastosować wag poststratyfikacyjnych. "
-            "Analiza kontynuuje z wagą bazową. Powód: "
-            + poststrat_error
-        )
-        weights = np.asarray(base_weights, dtype=float).reshape(-1)
-        poststrat_diag = None
+    weights, poststrat_diag = apply_poststrat_weights_from_targets(root, metry, base_weights)
 
     outdir = ensure_outdir(root)
 
@@ -15996,259 +14899,18 @@ def main() -> None:
             + (f"Top nieznane: {top_txt}" if top_txt else "")
         )
 
-    # ===== Nowa sekcja: A) Oczekiwanie archetypów — % mieszkańców (18 par) =====
-    respondent_id_col = "respondent_id" if "respondent_id" in df.columns else "__respondent_id__"
-    df_expect = df.copy()
-    if respondent_id_col == "__respondent_id__":
-        df_expect[respondent_id_col] = np.arange(1, len(df_expect) + 1, dtype=int)
-
-    expectation_weighting_meta = resolve_active_weighting_basis(
-        root=root,
-        n_rows=len(df_expect),
-        weights=weights,
-        poststrat_diag=poststrat_diag,
-        poststrat_error=poststrat_error,
-    )
-    active_weights_for_expectation = np.asarray(
-        expectation_weighting_meta.get("active_weights", np.ones(len(df_expect), dtype=float)),
-        dtype=float
-    ).reshape(-1)
-    active_weight_col = str(expectation_weighting_meta.get("active_weight_col", "") or "")
-    if active_weight_col:
-        df_expect[active_weight_col] = active_weights_for_expectation
-
-    df_A_expectation_long = build_pair_long_table(
-        df=df_expect,
-        pair_map=PAIR_MAP,
-        respondent_id_col=respondent_id_col,
-        weight_col=active_weight_col if active_weight_col else None,
-    )
-    df_A_expectation_scores = compute_respondent_archetype_scores(df_A_expectation_long)
-    df_A_expectation_scores = classify_respondent_archetype_support(df_A_expectation_scores)
-    df_A_expectation_scores.to_csv(
-        outdir / "A_expectation_respondent_archetype_scores.csv", index=False, encoding="utf-8-sig"
-    )
-
-    df_A_expectation_support = aggregate_archetype_support(
-        scores_table=df_A_expectation_scores,
-        weight_col="weight",
-        weighted=bool(expectation_weighting_meta.get("weighted", False)),
-    )
-    df_A_expectation_ioa = compute_ioa(
-        scores_table=df_A_expectation_scores,
-        weight_col="weight",
-        weighted=bool(expectation_weighting_meta.get("weighted", False)),
-    )
-
-    df_A_expectation_summary = df_A_expectation_support.merge(
-        df_A_expectation_ioa,
-        on="archetype",
-        how="left"
-    )
-    df_A_expectation_main = build_main_expectation_table(df_A_expectation_summary)
-
-    df_A_expectation_pair_detail = build_pair_detail_table(
-        long_table=df_A_expectation_long,
-        weighted=bool(expectation_weighting_meta.get("weighted", False)),
-        weight_col="weight",
-    )
-
-    df_A_expectation_main_out = df_A_expectation_main[[
-        "position",
-        "archetype",
-        "expected_pct",
-        "neutral_pct",
-        "not_expected_pct",
-        "strong_expected_pct",
-        "ioa_100",
-        "ioa_raw",
-        "n_respondents_valid",
-    ]].rename(columns={
-        "position": "Pozycja",
-        "archetype": "Archetyp",
-        "expected_pct": "% oczekujących",
-        "neutral_pct": "% neutralnych",
-        "not_expected_pct": "% nieoczekujących",
-        "strong_expected_pct": "% silnie oczekujących",
-        "ioa_100": "IOA 0-100",
-        "ioa_raw": "IOA raw (-3 do +3)",
-        "n_respondents_valid": "Liczba respondentów",
-    }).copy()
-
-    for c in ["% oczekujących", "% neutralnych", "% nieoczekujących", "% silnie oczekujących", "IOA 0-100"]:
-        if c in df_A_expectation_main_out.columns:
-            df_A_expectation_main_out[c] = pd.to_numeric(df_A_expectation_main_out[c], errors="coerce").round(1)
-    if "IOA raw (-3 do +3)" in df_A_expectation_main_out.columns:
-        df_A_expectation_main_out["IOA raw (-3 do +3)"] = pd.to_numeric(
-            df_A_expectation_main_out["IOA raw (-3 do +3)"], errors="coerce"
-        ).round(2)
-    if "Liczba respondentów" in df_A_expectation_main_out.columns:
-        df_A_expectation_main_out["Liczba respondentów"] = pd.to_numeric(
-            df_A_expectation_main_out["Liczba respondentów"], errors="coerce"
-        ).fillna(0).astype(int)
-
-    df_A_expectation_pair_detail_out = df_A_expectation_pair_detail.rename(columns={
-        "pair_id": "ID pary",
-        "left_archetype": "Archetyp lewy",
-        "right_archetype": "Archetyp prawy",
-        "mean_response_1_7": "Średnia odpowiedź 1-7",
-        "pct_response_1_3": "% odpowiedzi 1-3",
-        "pct_response_4": "% odpowiedzi 4",
-        "pct_response_5_7": "% odpowiedzi 5-7",
-        "mean_points_left": "Średnie punkty lewego",
-        "mean_points_right": "Średnie punkty prawego",
-        "n": "N",
-    }).copy()
-    for c in [
-        "Średnia odpowiedź 1-7",
-        "% odpowiedzi 1-3",
-        "% odpowiedzi 4",
-        "% odpowiedzi 5-7",
-        "Średnie punkty lewego",
-        "Średnie punkty prawego",
-    ]:
-        if c in df_A_expectation_pair_detail_out.columns:
-            df_A_expectation_pair_detail_out[c] = pd.to_numeric(
-                df_A_expectation_pair_detail_out[c], errors="coerce"
-            ).round(1 if "%" in c else 2)
-    if "N" in df_A_expectation_pair_detail_out.columns:
-        df_A_expectation_pair_detail_out["N"] = pd.to_numeric(
-            df_A_expectation_pair_detail_out["N"], errors="coerce"
-        ).fillna(0).astype(int)
-
-    if not df_A_expectation_main.empty:
-        s_expected_pct = (
-            df_A_expectation_main
-            .set_index("archetype")["expected_pct"]
-            .astype(float)
-            .sort_values(ascending=False)
-        )
-        plot_horizontal_metric_chart(
-            s_expected_pct,
-            outdir / "A_expectation_expected_pct.png",
-            "Społeczne oczekiwanie archetypu (%)",
-            xlabel="Mieszkańcy oczekujący archetypu (%)",
-            x_min=0.0,
-            x_max=100.0,
-            value_fmt="{:.1f}",
-            value_suffix="%",
-        )
-        plot_horizontal_metric_chart(
-            series_with_value_index(s_expected_pct, brand_values),
-            outdir / "A_expectation_expected_pct_values.png",
-            "Społeczne oczekiwanie wartości (%)",
-            xlabel="Mieszkańcy oczekujący wartości (%)",
-            x_min=0.0,
-            x_max=100.0,
-            value_fmt="{:.1f}",
-            value_suffix="%",
-        )
-
-        s_ioa_100 = (
-            df_A_expectation_main
-            .set_index("archetype")["ioa_100"]
-            .astype(float)
-            .sort_values(ascending=False)
-        )
-        df_balance_order = (
-            df_A_expectation_main[["archetype", "expected_pct", "neutral_pct", "not_expected_pct", "ioa_100"]]
-            .copy()
-            .sort_values(["expected_pct", "ioa_100"], ascending=[False, False], kind="mergesort")
-        )
-        plot_expectation_balance_stacked(
-            df_balance_order,
-            outdir / "A_expectation_balance_distribution.png",
-            "Bilans społecznego oczekiwania archetypów",
-        )
-        df_balance_values = df_balance_order.copy()
-        df_balance_values["archetype"] = df_balance_values["archetype"].astype(str).map(
-            lambda a: str(brand_values.get(a, a))
-        )
-        plot_expectation_balance_stacked(
-            df_balance_values,
-            outdir / "A_expectation_balance_distribution_values.png",
-            "Bilans społecznego oczekiwania wartości",
-        )
-        plot_horizontal_metric_chart(
-            s_ioa_100,
-            outdir / "A_expectation_ioa_100.png",
-            "Indeks Oczekiwania Archetypu (IOA)",
-            xlabel="IOA 0-100",
-            x_min=0.0,
-            x_max=100.0,
-            value_fmt="{:.1f}",
-            reference_line=50.0,
-        )
-        plot_horizontal_metric_chart(
-            series_with_value_index(s_ioa_100, brand_values),
-            outdir / "A_expectation_ioa_100_values.png",
-            "Indeks Oczekiwania Wartości (IOW)",
-            xlabel="IOW 0-100",
-            x_min=0.0,
-            x_max=100.0,
-            value_fmt="{:.1f}",
-            reference_line=50.0,
-        )
-
-    expectation_summary_payload = {
-        "top_expected": (
-            df_A_expectation_main.sort_values("expected_pct", ascending=False)["archetype"].head(3).astype(str).tolist()
-            if not df_A_expectation_main.empty else []
-        ),
-        "bottom_expected": (
-            df_A_expectation_main.sort_values("expected_pct", ascending=True)["archetype"].head(3).astype(str).tolist()
-            if not df_A_expectation_main.empty else []
-        ),
-        "top_ioa": (
-            df_A_expectation_main.sort_values("ioa_100", ascending=False)["archetype"].head(3).astype(str).tolist()
-            if not df_A_expectation_main.empty else []
-        ),
-    }
-
-    df_A_expectation_main.to_csv(
-        outdir / "A_expectation_main_technical.csv", index=False, encoding="utf-8-sig"
-    )
-    df_A_expectation_main_out.to_csv(
-        outdir / "A_expectation_main_table.csv", index=False, encoding="utf-8-sig"
-    )
-    df_A_expectation_pair_detail.to_csv(
-        outdir / "A_expectation_pair_detail_technical.csv", index=False, encoding="utf-8-sig"
-    )
-    df_A_expectation_pair_detail_out.to_csv(
-        outdir / "A_expectation_pair_detail_table.csv", index=False, encoding="utf-8-sig"
-    )
-    df_A_expectation_long.to_csv(
-        outdir / "A_expectation_long_table.csv", index=False, encoding="utf-8-sig"
-    )
-    pd.DataFrame([{
-        "weighting_applied_flag": bool(expectation_weighting_meta.get("weighting_applied_flag", False)),
-        "data_basis_status": str(expectation_weighting_meta.get("data_basis_status", "raw_unweighted")),
-        "data_basis_label": str(expectation_weighting_meta.get("data_basis_label", "")),
-        "data_basis_reason": str(expectation_weighting_meta.get("data_basis_reason", "")),
-        "active_weight_col": str(expectation_weighting_meta.get("active_weight_col", "")),
-    }]).to_csv(outdir / "A_expectation_data_basis_status.csv", index=False, encoding="utf-8-sig")
-
-    df_manual_validation = _run_manual_expectation_examples_validation()
-    df_manual_validation.to_csv(
-        outdir / "A_expectation_manual_validation.csv", index=False, encoding="utf-8-sig"
-    )
-
     # Zbiorcze wskazania (A/B1/B2/D13) — tabela + wykres do podsumowania
     A_cols = [(left, right) for _, left, right in A_PAIRS]
 
-    df_mentions = total_mentions_counts(
-        A, A_cols, b1, b2, d13, weights, weighted_counts=False
-    )
+    df_mentions = total_mentions_counts(A, A_cols, b1, b2, d13, weights)
     df_mentions_out = df_mentions.reset_index().rename(columns={"index": "archetyp"})
     df_mentions_out.to_csv(outdir / "mentions_total.csv", index=False, encoding="utf-8-sig")
 
     # Tabela: ile wskazań było w poszczególnych pytaniach (A1–A18, B1, B2, D13)
-    df_mentions_q = mentions_counts_by_question(
-        A, b1, b2, d13, weights, as_int=True, weighted_counts=False
-    )
+    # Liczniki raportujemy surowo (1:1 z bazą), bez ważenia.
+    raw_weights = np.ones(len(df), dtype=float)
+    df_mentions_q = mentions_counts_by_question(A, b1, b2, d13, raw_weights, as_int=True)
     df_mentions_q.to_csv(outdir / "mentions_by_question.csv", index=False, encoding="utf-8-sig")
-    df_mentions_diag = validate_mentions_by_question_counts(df_mentions_q, A, b1, b2, d13)
-    df_mentions_diag.to_csv(outdir / "diag_mentions_by_question.csv", index=False, encoding="utf-8-sig")
 
     # Wersja do raportu: puste zamiast 0 + sumy wierszy/kolumn
     df_mentions_q_report = mentions_counts_by_question_for_report(df_mentions_q)
@@ -16328,16 +14990,58 @@ def main() -> None:
         outdir / "D13_top1_values.png"
     )
 
+    # Audyt spójności liczników pytań (raw expected vs reported)
+    df_q_audit = build_question_aggregation_audit(
+        A=A,
+        b1=b1,
+        b2=b2,
+        d13=d13,
+        df_B1=df_B1,
+        df_B2=df_B2,
+        df_D13=df_D13,
+        df_mentions_q_raw=df_mentions_q,
+    )
+    df_q_audit.to_csv(outdir / "question_aggregation_audit.csv", index=False, encoding="utf-8-sig")
+    bad = df_q_audit[pd.to_numeric(df_q_audit["delta"], errors="coerce").fillna(0).astype(int) != 0]
+    if len(bad) > 0:
+        print("[WARN] Audyt agregacji pytan wykryl rozjazdy:")
+        for _r in bad.itertuples(index=False):
+            print(
+                f"  - {str(getattr(_r, 'pytanie', '?'))}: "
+                f"expected={int(getattr(_r, 'expected_raw', 0) or 0)}, "
+                f"reported={int(getattr(_r, 'reported_raw', 0) or 0)}, "
+                f"delta={int(getattr(_r, 'delta', 0) or 0)}"
+            )
+
     # ===== TOP5 (A, B1, B2, D13) – poprawne % =====
     # + dodatkowo: pełne % dla WSZYSTKICH archetypów (dla zakładki "Filtry")
 
-    # ---------- A: pełne % oczekujących (IOA; wszystkie archetypy) ----------
-    df_A_pct_all = (
-        df_A_expectation_main[["archetype", "expected_pct"]]
-        .rename(columns={"archetype": "archetyp", "expected_pct": "%"})
-        .copy()
-    )
-    df_A_pct_all["%"] = pd.to_numeric(df_A_pct_all["%"], errors="coerce")
+    # ---------- A: pełne % (wszystkie archetypy) ----------
+    w = np.asarray(weights, dtype=float).reshape(-1)
+
+    wins_A = {a: 0.0 for a in ARCHETYPES}
+    votes_A = {a: 0.0 for a in ARCHETYPES}
+
+    for j, (_pid, left_arch, right_arch) in enumerate(A_PAIRS):
+        v = A[:, j]
+        m = np.isfinite(v)
+        if not np.any(m):
+            continue
+
+        pair_votes = float(w[m].sum())
+        votes_A[left_arch] += pair_votes
+        votes_A[right_arch] += pair_votes
+
+        wins_A[left_arch] += float(w[m & (v < A_SCALE_CENTER)].sum())
+        wins_A[right_arch] += float(w[m & (v > A_SCALE_CENTER)].sum())
+
+    df_A_pct_all = pd.DataFrame({
+        "archetyp": list(wins_A.keys()),
+        "%": [
+            (wins_A[a] / votes_A[a] * 100.0) if votes_A[a] > 0 else np.nan
+            for a in wins_A.keys()
+        ],
+    })
 
     df_top5_A = df_A_pct_all.sort_values("%", ascending=False).head(5).reset_index(drop=True).copy()
     df_top5_A["%"] = df_top5_A["%"].astype(float).round(1).map(lambda v: f"{v:.1f}%")
@@ -16425,7 +15129,7 @@ def main() -> None:
         s_mentions,
         outdir / "mentions_total.png",
         "Łączna liczba wskazań archetypów",
-        xlabel="Liczba wskazań",
+        xlabel="Ważona liczba wskazań",
         rotate=45,
         value_fmt="{:.0f}",
     )
@@ -16433,7 +15137,7 @@ def main() -> None:
         series_with_value_index(s_mentions, brand_values),
         outdir / "mentions_total_values.png",
         "Łączna liczba wskazań wartości",
-        xlabel="Liczba wskazań",
+        xlabel="Ważona liczba wskazań",
         rotate=45,
         value_fmt="{:.0f}",
     )
@@ -16875,10 +15579,6 @@ def main() -> None:
         df_B1_pct=df_B1_pct,
         df_B2_pct=df_B2_pct,
         df_D13_pct=df_D13_pct,
-        df_A_expectation_main=df_A_expectation_main_out,
-        df_A_expectation_pair_detail=df_A_expectation_pair_detail_out,
-        expectation_summary_payload=expectation_summary_payload,
-        expectation_weighting_meta=expectation_weighting_meta,
         seg_packs_render=seg_packs_render,
         filters_pct=filters_pct,
         brand_values=brand_values,
@@ -16886,7 +15586,7 @@ def main() -> None:
         b2_declared_demo_payload=b2_declared_demo_payload,
         top5_simulation_payload=top5_simulation_payload,
         cluster_pack=cluster_pack,
-        n_respondents_total=len(df)
+        n_respondents=int(len(df)),
     )
 
     # Automatyczne otwarcie raportu w przeglądarce
