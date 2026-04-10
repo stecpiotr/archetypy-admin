@@ -173,40 +173,32 @@ def _app_build_signature() -> str:
     repo_root = str(Path(__file__).resolve().parent)
     git_bin = shutil.which("git") or "git"
 
-    commit = _first_nonempty(
-        os.getenv("STREAMLIT_GIT_COMMIT_SHA"),
-        os.getenv("GITHUB_SHA"),
-        os.getenv("COMMIT_SHA"),
-        os.getenv("VERCEL_GIT_COMMIT_SHA"),
-        _secret_get("STREAMLIT_GIT_COMMIT_SHA"),
-        _secret_get("GITHUB_SHA"),
-        _secret_get("COMMIT_SHA"),
+    gh_repo = _first_nonempty(
+        os.getenv("GITHUB_REPOSITORY"),
+        _secret_get("GITHUB_REPOSITORY"),
+        "stecpiotr/archetypy-admin",
     )
-    raw_commit_time = _first_nonempty(
-        os.getenv("STREAMLIT_GIT_COMMIT_TIME"),
-        os.getenv("GITHUB_COMMIT_TIME"),
-        os.getenv("COMMIT_TIME"),
-        os.getenv("VERCEL_GIT_COMMIT_TIMESTAMP"),
-        os.getenv("SOURCE_COMMIT_TIMESTAMP"),
-        _secret_get("STREAMLIT_GIT_COMMIT_TIME"),
-        _secret_get("GITHUB_COMMIT_TIME"),
-        _secret_get("COMMIT_TIME"),
+    gh_branch = _first_nonempty(
+        os.getenv("GITHUB_REF_NAME"),
+        _secret_get("GITHUB_REF_NAME"),
+        "main",
+    )
+    gh_token = _first_nonempty(
+        os.getenv("GITHUB_TOKEN"),
+        os.getenv("GH_TOKEN"),
+        _secret_get("GITHUB_TOKEN"),
+        _secret_get("GH_TOKEN"),
     )
 
-    if not commit:
-        deployed_sha = _first_nonempty(
-            _secret_get("DEPLOYED_SHA"),
-        )
-        if deployed_sha:
-            commit = deployed_sha
-    if not commit:
-        deployed_sha_path = Path(repo_root) / ".deployed_sha"
-        if deployed_sha_path.exists():
-            try:
-                commit = str(deployed_sha_path.read_text(encoding="utf-8", errors="ignore")).strip()
-            except Exception:
-                commit = ""
+    # Priorytet: ostatni commit z HEAD gałęzi (GitHub) - zgodnie z oczekiwaniem UI.
+    commit = ""
+    raw_commit_time = ""
+    gh_head_commit, gh_head_committed_at = _fetch_github_head_commit(gh_repo, gh_branch, gh_token)
+    if gh_head_commit and gh_head_committed_at:
+        commit = gh_head_commit
+        raw_commit_time = gh_head_committed_at
 
+    # Fallback 1: lokalny git HEAD.
     if not commit or not raw_commit_time:
         try:
             if not commit:
@@ -228,28 +220,42 @@ def _app_build_signature() -> str:
         except Exception:
             pass
 
-    if not commit or not raw_commit_time:
-        gh_repo = _first_nonempty(
-            os.getenv("GITHUB_REPOSITORY"),
-            _secret_get("GITHUB_REPOSITORY"),
-            "stecpiotr/archetypy-admin",
+    # Fallback 2: env/secrets/.deployed_sha.
+    if not commit:
+        commit = _first_nonempty(
+            os.getenv("STREAMLIT_GIT_COMMIT_SHA"),
+            os.getenv("GITHUB_SHA"),
+            os.getenv("COMMIT_SHA"),
+            os.getenv("VERCEL_GIT_COMMIT_SHA"),
+            _secret_get("STREAMLIT_GIT_COMMIT_SHA"),
+            _secret_get("GITHUB_SHA"),
+            _secret_get("COMMIT_SHA"),
+            _secret_get("DEPLOYED_SHA"),
         )
-        gh_branch = _first_nonempty(
-            os.getenv("GITHUB_REF_NAME"),
-            _secret_get("GITHUB_REF_NAME"),
-            "main",
+    if not raw_commit_time:
+        raw_commit_time = _first_nonempty(
+            os.getenv("STREAMLIT_GIT_COMMIT_TIME"),
+            os.getenv("GITHUB_COMMIT_TIME"),
+            os.getenv("COMMIT_TIME"),
+            os.getenv("VERCEL_GIT_COMMIT_TIMESTAMP"),
+            os.getenv("SOURCE_COMMIT_TIMESTAMP"),
+            _secret_get("STREAMLIT_GIT_COMMIT_TIME"),
+            _secret_get("GITHUB_COMMIT_TIME"),
+            _secret_get("COMMIT_TIME"),
         )
-        gh_token = _first_nonempty(
-            os.getenv("GITHUB_TOKEN"),
-            os.getenv("GH_TOKEN"),
-            _secret_get("GITHUB_TOKEN"),
-            _secret_get("GH_TOKEN"),
-        )
-        gh_commit, gh_committed_at = _fetch_github_head_commit(gh_repo, gh_branch, gh_token)
-        if not commit and gh_commit:
-            commit = gh_commit
-        if not raw_commit_time and gh_committed_at:
-            raw_commit_time = gh_committed_at
+    if not commit:
+        deployed_sha_path = Path(repo_root) / ".deployed_sha"
+        if deployed_sha_path.exists():
+            try:
+                commit = str(deployed_sha_path.read_text(encoding="utf-8", errors="ignore")).strip()
+            except Exception:
+                commit = ""
+
+    # Fallback 3: gdy mamy SHA, ale brak czasu - pobierz metadane tego konkretnego SHA z GitHub.
+    if commit and not raw_commit_time:
+        _sha_commit, sha_committed_at = _fetch_github_head_commit(gh_repo, commit, gh_token)
+        if sha_committed_at:
+            raw_commit_time = sha_committed_at
 
     build_time = _to_warsaw_time(raw_commit_time)
 
@@ -3098,6 +3104,10 @@ def matching_view() -> None:
         )
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
             st.markdown(result.get("match_formula", ""))
+            st.info(
+                "To równanie dotyczy wyłącznie wskaźnika `Poziom dopasowania` i NIE służy do liczenia "
+                "kolumny `Oczekiwania mieszkańców (%)`."
+            )
             st.markdown(
                 "Metryka celowo bardziej karze duże luki archetypowe: oprócz średniej różnicy uwzględnia "
                 "także RMSE (wrażliwy na skrajne odchylenia) i średnią z 3 największych luk."
@@ -3200,9 +3210,17 @@ def matching_view() -> None:
               }
               .match-section-header h3{
                 margin:0;
-                font-size:28px;
+                font-size:17px;
                 font-weight:900;
                 color:#1f2f44;
+              }
+              .match-profile-title{
+                text-align:center;
+                font-weight:800;
+                font-size:16px;
+                line-height:1.2;
+                color:#1f2f44;
+                margin:2px 0 8px 0;
               }
             </style>
             """,
@@ -3388,7 +3406,7 @@ def matching_view() -> None:
 
             with left_profile_col:
                 st.markdown(
-                    f"<div style='text-align:center;font-weight:800;font-size:28px;line-height:1.25;'>"
+                    f"<div class='match-profile-title'>"
                     f"Profil archetypowy {html.escape(str(person_name_gen or ''))}"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -3396,7 +3414,7 @@ def matching_view() -> None:
                 _show_image_compat(person_profile_img, max_width_px=520)
             with right_profile_col:
                 st.markdown(
-                    f"<div style='text-align:center;font-weight:800;font-size:28px;line-height:1.25;'>"
+                    f"<div class='match-profile-title'>"
                     f"Profil archetypowy mieszkańców {html.escape(str(jst_name_gen or ''))}"
                     f"</div>",
                     unsafe_allow_html=True,
