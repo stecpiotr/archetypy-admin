@@ -271,3 +271,158 @@ Decyzja:
 Uzasadnienie:
 - User wymaga precyzyjnej formy jezykowej i krotszego, czystszego naglowka.
 - Dane odmiany sa juz w modelu (`*_gen`) albo mozliwe do bezpiecznego wyliczenia fallbackiem.
+
+### D-033: Standalone HTML raportu JST udostepniamy tylko, gdy jest realnie bezpieczny
+Decyzja:
+- Przycisk `📥 Pobierz raport HTML (pełny)` jest aktywny tylko, gdy jednoplikowy HTML
+  (po osadzeniu zasobow) miesci sie w limicie `JST_REPORT_STANDALONE_HTML_LIMIT_BYTES`.
+- Gdy limit jest przekroczony albo osadzanie sie nie powiedzie, UI jednoznacznie kieruje
+  do pobrania `🧳 ZIP (WYNIKI)` i nie udaje, ze "sam HTML" bedzie dzialal.
+Uzasadnienie:
+- Dla duzych raportow osadzony HTML potrafi byc skrajnie ciezki i niestabilny.
+- User wprost wskazal, ze mylacy przycisk HTML bez pelnej funkcjonalnosci wprowadza w blad.
+
+### D-034: Pobieranie plikow nie moze wywolywac rerun z efektem "szarego zawieszenia"
+Decyzja:
+- Dla przyciskow `st.download_button` ustawiamy `on_click=\"ignore\"` (w raportach JST),
+  aby klikniecie pobierania nie triggerowalo rerunu aplikacji.
+Uzasadnienie:
+- Usuwa to nieczytelny efekt wizualny (wyszarzenie/overlay) i poprawia UX pobierania.
+
+### D-035: Pelny podglad online probujemy osadzic on-demand, a gdy to niemozliwe - pokazujemy jawny komunikat
+Decyzja:
+- Po wylaczeniu `Tryb lekki renderowania` aplikacja probuje osadzic zasoby raportu on-demand.
+- Jesli wynik jest za duzy albo osadzanie konczy sie bledem, nie renderujemy "udawanego pelnego" widoku;
+  zamiast tego pokazujemy jasny komunikat i rekomendujemy tryb lekki / ZIP.
+Uzasadnienie:
+- User oczekiwal, ze "pelny podglad" faktycznie osadzi obrazy; fallback do surowego HTML byl mylacy.
+
+### D-036: Fonty wykresow JST maja byc deterministyczne miedzy srodowiskami
+Decyzja:
+- Generator raportu wybiera font bazowy z kolejki: najpierw fonty dostarczone z repo (`assets/fonts`),
+  dopiero potem fonty systemowe.
+- Dodano fonty `segoeui.ttf` i `segoeuib.ttf` do `assets/fonts`, aby zmniejszyc rozjazdy miedzy
+  lokalnym wzorcem a raportami generowanymi na serwerze.
+Uzasadnienie:
+- Wczesniej wybor opieral sie glownie o dostepnosc systemowa, co dawalo inny wyglad PNG
+  na roznych maszynach/deployach.
+
+### D-037: `Oczekiwania mieszkańców (%)` liczymy z pelnych skladowych A/B1/B2/D13
+Decyzja:
+- W `🧭 Matching` wynik archetypu JST jest liczony jako srednia z 4 pelnych komponentow procentowych:
+  `score = (A_pct + B1_pct + B2_pct + D13_pct) / 4`.
+- Nie stosujemy juz wag komponentow `40/20/25/15`.
+- W zakresie `🧭 Matching` decyzja ta nadpisuje starsze opisy wag komponentow.
+Uzasadnienie:
+- User jednoznacznie wymagal odejscia od wag i uzycia pelnych wartosci kazdego komponentu.
+- Srednia 4 skladowych utrzymuje skale 0..100 i pozwala zachowac porownywalnosc z profilem polityka.
+
+### D-038: Tytuly profili 0-100 w Matching sa centrowane nad wykresami
+Decyzja:
+- W sekcji `Profile archetypowe 0-100` tytuly obu profili renderujemy jako centralnie wyrownane naglowki HTML (`text-align:center`).
+Uzasadnienie:
+- Poprawia czytelnosc i spelnia wymaganie usera, aby tytuly byly na srodku wykresow.
+
+### D-039: Build badge ma pokazywac czas ostatniego commita z `main` (GitHub HEAD)
+Decyzja:
+- `_app_build_signature()` ma priorytetowo pobierac SHA i czas z GitHub API dla HEAD wskazanej galezi (`main`),
+  a dopiero potem uzywac lokalnego git i env/secrets fallback.
+- Cache zapytania do GitHub API ustawiamy na `60s`, by odswiezenie stopki po deployu bylo szybkie.
+Uzasadnienie:
+- User oczekuje zgodnosci stopki z lista commitow na GitHub; stale env z poprzedniego deployu byly mylace.
+
+### D-040: Wzor `match = ...` musi byc jawnie oddzielony od liczenia `Oczekiwań mieszkańców (%)`
+Decyzja:
+- W sekcji wyjasnienia metryk dodajemy explicite komunikat, ze wzor `match = ...` dotyczy tylko
+  wskaznika `Poziom dopasowania`.
+Uzasadnienie:
+- User slusznie zglosil ryzyko pomylenia dwoch osobnych rzeczy: metryki dopasowania i profilu oczekiwan.
+
+### D-041: Korekta typografii po regresji wizualnej Matching
+Decyzja:
+- Po centrowaniu tytulow profili 0-100 utrzymujemy stonowane rozmiary fontow:
+  - naglowki sekcji: `17px`,
+  - tytuly profili 0-100: `16px`.
+Uzasadnienie:
+- Poprzednie duze fonty pogarszaly odbior i czytelnosc (zgloszenie usera na zrzutach 2783/2784).
+
+### D-042: Edytor `segment_hit_threshold_overrides` ma byc odporny na praktyczne wklejki
+Decyzja:
+- Parser progow przyjmuje nie tylko czysty JSON, ale tez format liniowy:
+  - `segment: wartosc`,
+  - `segment = wartosc`,
+  z tolerancja na smart quotes i trailing commas.
+Uzasadnienie:
+- User wkleja progi z notatek/manuali i nie zawsze trzyma idealny JSON; narzedzie ma pomagac, nie blokowac.
+
+### D-043: Reset progow nie modyfikuje aktywnego klucza widgetu w tej samej iteracji
+Decyzja:
+- W `jst_analysis_view` reset/zapis korzysta z klucza pomocniczego `pending` + `st.rerun()`,
+  a nie bezposredniej zmiany `st.session_state[widget_key]` po utworzeniu widgetu.
+Uzasadnienie:
+- Eliminuje `StreamlitAPIException` (`cannot be modified after the widget ... is instantiated`).
+
+### D-044: `Oczekiwania mieszkańców (%)` z premią dla pytan TOP1
+Decyzja:
+- W Matching stosujemy formule:
+  `score = (A_pct + B1_pct + 2*B2_pct + 2*D13_pct) / 6`.
+- `B2` i `D13` dostaja mnoznik x2 jako sygnal TOP1.
+Uzasadnienie:
+- User oczekuje mniejszego spłaszczenia profilu i mocniejszego docenienia pytan, gdzie wybierany jest najwazniejszy archetyp.
+
+### D-045: Sekcje Matching maja byc wizualnie lekkie i spojne z reszta panelu
+Decyzja:
+- Naglowki sekcji `Porównanie...` i `Profile...` renderujemy bez pelnego obramowanego boxa;
+  stosujemy prosty separator dolny i transparentne tlo.
+Uzasadnienie:
+- Poprzedni styl "kartowy" odstawal od reszty interfejsu i byl negatywnie oceniony przez usera.
+
+### D-046: `Oczekiwania mieszkańców` przechodzą na indeks syntetyczny ISOA/ISOW
+Decyzja:
+- W `🧭 Matching` porzucamy wzor sredniej/prostych premii i liczymy indeks:
+  - `E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)`,
+  - `D = 0.70*z(N) + 0.30*z(MBAL)`,
+  - `SEI_raw = 0.80*E + 0.20*D`,
+  - `SEI_100` min-max do `0..100` (fallback `50`).
+- Komponenty:
+  - `A`: `% oczekujących` z versusów,
+  - `B1`: TOP3 share,
+  - `B2`: TOP1 share,
+  - `N`: negatywne doświadczenie,
+  - `MBAL`: `Mneg - Mpos`.
+Uzasadnienie:
+- User wymagał metody odpornej na różne skale komponentów oraz lepiej oddającej społeczne oczekiwanie niż prosta średnia.
+
+### D-047: Nazewnictwo indeksu zależy od aktywnego trybu etykiet
+Decyzja:
+- W `🧭 Matching` dodajemy radio trybu etykiet (`Archetypy` / `Wartości`) i dynamicznie pokazujemy:
+  - `ISOA` / `Indeks Społecznego Oczekiwania Archetypu`,
+  - albo `ISOW` / `Indeks Społecznego Oczekiwania Wartości`.
+- Logika liczenia pozostaje identyczna, zmienia się tylko nazewnictwo i etykiety.
+Uzasadnienie:
+- User wymaga dynamicznej nomenklatury bez duplikowania logiki obliczeń.
+
+### D-048: Raport JST dostaje dedykowaną zakładkę ISOA/ISOW zaraz po `Podsumowanie`
+Decyzja:
+- W `raport.html` zakładka `tabW` została przebudowana na:
+  - `ISOA` (tryb Archetypy),
+  - `ISOW` (tryb Wartości),
+  i ustawiona jako druga zakładka (zaraz po `Podsumowanie`).
+- Zakładka zawiera: metodologię, podstawę danych, tabelę rankingową, wykres kołowy 0-100 oraz Top3/Bottom3.
+Uzasadnienie:
+- User oczekiwał osobnego, czytelnego miejsca dla nowego indeksu z pełnym kontekstem interpretacyjnym.
+
+### D-049: Wykres ISOA/ISOW ma być zgodny wizualnie z kołem profilu (referencja 2786)
+Decyzja:
+- Do wizualizacji ISOA/ISOW używamy koła 0-100 (ten sam język wizualny co wykres profilu), z dynamicznymi podpisami:
+  - archetypy w trybie `Archetypy`,
+  - wartości w trybie `Wartości`.
+Uzasadnienie:
+- User wprost wskazał docelowy styl wykresu i wymóg dynamicznych podpisów.
+
+### D-050: Duże pełne podglądy raportu w panelu nie mogą być blokowane zbyt niskim limitem sekretu
+Decyzja:
+- Hard limit podglądu panelowego wyznaczamy jako `max(secret, safe_limit, 260MB)`.
+- Dla podglądu oznaczonego jako `too_large` domyślnie włączamy opcję uruchomienia pełnej wersji (z ostrzeżeniem o wydajności), zamiast prezentować to jako „niedziałający podgląd”.
+Uzasadnienie:
+- User zgłosił realny przypadek, w którym raport był poprawny, ale panel odrzucał podgląd przez zbyt niski limit konfiguracyjny.

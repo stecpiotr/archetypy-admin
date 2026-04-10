@@ -170,7 +170,7 @@ Wynik:
 - Smoke-check skladni:
   - `python -m py_compile admin_dashboard.py app.py` (OK).
 
-### Krok 8 [PENDING]
+### Krok 8 [DONE]
 Temat: Stabilnosc eksportu HTML/ZIP, osadzanie zasobow, fonty i UX pobierania.
 Zakres:
 - poprawa dzialania standalone HTML (albo jasne wymuszenie ZIP),
@@ -181,6 +181,26 @@ Kryteria ukonczenia:
 1. Uzytkownik wie, co pobrac i dlaczego.
 2. Brak "szarego zawieszenia" bez informacji.
 3. Raporty lokalne i online maja spojny wyglad.
+Pierwszy krok wykonawczy:
+- przeaudytowac aktualny pipeline renderu/eksportu w `app.py` i `jst_analysis.py` (inline assets, przyciski pobierania, tryb lekki) oraz wskazac minimalny zestaw zmian kodu, ktory domyka wszystkie 4 punkty.
+Wynik:
+- `app.py` (`jst_analysis_view`):
+  - dodano polityke bezpiecznego exportu standalone HTML:
+    - przycisk `📥 Pobierz raport HTML (pełny)` jest aktywny tylko wtedy, gdy jednoplikowy HTML z osadzonymi zasobami miesci sie w limicie (`JST_REPORT_STANDALONE_HTML_LIMIT_BYTES`, domyslnie 85 MB),
+    - dla raportow zbyt ciezkich UI pokazuje jasny komunikat i rekomenduje ZIP (bez mylacego pobierania "samego HTML"),
+  - oba przyciski pobierania raportu (`HTML`, `ZIP`) maja `on_click=\"ignore\"`, co eliminuje rerun i efekt szarego "zawieszenia" po kliknieciu,
+  - `Podgląd raportu online` po wylaczeniu `Tryb lekki renderowania` probuje on-demand osadzic zasoby (`inline_local_assets`) i:
+    - renderuje wersje pelna, gdy miesci sie w limicie,
+    - albo pokazuje jednoznaczny komunikat, gdy pelny podglad jest zbyt duzy / osadzanie sie nie udalo.
+- `app.py`:
+  - dodano helper `_fmt_bytes_compact(...)` do czytelnych komunikatow o rozmiarach.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dodano deterministyczny wybor fontu (repo -> system) przez rejestracje fontow z plikow,
+  - `set_global_fonts()` korzysta teraz z `_pick_base_font()` i listy `font.sans-serif` dla spojnosci renderu PNG.
+- `assets/fonts/`:
+  - dodano `segoeui.ttf` i `segoeuib.ttf`, aby wyrownac wyglad wykresow miedzy srodowiskami.
+- Smoke-check:
+  - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
 
 ### Hotfix H-001 [DONE]
 Temat: Regresja stopki build na Windows (`unknown-time | local`).
@@ -292,3 +312,187 @@ Wynik:
   - usunieto dopisek `(siła archetypu, skala: 0-100)` z obu etykiet.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-007 [DONE]
+Temat: Dopracowanie UI Matching + stabilizacja pobierania + domkniecie fontow raportu.
+Kryteria ukonczenia:
+1. W radarze `Porównanie profili archetypowych` nie ucina dolnej etykiety archetypu.
+2. Sekcje `Porównanie profili archetypowych` oraz `Profile archetypowe 0-100` sa wyraznie oddzielone wizualnie.
+3. Blok interpretacji oceny dopasowania (`Ocena: ...`) jest bardziej czytelny, a pasek postepu wyzszy i wyrazniejszy.
+4. Pobieranie ZIP/HTML nie wywoluje bledu callbacka (`TypeError: 'str' object is not callable`) i nie wylogowuje usera.
+5. Komunikat o zbyt ciezkim standalone HTML jest informacyjny (nie myli z awaria generowania raportu).
+6. Fonty i typografia wykresow raportu sa blizsze wzorcowi z `C:\Poznan_Archetypy_Analiza`.
+Pierwszy krok wykonawczy:
+- poprawic `app.py` (layout Matching, panel oceny, kompatybilny wrapper dla `download_button`) oraz `jst_analysis.py` + `analyze_poznan_archetypes.py` (pewne dostarczenie i wybor fontow w runie).
+Wynik:
+- `app.py`:
+  - dodano kompatybilny wrapper `_download_button_compat(...)`, ktory:
+    - na nowszym Streamlit ustawia `on_click="ignore"`,
+    - na starszym Streamlit usuwa ten parametr (eliminuje blad `TypeError: 'str' object is not callable` przy pobieraniu),
+  - podmieniono krytyczne przyciski pobierania (`CSV/XLSX` i `HTML/ZIP`) na wrapper kompatybilny,
+  - komunikat o zbyt ciezkim standalone HTML zmieniono na informacyjny (`To nie jest błąd generowania raportu...`),
+  - sekcja `Poziom dopasowania` przebudowana:
+    - wyrazny panel z duza wartoscia `%`,
+    - badge `Ocena: ...`,
+    - wyzszy pasek postepu z ciemniejszym torem i obramowaniem,
+  - sekcja `Porównanie profili archetypowych`:
+    - dodane wizualne separatory/naglowki blokow,
+    - radar dostal wieksza wysokosc (`640`) i wiekszy dolny margines (`b=86`), co zapobiega ucinaniu etykiety dolnej.
+- `jst_analysis.py`:
+  - `_prepare_tool_run_dir(...)` synchronizuje teraz wybrane fonty do katalogu runa (`run/assets/fonts`), aby generator mial stabilny zestaw czcionek niezaleznie od hosta.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dodano logowanie wybranego fontu bazowego (`[fonts] matplotlib base font: ...`) dla latwiejszej diagnostyki,
+  - utrzymano deterministyczny wybor fontu z priorytetem fontow repo.
+- Smoke-check:
+  - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-008 [DONE]
+Temat: Dopracowanie sekcji `Profile archetypowe 0-100` + nowa metoda liczenia `Oczekiwania mieszkańców (%)`.
+Kryteria ukonczenia:
+1. Na wykresach 0-100 tytuly:
+   - `Profil archetypowy Krzysztofa Hetmana`,
+   - `Profil archetypowy mieszkańców Miasta Poznania`
+   sa centrowane wzgledem wykresu (na srodku obszaru wykresu, nie "uciekaja" na bok).
+2. `Oczekiwania mieszkańców (%)` sa liczone z pelnych skladowych A/B1/B2/D13
+   (bez wag komponentow 40/20/25/15).
+3. Opis metodologii w UI dopasowania jest zgodny z nowa formula.
+4. Smoke-check skladni przechodzi bez bledow.
+Pierwszy krok wykonawczy:
+- zlokalizowac miejsca:
+  - renderu tytulow w sekcji 0-100 (`app.py`),
+  - liczenia profilu JST (`_calc_jst_target_profile`) i opisu formuly w `matching_view`,
+  a nastepnie wdrozyc zmiany jednym spójnym patchem.
+Wynik:
+- `app.py`:
+  - sekcja `🧭 Matching > Podsumowanie > Profile archetypowe 0-100` ma teraz wycentrowane tytuly nad kazdym wykresem:
+    - `Profil archetypowy {osoba w dopelniaczu}`,
+    - `Profil archetypowy mieszkańców {JST w dopelniaczu}`,
+    renderowane jako centralny naglowek HTML (`text-align:center`).
+  - render obrazow 0-100 ustawiony kompatybilnie centrowo (`use_container_width` -> `use_column_width` -> `width`),
+    aby tytul i wykres byly osiowo spojne takze na starszych wersjach Streamlit.
+  - `_calc_jst_target_profile(...)` przelicza teraz `Oczekiwania mieszkańców (%)` jako srednia z pelnych skladowych:
+    - `A_pct` (pelna wartosc komponentu A),
+    - `B1_pct`, `B2_pct`, `D13_pct` (pelne trafienia %),
+    - formula: `score = (A_pct + B1_pct + B2_pct + D13_pct) / 4`.
+  - opis metodologii i etykiety audytu zostaly zsynchronizowane z nowa formula:
+    - nowy opis pod tabela i w expanderze,
+    - kolumny audytu: `A/B1/B2/D13 (pełne %)` + `Średnia 4 komponentów`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-009 [DONE]
+Temat: Korekta UX Matching po regresji wizualnej + uszczelnienie stopki commita.
+Kryteria ukonczenia:
+1. Sekcja `Profile archetypowe 0-100` ma wycentrowane, ale normalnej wielkosci tytuly (bez "wielkich" fontow i bez efektu jak na zrzutach 2783/2784).
+2. Sekcja `Porównanie profili archetypowych` ma bardziej stonowana typografie naglowka.
+3. W expanderze metryki dopasowania jest jednoznaczna informacja, ze wzor `match = ...` NIE liczy `Oczekiwan mieszkańców (%)`.
+4. Stopka build pokazuje czas ostatniego commita z `main` (GitHub HEAD), z fallbackiem gdy API niedostepne.
+5. Smoke-check skladni przechodzi.
+Pierwszy krok wykonawczy:
+- poprawic style i opisy w `app.py` (Matching), nastepnie zaktualizowac `_app_build_signature()` tak, aby priorytetem byl GitHub HEAD.
+Wynik:
+- `app.py` (`🧭 Matching`):
+  - zmniejszono przeskalowane fonty po poprzedniej iteracji:
+    - naglowki boxow sekcji (`.match-section-header h3`) do `18px`,
+    - tytuly profili 0-100 do `20px` (`.match-profile-title`) z zachowanym centrowaniem,
+  - dodano jednoznaczny komunikat w expanderze metryki:
+    - wzor `match = ...` dotyczy tylko `Poziomu dopasowania`,
+    - nie dotyczy liczenia `Oczekiwań mieszkańców (%)`.
+- `app.py` (`_app_build_signature`):
+  - zmieniono priorytet zrodla metadanych builda:
+    1) GitHub HEAD wskazanej galezi (`main`),
+    2) lokalny git HEAD,
+    3) env/secrets/`.deployed_sha`,
+    4) fallback czasu po SHA przez GitHub API.
+  - efekt: stopka ma pokazywac czas ostatniego commita z `main`, a nie stale env z poprzedniego deployu.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-010 [DONE]
+Temat: Naprawa edytora progow segmentow + dopracowanie sekcji Matching + mocniejsze rozroznienie `Oczekiwań mieszkańców (%)`.
+Kryteria ukonczenia:
+1. `segment_hit_threshold_overrides` akceptuje wklejki w praktycznym formacie (JSON i `segment: wartosc`) bez kruchych bledow parsera.
+2. `Przywróć domyślne` w edytorze progow nie wywoluje `StreamlitAPIException` o modyfikacji `session_state` po instancjacji widgetu.
+3. Sekcje `Porównanie profili archetypowych` i `Profile archetypowe 0-100` w Matching nie wygladaja jak obce, "kartowe" boksy.
+4. `Oczekiwania mieszkańców (%)` wzmacniaja sygnal TOP1 (B2/D13), aby ograniczyc odczucie sztucznego spłaszczenia.
+5. Smoke-check skladni przechodzi.
+Pierwszy krok wykonawczy:
+- poprawic parser i logike resetu progow w `jst_analysis_view`, nastepnie zmienic formule A/B1/B2/D13 i opisy metodyki oraz uproscic styl naglowkow sekcji Matching.
+Wynik:
+- `app.py`:
+  - `_parse_segment_threshold_overrides_text(...)`:
+    - akceptuje smart quotes i format liniowy `segment: wartosc` / `segment = wartosc`,
+    - zwraca czytelny blad z wskazaniem problematycznej linii, zamiast niejasnego `Invalid control character`,
+  - `jst_analysis_view`:
+    - reset i zapis progow dzialaja przez klucze pomocnicze (`pending` + `rerun`), bez bezposredniej modyfikacji klucza aktywnego widgetu,
+    - usunieto crash `StreamlitAPIException: ... cannot be modified after the widget ... is instantiated`,
+  - `matching_view`:
+    - odchudzono styl `match-section-header` (bez "pudelek", z prostym separatorem dolnym),
+    - formuła `Oczekiwań mieszkańców (%)` ma teraz premie TOP1:
+      `score = (A_pct + B1_pct + 2*B2_pct + 2*D13_pct) / 6`,
+    - opisy w UI i tabela audytu skladnikow zostaly zsynchronizowane z nowa formula,
+  - doprecyzowano, ze `match = ...` dotyczy wyłącznie `Poziomu dopasowania`.
+  - skrocono cache metadanych commita z GitHub do `60s`, aby stopka szybciej odswiezala czas/SHA po nowym deployu.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-011 [DONE]
+Temat: Przebudowa metodologii `Oczekiwań mieszkańców` do ISOA/ISOW + nowa zakładka raportowa + poprawki UI Matching i podglądu raportu.
+Kryteria ukonczenia:
+1. W `🧭 Matching -> Podsumowanie` stara metodologia i stary wzor sa usuniete; dziala nowy indeks:
+   - rdzen oczekiwania `E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)`,
+   - presja doswiadczenia `D = 0.70*z(N) + 0.30*z(MBAL)`,
+   - wynik surowy `SEI_raw = 0.80*E + 0.20*D`,
+   - skala finalna `SEI_100` w zakresie `0..100` (lub `50` przy braku rozstepu).
+2. W UI Matching nazewnictwo jest dynamiczne:
+   - `ISOA` / `Indeks Społecznego Oczekiwania Archetypu` dla trybu Archetypy,
+   - `ISOW` / `Indeks Społecznego Oczekiwania Wartości` dla trybu Wartości.
+3. W raporcie JST pojawia sie nowa zakladka zaraz po `Podsumowanie`:
+   - nazwa zakladki dynamiczna `ISOA`/`ISOW`,
+   - tresc: opis metodologii, baza danych (wazone/surowe), tabela rankingowa, wykres, Top3/Bottom3.
+4. Etykiety w tabeli Matching sa poprawione:
+   - bez `"(%)"` przy `Profil polityka` i `Oczekiwania mieszkańców` (to skala sily 0-100),
+   - separator sekcji (`szara linia`) jest przed naglowkami `Porównanie...` i `Profile archetypowe 0-100`.
+5. `📊 Analiza badania mieszkańców` nie traktuje limitu panelu jako "blad generowania"; komunikat i flow sa jednoznaczne oraz nie myla usera.
+6. Zakladki w `🧭 Matching` dostaja czytelniejszy, atrakcyjniejszy styl zgodny z reszta panelu.
+7. Zmiany generatora sa wdrozone w obu lokalizacjach:
+   - `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`,
+   - `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+8. Smoke-check skladni przechodzi:
+   - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py`.
+Pierwszy krok wykonawczy:
+- zlokalizowac i podmienic centralna funkcje liczenia profilu JST w Matching (`_calc_jst_target_profile`) oraz miejsca renderu opisu/metryk, tak aby od razu przejsc na ISOA/ISOW i od tego samego obiektu zasilić nową zakładkę raportową.
+Wynik:
+- `app.py`:
+  - `🧭 Matching` liczy teraz indeks syntetyczny przez standaryzacje komponentow:
+    - `E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)`,
+    - `D = 0.70*z(N) + 0.30*z(MBAL)`,
+    - `SEI_raw = 0.80*E + 0.20*D`,
+    - `SEI_100` min-max do `0..100` (fallback `50`),
+  - dodano helpery:
+    - `compute_top3_share`,
+    - `compute_top1_share`,
+    - `compute_negative_experience_share`,
+    - `compute_most_important_experience_balance`,
+    - `safe_zscore_by_archetype`,
+    - `build_social_expectation_core`,
+    - `build_experience_pressure`,
+    - `compute_social_expectation_index`,
+    - `update_matching_summary_description`,
+  - dodano radio trybu etykiet (`Archetypy` / `Wartości`) i dynamiczne nazwy `ISOA` / `ISOW` w `Podsumowaniu`,
+  - w tabelach Matching etykiety pozostaja bez `"(%)"` dla `Profil polityka` i `Oczekiwania mieszkańców`,
+  - sekcja tabow Matching dostala mocniejszy styl (czytelniejsze i bardziej "przyklejone" zakladki),
+  - `📊 Analiza badania mieszkańców`: podniesiono bezpieczny limit hard dla podgladu panelowego (`max(secret, safe_limit, 260MB)`) oraz domyslnie wlaczono "pokaz mimo duzego rozmiaru" dla pelnego podgladu.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dodano i wpięto nowe liczenie ISOA/ISOW do pipeline (`ISOA_ISOW_technical.csv`, `ISOA_ISOW_table.csv`),
+  - dodano zakladke raportowa `ISOA/ISOW` zaraz po `Podsumowanie`,
+  - tresc zakladki: metodologia, podstawa danych, tabela, wykres, Top3/Bottom3,
+  - wykres glowny ISOA/ISOW renderowany kolem 0-100 (styl jak referencyjny wykres profilu),
+  - podpisy na kole sa dynamiczne:
+    - archetypy w trybie `Archetypy`,
+    - wartosci w trybie `Wartości`.
+- Zmiany generatora zsynchronizowano rowniez do:
+  - `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Smoke-check:
+  - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

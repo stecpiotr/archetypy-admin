@@ -1728,6 +1728,205 @@ def compute_ioa(
     return pd.DataFrame(rows)
 
 
+def compute_top3_share(df_b1: pd.DataFrame, arch_names: List[str] = ARCHETYPES) -> Dict[str, float]:
+    out = {str(a): float("nan") for a in arch_names}
+    if df_b1 is None or len(df_b1) == 0:
+        return out
+    tmp = df_b1.copy()
+    tmp["archetyp"] = tmp.get("archetyp", "").astype(str)
+    tmp["%"] = pd.to_numeric(tmp.get("%", np.nan), errors="coerce")
+    for a in arch_names:
+        row = tmp[tmp["archetyp"] == str(a)]
+        if len(row) > 0:
+            out[str(a)] = float(row.iloc[0]["%"])
+    return out
+
+
+def compute_top1_share(df_b2: pd.DataFrame, arch_names: List[str] = ARCHETYPES) -> Dict[str, float]:
+    out = {str(a): float("nan") for a in arch_names}
+    if df_b2 is None or len(df_b2) == 0:
+        return out
+    tmp = df_b2.copy()
+    tmp["archetyp"] = tmp.get("archetyp", "").astype(str)
+    tmp["%"] = pd.to_numeric(tmp.get("%", np.nan), errors="coerce")
+    for a in arch_names:
+        row = tmp[tmp["archetyp"] == str(a)]
+        if len(row) > 0:
+            out[str(a)] = float(row.iloc[0]["%"])
+    return out
+
+
+def compute_negative_experience_share(df_d12: pd.DataFrame, arch_names: List[str] = ARCHETYPES) -> Dict[str, float]:
+    out = {str(a): float("nan") for a in arch_names}
+    if df_d12 is None or len(df_d12) == 0:
+        return out
+    tmp = df_d12.copy()
+    tmp["archetyp"] = tmp.get("archetyp", "").astype(str)
+    tmp["%MINUS"] = pd.to_numeric(tmp.get("%MINUS", np.nan), errors="coerce")
+    for a in arch_names:
+        row = tmp[tmp["archetyp"] == str(a)]
+        if len(row) > 0:
+            out[str(a)] = float(row.iloc[0]["%MINUS"])
+    return out
+
+
+def compute_most_important_experience_balance(
+        d12: np.ndarray,
+        d13: np.ndarray,
+        weights: np.ndarray,
+        arch_names: List[str] = ARCHETYPES,
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], float]:
+    n_arch = len(arch_names)
+    out_mbal = {str(a): float("nan") for a in arch_names}
+    out_mneg = {str(a): float("nan") for a in arch_names}
+    out_mpos = {str(a): float("nan") for a in arch_names}
+
+    d12_arr = np.asarray(d12, dtype=float)
+    d13_arr = np.asarray(d13, dtype=int).reshape(-1)
+    w = np.asarray(weights, dtype=float).reshape(-1)
+    if d12_arr.shape[0] == 0 or d13_arr.shape[0] == 0 or w.shape[0] == 0:
+        return out_mbal, out_mneg, out_mpos, 0.0
+
+    n = min(d12_arr.shape[0], d13_arr.shape[0], w.shape[0])
+    d12_arr = d12_arr[:n, :]
+    d13_arr = d13_arr[:n]
+    w = w[:n]
+    valid_d13 = (d13_arr >= 0) & np.isfinite(w) & (w > 0)
+    denom = float(np.sum(w[valid_d13])) if np.any(valid_d13) else 0.0
+    if denom <= 0:
+        return out_mbal, out_mneg, out_mpos, 0.0
+
+    for idx, a in enumerate(arch_names):
+        if idx >= d12_arr.shape[1]:
+            continue
+        col = np.asarray(d12_arr[:, idx], dtype=float)
+        base = valid_d13 & (d13_arr == idx) & np.isfinite(col)
+        w_base = float(np.sum(w[base])) if np.any(base) else 0.0
+        if w_base <= 0:
+            out_mneg[str(a)] = 0.0
+            out_mpos[str(a)] = 0.0
+            out_mbal[str(a)] = 0.0
+            continue
+        mneg = float(np.sum(w[base & (col < 0)]) / denom * 100.0)
+        mpos = float(np.sum(w[base & (col > 0)]) / denom * 100.0)
+        out_mneg[str(a)] = mneg
+        out_mpos[str(a)] = mpos
+        out_mbal[str(a)] = float(mneg - mpos)
+    return out_mbal, out_mneg, out_mpos, denom
+
+
+def safe_zscore_by_archetype(
+        values: Dict[str, float],
+        arch_names: List[str] = ARCHETYPES
+) -> Tuple[Dict[str, float], float, float]:
+    vals = [float(values.get(str(a), np.nan)) for a in arch_names]
+    finite_vals = np.asarray([v for v in vals if np.isfinite(v)], dtype=float)
+    if finite_vals.size < 2:
+        return {str(a): 0.0 for a in arch_names}, float("nan"), 0.0
+    mean_v = float(np.mean(finite_vals))
+    std_v = float(np.std(finite_vals, ddof=0))
+    if (not np.isfinite(std_v)) or std_v <= 1e-12:
+        return {str(a): 0.0 for a in arch_names}, mean_v, 0.0
+    out = {}
+    for a in arch_names:
+        v = float(values.get(str(a), np.nan))
+        out[str(a)] = float((v - mean_v) / std_v) if np.isfinite(v) else 0.0
+    return out, mean_v, std_v
+
+
+def build_social_expectation_core(
+        z_a: Dict[str, float],
+        z_b1: Dict[str, float],
+        z_b2: Dict[str, float],
+        arch_names: List[str] = ARCHETYPES
+) -> Dict[str, float]:
+    return {
+        str(a): float(0.50 * float(z_a.get(str(a), 0.0)) + 0.20 * float(z_b1.get(str(a), 0.0)) + 0.30 * float(z_b2.get(str(a), 0.0)))
+        for a in arch_names
+    }
+
+
+def build_experience_pressure(
+        z_n: Dict[str, float],
+        z_mbal: Dict[str, float],
+        arch_names: List[str] = ARCHETYPES
+) -> Dict[str, float]:
+    return {
+        str(a): float(0.70 * float(z_n.get(str(a), 0.0)) + 0.30 * float(z_mbal.get(str(a), 0.0)))
+        for a in arch_names
+    }
+
+
+def compute_social_expectation_index(
+        a_pct: Dict[str, float],
+        b1_pct: Dict[str, float],
+        b2_pct: Dict[str, float],
+        n_pct: Dict[str, float],
+        mbal_pp: Dict[str, float],
+        arch_names: List[str] = ARCHETYPES
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    z_a, mean_a, std_a = safe_zscore_by_archetype(a_pct, arch_names=arch_names)
+    z_b1, mean_b1, std_b1 = safe_zscore_by_archetype(b1_pct, arch_names=arch_names)
+    z_b2, mean_b2, std_b2 = safe_zscore_by_archetype(b2_pct, arch_names=arch_names)
+    z_n, mean_n, std_n = safe_zscore_by_archetype(n_pct, arch_names=arch_names)
+    z_mbal, mean_mbal, std_mbal = safe_zscore_by_archetype(mbal_pp, arch_names=arch_names)
+
+    core = build_social_expectation_core(z_a, z_b1, z_b2, arch_names=arch_names)
+    pressure = build_experience_pressure(z_n, z_mbal, arch_names=arch_names)
+    raw = {
+        str(a): float(0.80 * float(core.get(str(a), 0.0)) + 0.20 * float(pressure.get(str(a), 0.0)))
+        for a in arch_names
+    }
+    raw_vals = np.asarray([float(raw[str(a)]) for a in arch_names if np.isfinite(float(raw[str(a)]))], dtype=float)
+    if raw_vals.size > 0:
+        raw_min = float(np.min(raw_vals))
+        raw_max = float(np.max(raw_vals))
+    else:
+        raw_min, raw_max = 0.0, 0.0
+
+    if raw_max > raw_min:
+        scaled = {
+            str(a): float(np.clip(100.0 * (float(raw[str(a)]) - raw_min) / (raw_max - raw_min), 0.0, 100.0))
+            for a in arch_names
+        }
+    else:
+        scaled = {str(a): 50.0 for a in arch_names}
+
+    rows = []
+    for a in arch_names:
+        key = str(a)
+        rows.append({
+            "archetype": key,
+            "A_pct": float(a_pct.get(key, np.nan)),
+            "B1_pct": float(b1_pct.get(key, np.nan)),
+            "B2_pct": float(b2_pct.get(key, np.nan)),
+            "N_pct": float(n_pct.get(key, np.nan)),
+            "MBAL_pp": float(mbal_pp.get(key, np.nan)),
+            "core_E": float(core.get(key, 0.0)),
+            "pressure_D": float(pressure.get(key, 0.0)),
+            "SEI_raw": float(raw.get(key, 0.0)),
+            "SEI_100": float(scaled.get(key, 50.0)),
+        })
+    out = pd.DataFrame(rows)
+    out = out.sort_values(["SEI_100", "SEI_raw"], ascending=[False, False], kind="mergesort").reset_index(drop=True)
+    out.insert(0, "position", np.arange(1, len(out) + 1, dtype=int))
+
+    meta = {
+        "z_stats": {
+            "A": {"mean": mean_a, "std": std_a},
+            "B1": {"mean": mean_b1, "std": std_b1},
+            "B2": {"mean": mean_b2, "std": std_b2},
+            "N": {"mean": mean_n, "std": std_n},
+            "MBAL": {"mean": mean_mbal, "std": std_mbal},
+        },
+        "core_formula": "E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)",
+        "pressure_formula": "D = 0.70*z(N) + 0.30*z(MBAL)",
+        "raw_formula": "SEI_raw = 0.80*E + 0.20*D",
+        "scale_formula": "SEI_100 = min-max(0..100), fallback=50",
+    }
+    return out, meta
+
+
 def build_main_expectation_table(summary_table: pd.DataFrame) -> pd.DataFrame:
     if summary_table is None or len(summary_table) == 0:
         return pd.DataFrame(columns=[
@@ -1921,6 +2120,67 @@ def render_archetype_expectation_section(
     <div class="card" style="margin-top:16px;">
       <h3>Tabela szczegółowa par (18 porównań)</h3>
       {pair_detail_table_html}
+    </div>
+  </div>
+"""
+
+
+def render_isoa_isow_report_tab(
+        *,
+        data_basis_message: str,
+        data_basis_reason: str,
+        methodology_text_arche: str,
+        methodology_text_values: str,
+        table_html: str,
+        chart_html: str,
+        top_bottom_html: str,
+) -> str:
+    reason_html = ""
+    if str(data_basis_reason or "").strip():
+        reason_html = (
+            "<div class='small' style='margin-top:6px;'>"
+            f"Powód fallbacku: {_html_escape(str(data_basis_reason).strip())}"
+            "</div>"
+        )
+    return f"""
+  <div class="panel pW">
+    <h2>
+      <span class="mode-arche">Indeks Społecznego Oczekiwania Archetypu (ISOA)</span>
+      <span class="mode-values">Indeks Społecznego Oczekiwania Wartości (ISOW)</span>
+    </h2>
+    <div class="small">
+      <span class="mode-arche">{_html_escape(methodology_text_arche)}</span>
+      <span class="mode-values">{_html_escape(methodology_text_values)}</span>
+    </div>
+
+    <div class="card ioa-status-card">
+      <div><b>{_html_escape(data_basis_message)}</b></div>
+      {reason_html}
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>Jak czytać wskaźnik</h3>
+      <ul style="margin:8px 0 0 18px;">
+        <li><span class="mode-arche">Wysoki ISOA oznacza, że archetyp jest społecznie mocno oczekiwany w całym badaniu.</span><span class="mode-values">Wysoki ISOW oznacza, że wartość jest społecznie mocno oczekiwana w całym badaniu.</span></li>
+        <li>Wysoki komponent A + B2 oznacza szerokie oczekiwanie i wysoki priorytet.</li>
+        <li>Wysoka presja C13/D13 wzmacnia wynik, gdy mieszkańcy odczuwają brak archetypu/wartości.</li>
+        <li>Skala 0-100 jest indeksem syntetycznym, a nie odsetkiem respondentów.</li>
+      </ul>
+    </div>
+
+    <div class="card chart-half" style="margin-top:16px;">
+      <h3><span class="mode-arche">Wykres główny ISOA (0-100)</span><span class="mode-values">Wykres główny ISOW (0-100)</span></h3>
+      {chart_html}
+    </div>
+
+    <div class="card ioa-summary-card" style="margin-top:16px;">
+      <h3>Top 3 / Bottom 3</h3>
+      {top_bottom_html}
+    </div>
+
+    <div class="card ioa-main-card" style="margin-top:16px;">
+      <h3><span class="mode-arche">Tabela główna ISOA</span><span class="mode-values">Tabela główna ISOW</span></h3>
+      {table_html}
     </div>
   </div>
 """
@@ -7603,6 +7863,8 @@ CHART_NOTES = {
     "A_expectation_expected_pct_values.png": "Wynik główny: odsetek mieszkańców, którzy netto oczekują danej wartości po zbilansowaniu 3 porównań (score_mean > 0).",
     "A_expectation_ioa_100.png": "IOA 0-100 (Indeks Oczekiwania Archetypu): wskaźnik siły oczekiwania (nie jest procentem mieszkańców). Linia odniesienia: 50.",
     "A_expectation_ioa_100_values.png": "IOW 0-100 (Indeks Oczekiwania Wartości): wskaźnik siły oczekiwania (nie jest procentem mieszkańców). Linia odniesienia: 50.",
+    "ISOA_ISOW_wheel.png": "ISOA 0-100: syntetyczny indeks społecznego oczekiwania archetypu (A, B1, B2, C13/D13), nie jest procentem mieszkańców.",
+    "ISOA_ISOW_wheel_values.png": "ISOW 0-100: syntetyczny indeks społecznego oczekiwania wartości (A, B1, B2, C13/D13), nie jest procentem mieszkańców.",
     "B1_top3.png": "Odsetek osób, które umieściły archetyp w swojej „trójce” (maks. 3 wybory).",
     "B1_top3_values.png": "Odsetek osób, które umieściły wartość w swojej „trójce” (maks. 3 wybory).",
     "B2_top1.png": "Odsetek wskazań archetypu jako najważniejszego (TOP1).",
@@ -7715,6 +7977,8 @@ def save_report(outdir: Path, settings: Settings,
                 df_A_expectation_pair_detail: Optional[pd.DataFrame] = None,
                 expectation_summary_payload: Optional[Dict[str, List[str]]] = None,
                 expectation_weighting_meta: Optional[Dict[str, Any]] = None,
+                df_social_expectation_index: Optional[pd.DataFrame] = None,
+                social_expectation_meta: Optional[Dict[str, Any]] = None,
                 filters_pct: Optional[Dict[str, Dict[str, float]]] = None,
                 brand_values: Optional[Dict[str, str]] = None,
                 seg_packs_render: Optional[Dict[str, Any]] = None,
@@ -7728,6 +7992,7 @@ def save_report(outdir: Path, settings: Settings,
     cluster_pack = cluster_pack or {}
     expectation_summary_payload = expectation_summary_payload or {}
     expectation_weighting_meta = expectation_weighting_meta or {}
+    social_expectation_meta = social_expectation_meta or {}
     n_respondents_total = int(max(0, int(n_respondents_total or 0)))
     df_A_expectation_main = (
         df_A_expectation_main.copy()
@@ -7737,6 +8002,11 @@ def save_report(outdir: Path, settings: Settings,
     df_A_expectation_pair_detail = (
         df_A_expectation_pair_detail.copy()
         if isinstance(df_A_expectation_pair_detail, pd.DataFrame)
+        else pd.DataFrame()
+    )
+    df_social_expectation_index = (
+        df_social_expectation_index.copy()
+        if isinstance(df_social_expectation_index, pd.DataFrame)
         else pd.DataFrame()
     )
     has_poststrat = poststrat_diag is not None and len(poststrat_diag) > 0
@@ -9254,119 +9524,135 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             "</div>"
         )
 
-    expectation_methodology_text_arche = (
-        "Wynik główny pokazuje odsetek mieszkańców, którzy netto oczekują danego archetypu, "
-        "biorąc pod uwagę wszystkie trzy porównania, w których ten archetyp występował. "
-        "Dodatni bilans oznacza oczekiwanie archetypu, bilans zerowy — neutralność, "
-        "a ujemny — relatywny brak oczekiwania. Obok pokazano również indeks siły oczekiwania, "
-        "który nie jest procentem mieszkańców, lecz miarą intensywności preferencji."
+    isoa_methodology_text_arche = (
+        "ISOA łączy 4 źródła: A (% oczekujących z versusów), B1 (TOP3), B2 (TOP1) i C13/D13 (doświadczenia). "
+        "Najpierw liczony jest rdzeń oczekiwania E z A/B1/B2, potem presja doświadczenia D z C13/D13, "
+        "a na końcu wynik syntetyczny jest skalowany do 0-100."
     )
-    expectation_methodology_text_values = (
-        "Wynik główny pokazuje odsetek mieszkańców, którzy netto oczekują danej wartości, "
-        "biorąc pod uwagę wszystkie trzy porównania, w których ta wartość występowała. "
-        "Dodatni bilans oznacza oczekiwanie wartości, bilans zerowy — neutralność, "
-        "a ujemny — relatywny brak oczekiwania. Obok pokazano również indeks siły oczekiwania, "
-        "który nie jest procentem mieszkańców, lecz miarą intensywności preferencji."
+    isoa_methodology_text_values = (
+        "ISOW łączy 4 źródła: A (% oczekujących z versusów), B1 (TOP3), B2 (TOP1) i C13/D13 (doświadczenia). "
+        "Najpierw liczony jest rdzeń oczekiwania E z A/B1/B2, potem presja doświadczenia D z C13/D13, "
+        "a na końcu wynik syntetyczny jest skalowany do 0-100."
     )
 
-    def _summary_list_html(arche_items: List[str], values_mode: bool) -> str:
-        vals = [str(x) for x in (arche_items or []) if str(x).strip()]
-        if not vals:
-            return "<div class='small'>Brak danych.</div>"
-        out = ["<ol class='ioa-list'>"]
-        for a in vals:
-            lbl = str(brand_values.get(a, a)) if values_mode else str(a)
-            out.append(f"<li>{_icon_cell(a, lbl)}</li>")
-        out.append("</ol>")
-        return "".join(out)
+    def _fmt_cell(v: Any, digits: int) -> str:
+        try:
+            fv = float(v)
+        except Exception:
+            return "—"
+        if not np.isfinite(fv):
+            return "—"
+        return f"{fv:.{digits}f}"
 
-    top_expected = [str(x) for x in (expectation_summary_payload.get("top_expected", []) or [])]
-    bottom_expected = [str(x) for x in (expectation_summary_payload.get("bottom_expected", []) or [])]
-    top_ioa = [str(x) for x in (expectation_summary_payload.get("top_ioa", []) or [])]
-
-    expectation_summary_html = (
-        '<div class="label-arche">'
-        '<div class="ioa-summary-grid">'
-        '<div class="ioa-summary-item"><h4>3 najbardziej oczekiwane archetypy (% oczekujących)</h4>'
-        + _summary_list_html(top_expected, values_mode=False)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najmniej oczekiwane archetypy (% oczekujących)</h4>'
-        + _summary_list_html(bottom_expected, values_mode=False)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najsilniej oczekiwane archetypy (IOA 0-100)</h4>'
-        + _summary_list_html(top_ioa, values_mode=False)
-        + '</div>'
-        '</div>'
-        '</div>'
-        '<div class="label-values">'
-        '<div class="ioa-summary-grid">'
-        '<div class="ioa-summary-item"><h4>3 najbardziej oczekiwane wartości (% oczekujących)</h4>'
-        + _summary_list_html(top_expected, values_mode=True)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najmniej oczekiwane wartości (% oczekujących)</h4>'
-        + _summary_list_html(bottom_expected, values_mode=True)
-        + '</div>'
-        '<div class="ioa-summary-item"><h4>3 najsilniej oczekiwane wartości (IOW 0-100)</h4>'
-        + _summary_list_html(top_ioa, values_mode=True)
-        + '</div>'
-        '</div>'
-        '</div>'
-    )
-
-    def _ioa_main_table_dual(df_main: pd.DataFrame) -> str:
+    def _isoa_main_table_dual(df_main: pd.DataFrame) -> str:
         if df_main is None or len(df_main) == 0:
-            return '<div class="small">Brak danych dla tabeli głównej nowej sekcji.</div>'
+            return '<div class="small">Brak danych dla tabeli ISOA/ISOW.</div>'
 
+        base_cols = [
+            "Pozycja",
+            "Archetyp",
+            "ISOA 0-100",
+            "A: % oczekujących",
+            "B1: TOP3 (%)",
+            "B2: TOP1 (%)",
+            "C13/D13: negatywne doświadczenie (%)",
+            "C13/D13: bilans najważniejszego doświadczenia",
+            "Rdzeń oczekiwania",
+            "Presja doświadczenia",
+        ]
         d_a = df_main.copy()
+        d_a = d_a[[c for c in base_cols if c in d_a.columns]].copy()
+        if "Pozycja" in d_a.columns:
+            d_a["Pozycja"] = pd.to_numeric(d_a["Pozycja"], errors="coerce").fillna(0).astype(int)
+        for col, digits in [
+            ("ISOA 0-100", 1),
+            ("A: % oczekujących", 1),
+            ("B1: TOP3 (%)", 1),
+            ("B2: TOP1 (%)", 1),
+            ("C13/D13: negatywne doświadczenie (%)", 1),
+            ("C13/D13: bilans najważniejszego doświadczenia", 1),
+            ("Rdzeń oczekiwania", 2),
+            ("Presja doświadczenia", 2),
+        ]:
+            if col in d_a.columns:
+                d_a[col] = d_a[col].apply(lambda x, d=digits: _fmt_cell(x, d))
         if "Archetyp" in d_a.columns:
             d_a["Archetyp"] = d_a["Archetyp"].astype(str).apply(lambda a: _icon_cell(a, a))
         h_a = d_a.to_html(index=False, border=0, classes="tbl ioa-main-table", escape=False)
 
         d_v = df_main.copy()
+        d_v = d_v[[c for c in base_cols if c in d_v.columns]].copy()
+        if "Pozycja" in d_v.columns:
+            d_v["Pozycja"] = pd.to_numeric(d_v["Pozycja"], errors="coerce").fillna(0).astype(int)
+        for col, digits in [
+            ("ISOA 0-100", 1),
+            ("A: % oczekujących", 1),
+            ("B1: TOP3 (%)", 1),
+            ("B2: TOP1 (%)", 1),
+            ("C13/D13: negatywne doświadczenie (%)", 1),
+            ("C13/D13: bilans najważniejszego doświadczenia", 1),
+            ("Rdzeń oczekiwania", 2),
+            ("Presja doświadczenia", 2),
+        ]:
+            if col in d_v.columns:
+                d_v[col] = d_v[col].apply(lambda x, d=digits: _fmt_cell(x, d))
         if "Archetyp" in d_v.columns:
             d_v["Archetyp"] = d_v["Archetyp"].astype(str).apply(
-                lambda a: _icon_cell(a, brand_values.get(a, a))
+                lambda a: _icon_cell(a, str(brand_values.get(a, a)))
             )
-        d_v = d_v.rename(columns={
-            "IOA 0-100": "IOW 0-100",
-            "IOA raw (-3 do +3)": "IOW raw (-3 do +3)",
-        })
+            d_v = d_v.rename(columns={"Archetyp": "Wartość"})
+        d_v = d_v.rename(columns={"ISOA 0-100": "ISOW 0-100"})
         d_v = _values_mode_df(d_v)
         h_v = d_v.to_html(index=False, border=0, classes="tbl ioa-main-table", escape=False)
+        return f'<div class="label-arche">{h_a}</div><div class="label-values">{h_v}</div>'
 
-        note_arche = (
-            "<div class='small' style='margin-top:8px;'>"
-            "IOA raw = średni wynik score_mean w skali -3 do +3. "
-            "IOA 0-100 to przeskalowanie IOA raw do zakresu 0-100."
-            "</div>"
+    def _top_bottom_dual(df_main: pd.DataFrame) -> str:
+        if df_main is None or len(df_main) == 0 or "Archetyp" not in df_main.columns:
+            return "<div class='small'>Brak danych rankingowych.</div>"
+        d = df_main.copy()
+        d["ISOA 0-100"] = pd.to_numeric(d.get("ISOA 0-100"), errors="coerce")
+        d = d.dropna(subset=["ISOA 0-100"]).copy()
+        if d.empty:
+            return "<div class='small'>Brak danych rankingowych.</div>"
+        d = d.sort_values(["ISOA 0-100"], ascending=False, kind="mergesort")
+        top3 = d.head(3)["Archetyp"].astype(str).tolist()
+        bottom3 = d.tail(3)["Archetyp"].astype(str).tolist()
+
+        def _list_html(items: List[str], values_mode: bool) -> str:
+            if not items:
+                return "<div class='small'>Brak danych.</div>"
+            out = ["<ol class='ioa-list'>"]
+            for a in items:
+                lbl = str(brand_values.get(a, a)) if values_mode else str(a)
+                out.append(f"<li>{_icon_cell(a, lbl)}</li>")
+            out.append("</ol>")
+            return "".join(out)
+
+        return (
+            '<div class="label-arche"><div class="ioa-summary-grid">'
+            '<div class="ioa-summary-item"><h4>Top 3 archetypy (ISOA)</h4>'
+            + _list_html(top3, values_mode=False)
+            + "</div>"
+            '<div class="ioa-summary-item"><h4>Bottom 3 archetypy (ISOA)</h4>'
+            + _list_html(bottom3, values_mode=False)
+            + "</div></div></div>"
+            '<div class="label-values"><div class="ioa-summary-grid">'
+            '<div class="ioa-summary-item"><h4>Top 3 wartości (ISOW)</h4>'
+            + _list_html(top3, values_mode=True)
+            + "</div>"
+            '<div class="ioa-summary-item"><h4>Bottom 3 wartości (ISOW)</h4>'
+            + _list_html(bottom3, values_mode=True)
+            + "</div></div></div>"
         )
-        note_values = (
-            "<div class='small' style='margin-top:8px;'>"
-            "IOW raw = średni wynik score_mean w skali -3 do +3. "
-            "IOW 0-100 to przeskalowanie IOW raw do zakresu 0-100."
-            "</div>"
-        )
-        return f'<div class="label-arche">{h_a}{note_arche}</div><div class="label-values">{h_v}{note_values}</div>'
 
-    expectation_main_html = _ioa_main_table_dual(df_A_expectation_main)
-    expectation_pair_detail_html = (
-        df_to_html_dual(df_A_expectation_pair_detail, max_rows=60)
-        if len(df_A_expectation_pair_detail) > 0
-        else '<div class="small">Brak danych dla tabeli szczegółowej par.</div>'
-    )
-    expectation_balance_chart_html = img_tag_dual("A_expectation_balance_distribution.png")
-
-    expectation_panel_html = render_archetype_expectation_section(
-        methodology_text_arche=expectation_methodology_text_arche,
-        methodology_text_values=expectation_methodology_text_values,
+    isoa_isow_panel_html = render_isoa_isow_report_tab(
         data_basis_message=get_weighting_status_message(expectation_weighting_meta),
         data_basis_reason=str(expectation_weighting_meta.get("data_basis_reason", "")),
-        summary_block_html=expectation_summary_html,
-        main_table_html=expectation_main_html,
-        pair_detail_table_html=expectation_pair_detail_html,
-        balance_chart_html=expectation_balance_chart_html,
-        expected_chart_html=img_tag_dual("A_expectation_expected_pct.png"),
-        ioa_chart_html=img_tag_dual("A_expectation_ioa_100.png"),
+        methodology_text_arche=isoa_methodology_text_arche,
+        methodology_text_values=isoa_methodology_text_values,
+        table_html=_isoa_main_table_dual(df_social_expectation_index),
+        chart_html=img_tag_dual("ISOA_ISOW_wheel.png"),
+        top_bottom_html=_top_bottom_dual(df_social_expectation_index),
     )
 
     html_doc = f"""<html><head><meta charset="utf-8">{css}</head><body>
@@ -9384,8 +9670,8 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
 
 <div class="tabs">
   <input type="radio" name="tabs" id="tab0" checked>
-  <input type="radio" name="tabs" id="tabA">
   <input type="radio" name="tabs" id="tabW">
+  <input type="radio" name="tabs" id="tabA">
   <input type="radio" name="tabs" id="tabB">
   <input type="radio" name="tabs" id="tabD">
   <input type="radio" name="tabs" id="tabK">
@@ -9400,8 +9686,8 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
 
   <div class="labels">
     <label for="tab0">Podsumowanie</label>
+    <label for="tabW"><span class="mode-arche">ISOA</span><span class="mode-values">ISOW</span></label>
     <label for="tabA">Przywództwo</label>
-    <label for="tabW">IOA</label>
     <label for="tabB">Oczekiwania</label>
     <label for="tabD">Doświadczenia</label>
     <label for="tabS">Segmenty</label>
@@ -9449,6 +9735,8 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
     </div>
   </div>
 
+  {isoa_isow_panel_html}
+
   <div class="panel pA">
     <h2>Model preferowanego podejścia do spraw miasta</h2>
     <div class="small">
@@ -9488,8 +9776,6 @@ Plik autorski Badania.pro (narzędzie analityczne). Folder wyników: <span class
       {img_tag_dual("A_bilans_starc.png")}
     </div>
   </div>
-
-  {expectation_panel_html}
 
   <div class="panel pB">
     <h2>Oczekiwania wobec miasta (TOP3 i TOP1)</h2>
@@ -15276,7 +15562,7 @@ def _plot_segment_profile_wheel(outpath: Path,
             zorder=0,
         )
 
-    _ = mode  # compat: wykres segmentu zawsze pokazuje podpisy wartości
+    mode_norm = str(mode or "arche").strip().lower()
 
     for i, (arch, value_label, icon_file, color) in enumerate(ITEMS):
         center = 75 - i * 30
@@ -15363,7 +15649,7 @@ def _plot_segment_profile_wheel(outpath: Path,
             )
         )
 
-        ring_label = value_label
+        ring_label = str(brand_values.get(arch, value_label)) if mode_norm == "values" else str(arch)
         _draw_text_on_arc(
             ax=ax,
             text=ring_label,
@@ -16329,6 +16615,106 @@ def main() -> None:
         outdir / "D13_top1_values.png"
     )
 
+    # ===== ISOA/ISOW: syntetyczny indeks społecznego oczekiwania (A, B1, B2, C13/D13) =====
+    a_share_map = {str(a): float("nan") for a in ARCHETYPES}
+    if isinstance(df_A_expectation_main, pd.DataFrame) and (len(df_A_expectation_main) > 0):
+        _a_tmp = df_A_expectation_main.copy()
+        _a_tmp["archetype"] = _a_tmp.get("archetype", "").astype(str)
+        _a_tmp["expected_pct"] = pd.to_numeric(_a_tmp.get("expected_pct", np.nan), errors="coerce")
+        for _a in ARCHETYPES:
+            _row = _a_tmp[_a_tmp["archetype"] == str(_a)]
+            if len(_row) > 0:
+                a_share_map[str(_a)] = float(_row.iloc[0]["expected_pct"])
+
+    b1_share_map = compute_top3_share(df_B1, arch_names=ARCHETYPES)
+    b2_share_map = compute_top1_share(df_B2, arch_names=ARCHETYPES)
+    neg_share_map = compute_negative_experience_share(df_D12, arch_names=ARCHETYPES)
+    mbal_map, mneg_map, mpos_map, mbal_denom = compute_most_important_experience_balance(
+        d12=d12,
+        d13=d13,
+        weights=weights,
+        arch_names=ARCHETYPES,
+    )
+
+    df_social_expectation_index_tech, social_expectation_meta = compute_social_expectation_index(
+        a_pct=a_share_map,
+        b1_pct=b1_share_map,
+        b2_pct=b2_share_map,
+        n_pct=neg_share_map,
+        mbal_pp=mbal_map,
+        arch_names=ARCHETYPES,
+    )
+    social_expectation_meta["mbal_denominator_weight"] = float(mbal_denom)
+    social_expectation_meta["mneg_pct"] = {str(k): float(v) for k, v in mneg_map.items()}
+    social_expectation_meta["mpos_pct"] = {str(k): float(v) for k, v in mpos_map.items()}
+    social_expectation_meta["components_aligned"] = bool(
+        set(a_share_map.keys()) == set(ARCHETYPES)
+        and set(b1_share_map.keys()) == set(ARCHETYPES)
+        and set(b2_share_map.keys()) == set(ARCHETYPES)
+        and set(neg_share_map.keys()) == set(ARCHETYPES)
+        and set(mbal_map.keys()) == set(ARCHETYPES)
+    )
+
+    df_social_expectation_index = df_social_expectation_index_tech.rename(columns={
+        "position": "Pozycja",
+        "archetype": "Archetyp",
+        "SEI_100": "ISOA 0-100",
+        "A_pct": "A: % oczekujących",
+        "B1_pct": "B1: TOP3 (%)",
+        "B2_pct": "B2: TOP1 (%)",
+        "N_pct": "C13/D13: negatywne doświadczenie (%)",
+        "MBAL_pp": "C13/D13: bilans najważniejszego doświadczenia",
+        "core_E": "Rdzeń oczekiwania",
+        "pressure_D": "Presja doświadczenia",
+    }).copy()
+    for col, digits in [
+        ("ISOA 0-100", 1),
+        ("A: % oczekujących", 1),
+        ("B1: TOP3 (%)", 1),
+        ("B2: TOP1 (%)", 1),
+        ("C13/D13: negatywne doświadczenie (%)", 1),
+        ("C13/D13: bilans najważniejszego doświadczenia", 1),
+        ("Rdzeń oczekiwania", 2),
+        ("Presja doświadczenia", 2),
+    ]:
+        if col in df_social_expectation_index.columns:
+            df_social_expectation_index[col] = pd.to_numeric(
+                df_social_expectation_index[col], errors="coerce"
+            ).round(digits)
+    if "Pozycja" in df_social_expectation_index.columns:
+        df_social_expectation_index["Pozycja"] = pd.to_numeric(
+            df_social_expectation_index["Pozycja"], errors="coerce"
+        ).fillna(0).astype(int)
+
+    df_social_expectation_index_tech.to_csv(
+        outdir / "ISOA_ISOW_technical.csv", index=False, encoding="utf-8-sig"
+    )
+    df_social_expectation_index.to_csv(
+        outdir / "ISOA_ISOW_table.csv", index=False, encoding="utf-8-sig"
+    )
+
+    _isoa_series = (
+        df_social_expectation_index_tech.set_index("archetype")["SEI_100"].astype(float)
+        if ("archetype" in df_social_expectation_index_tech.columns and "SEI_100" in df_social_expectation_index_tech.columns)
+        else pd.Series(dtype=float)
+    )
+    _isoa_vals = np.asarray([float(_isoa_series.get(str(a), np.nan)) for a in ARCHETYPES], dtype=float)
+    _isoa_vals = np.where(np.isfinite(_isoa_vals), np.clip(_isoa_vals, 0.0, 100.0), 0.0)
+    _plot_segment_profile_wheel(
+        outpath=outdir / "ISOA_ISOW_wheel.png",
+        pm_share_pct=_isoa_vals,
+        brand_values=brand_values,
+        mode="arche",
+        value_suffix="",
+    )
+    _plot_segment_profile_wheel(
+        outpath=outdir / "ISOA_ISOW_wheel_values.png",
+        pm_share_pct=_isoa_vals,
+        brand_values=brand_values,
+        mode="values",
+        value_suffix="",
+    )
+
     # ===== TOP5 (A, B1, B2, D13) – poprawne % =====
     # + dodatkowo: pełne % dla WSZYSTKICH archetypów (dla zakładki "Filtry")
 
@@ -16880,6 +17266,8 @@ def main() -> None:
         df_A_expectation_pair_detail=df_A_expectation_pair_detail_out,
         expectation_summary_payload=expectation_summary_payload,
         expectation_weighting_meta=expectation_weighting_meta,
+        df_social_expectation_index=df_social_expectation_index,
+        social_expectation_meta=social_expectation_meta,
         seg_packs_render=seg_packs_render,
         filters_pct=filters_pct,
         brand_values=brand_values,

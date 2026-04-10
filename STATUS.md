@@ -27,9 +27,30 @@
      - `python -m py_compile send_link_jst.py db_jst_utils.py` (OK),
      - `npm run build` w `archetypy-ankieta` (OK).
 
-### W toku
-- Oczekuje realizacji `Krok 8` (stabilnosc eksportu HTML/ZIP, osadzanie zasobow, fonty i UX pobierania).
-- Pierwszy krok wykonawczy: audyt trybu standalone HTML vs ZIP i decyzja, czy wymuszamy ZIP albo poprawiamy self-contained HTML.
+### Zrobione: Hotfix H-011 (2026-04-10, popołudnie)
+- `app.py` (`🧭 Matching -> Podsumowanie`):
+  - `Oczekiwania mieszkańców` liczone nową metodą ISOA/ISOW:
+    - `E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)`,
+    - `D = 0.70*z(N) + 0.30*z(MBAL)`,
+    - `SEI_raw = 0.80*E + 0.20*D`,
+    - `SEI_100` przez min-max do `0..100` (fallback `50`),
+  - dodane helpery komponentowe (`compute_top3_share`, `compute_top1_share`, `compute_negative_experience_share`, `compute_most_important_experience_balance`),
+  - dodane radio trybu etykiet (`Archetypy`/`Wartości`) i dynamiczne nazewnictwo `ISOA` / `ISOW`,
+  - etykiety tabeli pozostają bez `"(%)"` przy `Profil polityka` i `Oczekiwania mieszkańców`,
+  - audyt komponentów pokazuje brakujące składowe bez wywalania sekcji.
+- `app.py` (`📊 Analiza badania mieszkańców`):
+  - podniesiony techniczny limit podglądu panelowego (`max(secret, safe_limit, 260MB)`),
+  - pełny podgląd dla dużych raportów można uruchamiać domyślnie z jasnym komunikatem (bez sugerowania błędu generowania).
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - policzony i zapisany nowy indeks (`ISOA_ISOW_technical.csv`, `ISOA_ISOW_table.csv`),
+  - dodana nowa zakładka raportowa zaraz po `Podsumowanie` z dynamiczną nazwą `ISOA`/`ISOW`,
+  - zakładka zawiera: metodologię, podstawę danych, wykres główny kołowy 0-100, tabelę, Top3/Bottom3,
+  - podpisy na wykresie kołowym zależne od trybu: archetypy (`Archetypy`) lub wartości (`Wartości`).
+- Synchronizacja lokalizacji generatora:
+  - zmiany skopiowane także do `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Testy:
+  - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
 
 ### Start Hotfix H-004 (2026-04-09, wieczor)
 - Zgloszone regresje:
@@ -294,6 +315,124 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Start Kroku 8 (2026-04-09, noc)
+- Przechodzimy do ostatniego otwartego etapu: stabilnosc eksportu raportu (`HTML/ZIP`), osadzanie zasobow, fonty i UX pobierania.
+- Pierwszy krok wykonawczy:
+  - audyt pipeline:
+    - `app.py` (podglad raportu, przyciski pobierania, komunikaty UX),
+    - `jst_analysis.py` (inline assets i bundlowanie ZIP),
+    - generator raportu (fonty i zaleznosci zasobow).
+
+### Zrobione w Kroku 8 (stabilnosc eksportu HTML/ZIP + fonty + UX pobierania)
+- `app.py` (`jst_analysis_view`):
+  - standalone HTML jest teraz jawnie kontrolowany limitem:
+    - nowy limit `JST_REPORT_STANDALONE_HTML_LIMIT_BYTES` (domyslnie `85_000_000`),
+    - przycisk `📥 Pobierz raport HTML (pełny)` jest aktywny tylko, gdy jednoplikowy HTML jest bezpieczny rozmiarowo,
+    - dla raportow zbyt ciezkich UI pokazuje jednoznaczny komunikat i kieruje do `ZIP`, bez mylacego pobierania niepelnego HTML.
+  - oba przyciski pobierania raportu (`HTML` i `ZIP`) maja `on_click=\"ignore\"`, co eliminuje rerun po kliknieciu i efekt "szarego zawieszenia",
+  - podglad online:
+    - po wylaczeniu `Tryb lekki renderowania` aplikacja probuje osadzic zasoby on-demand,
+    - jesli osadzenie jest mozliwe i miesci sie w limicie, renderuje pelna wersje,
+    - jesli nie (za duzy raport lub blad osadzania), pokazuje jasny komunikat zamiast mylacego niepelnego widoku.
+- `app.py`:
+  - dodano helper `_fmt_bytes_compact(...)` do czytelnych komunikatow o rozmiarze raportu.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dodano deterministyczny dobor fontu (`_candidate_font_files`, `_register_font`, `_pick_base_font`),
+  - `set_global_fonts()` korzysta z fontow repo (priorytet) i dopiero potem systemowych, aby wyrownac wyglad wykresow miedzy srodowiskami.
+- `assets/fonts/`:
+  - dodano `segoeui.ttf` i `segoeuib.ttf` jako fonty referencyjne.
+- Testy techniczne:
+  - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK),
+  - kontrolny pomiar dla runa Poznania:
+    - `raw_bytes = 6_014_713`,
+    - `inlined_bytes = 188_178_230` (potwierdza, dlaczego dla duzych raportow wymuszamy ZIP zamiast mylacego standalone HTML).
+
+### Start Hotfix H-007 (2026-04-10, noc)
+- Zgloszone problemy po wdrozeniu:
+  1. Ucinanie dolnej etykiety archetypu na radarze `Porównanie profili archetypowych`.
+  2. Zlewanie sie sekcji `Porównanie profili archetypowych` i `Profile archetypowe 0-100`.
+  3. Slaba czytelnosc interpretacji oceny dopasowania (`Ocena: ...`) i malo wyrazny pasek skali.
+  4. Bład callbacka przy pobieraniu (`TypeError: 'str' object is not callable`) po kliknieciu ZIP/HTML.
+  5. Komunikat o ciezkim standalone HTML odbierany jak blad generowania.
+  6. Nadal niespojna typografia wykresow raportu wzgledem wzorca.
+- Pierwszy krok wykonawczy:
+  - poprawic `app.py` (UI Matching + bezpieczny wrapper download), a nastepnie
+    domknac font pipeline w `jst_analysis.py` i `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`.
+
+### Start Hotfix H-008 (2026-04-10, rano)
+- Zgloszenie usera:
+  1. W sekcji `Profile archetypowe 0-100` tytuly profili maja byc wycentrowane na srodku wykresow.
+  2. `Oczekiwania mieszkańców (%)` maja byc liczone z pelnych wartosci A/B1/B2/D13
+     (bez wag komponentow 40/20/25/15).
+- Pierwszy krok wykonawczy:
+  - zmapowac miejsca renderu tytulow 0-100 i obliczen profilu JST w `app.py`,
+    potem podmienic formule oraz zsynchronizowac opis metodologii.
+
+### Zrobione w Hotfix H-008 (centrowanie tytulow 0-100 + nowa formula Oczekiwan mieszkancow)
+- `app.py`:
+  - w `🧭 Matching > Podsumowanie > Profile archetypowe 0-100` wycentrowano tytuly nad wykresami:
+    - `Profil archetypowy {osoba w dopelniaczu}`,
+    - `Profil archetypowy mieszkańców {JST w dopelniaczu}`.
+  - render samych obrazow 0-100 ustawiono kompatybilnie centrowo
+    (`use_container_width` -> `use_column_width` -> `width`), aby tytuly i wykresy byly osiowo spojne.
+  - `_calc_jst_target_profile(...)` liczy teraz wynik archetypu jako srednia z pelnych skladowych:
+    - `A_pct`, `B1_pct`, `B2_pct`, `D13_pct`,
+    - `score = (A_pct + B1_pct + B2_pct + D13_pct) / 4`.
+  - zaktualizowano opisy metodyki i etykiety tabeli audytu skladnikow
+    (pelne % dla A/B1/B2/D13 + `Średnia 4 komponentów`).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Start Hotfix H-009 (2026-04-10, rano)
+- Zgloszenie usera:
+  1. Za duze fonty po centrowaniu tytulow profili 0-100 (regresja wizualna).
+  2. Niejednoznaczny odbior wzoru `match = ...` (mylony z liczeniem `Oczekiwań mieszkańców (%)`).
+  3. Rozjazd czasu commita w stopce wzgledem GitHub `main`.
+- Pierwszy krok wykonawczy:
+  - skorygowac typografie Matching i podpis metryki,
+  - zmienic priorytet danych w `_app_build_signature()` na GitHub HEAD.
+
+### Zrobione w Hotfix H-009 (korekta typografii + stopka commita)
+- `app.py`:
+  - sekcja `🧭 Matching`:
+    - zmniejszono fonty naglowkow sekcji i tytulow kol 0-100 (koniec efektu "wielkich czcionek"),
+    - utrzymano centrowanie tytulow nad wykresami 0-100,
+    - dopisano jasny komunikat: wzor `match = ...` dotyczy tylko `Poziomu dopasowania`,
+      nie liczenia `Oczekiwań mieszkańców (%)`.
+  - `_app_build_signature()`:
+    - priorytet: GitHub HEAD (`main`) -> lokalny git -> env/secrets/`.deployed_sha`,
+    - fallback czasu dla konkretnego SHA przez GitHub API, gdy brak lokalnej daty.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Start Hotfix H-010 (2026-04-10, rano)
+- Zgloszenie usera:
+  1. Edytor `segment_hit_threshold_overrides` wywala bledy parsera i `StreamlitAPIException` po probie zapisu/resetu.
+  2. Sekcje `Porównanie profili archetypowych` oraz `Profile archetypowe 0-100` nadal wizualnie "odstaja".
+  3. `Oczekiwania mieszkańców (%)` sa odbierane jako zbyt plaskie i wymagaja mocniejszego docenienia sygnalu TOP1.
+- Pierwszy krok wykonawczy:
+  - naprawic parser + reset edytora progow, nastepnie uproscic styl sekcji Matching i podmienic formule `Oczekiwań mieszkańców`.
+
+### Zrobione w Hotfix H-010 (progi segmentow + Matching + nowa formula oczekiwan)
+- `app.py`:
+  - parser progow `segment_hit_threshold_overrides`:
+    - obsluguje JSON oraz format liniowy `segment: wartosc` / `segment = wartosc`,
+    - toleruje smart quotes i typowe wklejki z przecinkami,
+    - przy bledzie pokazuje konkretna, problematyczna linie.
+  - reset/zapis progow:
+    - przeniesiono na mechanizm `pending` + `st.rerun()` (bez modyfikacji aktywnego klucza widgetu),
+    - usunieto zrodlo `StreamlitAPIException` z ekranu 2787.
+  - `Oczekiwania mieszkańców (%)`:
+    - nowa formula z premia TOP1:
+      `score = (A_pct + B1_pct + 2*B2_pct + 2*D13_pct) / 6`,
+    - opisy metodyki i etykiety tabeli audytu dopasowano do nowej formuly.
+  - UI Matching:
+    - sekcje `Porównanie...` i `Profile...` maja prostszy, mniej "kartowy" styl (separator dolny zamiast pelnego boxa).
+  - stopka build:
+    - cache metadanych GitHub skrocony do `60s`, aby szybciej pokazywac najnowszy commit po deployu.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -302,5 +441,7 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Rozpoczac `Krok 8`: naprawic zachowanie eksportu raportu (HTML/ZIP),
-  z naciskiem na standalone HTML, osadzanie zasobow i UX przyciskow pobierania.
+- Zweryfikowac E2E na deployu:
+  1) czy stopka po odswiezeniu pokazuje najnowszy commit z `main`,
+  2) czy nowe sekcje w `🧭 Matching` wizualnie pasuja do reszty panelu,
+  3) czy nowa formula `Oczekiwań mieszkańców (%)` daje bardziej rozroznialny profil.

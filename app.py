@@ -2221,6 +2221,8 @@ def jst_analysis_view() -> None:
     inline_limit = int(st.secrets.get("JST_REPORT_INLINE_LIMIT_BYTES", 45_000_000) or 45_000_000)
     inline_source_limit = int(st.secrets.get("JST_REPORT_INLINE_SOURCE_LIMIT_BYTES", 70_000_000) or 70_000_000)
     safe_message_limit = int(st.secrets.get("JST_REPORT_SAFE_MESSAGE_LIMIT_BYTES", 185_000_000) or 185_000_000)
+    hard_limit_cfg = int(st.secrets.get("JST_REPORT_PANEL_HARD_LIMIT_BYTES", 0) or 0)
+    panel_hard_limit = int(max(hard_limit_cfg, safe_message_limit, 260_000_000))
     standalone_html_limit = int(
         st.secrets.get("JST_REPORT_STANDALONE_HTML_LIMIT_BYTES", 85_000_000) or 85_000_000
     )
@@ -2340,6 +2342,7 @@ def jst_analysis_view() -> None:
                     "inline_limit": inline_limit,
                     "inline_source_limit": inline_source_limit,
                     "safe_message_limit": safe_message_limit,
+                    "panel_hard_limit": panel_hard_limit,
                     "standalone_html_limit": standalone_html_limit,
                 }
                 st.session_state.pop(preview_inline_key, None)
@@ -2365,6 +2368,7 @@ def jst_analysis_view() -> None:
     inlined_bytes = int(meta.get("inlined_bytes") or 0)
     inlined_used = bool(meta.get("inlined_used"))
     safe_limit = int(meta.get("safe_message_limit") or safe_message_limit)
+    hard_limit = int(meta.get("panel_hard_limit") or panel_hard_limit)
     standalone_limit = int(meta.get("standalone_html_limit") or standalone_html_limit)
     raw_report_for_preview = ""
 
@@ -2455,6 +2459,7 @@ def jst_analysis_view() -> None:
         value=auto_light,
         key=f"jst_light_mode_{sid}",
     )
+    force_heavy_preview = False
     to_render = ""
     if light_mode:
         if report_path and report_path.exists():
@@ -2488,7 +2493,7 @@ def jst_analysis_view() -> None:
                                 "error": "",
                             }
                         else:
-                            st.session_state[preview_inline_key] = "__too_large__"
+                            st.session_state[preview_inline_key] = inlined_preview
                             st.session_state[preview_inline_meta_key] = {
                                 "status": "too_large",
                                 "bytes": inlined_preview_bytes,
@@ -2510,9 +2515,21 @@ def jst_analysis_view() -> None:
             elif status == "too_large":
                 sz = _fmt_bytes_compact(int(cached_meta.get("bytes") or 0))
                 lim = _fmt_bytes_compact(safe_limit)
-                st.error(f"Pełny podgląd jest zbyt duży dla panelu ({sz} > {lim}).")
-                st.info("Włącz „Tryb lekki renderowania” albo pobierz raport ZIP (WYNIKI) i otwórz lokalnie.")
-                return
+                st.warning(
+                    "Pełny podgląd jest duży dla panelu, ale możesz go uruchomić: "
+                    f"{sz} (zalecany bezpieczny limit: {lim})."
+                )
+                force_heavy_preview = st.toggle(
+                    "Pokaż pełny podgląd mimo dużego rozmiaru",
+                    value=True,
+                    key=f"jst_force_heavy_preview_{sid}",
+                )
+                if force_heavy_preview and isinstance(cached_inline, str) and cached_inline:
+                    to_render = cached_inline
+                    st.info("Uruchomiono pełny podgląd. Jeśli panel zwolni, przełącz na tryb lekki.")
+                else:
+                    st.info("Włącz „Tryb lekki renderowania” albo pobierz raport ZIP (WYNIKI) i otwórz lokalnie.")
+                    return
             else:
                 err = str(cached_meta.get("error") or "").strip()
                 st.error("Nie udało się osadzić zasobów pełnego podglądu w panelu.")
@@ -2522,11 +2539,17 @@ def jst_analysis_view() -> None:
                 return
 
     render_size = len(to_render.encode("utf-8", errors="ignore"))
-    if render_size > safe_limit:
+    if render_size > hard_limit:
+        st.error(
+            f"Podgląd raportu przekracza techniczny limit panelu ({_fmt_bytes_compact(render_size)} > {_fmt_bytes_compact(hard_limit)})."
+        )
+        st.info("Użyj trybu lekkiego albo pobierz raport ZIP (WYNIKI) i otwórz lokalnie.")
+        return
+    if render_size > safe_limit and not force_heavy_preview:
         st.error(
             "Podgląd raportu w panelu został wyłączony, bo przekracza bezpieczny limit przesyłania danych do przeglądarki."
         )
-        st.info("Użyj przycisku „📥 Pobierz raport HTML (pełny)” lub „🧳 Pobierz raport ZIP (WYNIKI)” i otwórz lokalnie.")
+        st.info("Włącz tryb lekki albo użyj trybu wymuszonego przy pełnym podglądzie.")
         return
 
     prepared = _prepare_report_html_for_iframe(to_render)
@@ -2591,132 +2614,541 @@ JST_A_PAIRS: List[Tuple[str, str, str]] = [
 JST_A_PAIR_COUNTS: Dict[str, int] = {
     a: sum(1 for _, left, right in JST_A_PAIRS if left == a or right == a) for a in JST_ARCHETYPES
 }
-JST_EXPECTATION_COMPONENT_WEIGHTS: Dict[str, float] = {
-    "A": 1.0,
-    "B1": 1.0,
-    "B2": 2.0,   # bonus za TOP1 mieszkańców
-    "D13": 2.0,  # bonus za TOP1 w pytaniu D13
+JST_D_ITEMS: List[Tuple[str, str]] = [
+    ("D1", "Władca"),
+    ("D2", "Bohater"),
+    ("D3", "Mędrzec"),
+    ("D4", "Opiekun"),
+    ("D5", "Kochanek"),
+    ("D6", "Błazen"),
+    ("D7", "Twórca"),
+    ("D8", "Odkrywca"),
+    ("D9", "Czarodziej"),
+    ("D10", "Towarzysz"),
+    ("D11", "Niewinny"),
+    ("D12", "Buntownik"),
+]
+JST_D_BY_ARCH: Dict[str, str] = {arch: qid for qid, arch in JST_D_ITEMS}
+JST_VALUE_BY_ARCH: Dict[str, str] = {
+    "Buntownik": "Odnowa",
+    "Błazen": "Otwartość",
+    "Kochanek": "Relacje",
+    "Opiekun": "Troska",
+    "Towarzysz": "Współpraca",
+    "Niewinny": "Przejrzystość",
+    "Władca": "Skuteczność",
+    "Mędrzec": "Racjonalność",
+    "Czarodziej": "Wizja",
+    "Bohater": "Odwaga",
+    "Twórca": "Rozwój",
+    "Odkrywca": "Wolność",
 }
-JST_EXPECTATION_WEIGHT_SUM: float = float(sum(JST_EXPECTATION_COMPONENT_WEIGHTS.values()) or 1.0)
+JST_ARCH_BY_KEY: Dict[str, str] = {}
+for _idx, _arch in enumerate(JST_ARCHETYPES):
+    _k = str(_arch or "").strip()
+    if _k:
+        JST_ARCH_BY_KEY[_k.casefold()] = _arch
+    JST_ARCH_BY_KEY[str(_idx + 1)] = _arch
+    JST_ARCH_BY_KEY[str(_idx)] = _arch
+del _idx
+del _arch
+del _k
 
 
-def _calc_jst_target_profile(rows: List[Dict[str, Any]]) -> Tuple[Dict[str, float], List[Dict[str, Any]], Dict[str, Any]]:
+def compute_top3_share(hit_weight_by_archetype: Dict[str, float], answered_weight: float) -> Dict[str, float]:
+    return {
+        a: (100.0 * float(hit_weight_by_archetype.get(a, 0.0)) / float(answered_weight)) if float(answered_weight) > 0 else float("nan")
+        for a in JST_ARCHETYPES
+    }
+
+
+def compute_top1_share(hit_weight_by_archetype: Dict[str, float], answered_weight: float) -> Dict[str, float]:
+    return {
+        a: (100.0 * float(hit_weight_by_archetype.get(a, 0.0)) / float(answered_weight)) if float(answered_weight) > 0 else float("nan")
+        for a in JST_ARCHETYPES
+    }
+
+
+def compute_negative_experience_share(neg_weight_by_archetype: Dict[str, float], answered_weight_by_archetype: Dict[str, float]) -> Dict[str, float]:
+    return {
+        a: (
+            100.0 * float(neg_weight_by_archetype.get(a, 0.0)) / float(answered_weight_by_archetype.get(a, 0.0))
+            if float(answered_weight_by_archetype.get(a, 0.0)) > 0
+            else float("nan")
+        )
+        for a in JST_ARCHETYPES
+    }
+
+
+def compute_most_important_experience_balance(
+    negative_weight_by_archetype: Dict[str, float],
+    positive_weight_by_archetype: Dict[str, float],
+    answered_weight: float,
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float]]:
+    mneg = {
+        a: (100.0 * float(negative_weight_by_archetype.get(a, 0.0)) / float(answered_weight)) if float(answered_weight) > 0 else float("nan")
+        for a in JST_ARCHETYPES
+    }
+    mpos = {
+        a: (100.0 * float(positive_weight_by_archetype.get(a, 0.0)) / float(answered_weight)) if float(answered_weight) > 0 else float("nan")
+        for a in JST_ARCHETYPES
+    }
+    mbal = {
+        a: (
+            float(mneg.get(a, float("nan"))) - float(mpos.get(a, float("nan")))
+            if math.isfinite(float(mneg.get(a, float("nan")))) and math.isfinite(float(mpos.get(a, float("nan"))))
+            else float("nan")
+        )
+        for a in JST_ARCHETYPES
+    }
+    return mbal, mneg, mpos
+
+
+def _matching_mode_labels(mode_choice: str) -> Tuple[str, str, str]:
+    pick = str(mode_choice or "").strip().lower()
+    if pick.startswith("wart"):
+        return (
+            "ISOW",
+            "Indeks Społecznego Oczekiwania Wartości (ISOW)",
+            "Wartość",
+        )
+    return (
+        "ISOA",
+        "Indeks Społecznego Oczekiwania Archetypu (ISOA)",
+        "Archetyp",
+    )
+
+
+def _matching_entity_name(entity: str, axis_label: str) -> str:
+    if str(axis_label) == "Wartość":
+        return str(JST_VALUE_BY_ARCH.get(str(entity), str(entity)))
+    return str(entity)
+
+
+def _parse_a_value(raw: Any) -> Optional[int]:
+    try:
+        val = int(float(str(raw).strip().replace(",", ".")))
+    except Exception:
+        return None
+    return val if 1 <= val <= 7 else None
+
+
+def _parse_binary_mark(raw: Any) -> Optional[bool]:
+    if raw is None:
+        return None
+    txt = str(raw).strip().lower()
+    if not txt:
+        return None
+    if txt in {"1", "1.0", "true", "t", "tak", "yes", "y", "x", "on"}:
+        return True
+    if txt in {"0", "0.0", "false", "f", "nie", "no", "n", "off"}:
+        return False
+    try:
+        return float(txt.replace(",", ".")) > 0.0
+    except Exception:
+        return None
+
+
+def _parse_archetype_choice(raw: Any) -> Optional[str]:
+    txt = str(raw or "").strip()
+    if not txt:
+        return None
+    key = txt.casefold()
+    if key in JST_ARCH_BY_KEY:
+        return JST_ARCH_BY_KEY[key]
+    m = re.search(r"(\d+)", txt)
+    if m:
+        key_num = str(int(m.group(1)))
+        if key_num in JST_ARCH_BY_KEY:
+            return JST_ARCH_BY_KEY[key_num]
+    return None
+
+
+def _parse_ab_choice(raw: Any) -> Optional[str]:
+    txt = str(raw or "").strip()
+    if not txt:
+        return None
+    up = txt.upper()
+    if up in {"A", "B"}:
+        return up
+    if txt in {"1", "2"}:
+        return "A" if txt == "1" else "B"
+    if up.startswith("A"):
+        return "A"
+    if up.startswith("B"):
+        return "B"
+    return None
+
+
+def safe_zscore_by_archetype(values: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
+    vals = [float(values.get(a, float("nan"))) for a in JST_ARCHETYPES]
+    finite_vals = [v for v in vals if math.isfinite(v)]
+    if len(finite_vals) < 2:
+        return {a: 0.0 for a in JST_ARCHETYPES}, {"mean": float("nan"), "std": 0.0}
+    mean_val = float(sum(finite_vals) / len(finite_vals))
+    variance = float(sum((v - mean_val) ** 2 for v in finite_vals) / len(finite_vals))
+    std_val = math.sqrt(max(0.0, variance))
+    if not math.isfinite(std_val) or std_val <= 1e-12:
+        return {a: 0.0 for a in JST_ARCHETYPES}, {"mean": mean_val, "std": 0.0}
+    out: Dict[str, float] = {}
+    for a in JST_ARCHETYPES:
+        v = float(values.get(a, float("nan")))
+        out[a] = float((v - mean_val) / std_val) if math.isfinite(v) else 0.0
+    return out, {"mean": mean_val, "std": std_val}
+
+
+def build_social_expectation_core(
+    z_a: Dict[str, float],
+    z_b1: Dict[str, float],
+    z_b2: Dict[str, float],
+) -> Dict[str, float]:
+    return {
+        a: float(0.50 * float(z_a.get(a, 0.0)) + 0.20 * float(z_b1.get(a, 0.0)) + 0.30 * float(z_b2.get(a, 0.0)))
+        for a in JST_ARCHETYPES
+    }
+
+
+def build_experience_pressure(
+    z_n: Dict[str, float],
+    z_mbal: Dict[str, float],
+) -> Dict[str, float]:
+    return {
+        a: float(0.70 * float(z_n.get(a, 0.0)) + 0.30 * float(z_mbal.get(a, 0.0)))
+        for a in JST_ARCHETYPES
+    }
+
+
+def compute_social_expectation_index(
+    core: Dict[str, float],
+    pressure: Dict[str, float],
+) -> Tuple[Dict[str, float], Dict[str, float]]:
+    raw = {
+        a: float(0.80 * float(core.get(a, 0.0)) + 0.20 * float(pressure.get(a, 0.0)))
+        for a in JST_ARCHETYPES
+    }
+    raw_vals = [float(raw[a]) for a in JST_ARCHETYPES if math.isfinite(float(raw[a]))]
+    if raw_vals:
+        r_min = min(raw_vals)
+        r_max = max(raw_vals)
+    else:
+        r_min, r_max = 0.0, 0.0
+    if r_max > r_min:
+        scaled = {
+            a: float(max(0.0, min(100.0, 100.0 * (float(raw[a]) - r_min) / (r_max - r_min))))
+            for a in JST_ARCHETYPES
+        }
+    else:
+        scaled = {a: 50.0 for a in JST_ARCHETYPES}
+    return raw, scaled
+
+
+def update_matching_summary_description(sei_short: str, sei_full: str, data_basis: str) -> str:
+    return (
+        f"Kolumna `Oczekiwania mieszkańców ({sei_short})` pokazuje `{sei_full}` w skali 0–100 "
+        f"(to indeks syntetyczny, nie procent mieszkańców). "
+        f"Podstawa danych: {data_basis}."
+    )
+
+
+def _calc_jst_target_profile(
+    rows: List[Dict[str, Any]],
+    row_weights: Optional[List[float]] = None,
+) -> Tuple[Dict[str, float], List[Dict[str, Any]], Dict[str, Any]]:
     if not rows:
         return {}, [], {}
-    totals = {a: 0.0 for a in JST_ARCHETYPES}
+
+    rows_n = int(len(rows))
+    if row_weights and len(row_weights) == rows_n:
+        weights = [float(w) if math.isfinite(float(w)) and float(w) > 0 else 1.0 for w in row_weights]
+    else:
+        weights = [1.0] * rows_n
+    mean_w = float(sum(weights) / max(1, len(weights)))
+    if mean_w > 0:
+        weights = [float(max(0.0, w / mean_w)) for w in weights]
+    total_w = float(sum(weights)) or float(rows_n) or 1.0
+
+    a_num = {a: 0.0 for a in JST_ARCHETYPES}
+    a_den = {a: 0.0 for a in JST_ARCHETYPES}
+    a_valid_by_q_w = {qid: 0.0 for qid, _, _ in JST_A_PAIRS}
+    b1_num = {a: 0.0 for a in JST_ARCHETYPES}
+    b1_den = 0.0
+    b2_num = {a: 0.0 for a in JST_ARCHETYPES}
+    b2_den = 0.0
+    n_neg_num = {a: 0.0 for a in JST_ARCHETYPES}
+    n_den = {a: 0.0 for a in JST_ARCHETYPES}
+    mbal_neg_num = {a: 0.0 for a in JST_ARCHETYPES}
+    mbal_pos_num = {a: 0.0 for a in JST_ARCHETYPES}
+    d13_den = 0.0
+
     respondent_vectors: List[Dict[str, Any]] = []
-    component_sums: Dict[str, Dict[str, float]] = {
-        a: {"A": 0.0, "B1": 0.0, "B2": 0.0, "D13": 0.0, "TOTAL": 0.0} for a in JST_ARCHETYPES
-    }
-    a_valid_total = 0
-    a_expected_total = len(rows) * len(JST_A_PAIRS)
-    a_valid_by_q = {qid: 0 for qid, _, _ in JST_A_PAIRS}
-    b1_selected_total = 0
-    b2_valid_total = 0
-    d13_valid_total = 0
+    b1_selected_total = 0.0
+    b2_valid_total_w = 0.0
+    d13_valid_total_w = 0.0
 
-    def _parse_a_value(raw: Any) -> Optional[int]:
-        try:
-            val = int(float(str(raw).strip().replace(",", ".")))
-        except Exception:
-            return None
-        return val if 1 <= val <= 7 else None
-
-    for rec in rows:
+    for idx, rec in enumerate(rows):
         payload = rec.get("payload") or {}
         if not isinstance(payload, dict):
             payload = {}
+        w = float(weights[idx]) if idx < len(weights) else 1.0
+        if w <= 0:
+            continue
 
-        # Oczekiwania mieszkańców z komponentów A/B1/B2/D13:
-        # - A: pełny % społecznego oczekiwania archetypu z par A1..A18 (0..100),
-        # - B1/B2/D13: pełne % trafień archetypu w tych pytaniach (0..100).
-        # Finalny wynik archetypu to średnia ważona z premią TOP1:
-        # score = (1*A_pct + 1*B1_pct + 2*B2_pct + 2*D13_pct) / 6
-        # Skala nie jest sztucznie zamykana do 100% sumarycznie między archetypami.
-        a_acc = {a: 0.0 for a in JST_ARCHETYPES}
+        a_score_sum = {a: 0.0 for a in JST_ARCHETYPES}
+        a_score_cnt = {a: 0 for a in JST_ARCHETYPES}
         for qid, left_arch, right_arch in JST_A_PAIRS:
             val = _parse_a_value(payload.get(qid))
             if val is None:
                 continue
-            a_valid_total += 1
-            a_valid_by_q[qid] = int(a_valid_by_q.get(qid, 0)) + 1
-            p_right = float(val - 1) / 6.0
-            p_left = 1.0 - p_right
-            if left_arch in a_acc:
-                a_acc[left_arch] += p_left
-            if right_arch in a_acc:
-                a_acc[right_arch] += p_right
+            a_valid_by_q_w[qid] = float(a_valid_by_q_w.get(qid, 0.0)) + w
+            points_left = float(4 - val)
+            points_right = float(val - 4)
+            a_score_sum[left_arch] += points_left
+            a_score_cnt[left_arch] = int(a_score_cnt.get(left_arch, 0)) + 1
+            a_score_sum[right_arch] += points_right
+            a_score_cnt[right_arch] = int(a_score_cnt.get(right_arch, 0)) + 1
 
-        selected_b1 = {
-            a
-            for a in JST_ARCHETYPES
-            if str(payload.get(f"B1_{a}") or "").strip().lower() in {"1", "1.0", "true", "t", "tak", "yes", "y"}
-        }
-        arch_by_lower = {a.casefold(): a for a in JST_ARCHETYPES}
-        b2_raw = str(payload.get("B2") or "").strip()
-        d13_raw = str(payload.get("D13") or "").strip()
-        b2 = arch_by_lower.get(b2_raw.casefold(), b2_raw)
-        d13 = arch_by_lower.get(d13_raw.casefold(), d13_raw)
-        b1_selected_total += int(len(selected_b1))
+        b1_selected: set[str] = set()
+        b1_answered = False
+        for a in JST_ARCHETYPES:
+            mark = _parse_binary_mark(payload.get(f"B1_{a}"))
+            if mark is None:
+                continue
+            b1_answered = True
+            if mark:
+                b1_selected.add(a)
+        if b1_answered:
+            b1_den += w
+            b1_selected_total += float(len(b1_selected)) * w
+            for a in b1_selected:
+                b1_num[a] += w
+
+        b2 = _parse_archetype_choice(payload.get("B2"))
         if b2 in JST_ARCHETYPES:
-            b2_valid_total += 1
+            b2_den += w
+            b2_num[b2] += w
+            b2_valid_total_w += w
+
+        d12_choice_by_arch: Dict[str, Optional[str]] = {}
+        for qid, a in JST_D_ITEMS:
+            choice = _parse_ab_choice(payload.get(qid))
+            d12_choice_by_arch[a] = choice
+            if choice is None:
+                continue
+            n_den[a] += w
+            if choice == "B":
+                n_neg_num[a] += w
+
+        d13 = _parse_archetype_choice(payload.get("D13"))
         if d13 in JST_ARCHETYPES:
-            d13_valid_total += 1
+            d13_den += w
+            d13_valid_total_w += w
+            selected_d_choice = d12_choice_by_arch.get(d13)
+            if selected_d_choice == "B":
+                mbal_neg_num[d13] += w
+            elif selected_d_choice == "A":
+                mbal_pos_num[d13] += w
 
         vec: Dict[str, float] = {}
         for a in JST_ARCHETYPES:
-            denom = float(JST_A_PAIR_COUNTS.get(a, 1) or 1)
-            a_norm = float(a_acc.get(a, 0.0)) / denom
-            b1_hit = 1.0 if a in selected_b1 else 0.0
-            b2_hit = 1.0 if b2 == a else 0.0
-            d13_hit = 1.0 if d13 == a else 0.0
-            a_component = a_norm * 100.0
-            b1_component = b1_hit * 100.0
-            b2_component = b2_hit * 100.0
-            d13_component = d13_hit * 100.0
-            score = (
-                JST_EXPECTATION_COMPONENT_WEIGHTS["A"] * a_component
-                + JST_EXPECTATION_COMPONENT_WEIGHTS["B1"] * b1_component
-                + JST_EXPECTATION_COMPONENT_WEIGHTS["B2"] * b2_component
-                + JST_EXPECTATION_COMPONENT_WEIGHTS["D13"] * d13_component
-            ) / JST_EXPECTATION_WEIGHT_SUM
-            vec[a] = score
-            component_sums[a]["A"] += a_component
-            component_sums[a]["B1"] += b1_component
-            component_sums[a]["B2"] += b2_component
-            component_sums[a]["D13"] += d13_component
-            component_sums[a]["TOTAL"] += score
+            cnt = int(a_score_cnt.get(a, 0))
+            if cnt > 0:
+                score_mean = float(a_score_sum.get(a, 0.0)) / float(cnt)
+                a_strength = max(0.0, min(100.0, ((score_mean + 3.0) / 6.0) * 100.0))
+                a_den[a] += w
+                if score_mean > 0:
+                    a_num[a] += w
+            else:
+                a_strength = 50.0
+            b1_hit = 100.0 if a in b1_selected else 0.0
+            b2_hit = 100.0 if b2 == a else 0.0
+            d13_hit = 100.0 if d13 == a else 0.0
+            vec[a] = float((a_strength + b1_hit + b2_hit + d13_hit) / 4.0)
 
-        for a in JST_ARCHETYPES:
-            totals[a] += vec[a]
-        respondent_vectors.append({"payload": payload, "vec": vec})
+        respondent_vectors.append({"payload": payload, "vec": vec, "weight": w})
 
-    n = float(len(rows))
-    profile = {a: round((totals[a] / n), 2) for a in JST_ARCHETYPES}
-    rows_n = int(len(rows))
-    component_means = {
+    comp_A = {
+        a: (100.0 * float(a_num[a]) / float(a_den[a])) if float(a_den[a]) > 0 else float("nan")
+        for a in JST_ARCHETYPES
+    }
+    comp_B1 = compute_top3_share(b1_num, b1_den)
+    comp_B2 = compute_top1_share(b2_num, b2_den)
+    comp_N = compute_negative_experience_share(n_neg_num, n_den)
+    comp_MBAL, comp_MNEG, comp_MPOS = compute_most_important_experience_balance(
+        negative_weight_by_archetype=mbal_neg_num,
+        positive_weight_by_archetype=mbal_pos_num,
+        answered_weight=d13_den,
+    )
+    expected_arches = set(JST_ARCHETYPES)
+    components_aligned = all(
+        set(comp.keys()) == expected_arches
+        for comp in (comp_A, comp_B1, comp_B2, comp_N, comp_MBAL)
+    )
+
+    z_A, z_meta_A = safe_zscore_by_archetype(comp_A)
+    z_B1, z_meta_B1 = safe_zscore_by_archetype(comp_B1)
+    z_B2, z_meta_B2 = safe_zscore_by_archetype(comp_B2)
+    z_N, z_meta_N = safe_zscore_by_archetype(comp_N)
+    z_MBAL, z_meta_MBAL = safe_zscore_by_archetype(comp_MBAL)
+
+    core_E = build_social_expectation_core(z_A, z_B1, z_B2)
+    press_D = build_experience_pressure(z_N, z_MBAL)
+    sei_raw, sei_100 = compute_social_expectation_index(core_E, press_D)
+
+    profile = {a: round(float(sei_100[a]), 2) for a in JST_ARCHETYPES}
+    component_rows = {
         a: {
-            "A": round(component_sums[a]["A"] / max(1, rows_n), 2),
-            "B1": round(component_sums[a]["B1"] / max(1, rows_n), 2),
-            "B2": round(component_sums[a]["B2"] / max(1, rows_n), 2),
-            "D13": round(component_sums[a]["D13"] / max(1, rows_n), 2),
-            "TOTAL": round(component_sums[a]["TOTAL"] / max(1, rows_n), 2),
+            "A": round(float(comp_A.get(a, float("nan"))), 3) if math.isfinite(float(comp_A.get(a, float("nan")))) else float("nan"),
+            "B1": round(float(comp_B1.get(a, float("nan"))), 3) if math.isfinite(float(comp_B1.get(a, float("nan")))) else float("nan"),
+            "B2": round(float(comp_B2.get(a, float("nan"))), 3) if math.isfinite(float(comp_B2.get(a, float("nan")))) else float("nan"),
+            "N": round(float(comp_N.get(a, float("nan"))), 3) if math.isfinite(float(comp_N.get(a, float("nan")))) else float("nan"),
+            "MBAL": round(float(comp_MBAL.get(a, float("nan"))), 3) if math.isfinite(float(comp_MBAL.get(a, float("nan")))) else float("nan"),
+            "E": round(float(core_E.get(a, 0.0)), 4),
+            "D": round(float(press_D.get(a, 0.0)), 4),
+            "SEI_raw": round(float(sei_raw.get(a, 0.0)), 4),
+            "SEI_100": round(float(sei_100.get(a, 50.0)), 3),
         }
         for a in JST_ARCHETYPES
     }
+    component_missing_counts = {
+        "A": int(sum(0 if math.isfinite(float(comp_A.get(a, float("nan")))) else 1 for a in JST_ARCHETYPES)),
+        "B1": int(sum(0 if math.isfinite(float(comp_B1.get(a, float("nan")))) else 1 for a in JST_ARCHETYPES)),
+        "B2": int(sum(0 if math.isfinite(float(comp_B2.get(a, float("nan")))) else 1 for a in JST_ARCHETYPES)),
+        "N": int(sum(0 if math.isfinite(float(comp_N.get(a, float("nan")))) else 1 for a in JST_ARCHETYPES)),
+        "MBAL": int(sum(0 if math.isfinite(float(comp_MBAL.get(a, float("nan")))) else 1 for a in JST_ARCHETYPES)),
+    }
+
     audit: Dict[str, Any] = {
         "rows_n": rows_n,
-        "a_valid_rate_pct": round((100.0 * a_valid_total / a_expected_total), 1) if a_expected_total > 0 else 0.0,
+        "weights_applied": bool(row_weights and len(row_weights) == rows_n),
+        "a_valid_rate_pct": round((100.0 * sum(float(v) for v in a_valid_by_q_w.values()) / max(1.0, total_w * len(JST_A_PAIRS))), 1),
         "a_valid_by_q_rate_pct": {
-            qid: round((100.0 * int(cnt) / max(1, rows_n)), 1) for qid, cnt in a_valid_by_q.items()
+            qid: round((100.0 * float(a_valid_by_q_w.get(qid, 0.0)) / max(1.0, total_w)), 1)
+            for qid, _, _ in JST_A_PAIRS
         },
-        "b1_mean_selected": round(float(b1_selected_total) / max(1, rows_n), 2),
-        "b2_valid_rate_pct": round((100.0 * b2_valid_total / max(1, rows_n)), 1),
-        "d13_valid_rate_pct": round((100.0 * d13_valid_total / max(1, rows_n)), 1),
-        "component_means_by_archetype": component_means,
-        "component_weights": dict(JST_EXPECTATION_COMPONENT_WEIGHTS),
+        "b1_valid_rate_pct": round((100.0 * float(b1_den) / max(1.0, total_w)), 1),
+        "b2_valid_rate_pct": round((100.0 * float(b2_valid_total_w) / max(1.0, total_w)), 1),
+        "d13_valid_rate_pct": round((100.0 * float(d13_valid_total_w) / max(1.0, total_w)), 1),
+        "b1_mean_selected": round((float(b1_selected_total) / max(1.0, float(b1_den))) if b1_den > 0 else 0.0, 2),
+        "component_means_by_archetype": component_rows,
+        "component_a_pct": comp_A,
+        "component_b1_pct": comp_B1,
+        "component_b2_pct": comp_B2,
+        "component_negative_pct": comp_N,
+        "component_mbal_pp": comp_MBAL,
+        "components_aligned": bool(components_aligned),
+        "component_missing_counts": component_missing_counts,
+        "z_meta": {
+            "A": z_meta_A,
+            "B1": z_meta_B1,
+            "B2": z_meta_B2,
+            "N": z_meta_N,
+            "MBAL": z_meta_MBAL,
+        },
+        "methodology": {
+            "core_formula": "E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)",
+            "pressure_formula": "D = 0.70*z(N) + 0.30*z(MBAL)",
+            "raw_formula": "SEI_raw = 0.80*E + 0.20*D",
+            "scale_formula": "SEI_100 = min-max(0..100), fallback=50",
+        },
     }
     return profile, respondent_vectors, audit
+
+
+def _norm_demo_token(value: Any) -> str:
+    txt = str(value or "").strip().lower()
+    repl = (
+        ("ą", "a"),
+        ("ć", "c"),
+        ("ę", "e"),
+        ("ł", "l"),
+        ("ń", "n"),
+        ("ó", "o"),
+        ("ś", "s"),
+        ("ż", "z"),
+        ("ź", "z"),
+    )
+    for a, b in repl:
+        txt = txt.replace(a, b)
+    return re.sub(r"\s+", " ", txt).strip()
+
+
+def _canon_demo_value(field: str, value: Any) -> str:
+    raw = str(value or "").strip()
+    n = _norm_demo_token(value)
+    if not n:
+        return "brak danych"
+    if field == "M_PLEC":
+        if n in {"1", "k", "kobieta"} or "kobiet" in n:
+            return "kobieta"
+        if n in {"2", "m", "mezczyzna"} or "mezczyzn" in n:
+            return "mężczyzna"
+    elif field == "M_WIEK":
+        if re.search(r"15\D*39", n):
+            return "15-39"
+        if re.search(r"40\D*59", n):
+            return "40-59"
+        if "60" in n:
+            return "60+"
+    return raw or "brak danych"
+
+
+def _poststrat_cell_from_payload(payload: Dict[str, Any]) -> Optional[str]:
+    g = _canon_demo_value("M_PLEC", payload.get("M_PLEC"))
+    a = _canon_demo_value("M_WIEK", payload.get("M_WIEK"))
+    if g == "kobieta":
+        g_id = 1
+    elif g == "mężczyzna":
+        g_id = 2
+    else:
+        return None
+    if a == "15-39":
+        a_id = 1
+    elif a == "40-59":
+        a_id = 2
+    elif a == "60+":
+        a_id = 3
+    else:
+        return None
+    return f"{g_id}_{a_id}"
+
+
+def _calc_poststrat_weights_for_payloads(payloads: List[Dict[str, Any]], study: Dict[str, Any]) -> Tuple[List[float], bool]:
+    if not payloads:
+        return [], False
+    targets = _load_poststrat_targets(study)
+    target_sum = float(sum(float(v or 0.0) for v in targets.values()))
+    if target_sum <= 0:
+        return [1.0] * len(payloads), False
+
+    sample_counts: Dict[str, int] = {}
+    for payload in payloads:
+        cell = _poststrat_cell_from_payload(payload)
+        if cell:
+            sample_counts[cell] = int(sample_counts.get(cell, 0)) + 1
+    present_cells = [k for k, v in sample_counts.items() if int(v) > 0]
+    if not present_cells:
+        return [1.0] * len(payloads), False
+
+    present_target_sum = float(sum(float(targets.get(k, 0.0) or 0.0) for k in present_cells))
+    sample_total = float(sum(sample_counts.values()))
+    if present_target_sum <= 0 or sample_total <= 0:
+        return [1.0] * len(payloads), False
+
+    cell_weights: Dict[str, float] = {}
+    for cell in present_cells:
+        target_share = float(targets.get(cell, 0.0) or 0.0) / present_target_sum
+        sample_share = float(sample_counts.get(cell, 0)) / sample_total
+        if sample_share > 0:
+            cell_weights[cell] = target_share / sample_share
+
+    if not cell_weights:
+        return [1.0] * len(payloads), False
+
+    weights = [float(cell_weights.get(_poststrat_cell_from_payload(p) or "", 1.0)) for p in payloads]
+    mean_w = float(sum(weights) / max(1, len(weights)))
+    if mean_w > 0:
+        weights = [float(max(0.0, w / mean_w)) for w in weights]
+    return weights, True
 
 
 def _dot(a: Dict[str, float], b: Dict[str, float]) -> float:
@@ -2731,9 +3163,49 @@ def matching_view() -> None:
     require_auth()
     if not _require_jst_ready():
         return
+    _set_view_scope("matching")
     back_button("home_root", "← Powrót do wyboru modułu")
     header("🧭 Matching")
     render_titlebar(["Panel", "Matching"])
+    st.markdown(
+        """
+        <style>
+          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab-list"]{
+            gap:10px;
+            border-bottom:1px solid #d7e0eb;
+            padding:4px 0 10px 0;
+            flex-wrap:wrap;
+          }
+          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab"]{
+            background:linear-gradient(180deg,#f9fbff 0%,#f3f7ff 100%);
+            border:1px solid #d4deed;
+            border-radius:999px;
+            padding:7px 16px;
+            font-weight:800;
+            color:#27435f;
+            letter-spacing:.01em;
+            box-shadow:0 1px 4px rgba(15,58,116,.06);
+          }
+          body[data-ap-view="matching"] div[data-testid="stTabs"] [aria-selected="true"]{
+            background:linear-gradient(180deg,#ffffff 0%,#eaf2ff 100%);
+            border-color:#6f9bdd;
+            color:#0d2f5e;
+            box-shadow:0 5px 14px rgba(15,58,116,.16);
+          }
+          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
+            display:none;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    mode_pick = st.radio(
+        "Tryb etykiet wskaźnika społecznego oczekiwania",
+        ["Archetypy", "Wartości"],
+        horizontal=True,
+        key="matching_label_mode",
+    )
+    current_sei_short, current_sei_full, current_axis_label = _matching_mode_labels(mode_pick)
 
     personal_studies = fetch_studies(sb)
     jst_studies = fetch_jst_studies(sb)
@@ -2761,7 +3233,14 @@ def matching_view() -> None:
 
             p_profile, p_n = _load_personal_profile_pct(str(person.get("id")))
             j_rows = list_jst_responses(sb, str(jst_study.get("id")))
-            j_profile, respondent_vectors, target_audit = _calc_jst_target_profile(j_rows)
+            source_payloads = [
+                (r.get("payload") if isinstance(r.get("payload"), dict) else {}) for r in j_rows
+            ]
+            profile_weights, profile_weights_used = _calc_poststrat_weights_for_payloads(source_payloads, jst_study)
+            j_profile, respondent_vectors, target_audit = _calc_jst_target_profile(
+                j_rows,
+                row_weights=profile_weights if profile_weights_used else None,
+            )
 
             if not p_profile:
                 st.error("Nie udało się policzyć profilu personalnego (brak odpowiedzi).")
@@ -2803,13 +3282,28 @@ def matching_view() -> None:
             for rec in respondent_vectors:
                 vec = {a: float(rec["vec"].get(a, 0.0)) for a in JST_ARCHETYPES}
                 sim = _dot(unit_person, vec) / (base_norm * (_norm(vec) or 1.0))
-                top_sim_rows.append({"sim": sim, "payload": rec.get("payload") or {}})
+                top_sim_rows.append(
+                    {
+                        "sim": sim,
+                        "payload": rec.get("payload") or {},
+                        "weight": float(rec.get("weight") or 1.0),
+                    }
+                )
             top_sim_rows.sort(key=lambda x: x["sim"], reverse=True)
             take_n = max(1, int(len(top_sim_rows) * 0.25))
             subset = top_sim_rows[:take_n]
 
             all_payloads = [r.get("payload") or {} for r in top_sim_rows]
             subset_payloads = [r.get("payload") or {} for r in subset]
+            all_weights = [
+                float(r.get("weight") or 1.0) if math.isfinite(float(r.get("weight") or 1.0)) else 1.0
+                for r in top_sim_rows
+            ]
+            subset_weights = [
+                float(r.get("weight") or 1.0) if math.isfinite(float(r.get("weight") or 1.0)) else 1.0
+                for r in subset
+            ]
+            weights_used = bool(profile_weights_used)
             jst_name_nom = str(jst_study.get("jst_full_nom") or "").strip() or str(jst_study.get("jst_name") or "").strip() or str(pick_jst)
             person_name_gen = _person_genitive(person)
             jst_name_gen = str(jst_study.get("jst_full_gen") or "").strip()
@@ -2933,68 +3427,10 @@ def matching_view() -> None:
                         return "bardzo zła"
                 return raw or "brak danych"
 
-            def _poststrat_cell(payload: Dict[str, Any]) -> Optional[str]:
-                g = _canon_demo("M_PLEC", payload.get("M_PLEC"))
-                a = _canon_demo("M_WIEK", payload.get("M_WIEK"))
-                if g == "kobieta":
-                    g_id = 1
-                elif g == "mężczyzna":
-                    g_id = 2
-                else:
-                    return None
-                if a == "15-39":
-                    a_id = 1
-                elif a == "40-59":
-                    a_id = 2
-                elif a == "60+":
-                    a_id = 3
-                else:
-                    return None
-                return f"{g_id}_{a_id}"
-
-            def _calc_poststrat_weights(payloads: List[Dict[str, Any]], study: Dict[str, Any]) -> Tuple[List[float], bool]:
-                if not payloads:
-                    return [], False
-                targets = _load_poststrat_targets(study)
-                target_sum = float(sum(float(v or 0.0) for v in targets.values()))
-                if target_sum <= 0:
-                    return [1.0] * len(payloads), False
-
-                sample_counts: Dict[str, int] = {}
-                for p in payloads:
-                    cell = _poststrat_cell(p)
-                    if cell:
-                        sample_counts[cell] = int(sample_counts.get(cell, 0)) + 1
-                present_cells = [k for k, v in sample_counts.items() if int(v) > 0]
-                if not present_cells:
-                    return [1.0] * len(payloads), False
-
-                present_target_sum = float(sum(float(targets.get(k, 0.0) or 0.0) for k in present_cells))
-                if present_target_sum <= 0:
-                    return [1.0] * len(payloads), False
-
-                sample_total = float(sum(sample_counts.values()))
-                if sample_total <= 0:
-                    return [1.0] * len(payloads), False
-
-                cell_weights: Dict[str, float] = {}
-                for k in present_cells:
-                    target_share = float(targets.get(k, 0.0) or 0.0) / present_target_sum
-                    sample_share = float(sample_counts.get(k, 0)) / sample_total
-                    if sample_share > 0:
-                        cell_weights[k] = target_share / sample_share
-
-                if not cell_weights:
-                    return [1.0] * len(payloads), False
-
-                weights = [float(cell_weights.get(_poststrat_cell(p) or "", 1.0)) for p in payloads]
-                mean_w = float(sum(weights) / max(1, len(weights)))
-                if mean_w > 0:
-                    weights = [float(max(0.0, w / mean_w)) for w in weights]
-                return weights, True
-
-            all_weights, weights_used = _calc_poststrat_weights(all_payloads, jst_study)
-            subset_weights = all_weights[:take_n] if all_weights else [1.0] * len(subset_payloads)
+            if not subset_weights:
+                subset_weights = [1.0] * len(subset_payloads)
+            if not all_weights:
+                all_weights = [1.0] * len(all_payloads)
 
             def _weighted_count(payloads: List[Dict[str, Any]], weights: List[float], field: str) -> Dict[str, float]:
                 out: Dict[str, float] = {}
@@ -3065,6 +3501,14 @@ def matching_view() -> None:
                 "jst_n": len(j_rows),
                 "personal_profile": p_profile,
                 "jst_profile": j_profile,
+                "mode_choice": mode_pick,
+                "sei_short": current_sei_short,
+                "sei_full": current_sei_full,
+                "sei_data_basis": (
+                    "dane ważone poststratyfikacyjnie"
+                    if bool(target_audit.get("weights_applied"))
+                    else "dane surowe"
+                ),
                 "strengths": strengths,
                 "gaps": gaps,
                 "strengths_rows": strengths_rows,
@@ -3152,6 +3596,9 @@ def matching_view() -> None:
             mcol2.metric("Różnica z karą za odchylenia (RMSE)", f"{float(metrics.get('rmse', 0.0)):.1f} pp")
             mcol3.metric("Średnia TOP3 luk", f"{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp")
         st.caption(f"Próba personalna: {result['personal_n']} odpowiedzi · Próba mieszkańców: {result['jst_n']} odpowiedzi")
+        sei_short = str(current_sei_short)
+        sei_full = str(current_sei_full)
+        sei_basis = str(result.get("sei_data_basis") or "dane surowe")
 
         cmp_rows = []
         for a in JST_ARCHETYPES:
@@ -3160,9 +3607,9 @@ def matching_view() -> None:
             diff = abs(pol - ocz)
             cmp_rows.append(
                 {
-                    "Archetyp": a,
-                    "Profil polityka (%)": f"{pol:.1f}",
-                    "Oczekiwania mieszkańców (%)": f"{ocz:.1f}",
+                    current_axis_label: _matching_entity_name(a, current_axis_label),
+                    "Profil polityka": f"{pol:.1f}",
+                    f"Oczekiwania mieszkańców ({sei_short})": f"{ocz:.1f}",
                     "Różnica |Δ|": f"{diff:.1f}",
                     "__sort_diff": diff,
                 }
@@ -3176,16 +3623,12 @@ def matching_view() -> None:
             hide_index=True,
             height=cmp_height,
         )
-        st.caption(
-            "„Oczekiwania mieszkańców (%)” liczymy z pełnych wartości A, B1, B2 i D13, "
-            "z premią dla TOP1: `B2` i `D13` mają mnożnik x2 "
-            "(wzór: `(A + B1 + 2*B2 + 2*D13) / 6`)."
-        )
+        st.caption(update_matching_summary_description(sei_short, sei_full, sei_basis))
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
             st.markdown(result.get("match_formula", ""))
             st.info(
                 "To równanie dotyczy wyłącznie wskaźnika `Poziom dopasowania` i NIE służy do liczenia "
-                "kolumny `Oczekiwania mieszkańców (%)`."
+                f"kolumny `Oczekiwania mieszkańców ({sei_short})`."
             )
             st.markdown(
                 "Metryka celowo bardziej karze duże luki archetypowe: oprócz średniej różnicy uwzględnia "
@@ -3198,19 +3641,29 @@ def matching_view() -> None:
                     f"RMSE `{float(metrics.get('rmse', 0.0)):.1f} pp`, "
                     f"TOP3_MAE `{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp`."
                 )
-            st.markdown("**Jak dokładnie liczony jest komponent `A` (pełna wartość %)?**")
+            st.markdown(f"**Jak liczony jest `{sei_full}`?**")
             st.markdown(
-                "- Dla każdej pary `A1..A18` odpowiedź 1–7 jest przeliczana liniowo na udział lewego/prawego archetypu.\n"
-                "- Wzór dla pary: `p_prawy = (wartość_A - 1) / 6`, `p_lewy = 1 - p_prawy`.\n"
-                "- Dla archetypu sumujemy wkłady z jego par i dzielimy przez liczbę par, w których występuje (`A_norm` 0–1).\n"
-                "- Komponenty B1/B2/D13 liczymy jako pełne trafienie `%` archetypu (0 albo 100 na respondenta).\n"
-                "- Składanie wyniku archetypu: `score = (A_pct + B1_pct + 2*B2_pct + 2*D13_pct) / 6`.\n"
-                "- `B2` i `D13` mają wagę x2, bo są pytaniami TOP1 i mocniej rozróżniają profil oczekiwań."
+                "- `A`: odsetek respondentów z dodatnim bilansem oczekiwania dla archetypu (`score_mean > 0`) w versusach A.\n"
+                "- `B1`: odsetek osób, które wskazały archetyp w TOP3.\n"
+                "- `B2`: odsetek osób, które wskazały archetyp jako TOP1.\n"
+                "- `N`: odsetek negatywnych doświadczeń dla archetypu (C13/D13).\n"
+                "- `MBAL`: bilans najważniejszego doświadczenia (C13/D13), liczony jako `Mneg - Mpos`.\n"
+                "- Standaryzacja: `z(x) = (x - średnia) / odchylenie` po 12 archetypach (gdy odchylenie=0, przyjmujemy `z=0`).\n"
+                "- Rdzeń oczekiwania: `E = 0.50*z(A) + 0.20*z(B1) + 0.30*z(B2)`.\n"
+                "- Presja doświadczenia: `D = 0.70*z(N) + 0.30*z(MBAL)`.\n"
+                "- Wynik surowy: `SEI_raw = 0.80*E + 0.20*D`.\n"
+                "- Skala końcowa: min-max do 0–100 (`SEI_100`), a przy braku rozstępu każdy archetyp dostaje `50`."
             )
             audit = result.get("target_audit") or {}
             if audit:
+                if not bool(audit.get("components_aligned", True)):
+                    st.warning(
+                        "Komponenty A/B1/B2/C13-D13 nie zostały zmapowane do identycznego zestawu 12 pozycji. "
+                        "Sprawdź kompletność danych wejściowych."
+                    )
                 st.markdown(
                     f"**Audyt danych wejściowych:** A valid `{float(audit.get('a_valid_rate_pct', 0.0)):.1f}%`, "
+                    f"B1 valid `{float(audit.get('b1_valid_rate_pct', 0.0)):.1f}%`, "
                     f"B2 valid `{float(audit.get('b2_valid_rate_pct', 0.0)):.1f}%`, "
                     f"D13 valid `{float(audit.get('d13_valid_rate_pct', 0.0)):.1f}%`, "
                     f"średnia liczba wskazań B1: `{float(audit.get('b1_mean_selected', 0.0)):.2f}`."
@@ -3218,16 +3671,28 @@ def matching_view() -> None:
                 comp = audit.get("component_means_by_archetype") or {}
                 if isinstance(comp, dict) and comp:
                     comp_rows: List[Dict[str, str]] = []
+                    def _fmt_cell(val: Any, digits: int) -> str:
+                        try:
+                            fval = float(val)
+                        except Exception:
+                            return "—"
+                        if not math.isfinite(fval):
+                            return "—"
+                        return f"{fval:.{digits}f}"
                     for a in JST_ARCHETYPES:
                         row = comp.get(a) or {}
                         comp_rows.append(
                             {
-                                "Archetyp": a,
-                                "A (pełne %)": f"{float(row.get('A', 0.0)):.1f}",
-                                "B1 (pełne %)": f"{float(row.get('B1', 0.0)):.1f}",
-                                "B2 (pełne %)": f"{float(row.get('B2', 0.0)):.1f}",
-                                "D13 (pełne %)": f"{float(row.get('D13', 0.0)):.1f}",
-                                "Wynik ważony (A+B1+2*B2+2*D13)/6": f"{float(row.get('TOTAL', 0.0)):.1f}",
+                                current_axis_label: _matching_entity_name(a, current_axis_label),
+                                "A (% oczekujących)": _fmt_cell(row.get("A"), 1),
+                                "B1: TOP3 (%)": _fmt_cell(row.get("B1"), 1),
+                                "B2: TOP1 (%)": _fmt_cell(row.get("B2"), 1),
+                                "C13/D13: negatywne doświadczenie (%)": _fmt_cell(row.get("N"), 1),
+                                "C13/D13: bilans najważniejszego doświadczenia": _fmt_cell(row.get("MBAL"), 1),
+                                "Rdzeń oczekiwania": _fmt_cell(row.get("E"), 2),
+                                "Presja doświadczenia": _fmt_cell(row.get("D"), 2),
+                                "SEI_raw": _fmt_cell(row.get("SEI_raw"), 2),
+                                f"{sei_short} 0-100": _fmt_cell(row.get("SEI_100"), 1),
                             }
                         )
                     st.dataframe(
@@ -3236,18 +3701,31 @@ def matching_view() -> None:
                         hide_index=True,
                         height=max(92, min(520, 40 + len(comp_rows) * 35)),
                     )
+                    missing_counts = audit.get("component_missing_counts") or {}
+                    if isinstance(missing_counts, dict):
+                        missing_bits = [
+                            f"{k}: {int(v)}"
+                            for k, v in missing_counts.items()
+                            if int(v or 0) > 0
+                        ]
+                        if missing_bits:
+                            st.warning(
+                                "Część komponentów ma braki danych dla wybranych archetypów/wartości "
+                                f"({', '.join(missing_bits)}). "
+                                "Indeks jest liczony dalej z zabezpieczeniem `z=0` tam, gdzie trzeba."
+                            )
         strengths_rows = result.get("strengths_rows") or []
         gaps_rows = result.get("gaps_rows") or []
         strength_items_html = "".join(
             [
-                f"<span class='match-chip good'>{html.escape(str(r.get('archetyp') or ''))} "
+                f"<span class='match-chip good'>{html.escape(_matching_entity_name(str(r.get('archetyp') or ''), current_axis_label))} "
                 f"<small>|Δ| {float(r.get('diff', 0.0)):.1f} pp</small></span>"
                 for r in strengths_rows
             ]
         )
         gap_items_html = "".join(
             [
-                f"<span class='match-chip gap'>{html.escape(str(r.get('archetyp') or ''))} "
+                f"<span class='match-chip gap'>{html.escape(_matching_entity_name(str(r.get('archetyp') or ''), current_axis_label))} "
                 f"<small>|Δ| {float(r.get('diff', 0.0)):.1f} pp</small></span>"
                 for r in gaps_rows
             ]
@@ -3283,11 +3761,11 @@ def matching_view() -> None:
             <style>
               .match-section-header{
                 border:none;
-                border-bottom:1px solid #d9e2ef;
+                border-top:1px solid #d9e2ef;
                 border-radius:0;
                 background:transparent;
-                padding:0 0 8px 0;
-                margin:16px 0 10px 0;
+                padding:12px 0 0 0;
+                margin:18px 0 10px 0;
               }
               .match-section-header h3{
                 margin:0;
