@@ -2063,6 +2063,10 @@ def _fmt_bytes_compact(size_bytes: int) -> str:
 
 
 _SEGMENT_HIT_THRESHOLD_DEFAULTS: Dict[str, float] = {
+    "0 z 2 · #2": 4.0,
+    "0 z 2 · #3": 4.0,
+    "1 z 1 · #1": 3.0,
+    "1 z 2 · #2": 3.0,
     "2 z 2 · #1": 3.94,
     "4 z 4 · #1": 3.0,
     "3 z 4 · #2": 2.1,
@@ -2372,6 +2376,15 @@ def jst_analysis_view() -> None:
 
     report_path_str = str(meta.get("report_path") or "")
     report_path = Path(report_path_str) if report_path_str else None
+    if not (report_path and report_path.exists()):
+        fallback_candidates = [
+            run_base / sid / "WYNIKI" / "raport.html",
+            template_root / "WYNIKI" / "raport.html",
+        ]
+        for cand in fallback_candidates:
+            if cand.exists():
+                report_path = cand
+                break
     raw_bytes = int(meta.get("raw_bytes") or 0)
     inlined_bytes = int(meta.get("inlined_bytes") or 0)
     inlined_used = bool(meta.get("inlined_used"))
@@ -2388,23 +2401,27 @@ def jst_analysis_view() -> None:
         full_report_bytes = 0
         full_report_error = ""
         full_report_available = False
-        if len(raw_report.encode("utf-8", errors="ignore")) > int(meta.get("inline_source_limit") or inline_source_limit):
-            full_report_error = (
-                "Raport źródłowy jest zbyt duży, aby bezpiecznie przygotować "
-                "samodzielny plik HTML."
-            )
+        # Nie osadzamy ponownie całego raportu przy każdym rerunie: to potrafi mocno wydłużyć UI.
+        if rendered and rendered != "__report_path_only__" and inlined_used:
+            full_report = str(rendered)
+            full_report_bytes = len(full_report.encode("utf-8", errors="ignore"))
+            full_report_available = bool(full_report and full_report_bytes <= standalone_limit)
+            if not full_report_available:
+                full_report_error = (
+                    "Samodzielny HTML byłby zbyt ciężki "
+                    f"({_fmt_bytes_compact(full_report_bytes)} > {_fmt_bytes_compact(standalone_limit)})."
+                )
         else:
-            try:
-                full_report = inline_local_assets(raw_report, report_path.parent)
-                full_report_bytes = len(full_report.encode("utf-8", errors="ignore"))
-                full_report_available = bool(full_report and full_report_bytes <= standalone_limit)
-                if not full_report_available:
-                    full_report_error = (
-                        "Samodzielny HTML byłby zbyt ciężki "
-                        f"({_fmt_bytes_compact(full_report_bytes)} > {_fmt_bytes_compact(standalone_limit)})."
-                    )
-            except Exception as ex:
-                full_report_error = f"Nie udało się osadzić wszystkich zasobów HTML: {ex}"
+            src_bytes = len(raw_report.encode("utf-8", errors="ignore"))
+            if src_bytes > int(meta.get("inline_source_limit") or inline_source_limit):
+                full_report_error = (
+                    "Raport źródłowy jest zbyt duży, aby bezpiecznie przygotować samodzielny plik HTML."
+                )
+            else:
+                full_report_error = (
+                    "Pełny HTML nie jest aktualnie zcache’owany w panelu. "
+                    "Użyj ZIP (WYNIKI) albo wygeneruj raport ponownie i pobierz od razu."
+                )
         report_zip = bundle_report_dir_zip(report_path.parent)
         d1, d2 = st.columns(2)
         with d1:
@@ -2441,6 +2458,26 @@ def jst_analysis_view() -> None:
                 f"To nie jest błąd generowania raportu. {full_report_error} "
                 "Pobierz paczkę ZIP (WYNIKI) i otwórz lokalnie plik `raport.html` z tego folderu."
             )
+    else:
+        report_slug = slugify(str((study or {}).get("jst_full_nom") or (study or {}).get("slug") or "raport-jst")) or "raport-jst"
+        cached_html = ""
+        if isinstance(rendered, str) and rendered not in {"", "__report_path_only__", "__inline_error__"}:
+            cached_html = rendered
+        st.warning(
+            "Raport został policzony, ale panel nie odnalazł pliku `raport.html` w katalogu runa. "
+            "Najczęściej pomaga kliknięcie „Przelicz od nowa”."
+        )
+        if cached_html:
+            _download_button_compat(
+                "📥 Pobierz raport HTML (z cache panelu)",
+                data=cached_html,
+                file_name=f"{report_slug}.html",
+                mime="text/html",
+                use_container_width=True,
+            )
+            st.caption("Ten plik HTML pochodzi z cache panelu; paczka ZIP wymaga poprawnego pliku runa.")
+        else:
+            st.info("Brak cache HTML do pobrania. Kliknij „Przelicz od nowa”.")
 
     preview_enabled = st.toggle(
         "Podgląd raportu online w panelu",
@@ -2813,42 +2850,45 @@ def safe_zscore_by_archetype(values: Dict[str, float]) -> Tuple[Dict[str, float]
     return out, {"mean": mean_val, "std": std_val}
 
 
-def build_social_expectation_core(
-    z_b1: Dict[str, float],
-    z_b2: Dict[str, float],
-) -> Dict[str, float]:
-    return {
-        a: float(0.35 * float(z_b1.get(a, 0.0)) + 0.65 * float(z_b2.get(a, 0.0)))
-        for a in JST_ARCHETYPES
-    }
+def compute_variant_b_correction(
+    b1_pct: Dict[str, float],
+    b2_pct: Dict[str, float],
+    n_pct: Dict[str, float],
+    mbal_pp: Dict[str, float],
+) -> Tuple[
+    Dict[str, float],
+    Dict[str, float],
+    Dict[str, float],
+    Dict[str, float],
+]:
+    delta_b1: Dict[str, float] = {}
+    delta_b2: Dict[str, float] = {}
+    delta_n: Dict[str, float] = {}
+    k_b: Dict[str, float] = {}
+    for a in JST_ARCHETYPES:
+        b1 = float(b1_pct.get(a, float("nan")))
+        b2 = float(b2_pct.get(a, float("nan")))
+        n = float(n_pct.get(a, float("nan")))
+        mbal = float(mbal_pp.get(a, float("nan")))
+        d_b1 = (b1 - 25.0) if math.isfinite(b1) else 0.0
+        d_b2 = (b2 - 8.33) if math.isfinite(b2) else 0.0
+        d_n = (n - 50.0) if math.isfinite(n) else 0.0
+        mbal_safe = mbal if math.isfinite(mbal) else 0.0
+        corr = float(0.35 * d_b1 + 0.90 * d_b2 + 0.08 * d_n + 0.20 * mbal_safe)
+        delta_b1[a] = float(d_b1)
+        delta_b2[a] = float(d_b2)
+        delta_n[a] = float(d_n)
+        k_b[a] = corr
+    return delta_b1, delta_b2, delta_n, k_b
 
 
-def build_experience_pressure(
-    z_n: Dict[str, float],
-    z_mbal: Dict[str, float],
-) -> Dict[str, float]:
-    return {
-        a: float(0.70 * float(z_n.get(a, 0.0)) + 0.30 * float(z_mbal.get(a, 0.0)))
-        for a in JST_ARCHETYPES
-    }
-
-
-def compute_social_expectation_index(
+def compute_social_expectation_variant_b(
     a_pct: Dict[str, float],
-    core: Dict[str, float],
-    pressure: Dict[str, float],
-) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, float]]:
-    priority_adj = {
-        a: float(8.0 * math.tanh(float(core.get(a, 0.0)) / 1.5))
-        for a in JST_ARCHETYPES
-    }
-    experience_adj = {
-        a: float(4.0 * math.tanh(float(pressure.get(a, 0.0)) / 1.5))
-        for a in JST_ARCHETYPES
-    }
+    k_b: Dict[str, float],
+) -> Tuple[Dict[str, float], Dict[str, float]]:
     raw = {
         a: (
-            float(a_pct.get(a, float("nan"))) + float(priority_adj.get(a, 0.0)) + float(experience_adj.get(a, 0.0))
+            float(a_pct.get(a, float("nan"))) + float(k_b.get(a, 0.0))
             if math.isfinite(float(a_pct.get(a, float("nan"))))
             else float("nan")
         )
@@ -2858,14 +2898,15 @@ def compute_social_expectation_index(
         a: float(max(0.0, min(100.0, float(raw[a])))) if math.isfinite(float(raw[a])) else float("nan")
         for a in JST_ARCHETYPES
     }
-    return raw, scaled, priority_adj, experience_adj
+    return raw, scaled
 
 
 def update_matching_summary_description(sei_short: str, sei_full: str, data_basis: str) -> str:
     return (
         f"Kolumna `Oczekiwania mieszkańców ({sei_short})` pokazuje `{sei_full}` w skali 0–100 "
         f"(to indeks syntetyczny, nie procent mieszkańców). "
-        "Wskaźnik jest zakotwiczony w `% oczekujących` z pytania A i korygowany przez priorytet (B1/B2) oraz doświadczenia (C13/D13). "
+        "Wskaźnik jest zakotwiczony w `% oczekujących` z pytania A. "
+        "B1 i B2 wzmacniają lub osłabiają wynik względem poziomu neutralnego, a C13/D13 działa jako umiarkowana korekta doświadczeniowa. "
         f"Podstawa danych: {data_basis}."
     )
 
@@ -3004,14 +3045,13 @@ def _calc_jst_target_profile(
         for comp in (comp_A, comp_B1, comp_B2, comp_N, comp_MBAL)
     )
 
-    z_B1, z_meta_B1 = safe_zscore_by_archetype(comp_B1)
-    z_B2, z_meta_B2 = safe_zscore_by_archetype(comp_B2)
-    z_N, z_meta_N = safe_zscore_by_archetype(comp_N)
-    z_MBAL, z_meta_MBAL = safe_zscore_by_archetype(comp_MBAL)
-
-    core_P = build_social_expectation_core(z_B1, z_B2)
-    press_D = build_experience_pressure(z_N, z_MBAL)
-    sei_raw, sei_100, p_adj, d_adj = compute_social_expectation_index(comp_A, core_P, press_D)
+    delta_b1, delta_b2, delta_n, corr_b = compute_variant_b_correction(
+        b1_pct=comp_B1,
+        b2_pct=comp_B2,
+        n_pct=comp_N,
+        mbal_pp=comp_MBAL,
+    )
+    sei_raw, sei_100 = compute_social_expectation_variant_b(comp_A, corr_b)
 
     profile = {
         a: (round(float(sei_100[a]), 2) if math.isfinite(float(sei_100.get(a, float("nan")))) else float("nan"))
@@ -3024,10 +3064,10 @@ def _calc_jst_target_profile(
             "B2": round(float(comp_B2.get(a, float("nan"))), 3) if math.isfinite(float(comp_B2.get(a, float("nan")))) else float("nan"),
             "N": round(float(comp_N.get(a, float("nan"))), 3) if math.isfinite(float(comp_N.get(a, float("nan")))) else float("nan"),
             "MBAL": round(float(comp_MBAL.get(a, float("nan"))), 3) if math.isfinite(float(comp_MBAL.get(a, float("nan")))) else float("nan"),
-            "P": round(float(core_P.get(a, 0.0)), 4),
-            "D": round(float(press_D.get(a, 0.0)), 4),
-            "P_adj": round(float(p_adj.get(a, 0.0)), 4),
-            "D_adj": round(float(d_adj.get(a, 0.0)), 4),
+            "delta_B1": round(float(delta_b1.get(a, 0.0)), 4),
+            "delta_B2": round(float(delta_b2.get(a, 0.0)), 4),
+            "delta_N": round(float(delta_n.get(a, 0.0)), 4),
+            "K_B": round(float(corr_b.get(a, 0.0)), 4),
             "SEI_raw": round(float(sei_raw.get(a, 0.0)), 4),
             "SEI_100": (
                 round(float(sei_100.get(a, float("nan"))), 3)
@@ -3065,19 +3105,12 @@ def _calc_jst_target_profile(
         "component_mbal_pp": comp_MBAL,
         "components_aligned": bool(components_aligned),
         "component_missing_counts": component_missing_counts,
-        "z_meta": {
-            "B1": z_meta_B1,
-            "B2": z_meta_B2,
-            "N": z_meta_N,
-            "MBAL": z_meta_MBAL,
-        },
         "methodology": {
             "anchor_formula": "A_base = % oczekujących z pytania A",
-            "core_formula": "P = 0.35*z(B1) + 0.65*z(B2)",
-            "pressure_formula": "D = 0.70*z(N) + 0.30*z(MBAL)",
-            "adjust_formula": "P_adj = 8*tanh(P/1.5), D_adj = 4*tanh(D/1.5)",
-            "raw_formula": "SEI_raw = A_base + P_adj + D_adj",
-            "scale_formula": "SEI_100 = clamp(SEI_raw, 0..100)",
+            "delta_formula": "delta_B1=B1-25.0; delta_B2=B2-8.33; delta_N=N-50.0; MBAL=Mneg-Mpos",
+            "corr_formula": "K_B = 0.35*delta_B1 + 0.90*delta_B2 + 0.08*delta_N + 0.20*MBAL",
+            "raw_formula": "SEI_B = A_base + K_B",
+            "scale_formula": "SEI_B_100 = clamp(SEI_B, 0..100)",
         },
     }
     return profile, respondent_vectors, audit
@@ -3201,25 +3234,36 @@ def matching_view() -> None:
         <style>
           body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab-list"]{
             gap:10px;
-            border-bottom:1px solid #d7e0eb;
-            padding:4px 0 10px 0;
+            border:1px solid #d4deee;
+            border-bottom:1px solid #c7d5e8;
+            padding:10px 12px 12px 12px;
+            background:linear-gradient(180deg,#f8fbff 0%,#f1f6ff 100%);
+            border-radius:14px 14px 10px 10px;
             flex-wrap:wrap;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
           }
           body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab"]{
-            background:linear-gradient(180deg,#f9fbff 0%,#f3f7ff 100%);
-            border:1px solid #d4deed;
-            border-radius:999px;
-            padding:7px 16px;
+            background:#ffffff;
+            border:1px solid #c7d5e8;
+            border-radius:12px;
+            padding:9px 16px;
             font-weight:800;
-            color:#27435f;
+            color:#31465f;
+            font-size:15px;
             letter-spacing:.01em;
-            box-shadow:0 1px 4px rgba(15,58,116,.06);
+            box-shadow:0 1px 3px rgba(15,58,116,.08);
+            transition:all .15s ease;
+          }
+          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab"]:hover{
+            border-color:#9fb6d8;
+            box-shadow:0 4px 12px rgba(31,111,196,.14);
           }
           body[data-ap-view="matching"] div[data-testid="stTabs"] [aria-selected="true"]{
-            background:linear-gradient(180deg,#ffffff 0%,#eaf2ff 100%);
-            border-color:#6f9bdd;
-            color:#0d2f5e;
-            box-shadow:0 5px 14px rgba(15,58,116,.16);
+            background:linear-gradient(180deg,#2d7dd2 0%,#1f6fc4 100%);
+            border-color:#1f6fc4;
+            color:#ffffff;
+            box-shadow:0 7px 16px rgba(31,111,196,.28);
+            transform:translateY(-1px);
           }
           body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
             display:none;
@@ -3678,12 +3722,10 @@ def matching_view() -> None:
                 f"- `B2`: odsetek osób, które wskazały {axis_entity_gen} jako TOP1.\n"
                 f"- `N`: odsetek negatywnych doświadczeń dla {axis_entity_gen} (C13/D13).\n"
                 "- `MBAL`: bilans najważniejszego doświadczenia (C13/D13), liczony jako `Mneg - Mpos`.\n"
-                "- Standaryzacja: `z(x) = (x - średnia) / odchylenie` po 12 archetypach (gdy odchylenie=0, przyjmujemy `z=0`).\n"
-                "- Korekta priorytetu: `P = 0.35*z(B1) + 0.65*z(B2)`.\n"
-                "- Presja doświadczenia: `D = 0.70*z(N) + 0.30*z(MBAL)`.\n"
-                "- Ograniczone korekty: `P_adj = 8*tanh(P/1.5)` oraz `D_adj = 4*tanh(D/1.5)`.\n"
-                "- Wynik końcowy: `SEI_raw = A + P_adj + D_adj`.\n"
-                "- Skala końcowa: `SEI_100 = clamp(SEI_raw, 0..100)` (bez min-max)."
+                "- Odchylenia od poziomów neutralnych: `delta_B1 = B1 - 25.0`, `delta_B2 = B2 - 8.33`, `delta_N = N - 50.0`.\n"
+                "- Korekta wariantu B: `K_B = 0.35*delta_B1 + 0.90*delta_B2 + 0.08*delta_N + 0.20*MBAL`.\n"
+                "- Wynik końcowy: `SEI_B = A + K_B`.\n"
+                "- Skala końcowa: `SEI_B_100 = clamp(SEI_B, 0..100)` (bez min-max)."
             )
             audit = result.get("target_audit") or {}
             if audit:
@@ -3720,11 +3762,11 @@ def matching_view() -> None:
                                 "B2: TOP1 (%)": _fmt_cell(row.get("B2"), 1),
                                 "C13/D13: negatywne doświadczenie (%)": _fmt_cell(row.get("N"), 1),
                                 "C13/D13: bilans najważniejszego doświadczenia": _fmt_cell(row.get("MBAL"), 1),
-                                "Korekta priorytetu": _fmt_cell(row.get("P"), 2),
-                                "Presja doświadczenia": _fmt_cell(row.get("D"), 2),
-                                "P_adj": _fmt_cell(row.get("P_adj"), 2),
-                                "D_adj": _fmt_cell(row.get("D_adj"), 2),
-                                "SEI_raw": _fmt_cell(row.get("SEI_raw"), 2),
+                                "delta_B1": _fmt_cell(row.get("delta_B1"), 2),
+                                "delta_B2": _fmt_cell(row.get("delta_B2"), 2),
+                                "delta_N": _fmt_cell(row.get("delta_N"), 2),
+                                "Korekta wariantu B": _fmt_cell(row.get("K_B"), 2),
+                                "SEI_B": _fmt_cell(row.get("SEI_raw"), 2),
                                 f"{sei_short} 0-100": _fmt_cell(row.get("SEI_100"), 1),
                             }
                         )
@@ -3745,7 +3787,7 @@ def matching_view() -> None:
                             st.warning(
                                 "Część komponentów ma braki danych dla wybranych archetypów/wartości "
                                 f"({', '.join(missing_bits)}). "
-                                "Indeks jest liczony dalej z zabezpieczeniem `z=0` tam, gdzie trzeba."
+                                "Indeks jest liczony dalej: brakujące komponenty działają jako neutralna korekta."
                             )
         strengths_rows = result.get("strengths_rows") or []
         gaps_rows = result.get("gaps_rows") or []
@@ -3802,7 +3844,7 @@ def matching_view() -> None:
               }
               .match-section-header h3{
                 margin:0;
-                font-size:17px;
+                font-size:21px;
                 font-weight:800;
                 color:#1f2f44;
               }
@@ -3879,8 +3921,8 @@ def matching_view() -> None:
                     fillcolor="rgba(37,99,235,0.18)",
                     line=dict(color="#2563eb", width=3),
                     marker=dict(size=5),
-                    name=f"Profil polityka: {person_name}",
-                    showlegend=False,
+                    name="Polityk (linia ciągła)",
+                    showlegend=True,
                     hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -3890,8 +3932,8 @@ def matching_view() -> None:
                     fillcolor="rgba(15,118,110,0.16)",
                     line=dict(color="#0f766e", width=3, dash="dot"),
                     marker=dict(size=5),
-                    name=f"Mieszkańcy: {jst_name} (N={int(result.get('jst_n') or 0)})",
-                    showlegend=False,
+                    name="Mieszkańcy (linia przerywana)",
+                    showlegend=True,
                     hovertemplate="<b>%{theta}</b><br>Mieszkańcy: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -3921,22 +3963,25 @@ def matching_view() -> None:
                 bgcolor="rgba(0,0,0,0)",
                 radialaxis=dict(visible=True, range=[0, 20]),
                 angularaxis=dict(
-                    tickfont=dict(size=13),
+                    tickfont=dict(size=16),
                     tickvals=radar_tick_labels,
                     ticktext=radar_tick_labels,
                     rotation=90,
                     direction="clockwise",
                 ),
             ),
-            margin=dict(l=28, r=28, t=36, b=86),
-            showlegend=False,
+            margin=dict(l=28, r=28, t=104, b=86),
+            showlegend=True,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.03,
+                y=1.14,
                 xanchor="center",
                 x=0.5,
-                font=dict(size=12),
+                font=dict(size=13),
+                bgcolor="rgba(255,255,255,0.88)",
+                bordercolor="#d6deea",
+                borderwidth=1,
             ),
         )
         st.plotly_chart(
@@ -3952,18 +3997,24 @@ def matching_view() -> None:
         lg1, lg2 = st.columns(2, gap="large")
         with lg1:
             st.markdown(
-                f"**TOP3 polityka:** "
-                f"<span style='color:{person_top_colors['main']};font-weight:800;'>●</span> główny, "
-                f"<span style='color:{person_top_colors['aux']};font-weight:800;'>●</span> wspierający, "
-                f"<span style='color:{person_top_colors['supp']};font-weight:800;'>●</span> poboczny",
+                f"<div style='font-size:15px;line-height:1.3;'>"
+                f"<div style='font-weight:400;'>TOP3 polityka:</div>"
+                f"<div style='font-weight:800;'>"
+                f"<span style='color:{person_top_colors['main']};'>●</span> główny, "
+                f"<span style='color:{person_top_colors['aux']};'>●</span> wspierający, "
+                f"<span style='color:{person_top_colors['supp']};'>●</span> poboczny"
+                f"</div></div>",
                 unsafe_allow_html=True,
             )
         with lg2:
             st.markdown(
-                f"**TOP3 mieszkańców:** "
-                f"<span style='color:{jst_top_colors['main']};font-weight:800;'>●</span> główny, "
-                f"<span style='color:{jst_top_colors['aux']};font-weight:800;'>●</span> wspierający, "
-                f"<span style='color:{jst_top_colors['supp']};font-weight:800;'>●</span> poboczny",
+                f"<div style='font-size:15px;line-height:1.3;'>"
+                f"<div style='font-weight:400;'>TOP3 mieszkańców:</div>"
+                f"<div style='font-weight:800;'>"
+                f"<span style='color:{jst_top_colors['main']};'>●</span> główny, "
+                f"<span style='color:{jst_top_colors['aux']};'>●</span> wspierający, "
+                f"<span style='color:{jst_top_colors['supp']};'>●</span> poboczny"
+                f"</div></div>",
                 unsafe_allow_html=True,
             )
 

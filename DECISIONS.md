@@ -471,3 +471,49 @@ Decyzja:
 Uzasadnienie:
 - Redukuje rozmiar payloadu do przegladarki bez zmiany logiki raportu.
 - Ogranicza ryzyko przekroczenia limitu komunikatu przy pelnym podgladzie.
+
+### D-055: ISOA/ISOW finalnie przechodzi na wariant B (neutralne odchylenia, bez z-score i bez min-max)
+Decyzja:
+- Dla finalnego indeksu ISOA/ISOW stosujemy wariant B:
+  - `delta_B1 = B1 - 25.0`,
+  - `delta_B2 = B2 - 8.33`,
+  - `delta_N = N - 50.0`,
+  - `K_B = 0.35*delta_B1 + 0.90*delta_B2 + 0.08*delta_N + 0.20*MBAL`,
+  - `SEI_B = A + K_B`,
+  - `SEI_B_100 = clamp(SEI_B, 0..100)`.
+- Nie stosujemy finalnego min-max, ani standaryzacji z-score dla wyniku końcowego.
+Uzasadnienie:
+- User wskazal, ze min-max i relatywne skale zbyt latwo produkowaly skrajnosci 0/100.
+- Wariant B utrzymuje zakotwiczenie wyniku w realnym poziomie `% oczekujących` z pytania A.
+
+### D-056: Rozdzielenie stylu tabel PPP i ISOA/ISOW
+Decyzja:
+- Tabela glowna PPP ma zachowac styl "bogaty":
+  - ikony w kolumnie nazwy,
+  - kolorowane naglowki wskaznikowe,
+  - pogrubiona kolumna `% oczekujących`.
+- Tabela glowna ISOA/ISOW ma miec jednolite czarne naglowki kolumn.
+Uzasadnienie:
+- User wymagal powrotu poprzedniej estetyki PPP, ale jednoczesnie zglaszal problemy z kolorystyka naglowkow w tabeli ISOA/ISOW.
+
+### D-057: Fallback pobierania raportu, gdy panel chwilowo nie odnajduje `raport.html`
+Decyzja:
+- W `jst_analysis_view`, jesli raport jest policzony, ale nie udaje sie znalezc pliku `WYNIKI/raport.html`, panel pokazuje:
+  - ostrzezenie diagnostyczne,
+  - fallback pobrania HTML z cache sesji (jezeli dostepny),
+  - wskazanie `Przelicz od nowa` dla odtworzenia brakujacego artefaktu runa.
+Uzasadnienie:
+- User zglosil przypadek "Raport gotowy", ale bez przyciskow pobierania; fallback eliminuje pusty stan.
+
+### D-058: Domyslne progi segmentow rozszerzamy o brakujace reguly 0/2 i 1/1
+Decyzja:
+- Domyslny zestaw `segment_hit_threshold_overrides` rozszerzamy o:
+  - `0 z 2 · #2: 4.0`,
+  - `0 z 2 · #3: 4.0`,
+  - `1 z 1 · #1: 3.0`,
+  - `1 z 2 · #2: 3.0`.
+- Zmiana obowiazuje:
+  - runtime panelu (`app.py`),
+  - domyslne `settings.json` w lokalizacji D: i C:.
+Uzasadnienie:
+- User podal docelowy komplet progow, ktory ma byc nowym baseline dla kolejnych przeliczen.

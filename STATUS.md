@@ -467,6 +467,39 @@
   - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
 
+### Zrobione w Hotfix H-013 (wariant B + styl tabel + fallback pobierania + domyslne progi)
+- `app.py`:
+  - dopracowano wyglad tabow `🧭 Matching` (mocniejszy active/hover, bardziej czytelna nawigacja),
+  - sekcyjne naglowki `Porównanie...` i `Profile 0-100...` sa renderowane w `21px`,
+  - radar porownawczy ma wieksze etykiety osi i legende linii na gorze (`linia ciągła` vs `linia przerywana`),
+  - legenda TOP3 pod radarem ma docelowy uklad dwuliniowy (opis normalny + druga linia pogrubiona),
+  - poprawiono komunikat brakow komponentow (neutralna korekta zamiast wzmianki o `z=0`),
+  - gdy panel nie odnajdzie `raport.html` po wygenerowaniu, pokazuje fallback pobrania HTML z cache panelu.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - domknieto tabelaryczne mapowanie wariantu B:
+    - `Korekta wariantu B` zamiast starych kolumn `Korekta priorytetu`/`Presja doświadczenia`,
+  - tabela glowna ISOA/ISOW ma teraz czarne naglowki kolumn,
+  - przywrocono styl tabeli glównej PPP (ikony, kolorowane naglowki, pogrubienie `% oczekujących`),
+  - zmniejszono typografie bloku `Jak czytać wskaźnik`,
+  - utrzymano kolorowane Top/Bottom 3 (strzalki + barwienie ikon/list) dla ISOA/ISOW i PPP.
+- Progi segmentow:
+  - `app.py` (`_SEGMENT_HIT_THRESHOLD_DEFAULTS`) zawiera teraz domyslnie:
+    - `0 z 2 · #2: 4.0`,
+    - `0 z 2 · #3: 4.0`,
+    - `1 z 1 · #1: 3.0`,
+    - `1 z 2 · #2: 3.0`,
+    - plus dotychczasowe progi (`2 z 2 · #1`, `3 z 4 · #2`, `4 z 4 · #1`, `1 z 4 · #3/#4`).
+  - to samo ustawiono w:
+    - `D:\PythonProject\archetypy\archetypy-admin\JST_Archetypy_Analiza\settings.json`,
+    - `C:\Poznan_Archetypy_Analiza\settings.json`.
+- Synchronizacja C:/D:
+  - finalny `analyze_poznan_archetypes.py` skopiowano z D: do C:.
+- Rebuild i testy:
+  - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, raport na D:),
+  - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, raport na C:).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -475,7 +508,8 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Zweryfikowac E2E na deployu:
-  1) `🧭 Matching` w trybie `Wartości`: czy radar i kola 0-100 pokazuja nazwy wartosci,
-  2) raport `C:\Poznan_Archetypy_Analiza\WYNIKI\raport.html`: czy widac taby `ISOA/ISOW` i `PPP`,
-  3) podglad online panelu dla ciezkiego raportu: czy nie pojawia sie `MessageSizeError`.
+- Potwierdzic z userem wizualny odbior:
+  1) tabs `🧭 Matching`,
+  2) tabela glowna PPP (ikony/kolory/pogrubienia),
+  3) tabela glowna ISOA/ISOW (czarne naglowki),
+  4) flow `Raport gotowy` -> przyciski pobierania/fallback.

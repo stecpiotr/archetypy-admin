@@ -7,6 +7,10 @@
   "segments_k_max": 10,
   "random_seed": 2026,
   "segment_hit_threshold_overrides": {
+    "0 z 2 · #2": 4.0,
+    "0 z 2 · #3": 4.0,
+    "1 z 1 · #1": 3.0,
+    "1 z 2 · #2": 3.0,
     "2 z 2 · #1": 3.94,
     "4 z 4 · #1": 3.0,
     "3 z 4 · #2": 2.1,

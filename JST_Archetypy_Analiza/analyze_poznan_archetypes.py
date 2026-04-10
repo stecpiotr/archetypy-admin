@@ -1836,29 +1836,36 @@ def safe_zscore_by_archetype(
     return out, mean_v, std_v
 
 
-def build_social_expectation_core(
-        z_b1: Dict[str, float],
-        z_b2: Dict[str, float],
+def compute_variant_b_correction(
+        b1_pct: Dict[str, float],
+        b2_pct: Dict[str, float],
+        n_pct: Dict[str, float],
+        mbal_pp: Dict[str, float],
         arch_names: List[str] = ARCHETYPES
-) -> Dict[str, float]:
-    return {
-        str(a): float(0.35 * float(z_b1.get(str(a), 0.0)) + 0.65 * float(z_b2.get(str(a), 0.0)))
-        for a in arch_names
-    }
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, float]]:
+    delta_b1: Dict[str, float] = {}
+    delta_b2: Dict[str, float] = {}
+    delta_n: Dict[str, float] = {}
+    k_b: Dict[str, float] = {}
+    for a in arch_names:
+        key = str(a)
+        b1 = float(b1_pct.get(key, np.nan))
+        b2 = float(b2_pct.get(key, np.nan))
+        n = float(n_pct.get(key, np.nan))
+        mbal = float(mbal_pp.get(key, np.nan))
+        d_b1 = (b1 - 25.0) if np.isfinite(b1) else 0.0
+        d_b2 = (b2 - 8.33) if np.isfinite(b2) else 0.0
+        d_n = (n - 50.0) if np.isfinite(n) else 0.0
+        mbal_safe = mbal if np.isfinite(mbal) else 0.0
+        corr = float(0.35 * d_b1 + 0.90 * d_b2 + 0.08 * d_n + 0.20 * mbal_safe)
+        delta_b1[key] = float(d_b1)
+        delta_b2[key] = float(d_b2)
+        delta_n[key] = float(d_n)
+        k_b[key] = corr
+    return delta_b1, delta_b2, delta_n, k_b
 
 
-def build_experience_pressure(
-        z_n: Dict[str, float],
-        z_mbal: Dict[str, float],
-        arch_names: List[str] = ARCHETYPES
-) -> Dict[str, float]:
-    return {
-        str(a): float(0.70 * float(z_n.get(str(a), 0.0)) + 0.30 * float(z_mbal.get(str(a), 0.0)))
-        for a in arch_names
-    }
-
-
-def compute_social_expectation_index(
+def compute_social_expectation_variant_b(
         a_pct: Dict[str, float],
         b1_pct: Dict[str, float],
         b2_pct: Dict[str, float],
@@ -1866,28 +1873,20 @@ def compute_social_expectation_index(
         mbal_pp: Dict[str, float],
         arch_names: List[str] = ARCHETYPES
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    z_b1, mean_b1, std_b1 = safe_zscore_by_archetype(b1_pct, arch_names=arch_names)
-    z_b2, mean_b2, std_b2 = safe_zscore_by_archetype(b2_pct, arch_names=arch_names)
-    z_n, mean_n, std_n = safe_zscore_by_archetype(n_pct, arch_names=arch_names)
-    z_mbal, mean_mbal, std_mbal = safe_zscore_by_archetype(mbal_pp, arch_names=arch_names)
-
-    core = build_social_expectation_core(z_b1, z_b2, arch_names=arch_names)
-    pressure = build_experience_pressure(z_n, z_mbal, arch_names=arch_names)
-    priority_adj = {
-        str(a): float(8.0 * np.tanh(float(core.get(str(a), 0.0)) / 1.5))
-        for a in arch_names
-    }
-    experience_adj = {
-        str(a): float(4.0 * np.tanh(float(pressure.get(str(a), 0.0)) / 1.5))
-        for a in arch_names
-    }
+    delta_b1, delta_b2, delta_n, k_b = compute_variant_b_correction(
+        b1_pct=b1_pct,
+        b2_pct=b2_pct,
+        n_pct=n_pct,
+        mbal_pp=mbal_pp,
+        arch_names=arch_names,
+    )
     raw = {}
     scaled = {}
     for a in arch_names:
         key = str(a)
         aval = float(a_pct.get(key, np.nan))
         if np.isfinite(aval):
-            raw_val = float(aval + float(priority_adj.get(key, 0.0)) + float(experience_adj.get(key, 0.0)))
+            raw_val = float(aval + float(k_b.get(key, 0.0)))
             raw[key] = raw_val
             scaled[key] = float(np.clip(raw_val, 0.0, 100.0))
         else:
@@ -1904,32 +1903,43 @@ def compute_social_expectation_index(
             "B2_pct": float(b2_pct.get(key, np.nan)),
             "N_pct": float(n_pct.get(key, np.nan)),
             "MBAL_pp": float(mbal_pp.get(key, np.nan)),
-            "core_E": float(core.get(key, 0.0)),
-            "pressure_D": float(pressure.get(key, 0.0)),
-            "priority_adj": float(priority_adj.get(key, 0.0)),
-            "experience_adj": float(experience_adj.get(key, 0.0)),
-            "SEI_raw": float(raw.get(key, 0.0)),
+            "delta_B1": float(delta_b1.get(key, 0.0)),
+            "delta_B2": float(delta_b2.get(key, 0.0)),
+            "delta_N": float(delta_n.get(key, 0.0)),
+            "K_B": float(k_b.get(key, 0.0)),
+            "SEI_B": float(raw.get(key, np.nan)),
             "SEI_100": float(scaled.get(key, np.nan)),
         })
     out = pd.DataFrame(rows)
-    out = out.sort_values(["SEI_100", "SEI_raw"], ascending=[False, False], kind="mergesort", na_position="last").reset_index(drop=True)
+    out = out.sort_values(["SEI_100", "SEI_B"], ascending=[False, False], kind="mergesort", na_position="last").reset_index(drop=True)
     out.insert(0, "position", np.arange(1, len(out) + 1, dtype=int))
 
     meta = {
-        "z_stats": {
-            "B1": {"mean": mean_b1, "std": std_b1},
-            "B2": {"mean": mean_b2, "std": std_b2},
-            "N": {"mean": mean_n, "std": std_n},
-            "MBAL": {"mean": mean_mbal, "std": std_mbal},
-        },
         "anchor_formula": "A_base = % oczekujących z pytania A",
-        "core_formula": "P = 0.35*z(B1) + 0.65*z(B2)",
-        "pressure_formula": "D = 0.70*z(N) + 0.30*z(MBAL)",
-        "adjust_formula": "P_adj = 8*tanh(P/1.5), D_adj = 4*tanh(D/1.5)",
-        "raw_formula": "SEI_raw = A_base + P_adj + D_adj",
-        "scale_formula": "SEI_100 = clamp(SEI_raw, 0..100)",
+        "delta_formula": "delta_B1=B1-25.0; delta_B2=B2-8.33; delta_N=N-50.0; MBAL=Mneg-Mpos",
+        "corr_formula": "K_B = 0.35*delta_B1 + 0.90*delta_B2 + 0.08*delta_N + 0.20*MBAL",
+        "raw_formula": "SEI_B = A_base + K_B",
+        "scale_formula": "SEI_B_100 = clamp(SEI_B, 0..100)",
     }
     return out, meta
+
+
+def compute_social_expectation_index(
+        a_pct: Dict[str, float],
+        b1_pct: Dict[str, float],
+        b2_pct: Dict[str, float],
+        n_pct: Dict[str, float],
+        mbal_pp: Dict[str, float],
+        arch_names: List[str] = ARCHETYPES
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    return compute_social_expectation_variant_b(
+        a_pct=a_pct,
+        b1_pct=b1_pct,
+        b2_pct=b2_pct,
+        n_pct=n_pct,
+        mbal_pp=mbal_pp,
+        arch_names=arch_names,
+    )
 
 
 def build_main_expectation_table(summary_table: pd.DataFrame) -> pd.DataFrame:
@@ -2163,12 +2173,12 @@ def render_isoa_isow_report_tab(
       {reason_html}
     </div>
 
-    <div class="card" style="margin-top:16px;">
+    <div class="card ioa-howto" style="margin-top:16px;">
       <h3>Jak czytać wskaźnik</h3>
       <ul style="margin:8px 0 0 18px;">
         <li><span class="mode-arche">Wysoki ISOA oznacza, że archetyp jest społecznie mocno oczekiwany w całym badaniu.</span><span class="mode-values">Wysoki ISOW oznacza, że wartość jest społecznie mocno oczekiwana w całym badaniu.</span></li>
-        <li>Wysoki komponent A + B2 oznacza szerokie oczekiwanie i wysoki priorytet.</li>
-        <li>Wysoka presja C13/D13 wzmacnia wynik, gdy mieszkańcy odczuwają brak archetypu/wartości.</li>
+        <li>Wysokie A + B2 oznacza szerokie oczekiwanie i wyraźny priorytet.</li>
+        <li>C13/D13 działa jako umiarkowana korekta doświadczeniowa (nie dominuje rdzenia).</li>
         <li>Skala 0-100 jest indeksem syntetycznym, a nie odsetkiem respondentów.</li>
       </ul>
     </div>
@@ -8288,9 +8298,11 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 }
 .ioa-summary-item h4 {
   margin: 0 0 8px 0;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.28;
 }
+.sum-up-arrow { color:#1e40af; font-weight:900; margin-right:6px; }
+.sum-down-arrow { color:#b42318; font-weight:900; margin-right:6px; }
 .ioa-list {
   margin: 0;
   padding-left: 20px;
@@ -8298,11 +8310,18 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 .ioa-list li {
   margin: 6px 0;
 }
+.ioa-list.tone-up li { color:#1e40af; font-weight:700; }
+.ioa-list.tone-down li { color:#b42318; font-weight:700; }
+.ioa-list.tone-up .aico { filter: invert(25%) sepia(66%) saturate(1329%) hue-rotate(202deg) brightness(90%) contrast(95%); }
+.ioa-list.tone-down .aico { filter: invert(25%) sepia(94%) saturate(2283%) hue-rotate(344deg) brightness(92%) contrast(101%); }
+.ioa-howto h3 { font-size: 18px; margin-bottom: 6px; }
+.ioa-howto ul li { font-size: 12.5px; line-height: 1.33; }
 
 .ioa-main-table td:nth-child(3) {
   font-weight: 800;
   color: #0f172a;
 }
+.ioa-main-table th { color:#0f172a !important; }
 .ioa-main-table th:nth-child(1), .ioa-main-table td:nth-child(1) {
   width: 64px;
   max-width: 64px;
@@ -8311,13 +8330,26 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 .ioa-main-table th:nth-child(2), .ioa-main-table td:nth-child(2) {
   min-width: 230px;
 }
-.ioa-main-table th:nth-child(3) { color:#2f7d32; }
-.ioa-main-table th:nth-child(4) { color:#475467; }
-.ioa-main-table th:nth-child(5) { color:#b42318; }
-.ioa-main-table th:nth-child(6) { color:#0b4f8a; }
 .ioa-main-table td:nth-child(8) {
   color: #556070;
 }
+.ppp-main-table td:nth-child(3) {
+  font-weight: 800;
+  color:#0b6b2d;
+}
+.ppp-main-table th:nth-child(1), .ppp-main-table td:nth-child(1) {
+  width: 64px;
+  max-width: 64px;
+  text-align: center;
+}
+.ppp-main-table th:nth-child(2), .ppp-main-table td:nth-child(2) {
+  min-width: 230px;
+}
+.ppp-main-table th:nth-child(3) { color:#0b6b2d; }
+.ppp-main-table th:nth-child(4) { color:#334155; }
+.ppp-main-table th:nth-child(5) { color:#c62000; }
+.ppp-main-table th:nth-child(6) { color:#00509d; }
+.ppp-main-table th:nth-child(7) { color:#0f4f9e; }
 .isoa-axis-legend {
   margin-top: 10px;
   display: flex;
@@ -9569,13 +9601,15 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
 
     isoa_methodology_text_arche = (
         "ISOA jest zakotwiczony w A (% oczekujących z versusów). "
-        "B1/B2 tworzą ograniczoną korektę priorytetu, a C13/D13 ograniczoną korektę doświadczeniową. "
-        "Wynik końcowy to A + korekty, ucięty do zakresu 0-100 (bez min-max)."
+        "B1 i B2 działają względem poziomów neutralnych (25% i 8.33%), "
+        "C13/D13 daje umiarkowaną korektę doświadczeniową. "
+        "Wynik końcowy to A + korekta wariantu B, przycięty do zakresu 0-100 (bez min-max)."
     )
     isoa_methodology_text_values = (
         "ISOW jest zakotwiczony w A (% oczekujących z versusów). "
-        "B1/B2 tworzą ograniczoną korektę priorytetu, a C13/D13 ograniczoną korektę doświadczeniową. "
-        "Wynik końcowy to A + korekty, ucięty do zakresu 0-100 (bez min-max)."
+        "B1 i B2 działają względem poziomów neutralnych (25% i 8.33%), "
+        "C13/D13 daje umiarkowaną korektę doświadczeniową. "
+        "Wynik końcowy to A + korekta wariantu B, przycięty do zakresu 0-100 (bez min-max)."
     )
 
     def _fmt_cell(v: Any, digits: int) -> str:
@@ -9600,8 +9634,8 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             "B2: TOP1 (%)",
             "C13/D13: negatywne doświadczenie (%)",
             "C13/D13: bilans najważniejszego doświadczenia",
-            "Korekta priorytetu",
-            "Presja doświadczenia",
+            "Korekta wariantu B",
+            "Różnica |Δ| vs profil polityka",
         ]
         d_a = df_main.copy()
         d_a = d_a[[c for c in base_cols if c in d_a.columns]].copy()
@@ -9614,8 +9648,8 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             ("B2: TOP1 (%)", 1),
             ("C13/D13: negatywne doświadczenie (%)", 1),
             ("C13/D13: bilans najważniejszego doświadczenia", 1),
-            ("Korekta priorytetu", 2),
-            ("Presja doświadczenia", 2),
+            ("Korekta wariantu B", 2),
+            ("Różnica |Δ| vs profil polityka", 1),
         ]:
             if col in d_a.columns:
                 d_a[col] = d_a[col].apply(lambda x, d=digits: _fmt_cell(x, d))
@@ -9634,8 +9668,8 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             ("B2: TOP1 (%)", 1),
             ("C13/D13: negatywne doświadczenie (%)", 1),
             ("C13/D13: bilans najważniejszego doświadczenia", 1),
-            ("Korekta priorytetu", 2),
-            ("Presja doświadczenia", 2),
+            ("Korekta wariantu B", 2),
+            ("Różnica |Δ| vs profil polityka", 1),
         ]:
             if col in d_v.columns:
                 d_v[col] = d_v[col].apply(lambda x, d=digits: _fmt_cell(x, d))
@@ -9647,6 +9681,65 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         d_v = d_v.rename(columns={"ISOA 0-100": "ISOW 0-100"})
         d_v = _values_mode_df(d_v)
         h_v = d_v.to_html(index=False, border=0, classes="tbl ioa-main-table", escape=False)
+        return f'<div class="label-arche">{h_a}</div><div class="label-values">{h_v}</div>'
+
+    def _ppp_main_table_dual(df_main: pd.DataFrame) -> str:
+        if df_main is None or len(df_main) == 0:
+            return '<div class="small">Brak danych dla tabeli PPP.</div>'
+        base_cols = [
+            "Pozycja",
+            "Archetyp",
+            "% oczekujących",
+            "% neutralnych",
+            "% nieoczekujących",
+            "% silnie oczekujących",
+            "PPP 0-100",
+            "PPP raw (-3 do +3)",
+            "Liczba respondentów",
+        ]
+        d_a = df_main.copy()
+        d_a = d_a[[c for c in base_cols if c in d_a.columns]].copy()
+        if "Pozycja" in d_a.columns:
+            d_a["Pozycja"] = pd.to_numeric(d_a["Pozycja"], errors="coerce").fillna(0).astype(int)
+        if "Liczba respondentów" in d_a.columns:
+            d_a["Liczba respondentów"] = pd.to_numeric(d_a["Liczba respondentów"], errors="coerce").fillna(0).astype(int)
+        for col, digits in [
+            ("% oczekujących", 1),
+            ("% neutralnych", 1),
+            ("% nieoczekujących", 1),
+            ("% silnie oczekujących", 1),
+            ("PPP 0-100", 1),
+            ("PPP raw (-3 do +3)", 2),
+        ]:
+            if col in d_a.columns:
+                d_a[col] = d_a[col].apply(lambda x, d=digits: _fmt_cell(x, d))
+        if "Archetyp" in d_a.columns:
+            d_a["Archetyp"] = d_a["Archetyp"].astype(str).apply(lambda a: _icon_cell(a, a))
+        h_a = d_a.to_html(index=False, border=0, classes="tbl ppp-main-table", escape=False)
+
+        d_v = df_main.copy()
+        d_v = d_v[[c for c in base_cols if c in d_v.columns]].copy()
+        if "Pozycja" in d_v.columns:
+            d_v["Pozycja"] = pd.to_numeric(d_v["Pozycja"], errors="coerce").fillna(0).astype(int)
+        if "Liczba respondentów" in d_v.columns:
+            d_v["Liczba respondentów"] = pd.to_numeric(d_v["Liczba respondentów"], errors="coerce").fillna(0).astype(int)
+        for col, digits in [
+            ("% oczekujących", 1),
+            ("% neutralnych", 1),
+            ("% nieoczekujących", 1),
+            ("% silnie oczekujących", 1),
+            ("PPP 0-100", 1),
+            ("PPP raw (-3 do +3)", 2),
+        ]:
+            if col in d_v.columns:
+                d_v[col] = d_v[col].apply(lambda x, d=digits: _fmt_cell(x, d))
+        if "Archetyp" in d_v.columns:
+            d_v["Archetyp"] = d_v["Archetyp"].astype(str).apply(
+                lambda a: _icon_cell(a, str(brand_values.get(a, a)))
+            )
+            d_v = d_v.rename(columns={"Archetyp": "Wartość"})
+        d_v = _values_mode_df(d_v)
+        h_v = d_v.to_html(index=False, border=0, classes="tbl ppp-main-table", escape=False)
         return f'<div class="label-arche">{h_a}</div><div class="label-values">{h_v}</div>'
 
     def _top_bottom_dual(df_main: pd.DataFrame) -> str:
@@ -9661,10 +9754,11 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         top3 = d.head(3)["Archetyp"].astype(str).tolist()
         bottom3 = d.tail(3)["Archetyp"].astype(str).tolist()
 
-        def _list_html(items: List[str], values_mode: bool) -> str:
+        def _list_html(items: List[str], values_mode: bool, tone: str) -> str:
             if not items:
                 return "<div class='small'>Brak danych.</div>"
-            out = ["<ol class='ioa-list'>"]
+            tone_class = "tone-up" if tone == "up" else "tone-down"
+            out = [f"<ol class='ioa-list {tone_class}'>"]
             for a in items:
                 lbl = str(brand_values.get(a, a)) if values_mode else str(a)
                 out.append(f"<li>{_icon_cell(a, lbl)}</li>")
@@ -9673,18 +9767,18 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
 
         return (
             '<div class="label-arche"><div class="ioa-summary-grid">'
-            '<div class="ioa-summary-item"><h4>Top 3 archetypy (ISOA)</h4>'
-            + _list_html(top3, values_mode=False)
+            '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 archetypy (ISOA)</h4>'
+            + _list_html(top3, values_mode=False, tone="up")
             + "</div>"
-            '<div class="ioa-summary-item"><h4>Bottom 3 archetypy (ISOA)</h4>'
-            + _list_html(bottom3, values_mode=False)
+            '<div class="ioa-summary-item"><h4><span class="sum-down-arrow">⬇</span> Bottom 3 archetypy (ISOA)</h4>'
+            + _list_html(bottom3, values_mode=False, tone="down")
             + "</div></div></div>"
             '<div class="label-values"><div class="ioa-summary-grid">'
-            '<div class="ioa-summary-item"><h4>Top 3 wartości (ISOW)</h4>'
-            + _list_html(top3, values_mode=True)
+            '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 wartości (ISOW)</h4>'
+            + _list_html(top3, values_mode=True, tone="up")
             + "</div>"
-            '<div class="ioa-summary-item"><h4>Bottom 3 wartości (ISOW)</h4>'
-            + _list_html(bottom3, values_mode=True)
+            '<div class="ioa-summary-item"><h4><span class="sum-down-arrow">⬇</span> Bottom 3 wartości (ISOW)</h4>'
+            + _list_html(bottom3, values_mode=True, tone="down")
             + "</div></div></div>"
         )
 
@@ -9694,10 +9788,11 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         bottom_expected = [str(x) for x in (data.get("bottom_expected") or []) if str(x).strip()]
         top_ppp = [str(x) for x in (data.get("top_ioa") or []) if str(x).strip()]
 
-        def _list_html(items: List[str], values_mode: bool) -> str:
+        def _list_html(items: List[str], values_mode: bool, tone: str) -> str:
             if not items:
                 return "<div class='small'>Brak danych.</div>"
-            out = ["<ol class='ioa-list'>"]
+            tone_class = "tone-up" if tone == "up" else "tone-down"
+            out = [f"<ol class='ioa-list {tone_class}'>"]
             for a in items:
                 lbl = str(brand_values.get(a, a)) if values_mode else str(a)
                 out.append(f"<li>{_icon_cell(a, lbl)}</li>")
@@ -9706,24 +9801,24 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
 
         return (
             '<div class="label-arche"><div class="ioa-summary-grid">'
-            '<div class="ioa-summary-item"><h4>Top 3 oczekiwane archetypy</h4>'
-            + _list_html(top_expected, values_mode=False)
+            '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 oczekiwane archetypy</h4>'
+            + _list_html(top_expected, values_mode=False, tone="up")
             + "</div>"
-            '<div class="ioa-summary-item"><h4>Bottom 3 oczekiwane archetypy</h4>'
-            + _list_html(bottom_expected, values_mode=False)
+            '<div class="ioa-summary-item"><h4><span class="sum-down-arrow">⬇</span> Bottom 3 oczekiwane archetypy</h4>'
+            + _list_html(bottom_expected, values_mode=False, tone="down")
             + "</div>"
-            '<div class="ioa-summary-item"><h4>Top 3 archetypy (PPP)</h4>'
-            + _list_html(top_ppp, values_mode=False)
+            '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 archetypy (PPP)</h4>'
+            + _list_html(top_ppp, values_mode=False, tone="up")
             + "</div></div></div>"
             '<div class="label-values"><div class="ioa-summary-grid">'
-            '<div class="ioa-summary-item"><h4>Top 3 oczekiwane wartości</h4>'
-            + _list_html(top_expected, values_mode=True)
+            '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 oczekiwane wartości</h4>'
+            + _list_html(top_expected, values_mode=True, tone="up")
             + "</div>"
-            '<div class="ioa-summary-item"><h4>Bottom 3 oczekiwane wartości</h4>'
-            + _list_html(bottom_expected, values_mode=True)
+            '<div class="ioa-summary-item"><h4><span class="sum-down-arrow">⬇</span> Bottom 3 oczekiwane wartości</h4>'
+            + _list_html(bottom_expected, values_mode=True, tone="down")
             + "</div>"
-            '<div class="ioa-summary-item"><h4>Top 3 wartości (PPP)</h4>'
-            + _list_html(top_ppp, values_mode=True)
+            '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 wartości (PPP)</h4>'
+            + _list_html(top_ppp, values_mode=True, tone="up")
             + "</div></div></div>"
         )
 
@@ -9741,7 +9836,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         data_basis_message=get_weighting_status_message(expectation_weighting_meta),
         data_basis_reason=str(expectation_weighting_meta.get("data_basis_reason", "")),
         summary_block_html=_ppp_summary_block_dual(expectation_summary_payload),
-        main_table_html=df_to_html_dual(df_A_expectation_main, max_rows=24),
+        main_table_html=_ppp_main_table_dual(df_A_expectation_main),
         pair_detail_table_html=df_to_html_dual(df_A_expectation_pair_detail, max_rows=60),
         balance_chart_html=img_tag_dual("A_expectation_balance_distribution.png"),
         expected_chart_html=img_tag_dual("A_expectation_expected_pct.png"),
@@ -16784,8 +16879,7 @@ def main() -> None:
         "B2_pct": "B2: TOP1 (%)",
         "N_pct": "C13/D13: negatywne doświadczenie (%)",
         "MBAL_pp": "C13/D13: bilans najważniejszego doświadczenia",
-        "core_E": "Korekta priorytetu",
-        "pressure_D": "Presja doświadczenia",
+        "K_B": "Korekta wariantu B",
     }).copy()
     for col, digits in [
         ("ISOA 0-100", 1),
@@ -16794,8 +16888,7 @@ def main() -> None:
         ("B2: TOP1 (%)", 1),
         ("C13/D13: negatywne doświadczenie (%)", 1),
         ("C13/D13: bilans najważniejszego doświadczenia", 1),
-        ("Korekta priorytetu", 2),
-        ("Presja doświadczenia", 2),
+        ("Korekta wariantu B", 2),
     ]:
         if col in df_social_expectation_index.columns:
             df_social_expectation_index[col] = pd.to_numeric(

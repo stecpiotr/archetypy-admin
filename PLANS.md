@@ -546,3 +546,42 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-013 [DONE]
+Temat: Domkniecie uwag po H-012 (wariant B w raportach, styl tabel/legend, tabs Matching, fallback pobierania raportu i progi domyslne segmentow).
+Kryteria ukonczenia:
+1. ISOA/ISOW w raporcie i Matching korzysta z wariantu B (bez min-max i bez z-score w finale).
+2. Tabela glowna PPP wraca wizualnie do wariantu z ikonami, kolorami naglowkow i pogrubieniem kluczowej kolumny.
+3. Tabela glowna ISOA/ISOW ma czarne naglowki kolumn (bez przypadkowej wielokolorowosci).
+4. `🧭 Matching`: naglowki sekcji `Porównanie...` i `Profile 0-100...` sa po `21px`, radar ma czytelniejsza legende linii i wieksze etykiety osi, a dolna legenda TOP3 jest dwuliniowa.
+5. `📊 Analiza badania mieszkańców`: gdy `raport.html` nie jest odnaleziony w runie, panel pokazuje fallback pobierania HTML z cache (zamiast pustego stanu bez przyciskow).
+6. Domyslne `segment_hit_threshold_overrides` zawieraja nowe progi wskazane przez usera.
+7. Zmiany generatora sa zsynchronizowane i przebudowane raporty w obu lokalizacjach (`D:` i `C:`).
+Pierwszy krok wykonawczy:
+- domknac mapowanie tabel ISOA/ISOW po przejsciu na wariant B, przywrocic docelowy styl PPP, a nastepnie zsynchronizowac `analyze_poznan_archetypes.py` na C: i wykonac rebuild.
+Wynik:
+- `app.py`:
+  - utrzymano wariant B (`K_B` + clamp) w Matching,
+  - poprawiono komunikat o brakach komponentow (neutralna korekta zamiast wzmianki o `z=0`),
+  - odswiezono styl tabow w Matching (bardziej wyrazny active/hover),
+  - sekcje `Porównanie...` i `Profile 0-100...` pracuja z naglowkiem `21px`,
+  - radar ma legende linii na gorze (`linia ciągła` vs `linia przerywana`) i wieksze etykiety osi,
+  - legenda TOP3 pod radarem jest dwuliniowa (opis zwykly + pogrubione znaczniki),
+  - dodano fallback pobierania HTML z cache, gdy panel nie znajdzie `raport.html` w runie.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - domknieto mapowanie danych wariantu B w tabeli wyjsciowej (`Korekta wariantu B`, bez starych kolumn `Korekta priorytetu/Presja doświadczenia`),
+  - tabela glowna ISOA/ISOW ma czarne naglowki kolumn,
+  - przywrocono styl tabeli PPP (ikony + kolory naglowkow + pogrubienie `% oczekujących`),
+  - zmniejszono typografie sekcji `Jak czytać wskaźnik`,
+  - zachowano strzalki i kolorowanie Top/Bottom 3 dla ISOA/ISOW i PPP.
+- `JST_Archetypy_Analiza/settings.json`:
+  - rozszerzono domyslne `segment_hit_threshold_overrides` o:
+    `0 z 2 · #2`, `0 z 2 · #3`, `1 z 1 · #1`, `1 z 2 · #2`.
+- Synchronizacja C:/D:
+  - `analyze_poznan_archetypes.py` skopiowany D -> C,
+  - `settings.json` zaktualizowany tez w `C:\Poznan_Archetypy_Analiza`.
+- Rebuild i smoke-check:
+  - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, WYNIKI na D:),
+  - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, WYNIKI na C:).
