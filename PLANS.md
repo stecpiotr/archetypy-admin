@@ -673,7 +673,7 @@ Krok A [DONE] — TOP3 + tabs + radar spacing
    - markery JST zmienic z kropek na kwadraty,
    - dopracowac zapis legendy TOP3 (bez przecinkow, wieksze odstepy).
 
-Krok B [PENDING] — metryka `Poziom dopasowania`
+Krok B [DONE] — metryka `Poziom dopasowania`
 1. Przebudowac metryke dopasowania tak, aby mocniej karala rozjazdy archetypow kluczowych (TOP3 polityka i TOP3 JST),
    bo obecnie przypadki z duzymi lukami na archetypach kluczowych sa oceniane zbyt wysoko.
 2. Zaktualizowac opis metryki w Matching i audyt, aby bylo jasne, jak liczona jest kara za luki kluczowe.
@@ -694,7 +694,60 @@ Wynik Etapu 2 (czesc 1):
   - `Demografia`: offset `👥 PROFIL DEMOGRAFICZNY` przeniesiony na caly box (padding-left:25, padding-top:15), nie tylko na sama tabele.
 - Smoke-check: `python -m py_compile app.py` (OK).
 
+Wynik Etapu 2 (czesc 2):
+- `app.py` (`Krok B`):
+  - metryka `Poziom dopasowania` przelicza teraz osobno luki kluczowe (unia TOP3 polityka + TOP3 mieszkancow),
+  - finalny wynik ma jawna kare kluczowa:
+    - `base = 0.40*(100-MAE) + 0.20*(100-RMSE) + 0.20*(100-TOP3_MAE) + 0.20*(100-KEY_MAE)`,
+    - `kara_kluczowa = 0.22*KEY_MAE + 0.10*max(0, KEY_MAX - 15)`,
+    - `match = clamp(0,100, base - kara_kluczowa)`,
+  - metryki w UI rozszerzone o `Luki kluczowe (TOP3 P+JST)`,
+  - w expanderze dopisano nowy opis wzoru i listę archetypow kluczowych.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
+Dogrywka A2 [PENDING, po Kroku B]:
+1. `🧭 Matching` tabs:
+   - poprawic nieczytelnosc aktywnej zakladki po najechaniu (hover nie moze "zjadac" kontrastu tekstu).
+2. `Porównanie profili archetypowych`:
+   - podniesc wyzej gorna legende profili i zblizyc caly blok wykresu/legend do tytulu sekcji,
+   - dolna legenda ma nie ucinać etykiety archetypu na radarze (`Władca`),
+   - napisy `TOP3 polityka` i `TOP3 mieszkańców` w dolnej legendzie bez pogrubienia,
+   - w legendzie `TOP3 mieszkańców` znaczniki `główny/wspierający/poboczny` jako kwadraty (nie kółka).
+3. Gorna legenda profili:
+   - zaokraglic rogi obramowania,
+   - odrobine zwiekszyc odstep miedzy profilem polityka i mieszkancow,
+   - zwiekszyc marginesy wewnetrzne (boczne oraz gorny/dolny).
+
 Kryteria ukonczenia Etapu 2:
 1. Wszystkie elementy z punktow 1-8 usera odwzorowane 1:1 na zrzutach.
 2. Brak regresji dzialania i wygladu pozostalych sekcji Matching.
 3. `py_compile` dla `app.py` przechodzi poprawnie.
+
+#### H-015 / Etap 3 [PENDING]
+Temat: Domkniecie brakow renderu w raporcie HTML (`Segmenty`, `Skupienia`, `Filtry`) dla standalone i podgladu online.
+Zakres:
+
+Krok D [PENDING] — mapy Segmentow i Skupien sterowane suwakiem
+1. `Segmenty`:
+   - naprawic brak renderu `Mapa przewag segmentów`,
+   - mapa ma sie aktualizowac wraz ze zmiana suwaka widocznych segmentow.
+2. `Skupienia (k-średnich)`:
+   - naprawic brak renderu `Mapa skupień (projekcja dla K=...)`,
+   - mapa ma sie aktualizowac po zmianie suwaka `Wybrany model skupień (K)`.
+3. Zweryfikowac, czy problem dotyczy:
+   - mapowania indeksu suwaka -> nazwa pliku mapy,
+   - czy tylko osadzania obrazow po inline (standalone/podglad online).
+
+Krok E [PENDING] — ikony w zakladce Filtry
+1. Przywrocic ikonki archetypu/wartosci w zakladce `Filtry` (jak w wersji referencyjnej).
+2. Potwierdzic dzialanie identycznie w:
+   - `raport.html` otwieranym lokalnie,
+   - `Podgląd raportu online w panelu`.
+
+Kryteria ukonczenia Etapu 3:
+1. `Mapa przewag segmentów` i `Mapa skupień` sa widoczne i reaguja na suwaki.
+2. `Filtry` pokazuja ikonki jak na referencji usera.
+3. Zmiany dzialaja tak samo w standalone HTML i podgladzie online.
+4. Rebuild + smoke-check po stronie generatora:
+   - `python -m py_compile jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py`,
+   - synchronizacja `analyze_poznan_archetypes.py` D -> C i rebuild raportow w obu lokalizacjach.

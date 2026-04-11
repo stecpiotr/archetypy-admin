@@ -3406,11 +3406,32 @@ def matching_view() -> None:
             sorted_gaps_desc = sorted(diff_vals, reverse=True)
             top3_gap_mae = float(sum(sorted_gaps_desc[:3]) / max(1, min(3, len(sorted_gaps_desc))))
 
+            arch_order = list(JST_ARCHETYPES)
+            person_top3 = sorted(
+                arch_order,
+                key=lambda a: (-float(p_profile.get(a, 0.0)), arch_order.index(a)),
+            )[:3]
+            jst_top3 = sorted(
+                arch_order,
+                key=lambda a: (-float(j_profile.get(a, 0.0)), arch_order.index(a)),
+            )[:3]
+            key_archetypes: List[str] = []
+            for arche in person_top3 + jst_top3:
+                if arche not in key_archetypes:
+                    key_archetypes.append(arche)
+            key_gap_vals = [float(diffs.get(a, 0.0)) for a in key_archetypes]
+            key_gap_mae = float(sum(key_gap_vals) / max(1, len(key_gap_vals)))
+            key_gap_max = float(max(key_gap_vals)) if key_gap_vals else 0.0
+
             score_mae = max(0.0, min(100.0, 100.0 - mae))
             score_rmse = max(0.0, min(100.0, 100.0 - rmse))
             score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
-            # Metryka mieszana: średni błąd + kara za duże odchylenia i największe luki.
-            match_score = max(0.0, min(100.0, 0.40 * score_mae + 0.25 * score_rmse + 0.35 * score_top3))
+            score_key = max(0.0, min(100.0, 100.0 - key_gap_mae))
+            base_score = 0.40 * score_mae + 0.20 * score_rmse + 0.20 * score_top3 + 0.20 * score_key
+            key_penalty = 0.22 * key_gap_mae + 0.10 * max(0.0, key_gap_max - 15.0)
+            # Metryka mieszana z dodatkową karą za luki na archetypach kluczowych
+            # (TOP3 polityka + TOP3 mieszkańców), żeby nie zawyżać wyniku przy strategicznych rozjazdach.
+            match_score = max(0.0, min(100.0, base_score - key_penalty))
 
             strengths = sorted(JST_ARCHETYPES, key=lambda a: diffs[a])[:3]
             gaps = sorted(JST_ARCHETYPES, key=lambda a: diffs[a], reverse=True)[:3]
@@ -3667,9 +3688,14 @@ def matching_view() -> None:
                     "mae": round(mae, 1),
                     "rmse": round(rmse, 1),
                     "top3_gap_mae": round(top3_gap_mae, 1),
+                    "key_gap_mae": round(key_gap_mae, 1),
+                    "key_gap_max": round(key_gap_max, 1),
+                    "key_penalty": round(key_penalty, 1),
                     "score_mae": round(score_mae, 1),
                     "score_rmse": round(score_rmse, 1),
                     "score_top3": round(score_top3, 1),
+                    "score_key": round(score_key, 1),
+                    "key_archetypes": list(key_archetypes),
                     "band_label": str(match_band[0]),
                     "band_desc": str(match_band[1]),
                 },
@@ -3679,9 +3705,12 @@ def matching_view() -> None:
                 "demo_weights_used": bool(weights_used),
                 "target_audit": target_audit,
                 "match_formula": (
-                    "match = clamp(0,100, 0.40*(100 - MAE) + 0.25*(100 - RMSE) + 0.35*(100 - TOP3_MAE)); "
+                    "base = 0.40*(100 - MAE) + 0.20*(100 - RMSE) + 0.20*(100 - TOP3_MAE) + 0.20*(100 - KEY_MAE); "
+                    "kara_kluczowa = 0.22*KEY_MAE + 0.10*max(0, KEY_MAX - 15); "
+                    "match = clamp(0,100, base - kara_kluczowa); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
-                    "TOP3_MAE = średnia z 3 największych |Δ|. "
+                    "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii TOP3 polityka i TOP3 mieszkańców, "
+                    "KEY_MAX = największa |Δ| w tej samej puli kluczowej. "
                     "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania."
                 ),
             }
@@ -3766,10 +3795,11 @@ def matching_view() -> None:
             unsafe_allow_html=True,
         )
         if metrics:
-            mcol1, mcol2, mcol3 = st.columns(3)
+            mcol1, mcol2, mcol3, mcol4 = st.columns(4)
             mcol1.metric("Średnia różnica (MAE)", f"{float(metrics.get('mae', 0.0)):.1f} pp")
             mcol2.metric("Różnica z karą za odchylenia (RMSE)", f"{float(metrics.get('rmse', 0.0)):.1f} pp")
             mcol3.metric("Średnia TOP3 luk", f"{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp")
+            mcol4.metric("Luki kluczowe (TOP3 P+JST)", f"{float(metrics.get('key_gap_mae', 0.0)):.1f} pp")
         st.caption(f"Próba personalna: {result['personal_n']} odpowiedzi · Próba mieszkańców: {result['jst_n']} odpowiedzi")
         sei_short = str(current_sei_short)
         sei_full = str(current_sei_full)
@@ -3806,16 +3836,25 @@ def matching_view() -> None:
                 f"kolumny `Oczekiwania mieszkańców ({sei_short})`."
             )
             st.markdown(
-                "Metryka celowo bardziej karze duże luki archetypowe: oprócz średniej różnicy uwzględnia "
-                "także RMSE (wrażliwy na skrajne odchylenia) i średnią z 3 największych luk."
+                "Metryka celowo mocniej karze strategiczne rozjazdy: oprócz MAE, RMSE i średniej 3 największych luk "
+                "uwzględnia też luki na archetypach kluczowych (unia TOP3 polityka + TOP3 mieszkańców) "
+                "oraz dodatkową karę za skrajny rozjazd w tej puli."
             )
             if metrics:
+                key_list = metrics.get("key_archetypes") or []
+                key_list_txt = ", ".join(
+                    [_matching_entity_name(str(a), current_axis_label) for a in key_list]
+                ) if isinstance(key_list, list) and key_list else "brak"
                 st.markdown(
                     f"**Składowe dla tego porównania:** "
                     f"MAE `{float(metrics.get('mae', 0.0)):.1f} pp`, "
                     f"RMSE `{float(metrics.get('rmse', 0.0)):.1f} pp`, "
-                    f"TOP3_MAE `{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp`."
+                    f"TOP3_MAE `{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp`, "
+                    f"KEY_MAE `{float(metrics.get('key_gap_mae', 0.0)):.1f} pp`, "
+                    f"KEY_MAX `{float(metrics.get('key_gap_max', 0.0)):.1f} pp`, "
+                    f"kara kluczowa `{float(metrics.get('key_penalty', 0.0)):.1f}`."
                 )
+                st.markdown(f"**Archetypy kluczowe (TOP3 polityka + TOP3 mieszkańców):** {key_list_txt}.")
             axis_entity_gen = "wartości" if current_axis_label == "Wartość" else "archetypu"
             st.markdown(f"**Jak liczony jest `{sei_full}`?**")
             st.markdown(

@@ -605,6 +605,43 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Dodane do planu po nowych screenach (H-015 / Etap 3)
+- Zgloszone i dopisane do `PLANS.md`:
+  1. `Segmenty`: brak renderu `Mapa przewag segmentów` mimo dzialajacego suwaka.
+  2. `Skupienia (k-średnich)`: brak renderu `Mapa skupień (projekcja dla K=...)` mimo zmiany suwaka modelu.
+  3. `Filtry`: brak ikonek archetypow/wartosci w wykresach porownawczych.
+- Etap 3 jest zaplanowany jako kolejny pakiet po domknieciu Etapu 2 / Krok B.
+- Na tym etapie nie wprowadzano jeszcze zmian kodu dla tych trzech punktow (tylko dopisanie do listy zadan).
+
+### Dopisane do Etapu 2 po kolejnych screenach (dogrywka A2)
+- Dodano do `PLANS.md` dodatkowe poprawki UI:
+  1. aktywna zakladka Matching ma pozostac czytelna po hover,
+  2. korekta polozenia legend i odstepow w `Porównanie profili archetypowych`,
+  3. dolna legenda TOP3: tytuly bez bold oraz kwadraty dla `TOP3 mieszkańców`.
+- Te poprawki sa oznaczone jako `Dogrywka A2` i beda robione po aktualnym `Kroku B`.
+
+### Zrobione w Hotfix H-015 — Etap 2 (Krok B)
+- `app.py`:
+  - przebudowano metryke `Poziom dopasowania`, aby mocniej karala luki na archetypach kluczowych:
+    - wyznaczana jest pula kluczowa = unia TOP3 polityka i TOP3 mieszkancow,
+    - liczony `KEY_MAE` (srednia luki w puli kluczowej) i `KEY_MAX` (najwieksza luka w puli),
+    - finalny wynik:
+      - `base = 0.40*(100-MAE) + 0.20*(100-RMSE) + 0.20*(100-TOP3_MAE) + 0.20*(100-KEY_MAE)`,
+      - `kara_kluczowa = 0.22*KEY_MAE + 0.10*max(0, KEY_MAX - 15)`,
+      - `match = clamp(0,100, base - kara_kluczowa)`.
+  - zaktualizowano opis metodyki i sekcje audytu:
+    - nowa metryka `Luki kluczowe (TOP3 P+JST)`,
+    - widoczne `KEY_MAE`, `KEY_MAX`, `kara kluczowa`,
+    - lista archetypow kluczowych.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Dopisane po ostatniej wiadomosci usera (dogrywka A2 + legenda)
+- Rozszerzono `Dogrywke A2` o dodatkowy punkt dla gornej legendy profili:
+  - zaokraglenie rogów obramowania,
+  - wiekszy odstep miedzy profilami,
+  - wieksze marginesy boczne i pionowe.
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

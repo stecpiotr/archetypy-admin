@@ -617,3 +617,33 @@ Decyzja:
 - Sekcja `Profile archetypowe 0-100` dostaje dodatkowy odstep od dolnej legendy TOP3 pod radarem.
 Uzasadnienie:
 - To bezposrednio domyka zgloszone regresje: nachodzenie legendy, nieczytelne markery JST i bledne przesuniecie tylko tabeli zamiast calej ramki.
+
+### D-071: Braki map i ikon w standalone/online raportu traktujemy jako osobny pakiet generatora (H-015 Etap 3)
+Decyzja:
+- Problemy:
+  - brak `Mapa przewag segmentów`,
+  - brak `Mapa skupień (projekcja dla K=...)`,
+  - brak ikonek w `Filtry`,
+  sa prowadzone jako osobny etap naprawczy po stronie generatora/inline assets, niezalezny od UI Matching.
+Uzasadnienie:
+- To osobna klasa regresji (raport HTML + podglad online), powiazana z mapowaniem obrazow i osadzaniem assetow po inline.
+- Rozdzielenie od Etapu 2 (Matching) zmniejsza ryzyko mieszania zmian i latwiejsza diagnostyke.
+
+### D-072: Drobne poprawki legend/tabs po nowych screenach trafiaja do dogrywki A2 (po Kroku B)
+Decyzja:
+- Nowe uwagi UI z kolejnych screenow (hover aktywnej zakladki, korekta polozenia legend i stylu dolnej legendy TOP3 w radarze) sa dodane jako `Dogrywka A2` w `H-015 / Etap 2`.
+- Kolejnosc zostaje utrzymana: najpierw `Krok B` (metryka `Poziom dopasowania`), potem `Dogrywka A2`.
+Uzasadnienie:
+- User poprosil o dopisanie do listy i przejscie do kolejnego etapu, wiec nie przerywamy aktualnego strumienia prac metrycznych.
+
+### D-073: `Poziom dopasowania` dostaje jawna kare za luki na archetypach kluczowych
+Decyzja:
+- W `🧭 Matching` finalna metryka dopasowania uwzglednia osobny komponent kluczowy:
+  - kluczowe archetypy = unia `TOP3 polityka` i `TOP3 mieszkańców`,
+  - liczony `KEY_MAE` (srednia |Δ| dla tej puli) i `KEY_MAX` (najwieksza |Δ|),
+  - wynik:
+    - `base = 0.40*(100-MAE) + 0.20*(100-RMSE) + 0.20*(100-TOP3_MAE) + 0.20*(100-KEY_MAE)`,
+    - `kara_kluczowa = 0.22*KEY_MAE + 0.10*max(0, KEY_MAX - 15)`,
+    - `match = clamp(0,100, base - kara_kluczowa)`.
+Uzasadnienie:
+- User zglosil, ze poprzednia metryka zbyt lagodnie ocenia przypadki, w ktorych archetypy kluczowe sa jednoczesnie najwiekszymi lukami.
