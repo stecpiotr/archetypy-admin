@@ -634,7 +634,7 @@ Wynik:
   - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
   - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
 
-### Hotfix H-015 [IN_PROGRESS]
+### Hotfix H-015 [DONE]
 Temat: Naprawa regresji interaktywnosci standalone HTML raportu + kolejny pakiet dopieszczen UI Matching i raportu.
 Kryteria ukonczenia:
 1. `📊 Analiza badania mieszkańców`:
@@ -827,6 +827,38 @@ Wynik Dogrywki A6:
 - `app.py`:
   - wdrożone poprawki legend/odstępów i top spacingu strony,
   - ponownie zaostrzona kara za brak dopasowania kluczowego.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
+Dogrywka A7 [DONE]:
+1. `Poziom dopasowania`:
+   - bardziej zróżnicowane progi i nazwy pasm (7 poziomów, analogicznie do stylu interpretacji natężenia):
+     - `0–29`, `30–49`, `50–59`, `60–69`, `70–79`, `80–89`, `90–100`,
+   - opisy jakościowe dopasowane do tych przedziałów,
+   - utrzymany guard kluczowych luk (`KEY_MAE`/`KEY_MAX`) ograniczający opis pasma.
+2. UI:
+   - doprecyzowano opis progów w expanderze `Jak liczony jest poziom dopasowania?`.
+
+Wynik Dogrywki A7:
+- `app.py`:
+  - 7-stopniowa skala opisowa poziomu dopasowania,
+  - dalej zaostrzona kara kluczowa (`0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9)`),
+  - zaktualizowane opisy metodologii i spójne kolorowanie badge oceny.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
+Dogrywka A8 [DONE]:
+1. `Poziom dopasowania` — finalny podział progów:
+   - `0–29` marginalne dopasowanie,
+   - `30–39` bardzo niskie dopasowanie,
+   - `40–49` niskie dopasowanie,
+   - `50–59` umiarkowane dopasowanie,
+   - `60–69` znaczące dopasowanie,
+   - `70–79` wysokie dopasowanie,
+   - `80–89` bardzo wysokie dopasowanie,
+   - `90–100` ekstremalnie wysokie dopasowanie.
+2. Zaktualizowano opis progów w expanderze metodologicznym i kolorowanie badge do nowego podziału.
+
+Wynik Dogrywki A8:
+- `app.py`: wdrożony finalny, 8-stopniowy podział progów z nazwami 1:1 wg wskazania usera.
 - Smoke-check: `python -m py_compile app.py` (OK).
 
 Kryteria ukonczenia Etapu 2:

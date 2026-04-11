@@ -756,3 +756,19 @@ Decyzja:
 Uzasadnienie:
 - User potwierdził, że kara nadal była zbyt łagodna dla dużych luk kluczowych i poprosił o dalsze dociśnięcie.
 - Dodatkowo wymagana była precyzyjna korekta geometrii legend i top spacingu.
+
+### D-085: 7-stopniowa skala opisowa `Poziomu dopasowania`
+Decyzja:
+- Zamiast 4 poziomów wprowadzono finalnie 8 poziomów opisowych:
+  - `0–29` marginalne dopasowanie,
+  - `30–39` bardzo niskie dopasowanie,
+  - `40–49` niskie dopasowanie,
+  - `50–59` umiarkowane dopasowanie,
+  - `60–69` znaczące dopasowanie,
+  - `70–79` wysokie dopasowanie,
+  - `80–89` bardzo wysokie dopasowanie,
+  - `90–100` ekstremalnie wysokie dopasowanie.
+- Guard dla kluczowych luk (`KEY_MAE`/`KEY_MAX`) pozostaje aktywny i może obniżyć opisowe pasmo.
+Uzasadnienie:
+- User poprosił o bardziej rozróżnione progi i opis jakościowy zbliżony do tabeli interpretacji natężenia archetypu.
+- 8-stopniowa skala daje czytelniejszy „język jakościowy” przy zachowaniu tej samej logiki obliczeń.

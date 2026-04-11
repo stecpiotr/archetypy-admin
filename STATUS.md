@@ -749,6 +749,38 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-015 — Etap 2 (Dogrywka A7)
+- `app.py`:
+  - `Poziom dopasowania` ma teraz bardziej zróżnicowaną skalę opisową (7 poziomów):
+    - `0–29` marginalne,
+    - `30–49` słabe,
+    - `50–59` umiarkowane,
+    - `60–69` znaczące,
+    - `70–79` wysokie,
+    - `80–89` bardzo wysokie,
+    - `90–100` ekstremalnie wysokie.
+  - opisy jakościowe zostały dopasowane do nowych pasm,
+  - guard kluczowych luk (`KEY_MAE`/`KEY_MAX`) nadal może obniżyć opisowe pasmo przy dużych rozjazdach,
+  - dopisano te progi także do opisu w expanderze metodologicznym.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-015 — Etap 2 (Dogrywka A8)
+- `app.py`:
+  - finalny podział progów `Poziomu dopasowania` ustawiony na:
+    - `0–29` marginalne,
+    - `30–39` bardzo niskie,
+    - `40–49` niskie,
+    - `50–59` umiarkowane,
+    - `60–69` znaczące,
+    - `70–79` wysokie,
+    - `80–89` bardzo wysokie,
+    - `90–100` ekstremalnie wysokie.
+  - opis progów w expanderze metodologicznym zaktualizowany do nowego podziału.
+  - badge kolorystyczny ocen dostrojony do nowych przedziałów.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -757,4 +789,4 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Wykonac szybki smoke-check wizualny `🧭 Matching` po Dogrywce A5 (radar + legendy + nowa kara kluczowa) i na tej podstawie zdecydować o finalnym domknięciu `H-015`.
+- Wykonac szybki smoke-check wizualny `🧭 Matching` po Dogrywce A8 i zebrać ewentualne ostatnie mikro-uwagi; merytorycznie `H-015` jest domknięty.

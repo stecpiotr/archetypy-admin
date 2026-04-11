@@ -3449,23 +3449,48 @@ def matching_view() -> None:
             strengths_rows = [{"archetyp": a, "diff": round(float(diffs[a]), 1)} for a in strengths]
             gaps_rows = [{"archetyp": a, "diff": round(float(diffs[a]), 1)} for a in gaps]
 
-            score_band_idx = 3 if match_score >= 80 else (2 if match_score >= 65 else (1 if match_score >= 50 else 0))
+            if match_score >= 90:
+                score_band_idx = 7
+            elif match_score >= 80:
+                score_band_idx = 6
+            elif match_score >= 70:
+                score_band_idx = 5
+            elif match_score >= 60:
+                score_band_idx = 4
+            elif match_score >= 50:
+                score_band_idx = 3
+            elif match_score >= 40:
+                score_band_idx = 2
+            elif match_score >= 30:
+                score_band_idx = 1
+            else:
+                score_band_idx = 0
             # Korekta opisu pasma: nawet wysoki wynik liczbowy nie powinien dawać "bardzo wysokiej" oceny,
             # jeżeli na archetypach kluczowych zostają duże luki.
-            key_guard_idx = 3
+            key_guard_idx = 7
             guard_note = ""
-            if key_gap_max >= 25.0 or key_gap_mae >= 18.0:
-                key_guard_idx = 1
-                guard_note = "Duże luki kluczowe obniżają ocenę opisową mimo wyniku bazowego."
-            elif key_gap_max >= 20.0 or key_gap_mae >= 14.0:
+            if key_gap_max >= 35.0 or key_gap_mae >= 24.0:
                 key_guard_idx = 2
+                guard_note = "Duże luki kluczowe obniżają ocenę opisową mimo wyniku bazowego."
+            elif key_gap_max >= 28.0 or key_gap_mae >= 19.0:
+                key_guard_idx = 3
                 guard_note = "Luki kluczowe pozostają wysokie i wymagają korekty przekazu."
+            elif key_gap_max >= 22.0 or key_gap_mae >= 15.0:
+                key_guard_idx = 4
+                guard_note = "W obszarze kluczowych archetypów nadal widoczne są istotne rozjazdy."
+            elif key_gap_max >= 18.0 or key_gap_mae >= 12.0:
+                key_guard_idx = 5
+                guard_note = "Drobne rozjazdy kluczowe ograniczają ocenę do poziomu wysokiego."
             final_band_idx = min(score_band_idx, key_guard_idx)
             match_bands: List[Tuple[str, str]] = [
-                ("Niskie", "Duże luki dominują - warto przebudować komunikację i priorytety."),
-                ("Umiarkowane", "Widać istotne rozjazdy między profilem polityka i oczekiwaniami mieszkańców."),
-                ("Umiarkowanie wysokie", "Profil jest częściowo zgodny, ale wymaga korekty na największych lukach."),
-                ("Bardzo wysokie", "Różnice są niskie i stabilne także na kluczowych archetypach."),
+                ("Marginalne dopasowanie", "Profile są w dużej mierze rozbieżne; potrzebna gruntowna korekta przekazu i priorytetów."),
+                ("Bardzo niskie dopasowanie", "Dopasowanie jest słabe i niestabilne; dominują rozjazdy strategiczne."),
+                ("Niskie dopasowanie", "Widać pojedyncze punkty wspólne, ale profil nadal wyraźnie się rozjeżdża."),
+                ("Umiarkowane dopasowanie", "Istnieje wspólny rdzeń, ale kluczowe luki nadal wymagają korekty."),
+                ("Znaczące dopasowanie", "Dopasowanie jest zauważalne, choć nadal potrzebne są poprawki na kluczowych pozycjach."),
+                ("Wysokie dopasowanie", "Profil jest w dużej części zgodny; pozostają pojedyncze luki do domknięcia."),
+                ("Bardzo wysokie dopasowanie", "Różnice są niewielkie i dotyczą głównie lokalnych odchyleń."),
+                ("Ekstremalnie wysokie dopasowanie", "Profile są niemal zbieżne także na kluczowych archetypach."),
             ]
             band_label, band_desc = match_bands[final_band_idx]
             if guard_note and final_band_idx < score_band_idx:
@@ -3785,17 +3810,29 @@ def matching_view() -> None:
         score_pct = max(0.0, min(100.0, score_pct))
         band_label = str(metrics.get("band_label") or "")
         band_desc = str(metrics.get("band_desc") or "")
-        if score_pct >= 85:
+        if score_pct >= 90:
             score_color = "#0f766e"
+            score_bg = "#ecfeff"
+        elif score_pct >= 80:
+            score_color = "#0e7490"
             score_bg = "#ecfeff"
         elif score_pct >= 70:
             score_color = "#1d4ed8"
             score_bg = "#eff6ff"
-        elif score_pct >= 55:
+        elif score_pct >= 60:
+            score_color = "#1d4ed8"
+            score_bg = "#eef2ff"
+        elif score_pct >= 50:
             score_color = "#b45309"
             score_bg = "#fffbeb"
-        else:
+        elif score_pct >= 40:
+            score_color = "#c2410c"
+            score_bg = "#fff7ed"
+        elif score_pct >= 30:
             score_color = "#b91c1c"
+            score_bg = "#fff1f2"
+        else:
+            score_color = "#7f1d1d"
             score_bg = "#fef2f2"
         st.markdown(
             f"""
@@ -3865,6 +3902,12 @@ def matching_view() -> None:
                 "Metryka celowo mocniej karze strategiczne rozjazdy: oprócz MAE, RMSE i średniej 3 największych luk "
                 "uwzględnia też luki na archetypach kluczowych (unia TOP3 polityka + TOP3 mieszkańców) "
                 "oraz dodatkową karę za skrajny rozjazd w tej puli."
+            )
+            st.markdown(
+                "**Progi oceny (wynik bazowy):** "
+                "`0–29` marginalne dopasowanie, `30–39` bardzo niskie, `40–49` niskie, `50–59` umiarkowane, "
+                "`60–69` znaczące, `70–79` wysokie, `80–89` bardzo wysokie, `90–100` ekstremalnie wysokie. "
+                "Następnie opis jest korygowany w dół, jeśli luki kluczowe (`KEY_MAE`/`KEY_MAX`) są zbyt duże."
             )
             st.caption(
                 "W modelu nie ma osobnej premii dodatniej za zgodność. Lepszy wynik wynika wyłącznie z niższych luk i mniejszej kary kluczowej."
