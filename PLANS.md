@@ -789,6 +789,25 @@ Wynik Dogrywki A4:
     - utrzymano model bez jawnej premii dodatniej.
 - Smoke-check: `python -m py_compile app.py` (OK).
 
+Dogrywka A5 [DONE]:
+1. `Porównanie profili archetypowych`:
+   - górna legenda przeniesiona wyżej (dalej od radaru, bliżej tytułu),
+   - legenda zawężona (`entrywidth`) i z większym „oddechem” wewnętrznym (padding przez NBSP + mniejszy font),
+   - dolna legenda TOP3 podciągnięta bliżej wykresu.
+2. Globalny layout:
+   - zmniejszony górny margines strony (`.block-container padding-top`), by podnieść cały widok.
+3. `Poziom dopasowania`:
+   - zwiększona kara za luki kluczowe:
+     - było: `0.22*KEY_MAE + 0.10*max(0, KEY_MAX - 15)`,
+     - jest: `0.30*KEY_MAE + 0.14*max(0, KEY_MAX - 12)`.
+
+Wynik Dogrywki A5:
+- `app.py`:
+  - dopracowano pozycjonowanie i geometrię legend przy radarze,
+  - zmniejszono wolne miejsce na górze strony,
+  - zaostrzono karę kluczową w metryce `Poziom dopasowania`.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
 Kryteria ukonczenia Etapu 2:
 1. Wszystkie elementy z punktow 1-8 usera odwzorowane 1:1 na zrzutach.
 2. Brak regresji dzialania i wygladu pozostalych sekcji Matching.

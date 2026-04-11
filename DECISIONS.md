@@ -722,3 +722,24 @@ Decyzja:
 Uzasadnienie:
 - User pokazał przypadek, gdzie duże rozjazdy na TOP3 dawały zbyt optymistyczny opis (`bardzo wysokie`).
 - Ogranicznik pasma lepiej odzwierciedla ryzyko strategiczne bez zmiany filozofii modelu kar.
+
+### D-082: Kara kluczowa w `Poziom dopasowania` zostaje zaostrzona
+Decyzja:
+- Wzór kary kluczowej zmieniono z:
+  - `0.22*KEY_MAE + 0.10*max(0, KEY_MAX - 15)`
+  na:
+  - `0.30*KEY_MAE + 0.14*max(0, KEY_MAX - 12)`.
+Uzasadnienie:
+- User wskazał przypadek z dużymi lukami kluczowymi, gdzie wynik pozostawał zbyt wysoki.
+- Zmiana zwiększa czułość na strategiczne rozjazdy (zwłaszcza przy wysokim `KEY_MAX`) bez dodawania premii dodatniej.
+
+### D-083: Radar — priorytet geometrii legend nad szerokością
+Decyzja:
+- Górna legenda radaru została:
+  - podniesiona wyżej (`y`),
+  - zawężona (`entrywidth`),
+  - optycznie „oddychająca” (mniejszy font + padding tekstu przez NBSP),
+  aby była bliżej tytułu i dalej od wykresu.
+- Dolna legenda TOP3 została podciągnięta bliżej wykresu.
+Uzasadnienie:
+- User zgłosił zbyt duży dystans tytuł→legenda i zbyt mały legenda→radar oraz zbyt „długą” górną legendę.

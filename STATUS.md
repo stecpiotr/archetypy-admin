@@ -718,6 +718,21 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-015 — Etap 2 (Dogrywka A5)
+- `app.py`:
+  - `Porównanie profili archetypowych`:
+    - górna legenda podniesiona wyżej (bliżej tytułu, dalej od radaru),
+    - legenda zawężona i czytelniejsza (mniejszy `entrywidth`, mniejszy font, większy oddech tekstu),
+    - dolna legenda TOP3 przybliżona do wykresu.
+  - globalny układ:
+    - zmniejszono wolne miejsce na górze strony (`.block-container` z `30px` na `18px`).
+  - `Poziom dopasowania`:
+    - zwiększono karę kluczową:
+      - było: `0.22*KEY_MAE + 0.10*max(0, KEY_MAX - 15)`,
+      - jest: `0.30*KEY_MAE + 0.14*max(0, KEY_MAX - 12)`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -726,4 +741,4 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Wykonac szybki smoke-check wizualny `🧭 Matching` na aktualnym buildzie (sekcja TOP3 + radar + nowy blok zalet/problemów) i zebrać kolejną paczkę uwag do finalnego domknięcia `H-015`.
+- Wykonac szybki smoke-check wizualny `🧭 Matching` po Dogrywce A5 (radar + legendy + nowa kara kluczowa) i na tej podstawie zdecydować o finalnym domknięciu `H-015`.
