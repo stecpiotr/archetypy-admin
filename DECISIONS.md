@@ -803,3 +803,22 @@ Decyzja:
 - Warstwa DB: dodano `merge_personal_study_responses(...)` na tabeli `responses`.
 Uzasadnienie:
 - User potrzebował operacji konsolidacji wyników personalnych bez utraty oryginalnych danych w badaniach źródłowych.
+
+### D-089: `Status badania` przeniesiony do modułu `Ustawienia ankiety`
+Decyzja:
+- Panel statusu (`Zawieś/Odwieś/Zamknij/Usuń`) nie jest już renderowany w widokach edycji danych.
+- Statusy są obsługiwane centralnie w:
+  - `Badania personalne -> ⚙️ Ustawienia ankiety`,
+  - `Badania mieszkańców -> ⚙️ Ustawienia ankiety`.
+Uzasadnienie:
+- User wskazał, że status ma być częścią ustawień ankiety, a nie formularzy edycji danych.
+- Rozdzielenie upraszcza UX: edycja danych i administracja statusem są w osobnych modułach.
+
+### D-090: Kara kluczowa liczy TOP3 warunkowo jako TOP2 przy wysokiej 3. pozycji
+Decyzja:
+- Dla puli kluczowej (`KEY_MAE`, `KEY_MAX`) stosujemy regułę:
+  - domyślnie TOP3 polityka i TOP3 mieszkańców,
+  - jeśli 3. pozycja profilu ma wynik `>70`, archetyp z 3. pozycji nie wchodzi do puli kluczowej (dla tego profilu liczymy TOP2).
+Uzasadnienie:
+- User wymagał, aby przy takim przypadku nie naliczać kary za „poboczny” archetyp z 3. miejsca.
+- Reguła zmniejsza ryzyko przeszacowania kary kluczowej dla tego konkretnego przypadku.

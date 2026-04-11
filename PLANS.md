@@ -990,3 +990,29 @@ Wynik:
     - dodatkowy bezpiecznik czyści wynik/komunikat, jeśli aktualny wybór badań różni się od policzonego pairingu.
 - Smoke-check:
   - `python -m py_compile app.py db_utils.py` (OK).
+
+### Hotfix H-018 [DONE]
+Temat: Ustawienia ankiety dla panelu mieszkańców + przeniesienie `Status badania` do ustawień + korekta etykiety RMSE.
+Kryteria ukończenia:
+1. W `Badania mieszkańców - panel` jest kafelek `⚙️ Ustawienia ankiety`.
+2. `Status badania` nie jest już renderowany w:
+   - `✏️ Edytuj dane badania`,
+   - `✏️ Edytuj dane badania mieszkańców`;
+   i jest dostępny w modułach ustawień.
+3. W Matching podpis metryki RMSE nie ucina się w UI.
+4. Reguła kluczowych luk: jeśli 3. pozycja ma wynik `>70`, nie wchodzi do puli kar kluczowych (kara liczona dla TOP2).
+Pierwszy krok wykonawczy:
+- przebudować `app.py`: dodać `jst_settings_view`, przepiąć routing i usunąć panel statusu z widoków edycji.
+Wynik:
+- `app.py`:
+  - dodano kafelek `⚙️ Ustawienia ankiety` w `home_jst_view`,
+  - dodano nowy widok `jst_settings_view()` z tabelą statusu/linkiem/liczbą odpowiedzi i pełnym panelem akcji statusu,
+  - `Status badania` przeniesiono do ustawień:
+    - `personal_settings_view()` dostał pełny panel akcji statusu,
+    - usunięto panel statusu z `edit_view()` i `jst_edit_view()`,
+  - skrócono etykietę metryki do `RMSE (kara odchyleń)`,
+  - pula kluczowych archetypów do kary działa dynamicznie:
+    - domyślnie TOP3,
+    - jeśli 3. pozycja ma `>70`, do puli wchodzi TOP2 (dla polityka i/lub mieszkańców).
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

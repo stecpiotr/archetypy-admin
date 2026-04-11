@@ -851,6 +851,24 @@
 - Test techniczny:
   - `python -m py_compile app.py db_utils.py` (OK).
 
+### Zrobione w Hotfix H-018 (ustawienia JST + przeniesienie statusu + RMSE label + TOP2/TOP3 kara)
+- `app.py`:
+  - `Badania mieszkańców - panel`:
+    - dodano kafelek `⚙️ Ustawienia ankiety` i routing do nowego widoku `jst_settings_view()`,
+    - w `jst_settings_view()` dodano:
+      - tabelę statusu/linku/liczby odpowiedzi,
+      - pełny panel akcji statusu (`Zawieś`, `Odwieś`, `Zamknij badanie`, `Usuń badanie`).
+  - `Status badania` przeniesiono z edycji do ustawień:
+    - usunięto panel statusu z `✏️ Edytuj dane badania` i `✏️ Edytuj dane badania mieszkańców`,
+    - `personal_settings_view()` rozszerzono o pełny panel statusu (akcje + potwierdzenia).
+  - Matching:
+    - etykieta metryki skrócona do `RMSE (kara odchyleń)` (bez ucinania),
+    - reguła puli kluczowej do kary:
+      - standardowo TOP3,
+      - jeśli 3. archetyp ma `>70`, 3. pozycja nie wchodzi do puli kar (liczenie dla TOP2).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -860,5 +878,6 @@
 
 ### Nastepny konkretny krok wykonawczy
 - Szybki smoke-test UI na środowisku użytkownika:
-  - potwierdzić nowe etykiety progów `Poziom dopasowania` na realnych parach badań,
-  - przejść E2E przez `Połącz badania` (2+ źródła) i potwierdzić wzrost liczby odpowiedzi w badaniu głównym.
+  - potwierdzić, że `Status badania` jest dostępny tylko w `⚙️ Ustawienia ankiety` (personalne + mieszkańców),
+  - sprawdzić, że etykieta `RMSE (kara odchyleń)` nie ucina się dla różnych szerokości ekranu,
+  - zweryfikować na 2-3 parach, że kara kluczowa liczy TOP2, gdy 3. pozycja ma wynik `>70`.

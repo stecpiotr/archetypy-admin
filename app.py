@@ -1612,7 +1612,7 @@ def home_jst_view() -> None:
     header("Badania mieszkańców - panel")
     render_titlebar(["Panel", "Badania mieszkańców"])
 
-    c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+    c1, c2, c3, c4, c5, c6 = st.columns(6, gap="small")
     with c1:
         if st.button("➕\n\nDodaj badanie\nmieszkańców", key="tile_home_jst_add", type="secondary", use_container_width=True):
             goto("jst_add")
@@ -1620,12 +1620,15 @@ def home_jst_view() -> None:
         if st.button("✏️\n\nEdytuj dane\nbadania", key="tile_home_jst_edit", type="secondary", use_container_width=True):
             goto("jst_edit")
     with c3:
+        if st.button("⚙️\n\nUstawienia\nankiety", key="tile_home_jst_settings", type="secondary", use_container_width=True):
+            goto("jst_settings")
+    with c4:
         if st.button("✉️\n\nWyślij link\ndo ankiety", key="tile_home_jst_send", type="secondary", use_container_width=True):
             goto("jst_send")
-    with c4:
+    with c5:
         if st.button("💾\n\nImport i eksport\nbaz danych", key="tile_home_jst_io", type="secondary", use_container_width=True):
             goto("jst_io")
-    with c5:
+    with c6:
         if st.button("📊\n\nAnaliza\nbadania", key="tile_home_jst_analysis", type="secondary", use_container_width=True):
             goto("jst_analysis")
 
@@ -1985,11 +1988,55 @@ def jst_edit_view() -> None:
         except Exception as e:
             st.error(f"Błąd zapisu: {e}")
 
-    study_status_row = fetch_jst_study_by_id(sb, str(study["id"])) or study
+def jst_settings_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("⚙️ Ustawienia ankiety")
+    render_titlebar(["Panel", "Badania mieszkańców", "Ustawienia ankiety"])
+    back_button("home_jst", "← Powrót do panelu mieszkańców")
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+
+    studies = fetch_jst_studies(sb)
+    if not studies:
+        st.info("Brak badań JST w bazie.")
+        return
+
+    counts_by_id = fetch_jst_response_counts(sb)
+    options: Dict[str, Dict[str, Any]] = {}
+    for s in studies:
+        sid = str(s.get("id") or "").strip()
+        if not sid:
+            continue
+        jst_label = _jst_option_label(s)
+        count = int(counts_by_id.get(sid, 0))
+        options[f"{jst_label} • {count} odp."] = s
+
+    choice = st.selectbox("Wybierz badanie", list(options.keys()), key="jst_settings_pick")
+    study = options[choice]
+    sid = str(study.get("id") or "").strip()
+    study_row = fetch_jst_study_by_id(sb, sid) or study
+    status_meta = _study_status_meta(study_row, kind="jst")
+    slug = str(study_row.get("slug") or "").strip()
+    survey_base = str(st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
+    survey_url = f"{survey_base}/{slug}" if slug else "—"
+
+    info_rows = pd.DataFrame(
+        [
+            {
+                "Status": status_meta["status_label"],
+                "Liczba odpowiedzi": int(counts_by_id.get(sid, 0)),
+                "Data uruchomienia": status_meta["started_at"],
+                "Ostatnia zmiana statusu": status_meta["status_changed_at"],
+                "Link ankiety": survey_url,
+            }
+        ]
+    )
+    st.dataframe(info_rows, use_container_width=True, hide_index=True)
 
     def _do_suspend_jst() -> None:
         try:
-            set_jst_study_status(sb, str(study["id"]), "suspended")
+            set_jst_study_status(sb, sid, "suspended")
             st.success("Badanie zostało zawieszone.")
             st.rerun()
         except Exception as exc:
@@ -1997,7 +2044,7 @@ def jst_edit_view() -> None:
 
     def _do_unsuspend_jst() -> None:
         try:
-            set_jst_study_status(sb, str(study["id"]), "active")
+            set_jst_study_status(sb, sid, "active")
             st.success("Badanie zostało odwieszone.")
             st.rerun()
         except Exception as exc:
@@ -2005,7 +2052,7 @@ def jst_edit_view() -> None:
 
     def _do_close_jst() -> None:
         try:
-            set_jst_study_status(sb, str(study["id"]), "closed")
+            set_jst_study_status(sb, sid, "closed")
             st.success("Badanie zostało zamknięte na stałe.")
             st.rerun()
         except Exception as exc:
@@ -2013,7 +2060,7 @@ def jst_edit_view() -> None:
 
     def _do_delete_jst() -> None:
         try:
-            soft_delete_jst_study(sb, str(study["id"]))
+            soft_delete_jst_study(sb, sid)
             st.success("Badanie zostało usunięte.")
             goto("home_jst")
         except Exception as exc:
@@ -2021,13 +2068,13 @@ def jst_edit_view() -> None:
 
     _render_study_status_panel(
         kind="jst",
-        study=study_status_row,
+        study=study_row,
         on_suspend=_do_suspend_jst,
         on_unsuspend=_do_unsuspend_jst,
         on_close=_do_close_jst,
         on_delete=_do_delete_jst,
-        close_confirm_key=f"jst_close_confirm_{study.get('id')}",
-        delete_confirm_key=f"jst_delete_confirm_{study.get('id')}",
+        close_confirm_key=f"jst_settings_close_confirm_{sid}",
+        delete_confirm_key=f"jst_settings_delete_confirm_{sid}",
     )
 
 
@@ -3607,14 +3654,19 @@ def matching_view() -> None:
             top3_gap_mae = float(sum(sorted_gaps_desc[:3]) / max(1, min(3, len(sorted_gaps_desc))))
 
             arch_order = list(JST_ARCHETYPES)
-            person_top3 = sorted(
-                arch_order,
-                key=lambda a: (-float(p_profile.get(a, 0.0)), arch_order.index(a)),
-            )[:3]
-            jst_top3 = sorted(
-                arch_order,
-                key=lambda a: (-float(j_profile.get(a, 0.0)), arch_order.index(a)),
-            )[:3]
+
+            def _key_priority_pool(profile: Dict[str, float]) -> List[str]:
+                ordered = sorted(
+                    arch_order,
+                    key=lambda a: (-float(profile.get(a, 0.0)), arch_order.index(a)),
+                )
+                top3 = ordered[:3]
+                if len(top3) >= 3 and float(profile.get(top3[2], 0.0)) > 70.0:
+                    return top3[:2]
+                return top3
+
+            person_top3 = _key_priority_pool(p_profile)
+            jst_top3 = _key_priority_pool(j_profile)
             key_archetypes: List[str] = []
             for arche in person_top3 + jst_top3:
                 if arche not in key_archetypes:
@@ -3945,7 +3997,8 @@ def matching_view() -> None:
                     "kara_kluczowa = 0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12); "
                     "match = clamp(0,100, base - kara_kluczowa); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
-                    "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii TOP3 polityka i TOP3 mieszkańców, "
+                    "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii priorytetów polityka i mieszkańców "
+                    "(TOP3, ale jeśli 3. pozycja ma >70, do puli kluczowej wchodzi tylko TOP2), "
                     "KEY_MAX = największa |Δ| w tej samej puli kluczowej. "
                     "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania. "
                     "Model nie dodaje osobnej premii dodatniej za zgodność - niższa luka poprawia wynik tylko przez mniejszą karę."
@@ -4049,9 +4102,9 @@ def matching_view() -> None:
         if metrics:
             mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
             mcol1.metric("Średnia różnica (MAE)", f"{float(metrics.get('mae', 0.0)):.1f} pp")
-            mcol2.metric("Różnica z karą za odchylenia (RMSE)", f"{float(metrics.get('rmse', 0.0)):.1f} pp")
+            mcol2.metric("RMSE (kara odchyleń)", f"{float(metrics.get('rmse', 0.0)):.1f} pp")
             mcol3.metric("Średnia TOP3 luk", f"{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp")
-            mcol4.metric("Luki kluczowe (TOP3 P+JST)", f"{float(metrics.get('key_gap_mae', 0.0)):.1f} pp")
+            mcol4.metric("Luki kluczowe (TOP P+JST)", f"{float(metrics.get('key_gap_mae', 0.0)):.1f} pp")
             mcol5.metric("Maks. luka kluczowa", f"{float(metrics.get('key_gap_max', 0.0)):.1f} pp")
         st.caption(f"Próba personalna: {result['personal_n']} odpowiedzi · Próba mieszkańców: {result['jst_n']} odpowiedzi")
         sei_short = str(current_sei_short)
@@ -4090,7 +4143,7 @@ def matching_view() -> None:
             )
             st.markdown(
                 "Metryka celowo mocniej karze strategiczne rozjazdy: oprócz MAE, RMSE i średniej 3 największych luk "
-                "uwzględnia też luki na archetypach kluczowych (unia TOP3 polityka + TOP3 mieszkańców) "
+                "uwzględnia też luki na archetypach kluczowych (unia priorytetów polityka i mieszkańców) "
                 "oraz dodatkową karę za skrajny rozjazd w tej puli."
             )
             st.markdown(
@@ -4116,7 +4169,10 @@ def matching_view() -> None:
                     f"KEY_MAX `{float(metrics.get('key_gap_max', 0.0)):.1f} pp`, "
                     f"kara kluczowa `{float(metrics.get('key_penalty', 0.0)):.1f}`."
                 )
-                st.markdown(f"**Archetypy kluczowe (TOP3 polityka + TOP3 mieszkańców):** {key_list_txt}.")
+                st.markdown(
+                    "**Archetypy kluczowe (TOP3, ale gdy 3. pozycja >70 -> TOP2):** "
+                    f"{key_list_txt}."
+                )
             axis_entity_gen = "wartości" if current_axis_label == "Wartość" else "archetypu"
             st.markdown(f"**Jak liczony jest `{sei_full}`?**")
             st.markdown(
@@ -4448,11 +4504,15 @@ def matching_view() -> None:
         person_profile_20 = {a: float(person_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
         jst_profile_20 = {a: float(jst_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
 
-        def _top3(profile: Dict[str, float], order: List[str]) -> List[str]:
-            return sorted(order, key=lambda a: (-float(profile.get(a, 0.0)), order.index(a)))[:3]
+        def _priority_top_for_ui(profile_100: Dict[str, float], order: List[str]) -> List[str]:
+            ordered = sorted(order, key=lambda a: (-float(profile_100.get(a, 0.0)), order.index(a)))
+            top3 = ordered[:3]
+            if len(top3) >= 3 and float(profile_100.get(top3[2], 0.0)) > 70.0:
+                return top3[:2]
+            return top3
 
-        p_top = _top3(person_profile_20, radar_order)
-        j_top = _top3(jst_profile_20, radar_order)
+        p_top = _priority_top_for_ui(person_profile_100, radar_order)
+        j_top = _priority_top_for_ui(jst_profile_100, radar_order)
         radar_top_union = set(p_top + j_top)
         radar_tick_text: List[str] = []
         for arche, lbl in zip(radar_order, radar_tick_labels):
@@ -5140,9 +5200,48 @@ def personal_settings_view() -> None:
         ]
     )
     st.dataframe(info_rows, use_container_width=True, hide_index=True)
-    st.info(
-        "Ta sekcja zbiera kluczowe ustawienia ankiety. "
-        "Szczegóły danych i statusu badania możesz dalej edytować też w module „Edytuj dane badania”."
+
+    def _do_suspend_personal() -> None:
+        try:
+            set_study_status(sb, str(study["id"]), "suspended")
+            st.success("Badanie zostało zawieszone.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zawiesić badania: {exc}")
+
+    def _do_unsuspend_personal() -> None:
+        try:
+            set_study_status(sb, str(study["id"]), "active")
+            st.success("Badanie zostało odwieszone.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się odwiesić badania: {exc}")
+
+    def _do_close_personal() -> None:
+        try:
+            set_study_status(sb, str(study["id"]), "closed")
+            st.success("Badanie zostało zamknięte na stałe.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zamknąć badania: {exc}")
+
+    def _do_delete_personal() -> None:
+        try:
+            soft_delete_study(sb, str(study["id"]))
+            st.success("Badanie oznaczone jako usunięte.")
+            goto("home_personal")
+        except Exception as exc:
+            st.error(f"Nie udało się usunąć badania: {exc}")
+
+    _render_study_status_panel(
+        kind="personal",
+        study=study,
+        on_suspend=_do_suspend_personal,
+        on_unsuspend=_do_unsuspend_personal,
+        on_close=_do_close_personal,
+        on_delete=_do_delete_personal,
+        close_confirm_key=f"personal_settings_close_confirm_{study.get('id')}",
+        delete_confirm_key=f"personal_settings_delete_confirm_{study.get('id')}",
     )
 
 
@@ -5282,7 +5381,6 @@ def personal_merge_view() -> None:
 def edit_view() -> None:
     require_auth()
     header("✏️ Edytuj dane badania")
-    status_schema_ready = _ensure_jst_schema_initialized()
 
     back_button()
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
@@ -5331,54 +5429,7 @@ def edit_view() -> None:
         except Exception as e:
             st.error(f"❌ Błąd zapisu: {e}")
 
-    fresh_res = sb.table("studies").select("*").eq("id", str(study.get("id"))).limit(1).execute()
-    study_status_row = (fresh_res.data or [study])[0]
-
-    def _do_suspend_personal() -> None:
-        try:
-            set_study_status(sb, str(study["id"]), "suspended")
-            st.success("Badanie zostało zawieszone.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Nie udało się zawiesić badania: {exc}")
-
-    def _do_unsuspend_personal() -> None:
-        try:
-            set_study_status(sb, str(study["id"]), "active")
-            st.success("Badanie zostało odwieszone.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Nie udało się odwiesić badania: {exc}")
-
-    def _do_close_personal() -> None:
-        try:
-            set_study_status(sb, str(study["id"]), "closed")
-            st.success("Badanie zostało zamknięte na stałe.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Nie udało się zamknąć badania: {exc}")
-
-    def _do_delete_personal() -> None:
-        try:
-            soft_delete_study(sb, str(study["id"]))
-            st.success("Badanie oznaczone jako usunięte.")
-            goto("home_personal")
-        except Exception as exc:
-            st.error(f"Nie udało się usunąć badania: {exc}")
-
-    if status_schema_ready:
-        _render_study_status_panel(
-            kind="personal",
-            study=study_status_row,
-            on_suspend=_do_suspend_personal,
-            on_unsuspend=_do_unsuspend_personal,
-            on_close=_do_close_personal,
-            on_delete=_do_delete_personal,
-            close_confirm_key=f"personal_close_confirm_{study.get('id')}",
-            delete_confirm_key=f"personal_delete_confirm_{study.get('id')}",
-        )
-    else:
-        st.warning("Nie udało się zainicjalizować sekcji „Status badania” (problem z połączeniem do bazy).")
+    st.info("Status badania i działania administracyjne znajdziesz teraz w module „⚙️ Ustawienia ankiety”.")
 
 def fetch_stats_table() -> Tuple[int, pd.DataFrame]:
     counts: Dict[str,int] = {}
@@ -6128,6 +6179,8 @@ else:
         jst_add_view()
     elif view == "jst_edit":
         jst_edit_view()
+    elif view == "jst_settings":
+        jst_settings_view()
     elif view == "jst_send":
         jst_send_view()
     elif view == "jst_io":
