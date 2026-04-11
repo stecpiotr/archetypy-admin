@@ -737,19 +737,39 @@ Dogrywka A3 [PENDING]:
      - `Główne problemy`,
    - logika ma wyciagac wnioski z rozjazdow i zgodnosci (szczegolnie na kluczowych archetypach) i prezentowac je atrakcyjnie wizualnie (bez niebieskich gradientow).
 2. Metryka dopasowania:
-   - ocenic i ewentualnie dodac jawna premie za bliskosc kluczowych archetypow (obecnie jest tylko efekt posredni przez nizsze `KEY_MAE` i mniejsza karę),
-   - jesli premia zostanie dodana: zaktualizowac wzor i opis metodyki.
+   - utrzymac model bez jawnej premii dodatniej (tylko model kar),
+   - uszczelnic opisy metodyki i UI tak, by bylo to jednoznaczne.
+
+Dogrywka A4 [PENDING]:
+1. `Porównanie profili archetypowych` (UI radar):
+   - zmniejszyc margines dolny pod tytulem sekcji,
+   - gora legenda: wycentrowac teksty i zwiekszyc czytelny odstep miedzy:
+     - `profil polityka (...)`,
+     - `profil mieszkańców (...)`,
+   - dolna legenda TOP3 podciagnac nieco do gory (bez kolizji z wykresem),
+   - oslabic pogrubienie tekstow `główny / wspierający / poboczny`.
+2. Radar:
+   - pogrubic etykiety osi (nazwy archetypow/wartosci), ktore naleza do TOP3
+     (z unii TOP3 polityka i TOP3 mieszkańców).
+3. `Poziom dopasowania`:
+   - sprawdzic kalibracje pasm oceny vs realne duze luki na archetypach kluczowych
+     (przypadek: wysoka ocena przy duzych lukach na TOP3 polityka/JST),
+   - dopracowac opis werbalny tak, aby nie komunikowal "niskich i stabilnych różnic"
+     przy wysokich wartościach `KEY_MAX` lub dużych lukach TOP3.
+4. Metryka:
+   - potwierdzic decyzje: rezygnujemy z jawnej premii za dopasowanie
+     (zostaje model oparty o kare, bez dodatniego bonusu).
 
 Kryteria ukonczenia Etapu 2:
 1. Wszystkie elementy z punktow 1-8 usera odwzorowane 1:1 na zrzutach.
 2. Brak regresji dzialania i wygladu pozostalych sekcji Matching.
 3. `py_compile` dla `app.py` przechodzi poprawnie.
 
-#### H-015 / Etap 3 [PENDING]
+#### H-015 / Etap 3 [DONE]
 Temat: Domkniecie brakow renderu w raporcie HTML (`Segmenty`, `Skupienia`, `Filtry`) dla standalone i podgladu online.
 Zakres:
 
-Krok D [PENDING] — mapy Segmentow i Skupien sterowane suwakiem
+Krok D [DONE] — mapy Segmentow i Skupien sterowane suwakiem
 1. `Segmenty`:
    - naprawic brak renderu `Mapa przewag segmentów`,
    - mapa ma sie aktualizowac wraz ze zmiana suwaka widocznych segmentow.
@@ -760,7 +780,7 @@ Krok D [PENDING] — mapy Segmentow i Skupien sterowane suwakiem
    - mapowania indeksu suwaka -> nazwa pliku mapy,
    - czy tylko osadzania obrazow po inline (standalone/podglad online).
 
-Krok E [PENDING] — ikony w zakladce Filtry
+Krok E [DONE] — ikony w zakladce Filtry
 1. Przywrocic ikonki archetypu/wartosci w zakladce `Filtry` (jak w wersji referencyjnej).
 2. Potwierdzic dzialanie identycznie w:
    - `raport.html` otwieranym lokalnie,
@@ -773,3 +793,20 @@ Kryteria ukonczenia Etapu 3:
 4. Rebuild + smoke-check po stronie generatora:
    - `python -m py_compile jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py`,
    - synchronizacja `analyze_poznan_archetypes.py` D -> C i rebuild raportow w obu lokalizacjach.
+
+Wynik Etapu 3:
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - `Segmenty`: JS przelaczania map korzysta teraz z jawnych map plikow per-K (`map_arche_by_k`, `map_values_by_k`) zamiast skladania samego stringu nazwy;
+    to domyka brak renderu map przy standalone/online.
+  - `Filtry`: dodano payload `FILTER_ICONS` i `iconSrc(...)` bierze ikony z mapy (fallback do `icons/<slug>.png`), co przywraca ikony na wykresach.
+  - do `seg_pack_ultra` i `seg_packs_render["ultra_premium"]` dopisywane sa mapy plikow segmentowych per-K.
+- `jst_analysis.py`:
+  - `inline_local_assets(...)` rozszerzono o inlining lokalnych sciezek zasobow pojawiajacych sie jako quoted-string w JS/JSON
+    (nie tylko atrybuty `src/href`), dzieki czemu dynamicznie podmieniane mapy/ikony dzialaja tez po osadzeniu standalone.
+- Smoke-check + rebuild:
+  - `python -m py_compile jst_analysis.py JST_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\\Poznan_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK),
+  - synchronizacja D -> C (`analyze_poznan_archetypes.py`),
+  - rebuild raportow:
+    - `python D:\\PythonProject\\archetypy\\archetypy-admin\\JST_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK),
+    - `python C:\\Poznan_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK).

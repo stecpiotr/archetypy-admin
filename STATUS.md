@@ -664,6 +664,31 @@
   - obecna metryka ma efekt "premii pośredniej" (niższy `KEY_MAE` i mniejsza kara),
     ale nie ma oddzielnej, jawnej premii dodatniej.
 
+### Zrobione w Hotfix H-015 — Etap 3 (mapy Segmenty/Skupienia + ikony Filtry)
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - `Segmenty`: dynamiczna podmiana map po suwaku korzysta z jawnych map per-K (`map_arche_by_k`, `map_values_by_k`) przekazywanych w payloadzie packa.
+  - `Filtry`: dodano payload `FILTER_ICONS`; `iconSrc(...)` bierze ikonę z mapy i ma fallback do `icons/<slug>.png`.
+  - `seg_pack_ultra` (oraz `seg_packs_render["ultra_premium"]`) jest wzbogacany o mapy plikow segmentowych per-K.
+- `jst_analysis.py`:
+  - `inline_local_assets(...)` inlinuje juz nie tylko `src/href`, ale tez lokalne sciezki assetow zapisane jako quoted-string w JS/JSON.
+  - Efekt: dynamicznie przełączane mapy (`Segmenty`, `Skupienia`) i ikony (`Filtry`) działają po osadzaniu standalone/podglądu online.
+- Weryfikacja:
+  - `python -m py_compile jst_analysis.py JST_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\\Poznan_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK),
+  - kontrola inlinera: w wygenerowanym HTML inline nie pozostają literalne ścieżki
+    `SEGMENTY_META_MAPA_STALA_K*.png`, `SKUPIENIA_MAPA_PCA_K*.png`, `icons/*.png`.
+- Synchronizacja C/D:
+  - skopiowano `analyze_poznan_archetypes.py` z D: do C:,
+  - przebudowano raporty na obu lokalizacjach (`D:\\...\\WYNIKI\\raport.html`, `C:\\Poznan_Archetypy_Analiza\\WYNIKI\\raport.html`).
+
+### Dopisane po ostatniej wiadomosci usera (Dogrywka A4 + decyzja o premii)
+- Do `PLANS.md` dopisano `Dogrywka A4`:
+  1. dopracowanie marginesow i legend sekcji `Porównanie profili archetypowych`,
+  2. pogrubianie etykiet osi dla archetypow/wartosci z TOP3 na radarze,
+  3. ponowna kalibracja komunikatu i pasm `Poziom dopasowania` dla przypadkow z duzymi lukami kluczowymi.
+- Potwierdzono decyzje metodyczna usera:
+  - rezygnujemy z jawnej premii za dopasowanie (brak dodatniego bonusu w score).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -672,4 +697,6 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Wykonac `H-015 / Etap 3 / Krok D`: naprawa map w `Segmenty` i `Skupienia` (render + reakcja na suwak).
+- Wykonac `H-015 / Etap 2 / Dogrywka A3`:
+  1. dodać sekcję `Główne zalety` / `Główne problemy` w `🧭 Matching / Podsumowanie`,
+  2. od razu po tym przejść do `Dogrywka A4` (radar + kalibracja komunikatu `Poziom dopasowania`) przy założeniu, że jawnej premii nie dodajemy.

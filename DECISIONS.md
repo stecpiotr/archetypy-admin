@@ -664,3 +664,33 @@ Decyzja:
 - Ewaluacja jawnej premii dodatniej zostaje zaplanowana jako osobny punkt (`Dogrywka A3`), z oceną ryzyka sztucznego zawyzania wyniku.
 Uzasadnienie:
 - User dopytal o premie; chcemy najpierw zweryfikowac wplyw merytoryczny, zanim dodamy nowy skladnik do wzoru.
+
+### D-076: Dynamiczne mapy/ikony raportu musza byc inlinowane rowniez poza `src/href`
+Decyzja:
+- W `jst_analysis.py` rozszerzono `inline_local_assets(...)` o zamiane lokalnych sciezek assetow zapisanych jako quoted-stringi w JS/JSON.
+- Dotyczy to dynamicznie podmienianych obrazow (np. `SEGMENTY_META_MAPA_STALA_K*.png`, `SKUPIENIA_MAPA_PCA_K*.png`, `icons/*.png`), ktore nie wystepuja jako statyczne `src/href` w HTML.
+Uzasadnienie:
+- Standalone/full HTML tracil interaktywnosc wizualna mimo poprawnego JS, bo dynamiczne zasoby nie byly osadzane i przestawaly byc osiagalne w `srcdoc`/jednoplikiowym HTML.
+
+### D-077: Segmenty dostaja jawny payload map per-K zamiast skladania nazw po stronie JS
+Decyzja:
+- `analyze_poznan_archetypes.py` dopisuje do `seg_pack_ultra` i `seg_packs_render["ultra_premium"]` slowniki:
+  - `map_arche_by_k`,
+  - `map_values_by_k`.
+- JS `setDynamicSegMap(...)` korzysta najpierw z tych map, a dopiero potem z fallbacku nazwy konwencyjnej.
+Uzasadnienie:
+- To eliminuje kruchosc zaleznosci od samego wzorca nazwy i domyka brak `Mapa przewag segmentów` przy standalone/online.
+
+### D-078: Rezygnujemy z jawnej premii za dopasowanie
+Decyzja:
+- Nie dodajemy dodatniego bonusu do `Poziom dopasowania` za bliskosc archetypow kluczowych.
+- Metryka pozostaje modelem kar (w tym kara za luki kluczowe), bez komponentu dodatniej premii.
+Uzasadnienie:
+- Jawna premia latwo podwojnie policzylaby ten sam efekt (nizsza kara + dodatkowy bonus), co sztucznie zawyzaloby ocene.
+- User jednoznacznie zdecydowal o rezygnacji z premii.
+
+### D-079: Kalibracja komunikatu `Poziom dopasowania` musi uwzgledniac skrajne luki kluczowe
+Decyzja:
+- W kolejnym kroku kalibrujemy progi/opisy pasm oceny tak, aby werdykt nie brzmial `bardzo wysokie` przy duzych lukach na archetypach kluczowych (np. >20 pp).
+Uzasadnienie:
+- Zgloszony przypadek (duze luki na TOP3 polityka/JST) pokazal, ze obecna narracja werbalna moze byc zbyt optymistyczna wzgledem merytorycznej interpretacji.

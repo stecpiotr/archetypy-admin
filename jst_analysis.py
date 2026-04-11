@@ -482,6 +482,10 @@ _SCRIPT_SRC_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 _CSS_URL_RE = re.compile(r"url\((?P<q>['\"]?)(?P<path>[^)\"']+)(?P=q)\)", re.IGNORECASE)
+_QUOTED_LOCAL_ASSET_RE = re.compile(
+    r'(?P<q>["\'])(?P<path>[^"\']+\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|eot))(?P=q)',
+    re.IGNORECASE,
+)
 
 
 def _is_external_ref(ref: str) -> bool:
@@ -646,7 +650,28 @@ def inline_local_assets(html_text: str, base_dir: Path) -> str:
             return match.group(0)
         return f"{attr}={quote}{data_uri}{quote}"
 
-    return _SRC_HREF_RE.sub(_replace, html_text or "")
+    html_text = _SRC_HREF_RE.sub(_replace, html_text or "")
+
+    def _replace_quoted_local_asset(match: re.Match) -> str:
+        quote = match.group("q") or '"'
+        ref = (match.group("path") or "").strip()
+        if _is_external_ref(ref):
+            return match.group(0)
+        candidate = _resolve_local_ref(ref, root=root, base_dir=root)
+        if candidate is None:
+            return match.group(0)
+        if candidate.suffix.lower() not in _ASSET_EXT:
+            return match.group(0)
+        data_uri = _to_data_uri(candidate)
+        if not data_uri:
+            return match.group(0)
+        return f"{quote}{data_uri}{quote}"
+
+    # W standalone część zasobów jest podmieniana dynamicznie przez JS (np. mapy po suwakach).
+    # Te ścieżki nie występują w atrybutach src/href, więc inlinujemy także lokalne stringi
+    # wyglądające jak referencje do plików graficznych/fontów.
+    html_text = _QUOTED_LOCAL_ASSET_RE.sub(_replace_quoted_local_asset, html_text)
+    return html_text
 
 
 def bundle_report_dir_zip(report_dir: Path) -> bytes:

@@ -8048,6 +8048,27 @@ def save_report(outdir: Path, settings: Settings,
     _filter_blocks_json = _js_json(["A", "B1", "B2", "D13"])
     _filter_pct_json = _js_json(filters_pct)
     _brand_values_json = _js_json(brand_values)
+
+    def _slug_ascii_local(s: str) -> str:
+        tr = str.maketrans({
+            "ł": "l", "Ł": "L",
+            "ą": "a", "Ą": "A",
+            "ć": "c", "Ć": "C",
+            "ę": "e", "Ę": "E",
+            "ń": "n", "Ń": "N",
+            "ó": "o", "Ó": "O",
+            "ś": "s", "Ś": "S",
+            "ż": "z", "Ż": "Z",
+            "ź": "z", "Ź": "Z",
+        })
+        txt = str(s or "").translate(tr)
+        txt = unicodedata.normalize("NFKD", txt)
+        txt = "".join(ch for ch in txt if not unicodedata.combining(ch))
+        txt = re.sub(r"[^a-zA-Z0-9]+", "_", txt).strip("_").lower()
+        return txt
+
+    filter_icons = {str(a): f"icons/{_slug_ascii_local(str(a))}.png" for a in ARCHETYPES}
+    _filter_icons_json = _js_json(filter_icons)
     _seg_packs_json = _js_json(seg_packs_render or {})
     _cluster_pack_json = _js_json(cluster_pack or {})
 
@@ -8437,6 +8458,7 @@ body[data-label-mode="values"] .mode-values { display:inline; }
     const FILTER_BLOCKS = __FILTER_BLOCKS__;
     const FILTER_PCT = __FILTER_PCT__;
     const BRAND_VALUES = __BRAND_VALUES__;
+    const FILTER_ICONS = __FILTER_ICONS__;
 
     document.addEventListener("DOMContentLoaded", function() {
       /* ---------- localStorage (file:// bywa blokowane) ---------- */
@@ -8498,7 +8520,8 @@ body[data-label-mode="values"] .mode-values { display:inline; }
       }
 
       function iconSrc(archeKey){
-        return "icons/" + slugAscii(archeKey) + ".png";
+        const key = String(archeKey || "");
+        return (FILTER_ICONS && FILTER_ICONS[key]) || ("icons/" + slugAscii(key) + ".png");
       }
       function toNumOrNaN(x){
         if (x === null || x === undefined || x === "") return NaN;
@@ -8821,16 +8844,21 @@ body[data-label-mode="values"] .mode-values { display:inline; }
     });
   }
 
-  function setDynamicSegMap(tabKey, shownK){
+  function setDynamicSegMap(tabKey, shownK, pack){
     const mapA = document.getElementById("seg_" + tabKey + "_map_arche");
     const mapV = document.getElementById("seg_" + tabKey + "_map_values");
     const safeK = Math.max(1, parseInt(shownK || 1, 10));
+    const p = (pack && typeof pack === "object") ? pack : (SEG_PACKS[tabKey] || {});
+    const byKArche = (p && p.map_arche_by_k && typeof p.map_arche_by_k === "object") ? p.map_arche_by_k : {};
+    const byKValues = (p && p.map_values_by_k && typeof p.map_values_by_k === "object") ? p.map_values_by_k : {};
+    const srcA = byKArche[String(safeK)] || ("SEGMENTY_META_MAPA_STALA_K" + safeK + ".png");
+    const srcV = byKValues[String(safeK)] || ("SEGMENTY_META_MAPA_STALA_K" + safeK + "_values.png");
 
     if (mapA){
-      mapA.setAttribute("src", "SEGMENTY_META_MAPA_STALA_K" + safeK + ".png");
+      mapA.setAttribute("src", srcA);
     }
     if (mapV){
-      mapV.setAttribute("src", "SEGMENTY_META_MAPA_STALA_K" + safeK + "_values.png");
+      mapV.setAttribute("src", srcV);
     }
   }
 
@@ -8890,7 +8918,7 @@ body[data-label-mode="values"] .mode-values { display:inline; }
     // ukrywanie/pokazywanie wg suwaka
     if (profilesDiv) applyVisibleSegmentCount(profilesDiv, shownK);
     if (matrixDiv) applyVisibleMatrixColumns(matrixDiv, shownK);
-    setDynamicSegMap(tabKey, shownK);
+    setDynamicSegMap(tabKey, shownK, pack);
 
     // obsługa suwaka
     if (slider && !slider.__bound){
@@ -8903,7 +8931,7 @@ body[data-label-mode="values"] .mode-values { display:inline; }
         const shownNow = Math.min(vv, modelK);
         applyVisibleSegmentCount(profilesDiv, shownNow);
         applyVisibleMatrixColumns(matrixDiv, shownNow);
-        setDynamicSegMap(tabKey, shownNow);
+        setDynamicSegMap(tabKey, shownNow, pack);
       });
     }
   }
@@ -9048,6 +9076,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
     """) \
         .replace("__FILTER_BLOCKS__", _filter_blocks_json) \
         .replace("__FILTER_PCT__", _filter_pct_json) \
+        .replace("__FILTER_ICONS__", _filter_icons_json) \
         .replace("__BRAND_VALUES__", _brand_values_json) \
         .replace("__SEG_PACKS__", _seg_packs_json) \
         .replace("__CLUSTER_PACK__", _cluster_pack_json)
@@ -17329,8 +17358,16 @@ def main() -> None:
     # - plik bazowy = widok domyślny zgodny z suwakiem startowym,
     # - warianty K1..Kmodel = pełna skala dynamiczna pod suwak.
     seg_prof_ultra_maps = list(seg_prof_ultra)
+    seg_map_arche_by_k: Dict[str, str] = {}
+    seg_map_values_by_k: Dict[str, str] = {}
+
+    def _remember_seg_map_names(k: int) -> None:
+        kk = max(1, int(k))
+        seg_map_arche_by_k[str(kk)] = f"SEGMENTY_META_MAPA_STALA_K{kk}.png"
+        seg_map_values_by_k[str(kk)] = f"SEGMENTY_META_MAPA_STALA_K{kk}_values.png"
 
     try:
+        _remember_seg_map_names(display_top_k)
         plot_segment_quadrant_map_fixed(
             segs=seg_prof_ultra_maps[:display_top_k],
             segs_logic=seg_prof_ultra_maps,
@@ -17343,6 +17380,7 @@ def main() -> None:
         )
 
         for shown_k in range(1, len(seg_prof_ultra_maps) + 1):
+            _remember_seg_map_names(shown_k)
             plot_segment_quadrant_map_fixed(
                 segs=seg_prof_ultra_maps[:shown_k],
                 segs_logic=seg_prof_ultra_maps,
@@ -17356,6 +17394,15 @@ def main() -> None:
 
     except Exception as e:
         print(f"[WARN] Nie udało się zbudować stałej mapy ćwiartek segmentów: {e}")
+
+    # Nazwy map per-K przekazujemy do JS, aby działało przełączanie suwaka
+    # zarówno w raportach ZIP (relatywne pliki), jak i po osadzaniu standalone.
+    if isinstance(seg_pack_ultra, dict):
+        seg_pack_ultra["map_arche_by_k"] = dict(seg_map_arche_by_k)
+        seg_pack_ultra["map_values_by_k"] = dict(seg_map_values_by_k)
+    if isinstance(seg_packs_render, dict) and isinstance(seg_packs_render.get("ultra_premium"), dict):
+        seg_packs_render["ultra_premium"]["map_arche_by_k"] = dict(seg_map_arche_by_k)
+        seg_packs_render["ultra_premium"]["map_values_by_k"] = dict(seg_map_values_by_k)
 
     # Bąbelkowa macierz TOP segmentów (statyczny widok zgodny z domyślnym TOP5)
     P_mean_overall = _wmean_cols(P, weights)
