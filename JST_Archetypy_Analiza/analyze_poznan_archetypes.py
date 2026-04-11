@@ -1847,6 +1847,7 @@ def compute_variant_b_correction(
     delta_b2: Dict[str, float] = {}
     delta_n: Dict[str, float] = {}
     k_b: Dict[str, float] = {}
+    b2_neutral = 8.3333333333
     for a in arch_names:
         key = str(a)
         b1 = float(b1_pct.get(key, np.nan))
@@ -1854,7 +1855,7 @@ def compute_variant_b_correction(
         n = float(n_pct.get(key, np.nan))
         mbal = float(mbal_pp.get(key, np.nan))
         d_b1 = (b1 - 25.0) if np.isfinite(b1) else 0.0
-        d_b2 = (b2 - 8.33) if np.isfinite(b2) else 0.0
+        d_b2 = (b2 - b2_neutral) if np.isfinite(b2) else 0.0
         d_n = (n - 50.0) if np.isfinite(n) else 0.0
         mbal_safe = mbal if np.isfinite(mbal) else 0.0
         corr = float(0.35 * d_b1 + 0.90 * d_b2 + 0.08 * d_n + 0.20 * mbal_safe)
@@ -1916,7 +1917,7 @@ def compute_social_expectation_variant_b(
 
     meta = {
         "anchor_formula": "A_base = % oczekujących z pytania A",
-        "delta_formula": "delta_B1=B1-25.0; delta_B2=B2-8.33; delta_N=N-50.0; MBAL=Mneg-Mpos",
+        "delta_formula": "delta_B1=B1-25.0; delta_B2=B2-8.3333333333; delta_N=N-50.0; MBAL=Mneg-Mpos",
         "corr_formula": "K_B = 0.35*delta_B1 + 0.90*delta_B2 + 0.08*delta_N + 0.20*MBAL",
         "raw_formula": "SEI_B = A_base + K_B",
         "scale_formula": "SEI_B_100 = clamp(SEI_B, 0..100)",
@@ -2185,7 +2186,7 @@ def render_isoa_isow_report_tab(
 
     <div class="card chart-half" style="margin-top:16px;">
       <h3><span class="mode-arche">Wykres główny ISOA (0-100)</span><span class="mode-values">Wykres główny ISOW (0-100)</span></h3>
-      {chart_html}
+      <div class="isoa-wheel-wrap">{chart_html}</div>
       <div class="isoa-axis-legend">
         <span><i style="background:#e53935"></i>Zmiana</span>
         <span><i style="background:#1e88e5"></i>Ludzie</span>
@@ -8335,7 +8336,7 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 }
 .ppp-main-table td:nth-child(3) {
   font-weight: 800;
-  color:#0b6b2d;
+  color:#0f172a;
 }
 .ppp-main-table th:nth-child(1), .ppp-main-table td:nth-child(1) {
   width: 64px;
@@ -8349,7 +8350,11 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 .ppp-main-table th:nth-child(4) { color:#334155; }
 .ppp-main-table th:nth-child(5) { color:#c62000; }
 .ppp-main-table th:nth-child(6) { color:#00509d; }
-.ppp-main-table th:nth-child(7) { color:#0f4f9e; }
+.ppp-main-table th:nth-child(7) { color:#0f172a; }
+.isoa-wheel-wrap{
+  width:85%;
+  margin:0 auto;
+}
 .isoa-axis-legend {
   margin-top: 10px;
   display: flex;
@@ -9601,13 +9606,13 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
 
     isoa_methodology_text_arche = (
         "ISOA jest zakotwiczony w A (% oczekujących z versusów). "
-        "B1 i B2 działają względem poziomów neutralnych (25% i 8.33%), "
+        "B1 i B2 działają względem poziomów neutralnych (25% i 8.3333333333%), "
         "C13/D13 daje umiarkowaną korektę doświadczeniową. "
         "Wynik końcowy to A + korekta wariantu B, przycięty do zakresu 0-100 (bez min-max)."
     )
     isoa_methodology_text_values = (
         "ISOW jest zakotwiczony w A (% oczekujących z versusów). "
-        "B1 i B2 działają względem poziomów neutralnych (25% i 8.33%), "
+        "B1 i B2 działają względem poziomów neutralnych (25% i 8.3333333333%), "
         "C13/D13 daje umiarkowaną korektę doświadczeniową. "
         "Wynik końcowy to A + korekta wariantu B, przycięty do zakresu 0-100 (bez min-max)."
     )
@@ -9787,6 +9792,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         top_expected = [str(x) for x in (data.get("top_expected") or []) if str(x).strip()]
         bottom_expected = [str(x) for x in (data.get("bottom_expected") or []) if str(x).strip()]
         top_ppp = [str(x) for x in (data.get("top_ioa") or []) if str(x).strip()]
+        bottom_ppp = [str(x) for x in (data.get("bottom_ioa") or []) if str(x).strip()]
 
         def _list_html(items: List[str], values_mode: bool, tone: str) -> str:
             if not items:
@@ -9809,6 +9815,9 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             + "</div>"
             '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 archetypy (PPP)</h4>'
             + _list_html(top_ppp, values_mode=False, tone="up")
+            + "</div>"
+            '<div class="ioa-summary-item"><h4><span class="sum-down-arrow">⬇</span> Bottom 3 archetypy (PPP)</h4>'
+            + _list_html(bottom_ppp, values_mode=False, tone="down")
             + "</div></div></div>"
             '<div class="label-values"><div class="ioa-summary-grid">'
             '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 oczekiwane wartości</h4>'
@@ -9819,6 +9828,9 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             + "</div>"
             '<div class="ioa-summary-item"><h4><span class="sum-up-arrow">⬆</span> Top 3 wartości (PPP)</h4>'
             + _list_html(top_ppp, values_mode=True, tone="up")
+            + "</div>"
+            '<div class="ioa-summary-item"><h4><span class="sum-down-arrow">⬇</span> Bottom 3 wartości (PPP)</h4>'
+            + _list_html(bottom_ppp, values_mode=True, tone="down")
             + "</div></div></div>"
         )
 
@@ -16705,6 +16717,10 @@ def main() -> None:
             df_A_expectation_main.sort_values("ioa_100", ascending=False)["archetype"].head(3).astype(str).tolist()
             if not df_A_expectation_main.empty else []
         ),
+        "bottom_ioa": (
+            df_A_expectation_main.sort_values("ioa_100", ascending=True)["archetype"].head(3).astype(str).tolist()
+            if not df_A_expectation_main.empty else []
+        ),
     }
 
     df_A_expectation_main.to_csv(
@@ -16859,6 +16875,17 @@ def main() -> None:
         mbal_pp=mbal_map,
         arch_names=ARCHETYPES,
     )
+    if isinstance(df_social_expectation_index_tech, pd.DataFrame) and not df_social_expectation_index_tech.empty:
+        df_social_expectation_index_tech["Mneg_pct"] = (
+            df_social_expectation_index_tech["archetype"].astype(str).map(lambda a: float(mneg_map.get(a, np.nan)))
+        )
+        df_social_expectation_index_tech["Mpos_pct"] = (
+            df_social_expectation_index_tech["archetype"].astype(str).map(lambda a: float(mpos_map.get(a, np.nan)))
+        )
+        df_social_expectation_index_tech["MBAL_check_pp"] = (
+            pd.to_numeric(df_social_expectation_index_tech["Mneg_pct"], errors="coerce")
+            - pd.to_numeric(df_social_expectation_index_tech["Mpos_pct"], errors="coerce")
+        )
     social_expectation_meta["mbal_denominator_weight"] = float(mbal_denom)
     social_expectation_meta["mneg_pct"] = {str(k): float(v) for k, v in mneg_map.items()}
     social_expectation_meta["mpos_pct"] = {str(k): float(v) for k, v in mpos_map.items()}
@@ -16902,6 +16929,23 @@ def main() -> None:
     df_social_expectation_index_tech.to_csv(
         outdir / "ISOA_ISOW_technical.csv", index=False, encoding="utf-8-sig"
     )
+    if isinstance(df_social_expectation_index_tech, pd.DataFrame) and not df_social_expectation_index_tech.empty:
+        df_mbal_control = df_social_expectation_index_tech[[
+            "position", "archetype", "Mneg_pct", "Mpos_pct", "MBAL_pp", "MBAL_check_pp"
+        ]].copy()
+        df_mbal_control = df_mbal_control.rename(columns={
+            "position": "Pozycja",
+            "archetype": "Archetyp",
+            "Mneg_pct": "Mneg (%)",
+            "Mpos_pct": "Mpos (%)",
+            "MBAL_pp": "MBAL (Mneg-Mpos)",
+            "MBAL_check_pp": "Kontrola MBAL (Mneg-Mpos)",
+        })
+        for col in ["Mneg (%)", "Mpos (%)", "MBAL (Mneg-Mpos)", "Kontrola MBAL (Mneg-Mpos)"]:
+            df_mbal_control[col] = pd.to_numeric(df_mbal_control[col], errors="coerce").round(3)
+        df_mbal_control.to_csv(
+            outdir / "ISOA_ISOW_MBAL_control.csv", index=False, encoding="utf-8-sig"
+        )
     df_social_expectation_index.to_csv(
         outdir / "ISOA_ISOW_table.csv", index=False, encoding="utf-8-sig"
     )

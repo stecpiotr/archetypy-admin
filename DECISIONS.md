@@ -517,3 +517,45 @@ Decyzja:
   - domyslne `settings.json` w lokalizacji D: i C:.
 Uzasadnienie:
 - User podal docelowy komplet progow, ktory ma byc nowym baseline dla kolejnych przeliczen.
+
+### D-059: `🧭 Matching` ma pokazac TOP3 polityk vs JST jako osobny, wizualny blok porownawczy
+Decyzja:
+- Pod sekcja `Najlepsze dopasowania / Największe luki` dodajemy nowy blok 2 kart:
+  - `TOP3 archetypów/wartości dla {osoba w dopełniaczu}`,
+  - `TOP3 archetypów/wartości dla {JST w dopełniaczu}`.
+- Forma: nowoczesne karty z etykietami rangi (`Główny`, `Wspierający`, `Poboczny`), bez listy `1/2/3`.
+Uzasadnienie:
+- User wprost wymagал atrakcyjniejszej, bardziej "produktowej" prezentacji TOP3 i porownania obok siebie.
+
+### D-060: Legenda radaru porownawczego ma byc dedykowana (nie surowa legenda Plotly)
+Decyzja:
+- Dla `Porównanie profili ...`:
+  - wyłączamy standardowa legende Plotly,
+  - renderujemy dedykowana legende UI z próbkami linii,
+  - nazwy dynamiczne:
+    - `profil polityka ({osoba})`,
+    - `profil mieszkańców ({JST})`,
+  - usuwamy tekstowy dopisek `Niebieska linia...`.
+Uzasadnienie:
+- Dotychczasowa legenda byla oceniona jako slaba wizualnie i dublowala informacje.
+
+### D-061: Wariant B – precyzja neutralu B2 i jawna kontrola MBAL w eksporcie
+Decyzja:
+- Neutral dla B2 ustawiamy dokladnie na `8.3333333333` (zamiast `8.33`).
+- Dodajemy pomocniczy eksport kontroli MBAL:
+  - `Mneg`,
+  - `Mpos`,
+  - `MBAL = Mneg - Mpos`,
+  w pliku `ISOA_ISOW_MBAL_control.csv`.
+Uzasadnienie:
+- User wymagal wiekszej precyzji i transparentnosci bez zmiany samej metodologii wariantu B.
+
+### D-062: Widok `Strategia komunikacji` w Matching ma byc bardziej decyzyjny
+Decyzja:
+- Rozszerzamy zakladke `Strategia komunikacji` z 3 prostych linijek do 4 blokow:
+  - os przekazu,
+  - luki do domknięcia,
+  - segment docelowy,
+  - plan testow (14 dni).
+Uzasadnienie:
+- User poprosil o realnie bardziej rozbudowany widok, a nie tylko skróconą notatkę.

@@ -500,6 +500,44 @@
   - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, raport na D:),
   - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, raport na C:).
 
+### Zrobione w Hotfix H-014 (Matching UI + PPP/ISOA final polish + MBAL control export)
+- `app.py`:
+  - `🧭 Matching`:
+    - dopracowany wyglad tabow (wyraźne "button-like" zakładki, mocniejszy aktywny stan i hover),
+    - pod `Najlepsze dopasowania / Największe luki` dodano nowe porownanie TOP3 polityk vs JST w nowoczesnych kartach obok siebie,
+    - radar porownawczy:
+      - legenda wizualna zastapiona estetycznymi pillami z probkami linii,
+      - etykiety dynamiczne: `profil polityka ({osoba})`, `profil mieszkańców ({JST})`,
+      - usunieto stary opis `Niebieska linia...`,
+    - TOP3 pod radarem dostaly nowy wyglad (karty, wycentrowanie, czytelniejszy podział),
+    - pod kołami 0-100 w trybie `Wartości` dodano centralna legende osi (`Zmiana/Ludzie/Porządek/Niezależność`),
+    - `Demografia`: wartosci w kolumnie `% grupa dopasowana` maja `font-size: 13.5px`,
+    - `Strategia komunikacji`: rozbudowana do 4 kart (os przekazu, luki, segment docelowy, plan testów 14 dni).
+  - wariant B:
+    - opis metodyki w Matching pokazuje precyzyjnie `delta_B2 = B2 - 8.3333333333`,
+    - audyt komponentow pokazuje dodatkowo `Mneg` i `Mpos` obok `MBAL`.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - wariant B liczy neutral B2 jako `8.3333333333`,
+  - dodano pomocniczy eksport kontroli MBAL:
+    - `ISOA_ISOW_MBAL_control.csv` z kolumnami `Mneg`, `Mpos`, `MBAL`, `Kontrola MBAL`,
+  - `PPP`:
+    - `% oczekujących` pozostaje pogrubione, ale czarne (zielony zostal tylko naglowek kolumny),
+    - naglowek `PPP 0-100` jest czarny,
+    - w podsumowaniu dodano brakujace `⬇ Bottom 3 (PPP)` (dla archetypow i wartosci),
+  - `ISOA/ISOW`:
+    - wykres glowny zmniejszony o ok. 15% (`isoa-wheel-wrap`).
+- Synchronizacja C:/D:
+  - finalny `analyze_poznan_archetypes.py` skopiowany D -> C,
+  - przebudowane raporty:
+    - `D:\PythonProject\archetypy\archetypy-admin\JST_Archetypy_Analiza\WYNIKI\raport.html`,
+    - `C:\Poznan_Archetypy_Analiza\WYNIKI\raport.html`,
+  - oba katalogi maja `ISOA_ISOW_MBAL_control.csv`.
+- Testy:
+  - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -508,8 +546,4 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Potwierdzic z userem wizualny odbior:
-  1) tabs `🧭 Matching`,
-  2) tabela glowna PPP (ikony/kolory/pogrubienia),
-  3) tabela glowna ISOA/ISOW (czarne naglowki),
-  4) flow `Raport gotowy` -> przyciski pobierania/fallback.
+- Potwierdzic na Twoich zrzutach, czy nowy wyglad tabow Matching i radaru jest juz zgodny z oczekiwaniem.

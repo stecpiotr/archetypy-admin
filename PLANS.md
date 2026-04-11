@@ -585,3 +585,51 @@ Wynik:
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
   - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, WYNIKI na D:),
   - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK, WYNIKI na C:).
+
+### Hotfix H-014 [DONE]
+Temat: Dopracowanie UI Matching + korekty transparentnosci wariantu B + finalne poprawki raportu PPP/ISOA.
+Kryteria ukonczenia:
+1. `🧭 Matching > Demografia`: kolumna `% grupa dopasowana` ma czytelna typografie `13.5px`.
+2. `🧭 Matching > Podsumowanie`: pod kolami 0-100 w trybie `Wartości` jest centralna legenda osi (`Zmiana/Ludzie/Porządek/Niezależność`).
+3. `🧭 Matching > Podsumowanie`: dodany nowoczesny blok porownania TOP3 polityk vs JST obok siebie (przed sekcja `Porównanie profili ...`).
+4. Radar porownawczy ma poprawiona estetyke legendy i dynamiczne etykiety:
+   - `profil polityka ({osoba})`,
+   - `profil mieszkańców ({JST})`,
+   oraz usuniety zbedny opis tekstowy pod wykresem.
+5. `🧭 Matching` taby (`Wybierz badania`, `Podsumowanie`, `Demografia`, `Strategia komunikacji`) sa jednoznacznie klikalne i bardziej "tabowe" wizualnie.
+6. `Strategia komunikacji` jest rozbudowana o bardziej praktyczny plan dzialan (os przekazu, luki, segment docelowy, plan testow).
+7. Raport:
+   - tabela PPP: `% oczekujących` pogrubione na czarno; zielony tylko naglowek kolumny,
+   - naglowek `PPP 0-100` w kolorze czarnym,
+   - w podsumowaniu PPP pojawia sie brakujace `⬇ Bottom 3 (PPP)`.
+8. Wykres glowny ISOA/ISOW w raporcie jest zmniejszony o ok. 15%.
+9. Wariant B:
+   - neutralny poziom B2 = `8.3333333333`,
+   - eksport pomocniczy zawiera kontrolke MBAL: `Mneg`, `Mpos`, `MBAL`.
+10. Zmiany obliczeniowe mieszkancow sa wdrozone i przebudowane na obu lokalizacjach (D + C).
+Pierwszy krok wykonawczy:
+- zrobic komplet zmian w `app.py` (Matching UI) i `JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (raport + eksport), potem synchronizacja pliku analizujacego na C i rebuild obu raportow.
+Wynik:
+- `app.py`:
+  - dopracowano taby Matching (mocniejsze style aktywne/hover, bardziej czytelna klikalnosc),
+  - sekcja `Podsumowanie` ma nowy blok TOP3 (polityk vs JST) w kartach obok siebie,
+  - radar ma ladniejsza, dedykowana legende i dynamiczne etykiety profili; usunieto zbedny opis pod wykresem,
+  - TOP3 pod radarem dostaly estetyczne karty i wycentrowany uklad,
+  - pod kolami 0-100 w trybie `Wartości` dodano centralna legende osi jak na wzorcu,
+  - `Demografia`: wartosci w kolumnie `% grupa dopasowana` maja rozmiar `13.5px`,
+  - `Strategia komunikacji` rozbudowana do 4 kart rekomendacyjnych (os przekazu, luki, segment docelowy, plan testow),
+  - doprecyzowano wzor wariantu B w opisie (`delta_B2 = B2 - 8.3333333333`) i dodano w audycie kolumny `Mneg/Mpos`.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - wariant B liczy `delta_B2` z neutralem `8.3333333333`,
+  - dodano eksport pomocniczy: `ISOA_ISOW_MBAL_control.csv` (`Mneg`, `Mpos`, `MBAL` + kontrola),
+  - tabela PPP: `% oczekujących` pogrubione czarne, naglowek `PPP 0-100` czarny,
+  - podsumowanie PPP zawiera teraz `Bottom 3 (PPP)` (archetypy i wartości),
+  - wykres glowny ISOA/ISOW opakowany w kontener `85%` szerokosci (`~15%` mniejszy).
+- Synchronizacja C:/D:
+  - plik `analyze_poznan_archetypes.py` skopiowany D -> C,
+  - raporty przebudowane na obu lokalizacjach.
+- Rebuild i smoke-check:
+  - `python -m py_compile app.py jst_analysis.py admin_dashboard.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
+  - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

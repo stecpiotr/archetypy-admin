@@ -2865,13 +2865,14 @@ def compute_variant_b_correction(
     delta_b2: Dict[str, float] = {}
     delta_n: Dict[str, float] = {}
     k_b: Dict[str, float] = {}
+    b2_neutral = 8.3333333333
     for a in JST_ARCHETYPES:
         b1 = float(b1_pct.get(a, float("nan")))
         b2 = float(b2_pct.get(a, float("nan")))
         n = float(n_pct.get(a, float("nan")))
         mbal = float(mbal_pp.get(a, float("nan")))
         d_b1 = (b1 - 25.0) if math.isfinite(b1) else 0.0
-        d_b2 = (b2 - 8.33) if math.isfinite(b2) else 0.0
+        d_b2 = (b2 - b2_neutral) if math.isfinite(b2) else 0.0
         d_n = (n - 50.0) if math.isfinite(n) else 0.0
         mbal_safe = mbal if math.isfinite(mbal) else 0.0
         corr = float(0.35 * d_b1 + 0.90 * d_b2 + 0.08 * d_n + 0.20 * mbal_safe)
@@ -3063,6 +3064,8 @@ def _calc_jst_target_profile(
             "B1": round(float(comp_B1.get(a, float("nan"))), 3) if math.isfinite(float(comp_B1.get(a, float("nan")))) else float("nan"),
             "B2": round(float(comp_B2.get(a, float("nan"))), 3) if math.isfinite(float(comp_B2.get(a, float("nan")))) else float("nan"),
             "N": round(float(comp_N.get(a, float("nan"))), 3) if math.isfinite(float(comp_N.get(a, float("nan")))) else float("nan"),
+            "Mneg": round(float(comp_MNEG.get(a, float("nan"))), 3) if math.isfinite(float(comp_MNEG.get(a, float("nan")))) else float("nan"),
+            "Mpos": round(float(comp_MPOS.get(a, float("nan"))), 3) if math.isfinite(float(comp_MPOS.get(a, float("nan")))) else float("nan"),
             "MBAL": round(float(comp_MBAL.get(a, float("nan"))), 3) if math.isfinite(float(comp_MBAL.get(a, float("nan")))) else float("nan"),
             "delta_B1": round(float(delta_b1.get(a, 0.0)), 4),
             "delta_B2": round(float(delta_b2.get(a, 0.0)), 4),
@@ -3102,12 +3105,14 @@ def _calc_jst_target_profile(
         "component_b1_pct": comp_B1,
         "component_b2_pct": comp_B2,
         "component_negative_pct": comp_N,
+        "component_mneg_pct": comp_MNEG,
+        "component_mpos_pct": comp_MPOS,
         "component_mbal_pp": comp_MBAL,
         "components_aligned": bool(components_aligned),
         "component_missing_counts": component_missing_counts,
         "methodology": {
             "anchor_formula": "A_base = % oczekujących z pytania A",
-            "delta_formula": "delta_B1=B1-25.0; delta_B2=B2-8.33; delta_N=N-50.0; MBAL=Mneg-Mpos",
+            "delta_formula": "delta_B1=B1-25.0; delta_B2=B2-8.3333333333; delta_N=N-50.0; MBAL=Mneg-Mpos",
             "corr_formula": "K_B = 0.35*delta_B1 + 0.90*delta_B2 + 0.08*delta_N + 0.20*MBAL",
             "raw_formula": "SEI_B = A_base + K_B",
             "scale_formula": "SEI_B_100 = clamp(SEI_B, 0..100)",
@@ -3232,40 +3237,46 @@ def matching_view() -> None:
     st.markdown(
         """
         <style>
-          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab-list"]{
+          div[data-testid="stTabs"] [data-baseweb="tab-list"],
+          div[data-testid="stTabs"] [role="tablist"]{
             gap:10px;
-            border:1px solid #d4deee;
-            border-bottom:1px solid #c7d5e8;
-            padding:10px 12px 12px 12px;
-            background:linear-gradient(180deg,#f8fbff 0%,#f1f6ff 100%);
-            border-radius:14px 14px 10px 10px;
+            border:1px solid #d4deee !important;
+            border-bottom:1px solid #c7d5e8 !important;
+            padding:10px 12px 12px 12px !important;
+            background:linear-gradient(180deg,#f8fbff 0%,#f1f6ff 100%) !important;
+            border-radius:14px 14px 10px 10px !important;
             flex-wrap:wrap;
             box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
           }
-          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab"]{
-            background:#ffffff;
-            border:1px solid #c7d5e8;
-            border-radius:12px;
-            padding:9px 16px;
-            font-weight:800;
-            color:#31465f;
-            font-size:15px;
+          div[data-testid="stTabs"] [data-baseweb="tab"],
+          div[data-testid="stTabs"] [role="tab"]{
+            background:#ffffff !important;
+            border:1px solid #c7d5e8 !important;
+            border-radius:12px !important;
+            padding:9px 16px !important;
+            font-weight:800 !important;
+            color:#31465f !important;
+            font-size:15px !important;
             letter-spacing:.01em;
             box-shadow:0 1px 3px rgba(15,58,116,.08);
             transition:all .15s ease;
+            cursor:pointer !important;
+            min-height:40px !important;
           }
-          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab"]:hover{
+          div[data-testid="stTabs"] [data-baseweb="tab"]:hover,
+          div[data-testid="stTabs"] [role="tab"]:hover{
             border-color:#9fb6d8;
             box-shadow:0 4px 12px rgba(31,111,196,.14);
+            background:#f7fbff;
           }
-          body[data-ap-view="matching"] div[data-testid="stTabs"] [aria-selected="true"]{
-            background:linear-gradient(180deg,#2d7dd2 0%,#1f6fc4 100%);
-            border-color:#1f6fc4;
-            color:#ffffff;
+          div[data-testid="stTabs"] [aria-selected="true"]{
+            background:linear-gradient(180deg,#2d7dd2 0%,#1f6fc4 100%) !important;
+            border-color:#1f6fc4 !important;
+            color:#ffffff !important;
             box-shadow:0 7px 16px rgba(31,111,196,.28);
             transform:translateY(-1px);
           }
-          body[data-ap-view="matching"] div[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
+          div[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
             display:none;
           }
         </style>
@@ -3722,7 +3733,7 @@ def matching_view() -> None:
                 f"- `B2`: odsetek osób, które wskazały {axis_entity_gen} jako TOP1.\n"
                 f"- `N`: odsetek negatywnych doświadczeń dla {axis_entity_gen} (C13/D13).\n"
                 "- `MBAL`: bilans najważniejszego doświadczenia (C13/D13), liczony jako `Mneg - Mpos`.\n"
-                "- Odchylenia od poziomów neutralnych: `delta_B1 = B1 - 25.0`, `delta_B2 = B2 - 8.33`, `delta_N = N - 50.0`.\n"
+                "- Odchylenia od poziomów neutralnych: `delta_B1 = B1 - 25.0`, `delta_B2 = B2 - 8.3333333333`, `delta_N = N - 50.0`.\n"
                 "- Korekta wariantu B: `K_B = 0.35*delta_B1 + 0.90*delta_B2 + 0.08*delta_N + 0.20*MBAL`.\n"
                 "- Wynik końcowy: `SEI_B = A + K_B`.\n"
                 "- Skala końcowa: `SEI_B_100 = clamp(SEI_B, 0..100)` (bez min-max)."
@@ -3761,6 +3772,8 @@ def matching_view() -> None:
                                 "B1: TOP3 (%)": _fmt_cell(row.get("B1"), 1),
                                 "B2: TOP1 (%)": _fmt_cell(row.get("B2"), 1),
                                 "C13/D13: negatywne doświadczenie (%)": _fmt_cell(row.get("N"), 1),
+                                "C13/D13: Mneg (%)": _fmt_cell(row.get("Mneg"), 1),
+                                "C13/D13: Mpos (%)": _fmt_cell(row.get("Mpos"), 1),
                                 "C13/D13: bilans najważniejszego doświadczenia": _fmt_cell(row.get("MBAL"), 1),
                                 "delta_B1": _fmt_cell(row.get("delta_B1"), 2),
                                 "delta_B2": _fmt_cell(row.get("delta_B2"), 2),
@@ -3856,13 +3869,136 @@ def matching_view() -> None:
                 color:#1f2f44;
                 margin:2px 0 8px 0;
               }
+              .match-top3-compare{
+                display:grid;
+                grid-template-columns:1fr 1fr;
+                gap:12px;
+                margin:14px 0 10px 0;
+              }
+              .match-top3-card{
+                border:1px solid #d9e2ef;
+                border-radius:14px;
+                background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+                padding:12px 12px 10px 12px;
+                box-shadow:0 2px 7px rgba(15,58,116,.07);
+              }
+              .match-top3-card h4{
+                margin:0 0 8px 0;
+                font-size:14px;
+                color:#1f2f44;
+                font-weight:900;
+              }
+              .match-top3-row{
+                display:flex;
+                gap:8px;
+                align-items:center;
+                margin:7px 0;
+              }
+              .match-top3-rank{
+                min-width:74px;
+                text-align:center;
+                font-size:11px;
+                font-weight:900;
+                letter-spacing:.02em;
+                border-radius:999px;
+                padding:4px 8px;
+                border:1px solid transparent;
+              }
+              .match-r-main{background:#e7f0ff;color:#1d4ed8;border-color:#bfdbfe;}
+              .match-r-aux{background:#f5f3ff;color:#7c3aed;border-color:#ddd6fe;}
+              .match-r-supp{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}
+              .match-top3-name{
+                flex:1;
+                font-weight:800;
+                color:#0f172a;
+                font-size:14px;
+                border:1px solid #dbe4ef;
+                border-radius:10px;
+                padding:6px 9px;
+                background:#fff;
+              }
+              .match-radar-legend{
+                display:flex;
+                justify-content:center;
+                gap:12px;
+                flex-wrap:wrap;
+                margin:4px 0 6px 0;
+              }
+              .match-radar-pill{
+                display:inline-flex;
+                align-items:center;
+                gap:8px;
+                border:1px solid #dbe4ef;
+                background:#fff;
+                border-radius:999px;
+                padding:6px 10px;
+                font-size:13px;
+                font-weight:700;
+                color:#1f2f44;
+              }
+              .match-radar-line{
+                width:30px;
+                height:0;
+                border-top:3px solid #2563eb;
+                display:inline-block;
+              }
+              .match-radar-line.dashed{
+                border-top:3px dashed #0f766e;
+              }
+              .match-top3-style-grid{
+                display:grid;
+                grid-template-columns:1fr 1fr;
+                gap:12px;
+                margin:6px 0 2px 0;
+              }
+              .match-top3-style-card{
+                border:1px solid #dbe4ef;
+                border-radius:12px;
+                background:#fff;
+                padding:10px 12px;
+                text-align:center;
+              }
+              .match-top3-style-card .title{
+                font-size:13px;
+                font-weight:800;
+                color:#1f2f44;
+                margin-bottom:4px;
+              }
+              .match-top3-style-card .line2{
+                font-size:14px;
+                font-weight:900;
+                line-height:1.35;
+              }
+              .match-wheel-legend{
+                margin-top:8px;
+                display:flex;
+                justify-content:center;
+                gap:16px;
+                flex-wrap:wrap;
+                align-items:center;
+              }
+              .match-wheel-legend span{
+                display:inline-flex;
+                align-items:center;
+                gap:6px;
+                font-size:13px;
+                color:#334155;
+                font-weight:700;
+              }
+              .match-wheel-legend i{
+                width:10px;
+                height:10px;
+                border-radius:3px;
+                display:inline-block;
+              }
+              @media (max-width: 900px){
+                .match-top3-compare{grid-template-columns:1fr;}
+                .match-top3-style-grid{grid-template-columns:1fr;}
+              }
             </style>
             """,
             unsafe_allow_html=True,
         )
-        compare_title = "Porównanie profili archetypowych" if current_axis_label == "Archetyp" else "Porównanie profili wartości"
-        st.markdown(f"<div class='match-section-header'><h3>{html.escape(compare_title)}</h3></div>", unsafe_allow_html=True)
-
         person_name = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
         jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "JST")
         person_name_gen = str(result.get("person_name_gen") or "").strip() or person_name
@@ -3886,6 +4022,54 @@ def matching_view() -> None:
 
         p_top = _top3(person_profile_20, radar_order)
         j_top = _top3(jst_profile_20, radar_order)
+        entity_gen = "archetypów" if current_axis_label == "Archetyp" else "wartości"
+        rank_names = ["Główny", "Wspierający", "Poboczny"]
+
+        def _top3_compare_card(title: str, items: List[str]) -> str:
+            rows: List[str] = []
+            for idx, item in enumerate(items[:3]):
+                item_label = _matching_entity_name(str(item), current_axis_label)
+                rank_class = "match-r-main" if idx == 0 else ("match-r-aux" if idx == 1 else "match-r-supp")
+                rows.append(
+                    "<div class='match-top3-row'>"
+                    f"<span class='match-top3-rank {rank_class}'>{html.escape(rank_names[idx])}</span>"
+                    f"<span class='match-top3-name'>{html.escape(item_label)}</span>"
+                    "</div>"
+                )
+            if not rows:
+                rows.append("<div class='match-top3-row'><span class='match-top3-name'>Brak danych</span></div>")
+            return (
+                "<div class='match-top3-card'>"
+                f"<h4>{html.escape(title)}</h4>"
+                + "".join(rows)
+                + "</div>"
+            )
+
+        st.markdown(
+            "<div class='match-top3-compare'>"
+            + _top3_compare_card(
+                f"TOP3 {entity_gen} dla {person_name_gen}",
+                p_top,
+            )
+            + _top3_compare_card(
+                f"TOP3 {entity_gen} dla {jst_name_gen}",
+                j_top,
+            )
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+        compare_title = "Porównanie profili archetypowych" if current_axis_label == "Archetyp" else "Porównanie profili wartości"
+        st.markdown(f"<div class='match-section-header'><h3>{html.escape(compare_title)}</h3></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="match-radar-legend">
+              <span class="match-radar-pill"><i class="match-radar-line"></i> profil polityka ({html.escape(person_name)})</span>
+              <span class="match-radar-pill"><i class="match-radar-line dashed"></i> profil mieszkańców ({html.escape(jst_name)})</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
         jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
@@ -3921,8 +4105,8 @@ def matching_view() -> None:
                     fillcolor="rgba(37,99,235,0.18)",
                     line=dict(color="#2563eb", width=3),
                     marker=dict(size=5),
-                    name="Polityk (linia ciągła)",
-                    showlegend=True,
+                    name=f"profil polityka ({person_name})",
+                    showlegend=False,
                     hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -3932,8 +4116,8 @@ def matching_view() -> None:
                     fillcolor="rgba(15,118,110,0.16)",
                     line=dict(color="#0f766e", width=3, dash="dot"),
                     marker=dict(size=5),
-                    name="Mieszkańcy (linia przerywana)",
-                    showlegend=True,
+                    name=f"profil mieszkańców ({jst_name})",
+                    showlegend=False,
                     hovertemplate="<b>%{theta}</b><br>Mieszkańcy: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -3971,7 +4155,7 @@ def matching_view() -> None:
                 ),
             ),
             margin=dict(l=28, r=28, t=104, b=86),
-            showlegend=True,
+            showlegend=False,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -3990,33 +4174,29 @@ def matching_view() -> None:
             config={"displaylogo": False, "displayModeBar": False, "responsive": True},
             key=f"matching-radar-compare-{person_sid}-{jst_sid}",
         )
-        st.caption(
-            f"Niebieska linia: profil polityka ({person_name}) • "
-            f"Turkusowa linia przerywana: profil mieszkańców ({jst_name}, N={int(result.get('jst_n') or 0)})."
+        st.markdown(
+            f"""
+            <div class="match-top3-style-grid">
+              <div class="match-top3-style-card">
+                <div class="title">TOP3 polityka</div>
+                <div class="line2">
+                  <span style="color:{person_top_colors['main']};">●</span> główny,
+                  <span style="color:{person_top_colors['aux']};">●</span> wspierający,
+                  <span style="color:{person_top_colors['supp']};">●</span> poboczny
+                </div>
+              </div>
+              <div class="match-top3-style-card">
+                <div class="title">TOP3 mieszkańców</div>
+                <div class="line2">
+                  <span style="color:{jst_top_colors['main']};">●</span> główny,
+                  <span style="color:{jst_top_colors['aux']};">●</span> wspierający,
+                  <span style="color:{jst_top_colors['supp']};">●</span> poboczny
+                </div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        lg1, lg2 = st.columns(2, gap="large")
-        with lg1:
-            st.markdown(
-                f"<div style='font-size:15px;line-height:1.3;'>"
-                f"<div style='font-weight:400;'>TOP3 polityka:</div>"
-                f"<div style='font-weight:800;'>"
-                f"<span style='color:{person_top_colors['main']};'>●</span> główny, "
-                f"<span style='color:{person_top_colors['aux']};'>●</span> wspierający, "
-                f"<span style='color:{person_top_colors['supp']};'>●</span> poboczny"
-                f"</div></div>",
-                unsafe_allow_html=True,
-            )
-        with lg2:
-            st.markdown(
-                f"<div style='font-size:15px;line-height:1.3;'>"
-                f"<div style='font-weight:400;'>TOP3 mieszkańców:</div>"
-                f"<div style='font-weight:800;'>"
-                f"<span style='color:{jst_top_colors['main']};'>●</span> główny, "
-                f"<span style='color:{jst_top_colors['aux']};'>●</span> wspierający, "
-                f"<span style='color:{jst_top_colors['supp']};'>●</span> poboczny"
-                f"</div></div>",
-                unsafe_allow_html=True,
-            )
 
         profile_title = (
             "Profile archetypowe 0-100 (siła archetypu, skala: 0-100)"
@@ -4065,6 +4245,18 @@ def matching_view() -> None:
                     unsafe_allow_html=True,
                 )
                 _show_image_compat(jst_profile_img, max_width_px=520)
+            if current_axis_label == "Wartość":
+                st.markdown(
+                    """
+                    <div class="match-wheel-legend">
+                      <span><i style="background:#e53935"></i>Zmiana</span>
+                      <span><i style="background:#1e88e5"></i>Ludzie</span>
+                      <span><i style="background:#2e7d32"></i>Porządek</span>
+                      <span><i style="background:#7e57c2"></i>Niezależność</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
         except Exception as e:
             st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")
 
@@ -4216,7 +4408,7 @@ def matching_view() -> None:
                         f"<td style=\"padding:0; min-width:176px; border:1px solid #dfe4ea; {top_border if idx == 0 else ''}\">"
                         "<div style=\"position:relative; height:34px; background:#fff;\">"
                         f"<div style=\"position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:{fill_color}; opacity:0.96;\"></div>"
-                        f"<span style=\"position:absolute; right:6px; top:7px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:12px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
+                        f"<span style=\"position:absolute; right:6px; top:6px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:13.5px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
                         "</div>"
                         "</td>"
                         f"<td style=\"font-size:13.5px; text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
@@ -4231,7 +4423,7 @@ def matching_view() -> None:
                 "<thead><tr>"
                 "<th style='min-width:150px; font-size:13.5px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
                 "<th style='min-width:220px; font-size:13.5px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
-                "<th style='min-width:176px; text-align:center; border-top:3px solid #b8c2cc;'>% grupa dopasowana</th>"
+                "<th style='min-width:176px; text-align:center; font-size:13.5px; border-top:3px solid #b8c2cc;'>% grupa dopasowana</th>"
                 f"<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>{jst_weighted_header_html}</th>"
                 "<th style='min-width:120px; text-align:center; border-top:3px solid #b8c2cc; border-right:3px solid #b8c2cc;'>Róznica (w pp.)</th>"
                 "</tr></thead><tbody>"
@@ -4256,12 +4448,92 @@ def matching_view() -> None:
             )
 
     with tab_strategy:
-        st.markdown("**Rekomendacje komunikacyjne (automatyczne):**")
-        strengths = result["strengths"]
-        gaps = result["gaps"]
-        st.markdown(f"1. W komunikacji wzmacniaj osie: **{strengths[0]}**, **{strengths[1]}**, **{strengths[2]}** – to naturalne pola dopasowania.")
-        st.markdown(f"2. Opracuj osobne narracje dla luk: **{gaps[0]}**, **{gaps[1]}**, **{gaps[2]}** (krótkie, konkretne obietnice + dowód wykonania).")
-        st.markdown("3. Dla grup najlepiej dopasowanych demograficznie przygotuj dedykowane komunikaty i testuj je w kampaniach SMS/e-mail.")
+        strengths = [str(_matching_entity_name(x, current_axis_label)) for x in (result.get("strengths") or [])[:3]]
+        gaps = [str(_matching_entity_name(x, current_axis_label)) for x in (result.get("gaps") or [])[:3]]
+        demo_cards = list(result.get("demo_cards") or [])
+        target_cards = demo_cards[:2]
+        target_group_txt = ", ".join([str(c.get("top") or "").strip() for c in target_cards if str(c.get("top") or "").strip()]) or "najmocniej dopasowane segmenty demograficzne"
+        strengths_txt = ", ".join(strengths) if strengths else "brak wyraźnych osi"
+        gaps_txt = ", ".join(gaps) if gaps else "brak wyraźnych luk"
+        st.markdown(
+            """
+            <style>
+              .match-strategy-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
+              .match-strategy-card{
+                border:1px solid #dbe4ef;
+                border-radius:14px;
+                background:linear-gradient(180deg,#ffffff 0%,#f7fbff 100%);
+                padding:12px 14px;
+              }
+              .match-strategy-card h4{
+                margin:0 0 8px 0;
+                font-size:15px;
+                font-weight:900;
+                color:#1f2f44;
+              }
+              .match-strategy-list{margin:0;padding-left:18px;}
+              .match-strategy-list li{margin:6px 0;font-size:14px;line-height:1.35;color:#1e293b;}
+              .match-strategy-badge{
+                display:inline-flex;
+                align-items:center;
+                gap:6px;
+                font-size:12px;
+                font-weight:800;
+                color:#1d4ed8;
+                background:#e8f0ff;
+                border:1px solid #bfdbfe;
+                border-radius:999px;
+                padding:4px 9px;
+                margin-bottom:8px;
+              }
+              @media (max-width: 960px){.match-strategy-grid{grid-template-columns:1fr;}}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"""
+            <div class="match-strategy-grid">
+              <div class="match-strategy-card">
+                <div class="match-strategy-badge">🎯 Oś przekazu</div>
+                <h4>Co wzmacniać w komunikacji</h4>
+                <ul class="match-strategy-list">
+                  <li>Buduj główną narrację wokół: <b>{html.escape(strengths_txt)}</b>.</li>
+                  <li>W kampanii używaj prostych dowodów wykonania: „co zrobiono”, „co to zmienia dla mieszkańca”, „kiedy będzie efekt”.</li>
+                  <li>Każdy materiał kończ jednym CTA dopasowanym do kanału (offline / social / SMS).</li>
+                </ul>
+              </div>
+              <div class="match-strategy-card">
+                <div class="match-strategy-badge">🧩 Luki komunikacyjne</div>
+                <h4>Co domykać priorytetowo</h4>
+                <ul class="match-strategy-list">
+                  <li>Luki wymagające osobnych mini-narracji: <b>{html.escape(gaps_txt)}</b>.</li>
+                  <li>Dla każdej luki przygotuj pakiet: problem → konkretna decyzja → mierzalny efekt.</li>
+                  <li>W debacie porównawczej używaj kontr-przekazu opartego o fakty i harmonogram realizacji.</li>
+                </ul>
+              </div>
+              <div class="match-strategy-card">
+                <div class="match-strategy-badge">👥 Segment docelowy</div>
+                <h4>Do kogo mówić najpierw</h4>
+                <ul class="match-strategy-list">
+                  <li>Pierwszy rzut komunikacji kieruj do: <b>{html.escape(target_group_txt)}</b>.</li>
+                  <li>Przygotuj 2 wersje kreacji: korzyść praktyczna oraz korzyść wartościowa (bardziej emocjonalna).</li>
+                  <li>W kanałach bezpośrednich (SMS/e-mail) stosuj krótkie, jednowątkowe komunikaty.</li>
+                </ul>
+              </div>
+              <div class="match-strategy-card">
+                <div class="match-strategy-badge">🧪 Plan testów</div>
+                <h4>Plan 14-dniowy (szybkie iteracje)</h4>
+                <ul class="match-strategy-list">
+                  <li>Dni 1-4: test 2 nagłówków dla osi „dopasowania” i 2 nagłówków dla osi „luki”.</li>
+                  <li>Dni 5-9: utrzymaj lepszy wariant, zmieniaj tylko CTA i format (grafika / krótki tekst / wideo).</li>
+                  <li>Dni 10-14: podsumuj reakcje i zamknij finalny zestaw przekazów dla najbliższej kampanii.</li>
+                </ul>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 def add_view() -> None:
     require_auth()
