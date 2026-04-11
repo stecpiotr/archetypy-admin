@@ -808,6 +808,27 @@ Wynik Dogrywki A5:
   - zaostrzono karę kluczową w metryce `Poziom dopasowania`.
 - Smoke-check: `python -m py_compile app.py` (OK).
 
+Dogrywka A6 [DONE]:
+1. Radar / legendy:
+   - górna legenda ustawiona minimalnie niżej,
+   - większa czcionka legendy górnej (`+1.5px`),
+   - węższa legenda (`entrywidth`),
+   - większy lewy „oddech” wewnętrzny wpisów legendy.
+2. Dolna legenda TOP3:
+   - przybliżona wyżej do wykresu.
+3. Globalny layout:
+   - `padding-top` kontenera głównego ustawiony na `3px`.
+4. Metryka:
+   - kolejny wzrost kary kluczowej:
+     - było: `0.30*KEY_MAE + 0.14*max(0, KEY_MAX - 12)`,
+     - jest: `0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9)`.
+
+Wynik Dogrywki A6:
+- `app.py`:
+  - wdrożone poprawki legend/odstępów i top spacingu strony,
+  - ponownie zaostrzona kara za brak dopasowania kluczowego.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
 Kryteria ukonczenia Etapu 2:
 1. Wszystkie elementy z punktow 1-8 usera odwzorowane 1:1 na zrzutach.
 2. Brak regresji dzialania i wygladu pozostalych sekcji Matching.

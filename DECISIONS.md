@@ -743,3 +743,16 @@ Decyzja:
 - Dolna legenda TOP3 została podciągnięta bliżej wykresu.
 Uzasadnienie:
 - User zgłosił zbyt duży dystans tytuł→legenda i zbyt mały legenda→radar oraz zbyt „długą” górną legendę.
+
+### D-084: Kolejne zaostrzenie kary kluczowej + mikro-tuning legendy radaru
+Decyzja:
+- Kara kluczowa została ponownie podniesiona do:
+  - `0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9)`.
+- W radarze:
+  - górna legenda: nieco niżej, większa czcionka, mniejsza szerokość wpisu (`entrywidth`),
+  - większy lewy oddech wpisów legendy przez dodatkowy padding tekstu,
+  - dolna legenda TOP3 bliżej wykresu.
+- Globalny `padding-top` strony ustawiono na `3px`.
+Uzasadnienie:
+- User potwierdził, że kara nadal była zbyt łagodna dla dużych luk kluczowych i poprosił o dalsze dociśnięcie.
+- Dodatkowo wymagana była precyzyjna korekta geometrii legend i top spacingu.

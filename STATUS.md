@@ -733,6 +733,22 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-015 — Etap 2 (Dogrywka A6)
+- `app.py`:
+  - radar `Porównanie profili ...`:
+    - górna legenda ustawiona trochę niżej,
+    - czcionka legendy górnej zwiększona (`+1.5px`),
+    - legenda zawężona (`entrywidth`) i z większym lewym oddechem wpisów,
+    - dolna legenda TOP3 podciągnięta wyżej.
+  - globalny layout:
+    - `padding-top` głównego kontenera ustawiony na `3px`.
+  - metryka `Poziom dopasowania`:
+    - kara kluczowa zaostrzona:
+      - było: `0.30*KEY_MAE + 0.14*max(0, KEY_MAX - 12)`,
+      - jest: `0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9)`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

@@ -426,7 +426,7 @@ st.markdown(
 <style>
 :root{ --brand:#178AE6; --brand-hover:#0F6FC0; --line:#E6E9EE; --line-2:#D7DEE8; }
 .stApp, .stApp > header { background:#FAFAFA !important; }
-.block-container{ max-width:1160px !important; padding-top:18px !important; }
+.block-container{ max-width:1160px !important; padding-top:3px !important; }
 .page-title{ font-size:36px; font-weight:800; color:#111827; letter-spacing:.2px; margin:15px 0 45px 0; padding-bottom:12px; border-bottom:1px solid var(--line); }
 .hr-thin{ border:0; border-top:1px solid var(--line); margin:16px 0 22px 0; }
 /* Kafelki panelu startowego (3 kolumny) */
@@ -3439,7 +3439,7 @@ def matching_view() -> None:
             score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
             score_key = max(0.0, min(100.0, 100.0 - key_gap_mae))
             base_score = 0.40 * score_mae + 0.20 * score_rmse + 0.20 * score_top3 + 0.20 * score_key
-            key_penalty = 0.30 * key_gap_mae + 0.14 * max(0.0, key_gap_max - 12.0)
+            key_penalty = 0.45 * key_gap_mae + 0.22 * max(0.0, key_gap_max - 9.0)
             # Metryka mieszana z dodatkową karą za luki na archetypach kluczowych
             # (TOP3 polityka + TOP3 mieszkańców), żeby nie zawyżać wyniku przy strategicznych rozjazdach.
             match_score = max(0.0, min(100.0, base_score - key_penalty))
@@ -3731,7 +3731,7 @@ def matching_view() -> None:
                 "target_audit": target_audit,
                 "match_formula": (
                     "base = 0.40*(100 - MAE) + 0.20*(100 - RMSE) + 0.20*(100 - TOP3_MAE) + 0.20*(100 - KEY_MAE); "
-                    "kara_kluczowa = 0.30*KEY_MAE + 0.14*max(0, KEY_MAX - 12); "
+                    "kara_kluczowa = 0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9); "
                     "match = clamp(0,100, base - kara_kluczowa); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
                     "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii TOP3 polityka i TOP3 mieszkańców, "
@@ -4135,7 +4135,7 @@ def matching_view() -> None:
                 display:grid;
                 grid-template-columns:1fr 1fr;
                 gap:12px;
-                margin:-10px 0 6px 0;
+                margin:-18px 0 4px 0;
               }
               .match-top3-style-card{
                 border:1px solid #dbe4ef;
@@ -4378,8 +4378,8 @@ def matching_view() -> None:
         j_marker_r, j_marker_c = _marker_series(jst_profile_20, j_top, jst_top_colors)
         person_vals = [float(person_profile_20.get(a, 0.0)) for a in radar_order]
         jst_vals = [float(jst_profile_20.get(a, 0.0)) for a in radar_order]
-        legend_person_label = f"\u00a0\u00a0profil polityka ({person_name})\u00a0\u00a0"
-        legend_jst_label = f"\u00a0\u00a0profil mieszkańców ({jst_name})\u00a0\u00a0"
+        legend_person_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil polityka ({person_name})\u00a0\u00a0\u00a0"
+        legend_jst_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil mieszkańców ({jst_name})\u00a0\u00a0\u00a0"
 
         fig_cmp = go.Figure(
             data=[
@@ -4444,15 +4444,15 @@ def matching_view() -> None:
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.19,
+                y=1.16,
                 xanchor="center",
                 x=0.5,
-                font=dict(size=12),
+                font=dict(size=13.5),
                 bgcolor="rgba(255,255,255,0.94)",
                 bordercolor="#cfd9e8",
                 borderwidth=1,
                 entrywidthmode="pixels",
-                entrywidth=280,
+                entrywidth=232,
                 tracegroupgap=28,
                 itemclick="toggle",
                 itemdoubleclick="toggleothers",
