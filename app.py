@@ -8,6 +8,7 @@ import html
 import math
 import json
 import inspect
+import base64
 import subprocess
 from io import BytesIO
 from pathlib import Path
@@ -2793,6 +2794,21 @@ _MATCHING_ICON_BY_ARCH: Dict[str, str] = {
     "Niewinny": "🕊",
     "Towarzysz": "🍻",
 }
+_MATCHING_ICON_FILE_BY_ARCH: Dict[str, str] = {
+    "Buntownik": "buntownik.png",
+    "Błazen": "blazen.png",
+    "Kochanek": "kochanek.png",
+    "Opiekun": "opiekun.png",
+    "Towarzysz": "towarzysz.png",
+    "Niewinny": "niewinny.png",
+    "Władca": "wladca.png",
+    "Mędrzec": "medrzec.png",
+    "Czarodziej": "czarodziej.png",
+    "Bohater": "bohater.png",
+    "Twórca": "tworca.png",
+    "Odkrywca": "odkrywca.png",
+}
+_MATCHING_ICON_DATA_URI_CACHE: Dict[str, str] = {}
 
 
 def _matching_entity_icon(entity: str, axis_label: str) -> str:
@@ -2800,6 +2816,29 @@ def _matching_entity_icon(entity: str, axis_label: str) -> str:
     if str(axis_label) == "Wartość":
         ent = str(_JST_ARCH_BY_VALUE.get(ent, ent))
     return str(_MATCHING_ICON_BY_ARCH.get(ent, "•"))
+
+
+def _matching_entity_icon_html(entity: str, axis_label: str) -> str:
+    ent = str(entity)
+    if str(axis_label) == "Wartość":
+        ent = str(_JST_ARCH_BY_VALUE.get(ent, ent))
+    icon_file = str(_MATCHING_ICON_FILE_BY_ARCH.get(ent, "")).strip()
+    if icon_file:
+        icon_path = Path(__file__).with_name("ikony") / icon_file
+        if icon_path.exists():
+            cached = _MATCHING_ICON_DATA_URI_CACHE.get(icon_file)
+            if not cached:
+                try:
+                    encoded = base64.b64encode(icon_path.read_bytes()).decode("ascii")
+                    cached = f"data:image/png;base64,{encoded}"
+                    _MATCHING_ICON_DATA_URI_CACHE[icon_file] = cached
+                except Exception:
+                    cached = ""
+            if cached:
+                return (
+                    f"<img src='{cached}' alt='{html.escape(ent)}' class='match-top3-icon-img'/>"
+                )
+    return html.escape(str(_MATCHING_ICON_BY_ARCH.get(ent, "•")))
 
 
 def _parse_a_value(raw: Any) -> Optional[int]:
@@ -3264,10 +3303,10 @@ def matching_view() -> None:
           div[data-testid="stTabs"] [data-baseweb="tab-list"],
           div[data-testid="stTabs"] [role="tablist"]{
             gap:10px;
-            border:1px solid #cfd7e3 !important;
-            border-bottom:1px solid #c4cedb !important;
+            border:1px solid #c4cedc !important;
+            border-bottom:1px solid #bcc7d7 !important;
             padding:10px 12px 12px 12px !important;
-            background:linear-gradient(180deg,#f0f3f8 0%,#e8edf5 100%) !important;
+            background:#edf2f8 !important;
             border-radius:14px 14px 0 0 !important;
             flex-wrap:wrap;
             box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
@@ -3275,30 +3314,33 @@ def matching_view() -> None:
           div[data-testid="stTabs"] [data-baseweb="tab"],
           div[data-testid="stTabs"] [role="tab"]{
             background:#ffffff !important;
-            border:1px solid #c2cddd !important;
+            border:1px solid #b9c6d8 !important;
             border-radius:12px !important;
             padding:9px 16px !important;
             font-weight:800 !important;
-            color:#31465f !important;
+            color:#2d3f57 !important;
             font-size:15px !important;
             letter-spacing:.01em;
-            box-shadow:0 1px 3px rgba(15,58,116,.08);
+            box-shadow:0 1px 3px rgba(15,58,116,.06);
             transition:all .15s ease;
             cursor:pointer !important;
             min-height:40px !important;
           }
           div[data-testid="stTabs"] [data-baseweb="tab"]:hover,
           div[data-testid="stTabs"] [role="tab"]:hover{
-            border-color:#a9b7cb;
-            box-shadow:0 4px 12px rgba(15,23,42,.10);
-            background:#f9fbff;
+            border-color:#7fa6da !important;
+            box-shadow:0 5px 14px rgba(37,99,235,.18) !important;
+            background:#f3f8ff !important;
           }
           div[data-testid="stTabs"] [aria-selected="true"]{
-            background:#ffffff !important;
-            border-color:#8fa2bd !important;
-            color:#1f3f6b !important;
-            box-shadow:0 6px 14px rgba(15,23,42,.14);
+            background:linear-gradient(180deg,#2f7fd8 0%, #2b70c2 100%) !important;
+            border-color:#255fa6 !important;
+            color:#ffffff !important;
+            box-shadow:0 7px 16px rgba(37,99,235,.30) !important;
             transform:translateY(-1px);
+          }
+          div[data-testid="stTabs"] [aria-selected="true"] *{
+            color:#ffffff !important;
           }
           div[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
             display:none;
@@ -3904,6 +3946,9 @@ def matching_view() -> None:
                 padding:12px 0 0 0;
                 margin:18px 0 10px 0;
               }
+              .match-section-header.match-profile-header{
+                margin-top:28px;
+              }
               .match-section-header h3{
                 margin:0;
                 font-size:21px;
@@ -3927,9 +3972,9 @@ def matching_view() -> None:
               .match-top3-card{
                 border:1px solid #d9e2ef;
                 border-radius:14px;
-                background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+                background:#ffffff;
                 padding:12px 12px 10px 12px;
-                box-shadow:0 2px 7px rgba(15,58,116,.07);
+                box-shadow:0 2px 6px rgba(15,23,42,.06);
               }
               .match-top3-card h4{
                 margin:0 0 8px 0;
@@ -3973,8 +4018,19 @@ def matching_view() -> None:
               .match-top3-name.match-r-aux{color:#8a6a00;}
               .match-top3-name.match-r-supp{color:#1b7f3c;}
               .match-top3-icon{
-                font-size:15px;
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                width:18px;
+                min-width:18px;
+                height:18px;
                 line-height:1;
+              }
+              .match-top3-icon-img{
+                width:18px;
+                height:18px;
+                object-fit:contain;
+                display:block;
               }
               .match-radar-legend{
                 display:flex;
@@ -4024,9 +4080,17 @@ def matching_view() -> None:
                 margin-bottom:4px;
               }
               .match-top3-style-card .line2{
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                gap:18px;
+                flex-wrap:wrap;
                 font-size:14px;
                 font-weight:900;
                 line-height:1.35;
+              }
+              .match-top3-style-card .line2 span{
+                white-space:nowrap;
               }
               .match-wheel-legend{
                 margin-top:8px;
@@ -4088,12 +4152,12 @@ def matching_view() -> None:
             rows: List[str] = []
             for idx, item in enumerate(items[:3]):
                 item_label = _matching_entity_name(str(item), current_axis_label)
-                item_icon = _matching_entity_icon(str(item), current_axis_label)
+                item_icon_html = _matching_entity_icon_html(str(item), current_axis_label)
                 rank_class = "match-r-main" if idx == 0 else ("match-r-aux" if idx == 1 else "match-r-supp")
                 rows.append(
                     "<div class='match-top3-row'>"
                     f"<span class='match-top3-rank {rank_class}'>{html.escape(rank_names[idx])}</span>"
-                    f"<span class='match-top3-name {rank_class}'><span class='match-top3-icon'>{html.escape(item_icon)}</span>{html.escape(item_label)}</span>"
+                    f"<span class='match-top3-name {rank_class}'><span class='match-top3-icon'>{item_icon_html}</span>{html.escape(item_label)}</span>"
                     "</div>"
                 )
             if not rows:
@@ -4155,7 +4219,7 @@ def matching_view() -> None:
                     fill="toself",
                     fillcolor="rgba(37,99,235,0.18)",
                     line=dict(color="#2563eb", width=3),
-                    marker=dict(size=5),
+                    marker=dict(size=5, symbol="circle"),
                     name=f"profil polityka ({person_name})",
                     showlegend=True,
                     hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
@@ -4166,7 +4230,7 @@ def matching_view() -> None:
                     fill="toself",
                     fillcolor="rgba(15,118,110,0.16)",
                     line=dict(color="#0f766e", width=3, dash="dot"),
-                    marker=dict(size=5),
+                    marker=dict(size=6, symbol="square"),
                     name=f"profil mieszkańców ({jst_name})",
                     showlegend=True,
                     hovertemplate="<b>%{theta}</b><br>Mieszkańcy: %{r:.2f}<extra></extra>",
@@ -4175,7 +4239,7 @@ def matching_view() -> None:
                     r=p_marker_r,
                     theta=radar_tick_labels,
                     mode="markers",
-                    marker=dict(size=16, color=p_marker_c, opacity=0.92, line=dict(color="black", width=2.6)),
+                    marker=dict(size=16, symbol="circle", color=p_marker_c, opacity=0.92, line=dict(color="black", width=2.6)),
                     name="TOP3 polityka",
                     showlegend=False,
                     hovertemplate="<b>%{theta}</b><br>TOP3 polityka: %{r:.2f}<extra></extra>",
@@ -4184,7 +4248,7 @@ def matching_view() -> None:
                     r=j_marker_r,
                     theta=radar_tick_labels,
                     mode="markers",
-                    marker=dict(size=14, color=j_marker_c, opacity=0.94, line=dict(color="#0f172a", width=2.0)),
+                    marker=dict(size=14, symbol="square", color=j_marker_c, opacity=0.94, line=dict(color="#0f172a", width=2.0)),
                     name="TOP3 mieszkańców",
                     showlegend=False,
                     hovertemplate="<b>%{theta}</b><br>TOP3 mieszkańców: %{r:.2f}<extra></extra>",
@@ -4205,12 +4269,12 @@ def matching_view() -> None:
                     direction="clockwise",
                 ),
             ),
-            margin=dict(l=28, r=28, t=78, b=48),
+            margin=dict(l=24, r=24, t=116, b=18),
             showlegend=True,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.03,
+                y=1.07,
                 xanchor="center",
                 x=0.5,
                 font=dict(size=13),
@@ -4233,17 +4297,17 @@ def matching_view() -> None:
               <div class="match-top3-style-card">
                 <div class="title">TOP3 polityka</div>
                 <div class="line2">
-                  <span style="color:{person_top_colors['main']};">●</span> główny,
-                  <span style="color:{person_top_colors['aux']};">●</span> wspierający,
-                  <span style="color:{person_top_colors['supp']};">●</span> poboczny
+                  <span><span style="color:{person_top_colors['main']};">●</span> główny</span>
+                  <span><span style="color:{person_top_colors['aux']};">●</span> wspierający</span>
+                  <span><span style="color:{person_top_colors['supp']};">●</span> poboczny</span>
                 </div>
               </div>
               <div class="match-top3-style-card">
                 <div class="title">TOP3 mieszkańców</div>
                 <div class="line2">
-                  <span style="color:{jst_top_colors['main']};">●</span> główny,
-                  <span style="color:{jst_top_colors['aux']};">●</span> wspierający,
-                  <span style="color:{jst_top_colors['supp']};">●</span> poboczny
+                  <span><span style="color:{jst_top_colors['main']};">●</span> główny</span>
+                  <span><span style="color:{jst_top_colors['aux']};">●</span> wspierający</span>
+                  <span><span style="color:{jst_top_colors['supp']};">●</span> poboczny</span>
                 </div>
               </div>
             </div>
@@ -4256,7 +4320,7 @@ def matching_view() -> None:
             if current_axis_label == "Archetyp"
             else "Profile wartości 0-100 (siła wartości, skala: 0-100)"
         )
-        st.markdown(f"<div class='match-section-header'><h3>{html.escape(profile_title)}</h3></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='match-section-header match-profile-header'><h3>{html.escape(profile_title)}</h3></div>", unsafe_allow_html=True)
         left_profile_col, right_profile_col = st.columns(2, gap="large")
         try:
             import admin_dashboard as AD
@@ -4324,11 +4388,11 @@ def matching_view() -> None:
               .match-demo-stat-main{margin-top:2px;font-size:14px;font-weight:900;color:#111827;line-height:1.2;}
               .match-demo-stat-sub{margin-top:2px;font-size:12.5px;color:#3f4954;}
               .match-demo-table-wrap{overflow-x:auto;max-width:940px;}
-              .match-demo-profile-offset{padding:15px 0 0 25px;}
+              .match-demo-box.match-demo-profile-box{padding-top:15px;padding-left:25px;}
               .match-demo-table{margin-top:0;width:100%;min-width:720px;max-width:940px;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;font-size:13.5px;color:#334155;}
               .match-demo-table th,.match-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
               .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;font-size:13.5px;}
-              @media (max-width:900px){ .match-demo-profile-offset{padding:10px 0 0 0;} }
+              @media (max-width:900px){ .match-demo-box.match-demo-profile-box{padding:12px 12px 10px 12px;} }
             </style>
             """,
             unsafe_allow_html=True,
@@ -4489,11 +4553,11 @@ def matching_view() -> None:
             )
             st.markdown(
                 f"""
-                <div class="match-demo-box">
+                <div class="match-demo-box match-demo-profile-box">
                   <div class="match-demo-box-label">👥 PROFIL DEMOGRAFICZNY</div>
                   <div class="match-demo-box-note">W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.</div>
                   <div class="match-demo-box-note">{html.escape(weights_note)}</div>
-                  <div class="match-demo-profile-offset">{table_html}</div>
+                  {table_html}
                 </div>
                 """,
                 unsafe_allow_html=True,

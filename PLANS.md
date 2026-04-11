@@ -654,3 +654,47 @@ Kryteria ukonczenia:
    - `py_compile` oraz rebuild raportow D/C wykonane.
 Pierwszy krok wykonawczy:
 - uszczelnic `inline_local_assets(...)` w `jst_analysis.py`, aby inliner nie uszkadzal skryptow JS podczas zamiany `src/href` na data URI.
+
+#### H-015 / Etap 2 [IN_PROGRESS]
+Temat: Korekty wizualne Matching + dopracowanie metryki `Poziom dopasowania` (po nowych screenach usera).
+Zakres (zgrupowany krok po kroku):
+
+Krok A [DONE] — TOP3 + tabs + radar spacing
+1. `TOP3 ... dla {osoba}` i `TOP3 ... dla {JST}`:
+   - odejsc od obecnego niebieskiego gradientu (preferencja: biale tło / neutralny styl),
+   - ikonki musza byc zgodne z ikonami archetypow z wykresow kolowych,
+   - zachowac rowna geometrie wierszy i stala szerokosc etykiet roli.
+2. `🧭 Matching` tabs:
+   - mocniejsze zaznaczenie aktywnej zakladki (moze zostac niebieskie),
+   - wyrazniejszy hover.
+3. Radar (`Porównanie profili archetypowych`):
+   - legenda nie moze nachodzic na wykres,
+   - mniejsze odstepy pionowe: legenda i dolny blok TOP3 blizej radaru,
+   - markery JST zmienic z kropek na kwadraty,
+   - dopracowac zapis legendy TOP3 (bez przecinkow, wieksze odstepy).
+
+Krok B [PENDING] — metryka `Poziom dopasowania`
+1. Przebudowac metryke dopasowania tak, aby mocniej karala rozjazdy archetypow kluczowych (TOP3 polityka i TOP3 JST),
+   bo obecnie przypadki z duzymi lukami na archetypach kluczowych sa oceniane zbyt wysoko.
+2. Zaktualizowac opis metryki w Matching i audyt, aby bylo jasne, jak liczona jest kara za luki kluczowe.
+
+Krok C [DONE] — Demografia box + separacja sekcji 0-100
+1. Cofnac blad z `👥 PROFIL DEMOGRAFICZNY`:
+   - przesuniecie ma dotyczyc calej ramki/boxa, a nie samej tabeli.
+   - docelowy offset jak na referencji usera (`left: 25px`, `top: 15px`) dla kontenera boxa.
+2. Dodac wiekszy odstep miedzy dolnym blokiem TOP3 pod radarem a sekcja
+   `Profile archetypowe 0-100`, aby sekcje sie nie zlewaly.
+
+Wynik Etapu 2 (czesc 1):
+- `app.py`:
+  - TOP3 polityk/JST: biale tlo kart (bez niebieskiego gradientu), ikony archetypow jako realne ikony PNG (te same co na kolach), rowna geometria rolek i nazw.
+  - tabs Matching: mocniejsze zaznaczenie active (niebieski), wyrazniejszy hover i bardziej neutralny kontener.
+  - radar porownawczy: markery JST zmienione na kwadraty, legenda odsunięta od wykresu (bez nachodzenia), dolna legenda TOP3 bez przecinkow i z wiekszym spacingiem.
+  - sekcja `Profile archetypowe 0-100`: dodany wiekszy odstep od dolnej legendy radaru.
+  - `Demografia`: offset `👥 PROFIL DEMOGRAFICZNY` przeniesiony na caly box (padding-left:25, padding-top:15), nie tylko na sama tabele.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
+Kryteria ukonczenia Etapu 2:
+1. Wszystkie elementy z punktow 1-8 usera odwzorowane 1:1 na zrzutach.
+2. Brak regresji dzialania i wygladu pozostalych sekcji Matching.
+3. `py_compile` dla `app.py` przechodzi poprawnie.

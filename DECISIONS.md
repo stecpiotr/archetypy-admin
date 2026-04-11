@@ -593,3 +593,27 @@ Decyzja:
 - Jednoczesnie zmniejszono marginesy gorne/dolne, by legenda i blok TOP3 byly blizej wykresu.
 Uzasadnienie:
 - User oczekiwal powrotu funkcji klikania legendy i mniejszych "dziur" pionowych wokol radaru.
+
+### D-068: Realizacja kolejnych poprawek Matching jest etapowa (pakietami), nie hurtowo
+Decyzja:
+- Po nowych uwagach usera dalsze poprawki dzielimy na etapy:
+  - A: TOP3/tabs/radar (wizual),
+  - B: metryka `Poziom dopasowania`,
+  - C: demografia box + separacja sekcji 0-100.
+Uzasadnienie:
+- User jawnie poprosil o prace "krok po kroku", grupujac podobne zagadnienia, aby uniknac chaosu i problemow z kompaktowaniem.
+
+### D-069: TOP3 w Matching uzywa ikon archetypow z tych samych assetow co kola
+Decyzja:
+- W kartach `TOP3 ... dla {osoba/JST}` nie uzywamy juz samych emoji.
+- Ikony renderujemy z plikow `ikony/*.png` (te same assety, ktore sa uzywane na wykresach kolowych), osadzajac je jako data URI.
+Uzasadnienie:
+- User wymagal, aby ikony w TOP3 byly zgodne wizualnie z ikonami archetypow z wykresow.
+
+### D-070: Radar i demografia — priorytet czytelnosci i braku kolizji layoutu
+Decyzja:
+- Na radarze porownawczym JST ma markery kwadratowe (linia i TOP3), a legenda profili dostaje wiekszy margines gorny, aby nie nachodzila na wykres.
+- W `Demografia / 👥 PROFIL DEMOGRAFICZNY` przesuniecie (`padding-left:25px`, `padding-top:15px`) stosujemy do calego boxa, nie do samej tabeli.
+- Sekcja `Profile archetypowe 0-100` dostaje dodatkowy odstep od dolnej legendy TOP3 pod radarem.
+Uzasadnienie:
+- To bezposrednio domyka zgloszone regresje: nachodzenie legendy, nieczytelne markery JST i bledne przesuniecie tylko tabeli zamiast calej ramki.

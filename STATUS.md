@@ -577,6 +577,34 @@
 - Smoke-check:
   - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
 
+### Start Hotfix H-015 — Etap 2 (po nowych screenach usera)
+- User dopisal nowe uwagi i poprosil o wpisanie ich do planu zamiast wdrazania wszystkiego naraz.
+- Zakres dodany do `PLANS.md` jako `H-015 / Etap 2 [IN_PROGRESS]`, z podzialem na 3 kroki:
+  1. TOP3/tabs/radar spacing (wizual i czytelnosc),
+  2. korekta metryki `Poziom dopasowania` (kara za luki kluczowych archetypow),
+  3. naprawa offsetu `👥 PROFIL DEMOGRAFICZNY` i separacji sekcji 0-100.
+
+### Zrobione w Hotfix H-015 — Etap 2 (Krok A + C)
+- `app.py`:
+  - TOP3 polityk/JST:
+    - usunieto niebieski gradient z kart (`background:#fff`),
+    - podmieniono ikonki na realne ikony archetypow (PNG z `ikony/*.png`, osadzane jako data URI),
+    - zachowano rowna geometrie wierszy i stale szerokosci etykiet ról.
+  - Taby `🧭 Matching`:
+    - mocniej podkreslony aktywny tab (niebieski, bialy tekst, wyzszy kontrast),
+    - mocniejszy hover (wyrazniejsza obwodka + cień).
+  - Radar `Porównanie profili ...`:
+    - marker JST zmieniony na kwadrat (dla linii i punktow TOP3),
+    - przesunieto legende i marginesy, aby nie nachodzila na wykres,
+    - dolna legenda TOP3 bez przecinkow i z wiekszym spacingiem miedzy elementami.
+  - Sekcja `Profile archetypowe 0-100 ...`:
+    - dodany wiekszy odstep od bloku TOP3 pod radarem (`match-profile-header`).
+  - `Demografia / 👥 PROFIL DEMOGRAFICZNY`:
+    - offset przeniesiony na caly box (`.match-demo-box.match-demo-profile-box`),
+    - usunieto przesuwanie samej tabeli wewnetrznej.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -585,4 +613,4 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Potwierdzic na Twoich zrzutach, czy nowy wyglad tabow Matching i radaru jest juz zgodny z oczekiwaniem.
+- Wykonac `H-015 / Etap 2 / Krok B`: przebudowa metryki `Poziom dopasowania` z dodatkowa kara za rozjazdy na archetypach kluczowych (TOP3 polityka + TOP3 JST) i aktualizacja opisu metodyki.
