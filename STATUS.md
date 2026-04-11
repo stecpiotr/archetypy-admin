@@ -887,6 +887,14 @@
   - `python -m py_compile app.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
 
+### Zrobione w Hotfix H-020 (runtime fix `person_top_colors`)
+- `app.py`:
+  - naprawiono błąd `UnboundLocalError: cannot access local variable 'person_top_colors'`,
+  - przeniesiono deklaracje palet (`person_top_colors`, `jst_top_colors`) nad miejsce, gdzie budowana jest legenda ról (`_role_legend_html`),
+  - usunięto późniejszy duplikat deklaracji.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -896,6 +904,7 @@
 
 ### Nastepny konkretny krok wykonawczy
 - Szybki smoke-test UI na środowisku użytkownika:
+  - potwierdzić na parze `Hetman` że błąd runtime zniknął i widok `Podsumowanie` renderuje się do końca,
   - potwierdzić na parze `Hetman` że przy 3. pozycji `<70` widok pokazuje `TOP2` i nie liczy tej pozycji do `Maks. luki kluczowej`,
   - potwierdzić, że `Status badania` jest dostępny tylko w `⚙️ Ustawienia ankiety` (personalne + mieszkańców),
   - sprawdzić, że etykieta `RMSE (kara odchyleń)` nie ucina się dla różnych szerokości ekranu.

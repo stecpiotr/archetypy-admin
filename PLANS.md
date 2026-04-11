@@ -1039,3 +1039,17 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Hotfix H-020 [DONE]
+Temat: Szybki fix runtime `UnboundLocalError` w `🧭 Matching`.
+Kryteria ukończenia:
+1. `matching_view` nie wywala błędu `cannot access local variable 'person_top_colors'`.
+2. Panel `Podsumowanie` renderuje się poprawnie po wejściu na radar i legendy TOP.
+Pierwszy krok wykonawczy:
+- skorygować kolejność inicjalizacji zmiennych kolorów legendy względem nowego helpera `_role_legend_html(...)`.
+Wynik:
+- `app.py`:
+  - deklaracje `person_top_colors` i `jst_top_colors` przeniesiono nad pierwsze użycie (`p_role_legend` / `j_role_legend`),
+  - usunięto duplikat deklaracji niżej w tej samej sekcji.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

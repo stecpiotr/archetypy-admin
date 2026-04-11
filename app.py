@@ -4522,6 +4522,8 @@ def matching_view() -> None:
         rank_names = ["Główny", "Wspierający", "Poboczny"]
         p_top_label = f"TOP{max(1, len(p_top))} polityka"
         j_top_label = f"TOP{max(1, len(j_top))} mieszkańców"
+        person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
+        jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
 
         def _role_legend_html(palette: Dict[str, str], marker: str, count: int) -> str:
             role_defs = [("główny", "main"), ("wspierający", "aux"), ("poboczny", "supp")]
@@ -4663,9 +4665,6 @@ def matching_view() -> None:
 
         compare_title = "Porównanie profili archetypowych" if current_axis_label == "Archetyp" else "Porównanie profili wartości"
         st.markdown(f"<div class='match-section-header match-compare-header'><h3>{html.escape(compare_title)}</h3></div>", unsafe_allow_html=True)
-
-        person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
-        jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
 
         def _marker_series(profile: Dict[str, float], top3: List[str], palette: Dict[str, str]) -> Tuple[List[Optional[float]], List[str]]:
             r_vals: List[Optional[float]] = []

@@ -822,3 +822,9 @@ Decyzja:
 Uzasadnienie:
 - User doprecyzował, że archetyp poniżej 70% nie powinien być klasyfikowany jako poboczny/kluczowy.
 - Reguła zmniejsza ryzyko przeszacowania kary kluczowej dla tego konkretnego przypadku.
+
+### D-091: W sekcji radaru/legendy zmienne palet kolorów muszą być inicjalizowane przed helperami HTML
+Decyzja:
+- `person_top_colors` i `jst_top_colors` są deklarowane przed wywołaniami helperów, które budują legendę (`_role_legend_html`).
+Uzasadnienie:
+- W przeciwnym razie Python zgłasza `UnboundLocalError` w runtime (`matching_view`) i cały `Podsumowanie` w Matching przestaje się renderować.
