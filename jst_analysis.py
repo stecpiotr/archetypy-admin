@@ -469,7 +469,10 @@ _ASSET_EXT = {
     ".otf",
     ".eot",
 }
-_SRC_HREF_RE = re.compile(r'(?P<attr>src|href)=["\'](?P<path>[^"\']+)["\']', re.IGNORECASE)
+_SRC_HREF_RE = re.compile(
+    r'(?P<attr>src|href)=(?P<q>["\'])(?P<path>[^"\']+)(?P=q)',
+    re.IGNORECASE,
+)
 _LINK_STYLESHEET_RE = re.compile(
     r'<link(?P<attrs>[^>]*?)href=["\'](?P<href>[^"\']+)["\'](?P<tail>[^>]*)>',
     re.IGNORECASE,
@@ -624,6 +627,7 @@ def inline_local_assets(html_text: str, base_dir: Path) -> str:
 
     def _replace(match: re.Match) -> str:
         attr = match.group("attr")
+        quote = match.group("q") or '"'
         ref = match.group("path")
         ref_clean = (ref or "").strip()
         if _is_external_ref(ref_clean):
@@ -640,7 +644,7 @@ def inline_local_assets(html_text: str, base_dir: Path) -> str:
         data_uri = _to_data_uri(candidate)
         if not data_uri:
             return match.group(0)
-        return f'{attr}="{data_uri}"'
+        return f"{attr}={quote}{data_uri}{quote}"
 
     return _SRC_HREF_RE.sub(_replace, html_text or "")
 

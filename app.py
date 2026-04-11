@@ -425,7 +425,7 @@ st.markdown(
 <style>
 :root{ --brand:#178AE6; --brand-hover:#0F6FC0; --line:#E6E9EE; --line-2:#D7DEE8; }
 .stApp, .stApp > header { background:#FAFAFA !important; }
-.block-container{ max-width:1160px !important; padding-top:72px !important; }
+.block-container{ max-width:1160px !important; padding-top:30px !important; }
 .page-title{ font-size:36px; font-weight:800; color:#111827; letter-spacing:.2px; margin:15px 0 45px 0; padding-bottom:12px; border-bottom:1px solid var(--line); }
 .hr-thin{ border:0; border-top:1px solid var(--line); margin:16px 0 22px 0; }
 /* Kafelki panelu startowego (3 kolumny) */
@@ -2778,6 +2778,30 @@ def _matching_entity_name(entity: str, axis_label: str) -> str:
     return str(entity)
 
 
+_JST_ARCH_BY_VALUE: Dict[str, str] = {str(v): str(k) for k, v in JST_VALUE_BY_ARCH.items()}
+_MATCHING_ICON_BY_ARCH: Dict[str, str] = {
+    "Władca": "♕",
+    "Bohater": "🛡",
+    "Mędrzec": "📖",
+    "Opiekun": "👐",
+    "Kochanek": "♡",
+    "Błazen": "❦",
+    "Twórca": "⚒",
+    "Odkrywca": "🧭",
+    "Czarodziej": "✣",
+    "Buntownik": "✊",
+    "Niewinny": "🕊",
+    "Towarzysz": "🍻",
+}
+
+
+def _matching_entity_icon(entity: str, axis_label: str) -> str:
+    ent = str(entity)
+    if str(axis_label) == "Wartość":
+        ent = str(_JST_ARCH_BY_VALUE.get(ent, ent))
+    return str(_MATCHING_ICON_BY_ARCH.get(ent, "•"))
+
+
 def _parse_a_value(raw: Any) -> Optional[int]:
     try:
         val = int(float(str(raw).strip().replace(",", ".")))
@@ -3240,18 +3264,18 @@ def matching_view() -> None:
           div[data-testid="stTabs"] [data-baseweb="tab-list"],
           div[data-testid="stTabs"] [role="tablist"]{
             gap:10px;
-            border:1px solid #d4deee !important;
-            border-bottom:1px solid #c7d5e8 !important;
+            border:1px solid #cfd7e3 !important;
+            border-bottom:1px solid #c4cedb !important;
             padding:10px 12px 12px 12px !important;
-            background:linear-gradient(180deg,#f8fbff 0%,#f1f6ff 100%) !important;
-            border-radius:14px 14px 10px 10px !important;
+            background:linear-gradient(180deg,#f0f3f8 0%,#e8edf5 100%) !important;
+            border-radius:14px 14px 0 0 !important;
             flex-wrap:wrap;
             box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
           }
           div[data-testid="stTabs"] [data-baseweb="tab"],
           div[data-testid="stTabs"] [role="tab"]{
             background:#ffffff !important;
-            border:1px solid #c7d5e8 !important;
+            border:1px solid #c2cddd !important;
             border-radius:12px !important;
             padding:9px 16px !important;
             font-weight:800 !important;
@@ -3265,15 +3289,15 @@ def matching_view() -> None:
           }
           div[data-testid="stTabs"] [data-baseweb="tab"]:hover,
           div[data-testid="stTabs"] [role="tab"]:hover{
-            border-color:#9fb6d8;
-            box-shadow:0 4px 12px rgba(31,111,196,.14);
-            background:#f7fbff;
+            border-color:#a9b7cb;
+            box-shadow:0 4px 12px rgba(15,23,42,.10);
+            background:#f9fbff;
           }
           div[data-testid="stTabs"] [aria-selected="true"]{
-            background:linear-gradient(180deg,#2d7dd2 0%,#1f6fc4 100%) !important;
-            border-color:#1f6fc4 !important;
-            color:#ffffff !important;
-            box-shadow:0 7px 16px rgba(31,111,196,.28);
+            background:#ffffff !important;
+            border-color:#8fa2bd !important;
+            color:#1f3f6b !important;
+            box-shadow:0 6px 14px rgba(15,23,42,.14);
             transform:translateY(-1px);
           }
           div[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
@@ -3632,8 +3656,33 @@ def matching_view() -> None:
         return
 
     with tab_summary:
-        st.markdown(f"**Badanie personalne:** {result['person_label']}")
-        st.markdown(f"**Badanie mieszkańców:** {result['jst_label']}")
+        st.markdown(
+            f"""
+            <style>
+              .match-target-card{{border:1px solid #d5dfec;border-radius:14px;background:linear-gradient(180deg,#ffffff 0%,#f6f9ff 100%);padding:10px 12px;margin:0 0 10px 0;}}
+              .match-target-title{{font-size:13px;font-weight:900;color:#334155;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.03em;}}
+              .match-target-grid{{display:grid;grid-template-columns:1fr 1fr;gap:10px;}}
+              .match-target-item{{border:1px solid #dbe4ef;border-radius:12px;background:#fff;padding:8px 10px;}}
+              .match-target-item .k{{font-size:12px;font-weight:800;color:#64748b;margin:0 0 2px 0;}}
+              .match-target-item .v{{font-size:16px;font-weight:900;color:#1f2f44;line-height:1.28;}}
+              @media (max-width:900px){{ .match-target-grid{{grid-template-columns:1fr;}} }}
+            </style>
+            <div class="match-target-card">
+              <div class="match-target-title">Dla kogo liczony jest matching</div>
+              <div class="match-target-grid">
+                <div class="match-target-item">
+                  <div class="k">👤 Badanie personalne</div>
+                  <div class="v">{html.escape(str(result['person_label']))}</div>
+                </div>
+                <div class="match-target-item">
+                  <div class="k">🏙️ Badanie mieszkańców</div>
+                  <div class="v">{html.escape(str(result['jst_label']))}</div>
+                </div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         metrics = result.get("match_metrics") or {}
         score_pct = float(result.get("match_score") or 0.0)
         score_pct = max(0.0, min(100.0, score_pct))
@@ -3889,40 +3938,50 @@ def matching_view() -> None:
                 font-weight:900;
               }
               .match-top3-row{
-                display:flex;
+                display:grid;
+                grid-template-columns:118px 1fr;
                 gap:8px;
                 align-items:center;
                 margin:7px 0;
               }
               .match-top3-rank{
-                min-width:74px;
+                width:118px;
                 text-align:center;
                 font-size:11px;
                 font-weight:900;
                 letter-spacing:.02em;
                 border-radius:999px;
-                padding:4px 8px;
+                padding:6px 8px;
                 border:1px solid transparent;
               }
-              .match-r-main{background:#e7f0ff;color:#1d4ed8;border-color:#bfdbfe;}
-              .match-r-aux{background:#f5f3ff;color:#7c3aed;border-color:#ddd6fe;}
-              .match-r-supp{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}
+              .match-r-main{background:#fff1f0;color:#d7263d;border-color:#f6c1c0;}
+              .match-r-aux{background:#fff9df;color:#8a6a00;border-color:#f4e5a0;}
+              .match-r-supp{background:#eefbea;color:#1b7f3c;border-color:#b8e6c9;}
               .match-top3-name{
                 flex:1;
                 font-weight:800;
-                color:#0f172a;
                 font-size:14px;
                 border:1px solid #dbe4ef;
-                border-radius:10px;
-                padding:6px 9px;
-                background:#fff;
+                border-radius:999px;
+                padding:6px 12px;
+                background:#f8fbff;
+                display:inline-flex;
+                align-items:center;
+                gap:8px;
+              }
+              .match-top3-name.match-r-main{color:#d7263d;}
+              .match-top3-name.match-r-aux{color:#8a6a00;}
+              .match-top3-name.match-r-supp{color:#1b7f3c;}
+              .match-top3-icon{
+                font-size:15px;
+                line-height:1;
               }
               .match-radar-legend{
                 display:flex;
                 justify-content:center;
                 gap:12px;
                 flex-wrap:wrap;
-                margin:4px 0 6px 0;
+                margin:2px 0 2px 0;
               }
               .match-radar-pill{
                 display:inline-flex;
@@ -3931,7 +3990,7 @@ def matching_view() -> None:
                 border:1px solid #dbe4ef;
                 background:#fff;
                 border-radius:999px;
-                padding:6px 10px;
+                padding:8px 16px;
                 font-size:13px;
                 font-weight:700;
                 color:#1f2f44;
@@ -3949,7 +4008,7 @@ def matching_view() -> None:
                 display:grid;
                 grid-template-columns:1fr 1fr;
                 gap:12px;
-                margin:6px 0 2px 0;
+                margin:0 0 2px 0;
               }
               .match-top3-style-card{
                 border:1px solid #dbe4ef;
@@ -4029,11 +4088,12 @@ def matching_view() -> None:
             rows: List[str] = []
             for idx, item in enumerate(items[:3]):
                 item_label = _matching_entity_name(str(item), current_axis_label)
+                item_icon = _matching_entity_icon(str(item), current_axis_label)
                 rank_class = "match-r-main" if idx == 0 else ("match-r-aux" if idx == 1 else "match-r-supp")
                 rows.append(
                     "<div class='match-top3-row'>"
                     f"<span class='match-top3-rank {rank_class}'>{html.escape(rank_names[idx])}</span>"
-                    f"<span class='match-top3-name'>{html.escape(item_label)}</span>"
+                    f"<span class='match-top3-name {rank_class}'><span class='match-top3-icon'>{html.escape(item_icon)}</span>{html.escape(item_label)}</span>"
                     "</div>"
                 )
             if not rows:
@@ -4061,15 +4121,6 @@ def matching_view() -> None:
 
         compare_title = "Porównanie profili archetypowych" if current_axis_label == "Archetyp" else "Porównanie profili wartości"
         st.markdown(f"<div class='match-section-header'><h3>{html.escape(compare_title)}</h3></div>", unsafe_allow_html=True)
-        st.markdown(
-            f"""
-            <div class="match-radar-legend">
-              <span class="match-radar-pill"><i class="match-radar-line"></i> profil polityka ({html.escape(person_name)})</span>
-              <span class="match-radar-pill"><i class="match-radar-line dashed"></i> profil mieszkańców ({html.escape(jst_name)})</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
         person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
         jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
@@ -4106,7 +4157,7 @@ def matching_view() -> None:
                     line=dict(color="#2563eb", width=3),
                     marker=dict(size=5),
                     name=f"profil polityka ({person_name})",
-                    showlegend=False,
+                    showlegend=True,
                     hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -4117,7 +4168,7 @@ def matching_view() -> None:
                     line=dict(color="#0f766e", width=3, dash="dot"),
                     marker=dict(size=5),
                     name=f"profil mieszkańców ({jst_name})",
-                    showlegend=False,
+                    showlegend=True,
                     hovertemplate="<b>%{theta}</b><br>Mieszkańcy: %{r:.2f}<extra></extra>",
                 ),
                 go.Scatterpolar(
@@ -4154,18 +4205,20 @@ def matching_view() -> None:
                     direction="clockwise",
                 ),
             ),
-            margin=dict(l=28, r=28, t=104, b=86),
-            showlegend=False,
+            margin=dict(l=28, r=28, t=78, b=48),
+            showlegend=True,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.14,
+                y=1.03,
                 xanchor="center",
                 x=0.5,
                 font=dict(size=13),
                 bgcolor="rgba(255,255,255,0.88)",
                 bordercolor="#d6deea",
                 borderwidth=1,
+                itemclick="toggle",
+                itemdoubleclick="toggleothers",
             ),
         )
         st.plotly_chart(
@@ -4220,14 +4273,11 @@ def matching_view() -> None:
                 label_mode=("values" if current_axis_label == "Wartość" else "arche"),
             )
 
-            def _show_image_compat(img_path: str, max_width_px: int = 520) -> None:
+            def _show_image_compat(img_path: str, max_width_px: int = 560) -> None:
                 try:
-                    st.image(img_path, use_container_width=True)
+                    st.image(img_path, width=max_width_px)
                 except TypeError:
-                    try:
-                        st.image(img_path, use_column_width=True)
-                    except Exception:
-                        st.image(img_path, width=max_width_px)
+                    st.image(img_path, use_column_width=True)
 
             with left_profile_col:
                 st.markdown(
@@ -4274,9 +4324,11 @@ def matching_view() -> None:
               .match-demo-stat-main{margin-top:2px;font-size:14px;font-weight:900;color:#111827;line-height:1.2;}
               .match-demo-stat-sub{margin-top:2px;font-size:12.5px;color:#3f4954;}
               .match-demo-table-wrap{overflow-x:auto;max-width:940px;}
+              .match-demo-profile-offset{padding:15px 0 0 25px;}
               .match-demo-table{margin-top:0;width:100%;min-width:720px;max-width:940px;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;font-size:13.5px;color:#334155;}
               .match-demo-table th,.match-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
               .match-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;font-size:13.5px;}
+              @media (max-width:900px){ .match-demo-profile-offset{padding:10px 0 0 0;} }
             </style>
             """,
             unsafe_allow_html=True,
@@ -4441,7 +4493,7 @@ def matching_view() -> None:
                   <div class="match-demo-box-label">👥 PROFIL DEMOGRAFICZNY</div>
                   <div class="match-demo-box-note">W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.</div>
                   <div class="match-demo-box-note">{html.escape(weights_note)}</div>
-                  {table_html}
+                  <div class="match-demo-profile-offset">{table_html}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,

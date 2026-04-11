@@ -8288,7 +8288,7 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 
 .ioa-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: 14px;
 }
 .ioa-summary-item {
@@ -8353,7 +8353,7 @@ img.img-profile-sm { width:64%; margin-left:0; margin-right:0; }
 .ppp-main-table th:nth-child(7) { color:#0f172a; }
 .isoa-wheel-wrap{
   width:85%;
-  margin:0 auto;
+  margin:0;
 }
 .isoa-axis-legend {
   margin-top: 10px;

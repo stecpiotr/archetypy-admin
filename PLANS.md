@@ -633,3 +633,24 @@ Wynik:
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
   - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
   - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-015 [IN_PROGRESS]
+Temat: Naprawa regresji interaktywnosci standalone HTML raportu + kolejny pakiet dopieszczen UI Matching i raportu.
+Kryteria ukonczenia:
+1. `📊 Analiza badania mieszkańców`:
+   - standalone/full HTML zachowuje interaktywnosc JS jak wersja ZIP (`Archetypy/Wartości`, Segmenty, Skupienia, Filtry, suwaki).
+2. Raport:
+   - `PPP / Podsumowanie`: 4 boksy (`Top3/Bottom3 oczekiwane` + `Top3/Bottom3 PPP`) w jednej linii na desktopie,
+   - `Wykres główny ISOA/ISOW`: wyrównany do lewej (bez centrowania).
+3. `🧭 Matching`:
+   - poprawiony layout topu (mniejsza pusta przestrzeń),
+   - mocniej czytelna karta "dla kogo jest matching",
+   - dopracowany styl tabów (bardziej neutralny kolor + ostre dolne rogi),
+   - radar: przywrócona klikalna legenda profili i mniejsze odstępy od wykresu,
+   - TOP3 polityk/JST: ikonki przy nazwach, rowna geometria "pastylek", kolory zgodne z rolą (główny/wspierający/poboczny),
+   - Demografia: offset tabeli `👥 PROFIL DEMOGRAFICZNY` (`padding-left:25px`, `padding-top:15px`).
+4. Synchronizacja i testy:
+   - zmiany obliczeniowe/generatorowe mieszkancow zsynchronizowane na D: i C:,
+   - `py_compile` oraz rebuild raportow D/C wykonane.
+Pierwszy krok wykonawczy:
+- uszczelnic `inline_local_assets(...)` w `jst_analysis.py`, aby inliner nie uszkadzal skryptow JS podczas zamiany `src/href` na data URI.

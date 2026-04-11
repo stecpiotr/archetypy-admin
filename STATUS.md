@@ -538,6 +538,45 @@
   - `python JST_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK),
   - `python C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
 
+### Start Hotfix H-015 (2026-04-11, noc)
+- Zgloszenie usera:
+  1. Standalone/full HTML z `📊 Analiza badania mieszkańców` traci interaktywnosc JS (radio trybu etykiet, Segmenty, Skupienia, Filtry, suwaki), podczas gdy ZIP dziala poprawnie.
+  2. Dodatkowe poprawki UI w `🧭 Matching` + drobne poprawki układu w raporcie (PPP/ISOA).
+- Pierwszy krok wykonawczy:
+  - naprawic pipeline inline assets w `jst_analysis.py`, bo to najbardziej prawdopodobne źródło regresji standalone HTML.
+
+### Zrobione w Hotfix H-015 — Etap 1 (stabilizacja standalone + pierwsze poprawki UI)
+- `jst_analysis.py`:
+  - naprawiono inliner `inline_local_assets(...)`:
+    - regex `src/href` zachowuje oryginalny typ cudzyslowu (`'` lub `"`),
+    - eliminacja uszkadzania duzych blokow JS/JSON podczas podmiany na data URI.
+  - weryfikacja syntaktyczna:
+    - przed poprawka: `node --check` dla skryptu #3 z inlined HTML zwracal blad skladni,
+    - po poprawce: wszystkie 3 skrypty przechodza `node --check` poprawnie.
+- `app.py` (`🧭 Matching`) — etap dopieszczen UI:
+  - zmniejszono globalny gorny margines kontenera (`padding-top:30px`) dla mniejszej pustej przestrzeni na gorze,
+  - karta "dla kogo jest matching" przebudowana na wyrazny box 2-kolumnowy (personalne vs mieszkancow),
+  - taby Matching przestylizowane na bardziej neutralny (szaro-niebieski) kontener z ostrymi dolnymi rogami,
+  - TOP3 polityk/JST:
+    - dodane ikonki przy nazwach archetypow/wartosci,
+    - rowna geometria rzedow (stala szerokosc etykiety roli, bez "wciecia" dla `Wspierający`),
+    - kolory nazw zgodne z rola (główny/wspierający/poboczny),
+  - radar porownawczy:
+    - przywrocona klikalna legenda Plotly dla dwoch linii profili (`itemclick=toggle`),
+    - zmniejszone odstepy pionowe (legenda i dolny blok TOP3 blizej wykresu),
+  - profile 0-100: render obu obrazow ustawiony na stala szerokosc (`width=560`) dla 1:1 skali po obu stronach,
+  - `Demografia > 👥 PROFIL DEMOGRAFICZNY`: dodano offset tabeli (`padding-top:15px`, `padding-left:25px`).
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (+ sync C:):
+  - `PPP / Podsumowanie`: siatka podsumowania ustawiona na 4 kolumny (`Top3/Bottom3 oczekiwane` + `Top3/Bottom3 PPP` w jednej linii na desktopie),
+  - `ISOA/ISOW`: `Wykres główny` wyrównany do lewej (`.isoa-wheel-wrap { margin:0; }`).
+- Synchronizacja i rebuild:
+  - `analyze_poznan_archetypes.py` skopiowany D -> C,
+  - przebudowano raporty na obu lokalizacjach:
+    - `D:\PythonProject\archetypy\archetypy-admin\JST_Archetypy_Analiza\WYNIKI\raport.html`,
+    - `C:\Poznan_Archetypy_Analiza\WYNIKI\raport.html`.
+- Smoke-check:
+  - `python -m py_compile app.py jst_analysis.py JST_Archetypy_Analiza\analyze_poznan_archetypes.py C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

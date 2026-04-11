@@ -559,3 +559,37 @@ Decyzja:
   - plan testow (14 dni).
 Uzasadnienie:
 - User poprosil o realnie bardziej rozbudowany widok, a nie tylko skróconą notatkę.
+
+### D-063: Inliner standalone HTML nie moze zmieniac typu cudzyslowu dla `src/href`
+Decyzja:
+- W `jst_analysis.py` regex podmiany `src/href` przechwytuje i zachowuje oryginalny quote (`'` lub `"`), zamiast wymuszac zawsze `"..."`.
+Uzasadnienie:
+- Wymuszanie `"` uszkadzalo duze bloki JS/JSON osadzajace HTML w stringach (szczegolnie Segmenty/Skupienia/Filtry), przez co standalone/full HTML tracil interaktywnosc, mimo ze ZIP dzialal poprawnie.
+
+### D-064: Podsumowanie PPP ma miec 4 boksy w jednym rzędzie, a ISOA/ISOW wheel ma byc przy lewej krawedzi
+Decyzja:
+- `ioa-summary-grid` ustawiono na 4 kolumny (desktop), aby wszystkie bloki Top/Bottom + PPP byly obok siebie.
+- `isoa-wheel-wrap` pozostaje o szerokosci `85%`, ale bez centrowania (`margin:0`), czyli wyrównane do lewej.
+Uzasadnienie:
+- User wymagal bardziej zwartego ukladu podsumowania PPP i lewostronnego osadzenia glównego wykresu ISOA/ISOW.
+
+### D-065: Matching UI — neutralniejsza nawigacja i mocniejsze wskazanie kontekstu porownania
+Decyzja:
+- Taby w `🧭 Matching` dostaly neutralniejsze, szare tło kontenera i ostre dolne rogi.
+- Sekcja "dla kogo jest matching" jest renderowana jako wyrazna karta 2-kolumnowa (badanie personalne vs badanie mieszkańców).
+- Dodatkowo zmniejszono globalny górny offset kontenera do `30px`.
+Uzasadnienie:
+- User zglosil zbyt duza pusta przestrzen na gorze i slabą czytelnosc informacji, kogo dotyczy aktualne porownanie.
+
+### D-066: TOP3 polityk/JST w Matching ma utrzymywać stałą geometrię i ikonki
+Decyzja:
+- Wiersze TOP3 sa renderowane w siatce `118px + 1fr` (stala szerokosc etykiety roli), z ikoną przy nazwie i kolorami zgodnymi z rolą (`główny/wspierający/poboczny`).
+Uzasadnienie:
+- User wskazal problem "wciecia" drugiego wiersza (`Wspierający`) i brak ikon, przez co porownanie bylo mniej czytelne.
+
+### D-067: Radar porownawczy odzyskuje klikalna legendę Plotly
+Decyzja:
+- Dla dwoch glownych linii (`profil polityka`, `profil mieszkańców`) wlaczono `showlegend=True` i `itemclick=toggle`, aby mozna bylo ukrywac/pokazywac linie kliknieciem.
+- Jednoczesnie zmniejszono marginesy gorne/dolne, by legenda i blok TOP3 byly blizej wykresu.
+Uzasadnienie:
+- User oczekiwal powrotu funkcji klikania legendy i mniejszych "dziur" pionowych wokol radaru.
