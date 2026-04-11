@@ -1053,3 +1053,17 @@ Wynik:
   - usunięto duplikat deklaracji niżej w tej samej sekcji.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-021 [DONE]
+Temat: Runtime fix `IndexError` dla TOP2/TOP3 w markerach radaru (`🧭 Matching`).
+Kryteria ukończenia:
+1. `matching_view` nie wywala błędu `IndexError: list index out of range` w `_marker_series`.
+2. Render markerów TOP działa zarówno dla TOP3, jak i dla TOP2 (gdy 3. pozycja nie kwalifikuje się).
+Pierwszy krok wykonawczy:
+- zmienić budowanie mapy markerów tak, żeby nie indeksować `top3[2]` bezwarunkowo.
+Wynik:
+- `app.py`:
+  - `_marker_series` buduje `mapping` inkrementalnie (`if len(top3) > 0/1/2`) zamiast przez słownik z bezpośrednimi odwołaniami `top3[0..2]`,
+  - eliminuje to crash przy przypadkach TOP2.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

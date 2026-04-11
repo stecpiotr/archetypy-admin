@@ -828,3 +828,14 @@ Decyzja:
 - `person_top_colors` i `jst_top_colors` są deklarowane przed wywołaniami helperów, które budują legendę (`_role_legend_html`).
 Uzasadnienie:
 - W przeciwnym razie Python zgłasza `UnboundLocalError` w runtime (`matching_view`) i cały `Podsumowanie` w Matching przestaje się renderować.
+
+### D-092: Marker map w radarze musi być budowany bez bezpośredniego indeksowania TOP listy
+Decyzja:
+- W helperze `_marker_series` mapowanie `archetyp -> kolor roli` budujemy inkrementalnie:
+  - dodajemy `top3[0]` tylko gdy `len(top3) > 0`,
+  - dodajemy `top3[1]` tylko gdy `len(top3) > 1`,
+  - dodajemy `top3[2]` tylko gdy `len(top3) > 2`.
+- Nie tworzymy słownika z kluczami `top3[0..2]` w jednej literałowej instrukcji.
+Uzasadnienie:
+- Python ocenia klucze słownika natychmiast; przy TOP2 dostęp do `top3[2]` powodował `IndexError` mimo warunku w wartości.
+- Wariant inkrementalny jest odporny zarówno dla TOP2, jak i TOP3.

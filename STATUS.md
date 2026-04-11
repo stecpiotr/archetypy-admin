@@ -895,6 +895,17 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-021 (runtime fix `IndexError` dla TOP2/TOP3)
+- `app.py` (`matching_view`, helper `_marker_series`):
+  - usunięto bezwarunkowe indeksowanie `top3[0]`, `top3[1]`, `top3[2]` w literałe słownika,
+  - mapa markerów jest budowana bezpiecznie krokowo:
+    - `if len(top3) > 0` -> kolor `main`,
+    - `if len(top3) > 1` -> kolor `aux`,
+    - `if len(top3) > 2` -> kolor `supp`,
+  - dzięki temu przypadki TOP2 nie powodują już `IndexError: list index out of range`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

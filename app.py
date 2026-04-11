@@ -4669,11 +4669,13 @@ def matching_view() -> None:
         def _marker_series(profile: Dict[str, float], top3: List[str], palette: Dict[str, str]) -> Tuple[List[Optional[float]], List[str]]:
             r_vals: List[Optional[float]] = []
             colors: List[str] = []
-            mapping = {
-                top3[0]: palette["main"] if len(top3) > 0 else "rgba(0,0,0,0)",
-                top3[1]: palette["aux"] if len(top3) > 1 else "rgba(0,0,0,0)",
-                top3[2]: palette["supp"] if len(top3) > 2 else "rgba(0,0,0,0)",
-            }
+            mapping: Dict[str, str] = {}
+            if len(top3) > 0:
+                mapping[top3[0]] = palette["main"]
+            if len(top3) > 1:
+                mapping[top3[1]] = palette["aux"]
+            if len(top3) > 2:
+                mapping[top3[2]] = palette["supp"]
             for arche in radar_order:
                 if arche in mapping:
                     r_vals.append(float(profile.get(arche, 0.0)))
