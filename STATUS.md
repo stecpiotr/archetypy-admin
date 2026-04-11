@@ -689,6 +689,35 @@
 - Potwierdzono decyzje metodyczna usera:
   - rezygnujemy z jawnej premii za dopasowanie (brak dodatniego bonusu w score).
 
+### Zrobione w Hotfix H-015 — Etap 2 (Dogrywka A3)
+- `app.py` (`🧭 Matching / Podsumowanie`):
+  - pod kartami `TOP3 ... dla ...` dodano nowy blok:
+    - `Główne zalety`,
+    - `Główne problemy`,
+    liczony dynamicznie z faktycznych danych porownania (`TOP3`, `|Δ|`, `KEY_MAE`, `KEY_MAX`, najlepsza zgodność).
+  - sekcja ma neutralny styl (`białe` karty, bez niebieskiego gradientu), ze zwięzłymi punktami interpretacyjnymi.
+  - opisy metryki (`match_formula` + expander `Jak liczony jest poziom dopasowania?`) doprecyzowano:
+    - brak jawnej premii dodatniej,
+    - lepsza zgodność poprawia wynik wyłącznie przez mniejszą karę.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-015 — Etap 2 (Dogrywka A4)
+- `app.py`:
+  - `Porównanie profili archetypowych`:
+    - zmniejszony odstęp pod tytułem sekcji,
+    - dopracowana górna legenda (większy odstęp między profilami, lepsze pozycjonowanie),
+    - dolna legenda TOP3 podciągnięta wyżej bez kolizji z wykresem,
+    - zmniejszone pogrubienie etykiet `główny / wspierający / poboczny`.
+  - radar:
+    - etykiety osi dla pozycji z TOP3 (unia polityk + mieszkańcy) są wyróżnione pogrubieniem.
+  - `Poziom dopasowania`:
+    - kalibracja opisu pasm: duże luki kluczowe (`KEY_MAX` / `KEY_MAE`) obniżają werbalną ocenę,
+      aby nie komunikować zbyt optymistycznie przy strategicznych rozjazdach.
+  - utrzymano decyzję: brak jawnej premii dodatniej (model kar).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -697,6 +726,4 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Wykonac `H-015 / Etap 2 / Dogrywka A3`:
-  1. dodać sekcję `Główne zalety` / `Główne problemy` w `🧭 Matching / Podsumowanie`,
-  2. od razu po tym przejść do `Dogrywka A4` (radar + kalibracja komunikatu `Poziom dopasowania`) przy założeniu, że jawnej premii nie dodajemy.
+- Wykonac szybki smoke-check wizualny `🧭 Matching` na aktualnym buildzie (sekcja TOP3 + radar + nowy blok zalet/problemów) i zebrać kolejną paczkę uwag do finalnego domknięcia `H-015`.

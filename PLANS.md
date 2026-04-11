@@ -655,7 +655,7 @@ Kryteria ukonczenia:
 Pierwszy krok wykonawczy:
 - uszczelnic `inline_local_assets(...)` w `jst_analysis.py`, aby inliner nie uszkadzal skryptow JS podczas zamiany `src/href` na data URI.
 
-#### H-015 / Etap 2 [IN_PROGRESS]
+#### H-015 / Etap 2 [DONE]
 Temat: Korekty wizualne Matching + dopracowanie metryki `Poziom dopasowania` (po nowych screenach usera).
 Zakres (zgrupowany krok po kroku):
 
@@ -730,7 +730,7 @@ Wynik Dogrywki A2:
     - znaczniki dla `TOP3 mieszkańców` zmienione na kwadraty.
 - Smoke-check: `python -m py_compile app.py` (OK).
 
-Dogrywka A3 [PENDING]:
+Dogrywka A3 [DONE]:
 1. `🧭 Matching / Podsumowanie`:
    - pod blokami `TOP3 archetypów dla ...` dodac nowa sekcje:
      - `Główne zalety`,
@@ -740,7 +740,22 @@ Dogrywka A3 [PENDING]:
    - utrzymac model bez jawnej premii dodatniej (tylko model kar),
    - uszczelnic opisy metodyki i UI tak, by bylo to jednoznaczne.
 
-Dogrywka A4 [PENDING]:
+Wynik Dogrywki A3:
+- `app.py`:
+  - pod kartami `TOP3 ... dla ...` dodano nowy, dwukolumnowy blok:
+    - `Główne zalety`,
+    - `Główne problemy`,
+    liczony dynamicznie z:
+    - zgodnosci/różnicy priorytetu głównego,
+    - wspólnego TOP3 (część wspólna),
+    - średniej luki kluczowej (`KEY_MAE`),
+    - największej luki kluczowej (`KEY_MAX`),
+    - najlepiej dopasowanej pozycji (`min |Δ|`).
+  - sekcja ma neutralny, biały styl (bez niebieskich gradientów) i czytelne badge/listy.
+  - doprecyzowano opisy metryki (`match_formula` + expander), że model **nie ma jawnej premii dodatniej** i działa wyłącznie przez mechanizm kar.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
+Dogrywka A4 [DONE]:
 1. `Porównanie profili archetypowych` (UI radar):
    - zmniejszyc margines dolny pod tytulem sekcji,
    - gora legenda: wycentrowac teksty i zwiekszyc czytelny odstep miedzy:
@@ -759,6 +774,20 @@ Dogrywka A4 [PENDING]:
 4. Metryka:
    - potwierdzic decyzje: rezygnujemy z jawnej premii za dopasowanie
      (zostaje model oparty o kare, bez dodatniego bonusu).
+
+Wynik Dogrywki A4:
+- `app.py`:
+  - radar `Porównanie profili ...`:
+    - zmniejszony odstęp pod tytułem sekcji (`match-compare-header`),
+    - dopracowane pozycjonowanie górnej legendy i większy odstęp między profilami (`entrywidth`, `tracegroupgap`, `y`),
+    - dolna legenda TOP3 podciągnięta wyżej (`margin` bloku stylu),
+    - osłabione pogrubienie etykiet `główny / wspierający / poboczny`.
+  - etykiety osi radaru dla pozycji z TOP3 (unia polityk + mieszkańcy) są wyróżnione pogrubieniem (styl `ticktext`).
+  - `Poziom dopasowania`:
+    - kalibracja opisu pasm: wysoka luka kluczowa (`KEY_MAX` / `KEY_MAE`) obniża opisową ocenę pasma,
+      nawet gdy sam wynik liczbowy jest relatywnie wysoki,
+    - utrzymano model bez jawnej premii dodatniej.
+- Smoke-check: `python -m py_compile app.py` (OK).
 
 Kryteria ukonczenia Etapu 2:
 1. Wszystkie elementy z punktow 1-8 usera odwzorowane 1:1 na zrzutach.

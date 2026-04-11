@@ -3449,14 +3449,28 @@ def matching_view() -> None:
             strengths_rows = [{"archetyp": a, "diff": round(float(diffs[a]), 1)} for a in strengths]
             gaps_rows = [{"archetyp": a, "diff": round(float(diffs[a]), 1)} for a in gaps]
 
-            if match_score >= 80:
-                match_band = ("Bardzo wysokie", "Różnice są niskie i stabilne także na największych lukach.")
-            elif match_score >= 65:
-                match_band = ("Umiarkowanie wysokie", "Profil jest częściowo zgodny, ale wymaga korekty na największych lukach.")
-            elif match_score >= 50:
-                match_band = ("Umiarkowane", "Widać istotne rozjazdy między profilem polityka i oczekiwaniami mieszkańców.")
-            else:
-                match_band = ("Niskie", "Duże luki dominują - warto przebudować komunikację i priorytety.")
+            score_band_idx = 3 if match_score >= 80 else (2 if match_score >= 65 else (1 if match_score >= 50 else 0))
+            # Korekta opisu pasma: nawet wysoki wynik liczbowy nie powinien dawać "bardzo wysokiej" oceny,
+            # jeżeli na archetypach kluczowych zostają duże luki.
+            key_guard_idx = 3
+            guard_note = ""
+            if key_gap_max >= 25.0 or key_gap_mae >= 18.0:
+                key_guard_idx = 1
+                guard_note = "Duże luki kluczowe obniżają ocenę opisową mimo wyniku bazowego."
+            elif key_gap_max >= 20.0 or key_gap_mae >= 14.0:
+                key_guard_idx = 2
+                guard_note = "Luki kluczowe pozostają wysokie i wymagają korekty przekazu."
+            final_band_idx = min(score_band_idx, key_guard_idx)
+            match_bands: List[Tuple[str, str]] = [
+                ("Niskie", "Duże luki dominują - warto przebudować komunikację i priorytety."),
+                ("Umiarkowane", "Widać istotne rozjazdy między profilem polityka i oczekiwaniami mieszkańców."),
+                ("Umiarkowanie wysokie", "Profil jest częściowo zgodny, ale wymaga korekty na największych lukach."),
+                ("Bardzo wysokie", "Różnice są niskie i stabilne także na kluczowych archetypach."),
+            ]
+            band_label, band_desc = match_bands[final_band_idx]
+            if guard_note and final_band_idx < score_band_idx:
+                band_desc = f"{band_desc} {guard_note}"
+            match_band = (band_label, band_desc)
 
             unit_person = {a: float(p_profile.get(a, 0.0)) for a in JST_ARCHETYPES}
             top_sim_rows = []
@@ -3722,7 +3736,8 @@ def matching_view() -> None:
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
                     "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii TOP3 polityka i TOP3 mieszkańców, "
                     "KEY_MAX = największa |Δ| w tej samej puli kluczowej. "
-                    "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania."
+                    "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania. "
+                    "Model nie dodaje osobnej premii dodatniej za zgodność - niższa luka poprawia wynik tylko przez mniejszą karę."
                 ),
             }
             st.success("Wynik dopasowania został obliczony.")
@@ -3850,6 +3865,9 @@ def matching_view() -> None:
                 "Metryka celowo mocniej karze strategiczne rozjazdy: oprócz MAE, RMSE i średniej 3 największych luk "
                 "uwzględnia też luki na archetypach kluczowych (unia TOP3 polityka + TOP3 mieszkańców) "
                 "oraz dodatkową karę za skrajny rozjazd w tej puli."
+            )
+            st.caption(
+                "W modelu nie ma osobnej premii dodatniej za zgodność. Lepszy wynik wynika wyłącznie z niższych luk i mniejszej kary kluczowej."
             )
             if metrics:
                 key_list = metrics.get("key_archetypes") or []
@@ -3997,7 +4015,7 @@ def matching_view() -> None:
                 margin:18px 0 10px 0;
               }
               .match-section-header.match-compare-header{
-                margin:14px 0 4px 0;
+                margin:10px 0 2px 0;
               }
               .match-section-header.match-profile-header{
                 margin-top:30px;
@@ -4117,7 +4135,7 @@ def matching_view() -> None:
                 display:grid;
                 grid-template-columns:1fr 1fr;
                 gap:12px;
-                margin:0 0 2px 0;
+                margin:-4px 0 8px 0;
               }
               .match-top3-style-card{
                 border:1px solid #dbe4ef;
@@ -4139,7 +4157,7 @@ def matching_view() -> None:
                 gap:18px;
                 flex-wrap:wrap;
                 font-size:14px;
-                font-weight:900;
+                font-weight:700;
                 line-height:1.35;
               }
               .match-top3-style-card .line2 span{
@@ -4202,6 +4220,11 @@ def matching_view() -> None:
 
         p_top = _top3(person_profile_20, radar_order)
         j_top = _top3(jst_profile_20, radar_order)
+        radar_top_union = set(p_top + j_top)
+        radar_tick_text: List[str] = []
+        for arche, lbl in zip(radar_order, radar_tick_labels):
+            safe_lbl = html.escape(str(lbl))
+            radar_tick_text.append(f"<b>{safe_lbl}</b>" if arche in radar_top_union else safe_lbl)
         entity_gen = "archetypów" if current_axis_label == "Archetyp" else "wartości"
         rank_names = ["Główny", "Wspierający", "Poboczny"]
 
@@ -4237,6 +4260,94 @@ def matching_view() -> None:
                 j_top,
             )
             + "</div>",
+            unsafe_allow_html=True,
+        )
+        diff_by_entity: Dict[str, float] = {
+            a: abs(float(person_profile_100.get(a, 0.0)) - float(jst_profile_100.get(a, 0.0)))
+            for a in JST_ARCHETYPES
+        }
+        key_union: List[str] = []
+        for arche in p_top + j_top:
+            if arche not in key_union:
+                key_union.append(arche)
+        key_gap_vals_live = [float(diff_by_entity.get(a, 0.0)) for a in key_union]
+        key_gap_mae_live = float(sum(key_gap_vals_live) / max(1, len(key_gap_vals_live)))
+        key_max_entity = max(
+            key_union or list(diff_by_entity.keys()),
+            key=lambda a: float(diff_by_entity.get(a, 0.0)),
+        )
+        key_max_gap_live = float(diff_by_entity.get(key_max_entity, 0.0))
+        best_entity = min(diff_by_entity.keys(), key=lambda a: float(diff_by_entity.get(a, 0.0)))
+        best_gap_live = float(diff_by_entity.get(best_entity, 0.0))
+        overlap_top = [a for a in p_top if a in j_top]
+
+        advantages: List[str] = []
+        problems: List[str] = []
+        axis_gen = "archetypach" if current_axis_label == "Archetyp" else "wartościach"
+
+        if p_top and j_top and p_top[0] == j_top[0]:
+            main_name = _matching_entity_name(p_top[0], current_axis_label)
+            advantages.append(f"Zgodny priorytet główny: {main_name}.")
+        elif p_top and j_top:
+            p_main = _matching_entity_name(p_top[0], current_axis_label)
+            j_main = _matching_entity_name(j_top[0], current_axis_label)
+            problems.append(f"Różny priorytet główny: polityk stawia na {p_main}, mieszkańcy na {j_main}.")
+
+        if overlap_top:
+            overlap_txt = ", ".join(_matching_entity_name(a, current_axis_label) for a in overlap_top)
+            advantages.append(f"Wspólne TOP3 ({len(overlap_top)}/3): {overlap_txt}.")
+        else:
+            problems.append(f"Brak wspólnych pozycji w TOP3 polityka i mieszkańców.")
+
+        if key_gap_mae_live <= 10.0:
+            advantages.append(f"Średnia luka na kluczowych {axis_gen} jest niska ({key_gap_mae_live:.1f} pp).")
+        elif key_gap_mae_live >= 16.0:
+            problems.append(f"Średnia luka na kluczowych {axis_gen} jest wysoka ({key_gap_mae_live:.1f} pp).")
+
+        if key_max_gap_live >= 20.0:
+            key_max_name = _matching_entity_name(key_max_entity, current_axis_label)
+            problems.append(f"Największa luka kluczowa: {key_max_name} (|Δ| {key_max_gap_live:.1f} pp).")
+
+        best_name = _matching_entity_name(best_entity, current_axis_label)
+        advantages.append(f"Najlepsza zgodność dotyczy pozycji {best_name} (|Δ| {best_gap_live:.1f} pp).")
+
+        if not advantages:
+            advantages = ["Brak wyraźnych przewag w tym porównaniu — potrzebna dalsza kalibracja przekazu."]
+        if not problems:
+            problems = ["Brak krytycznych rozjazdów na kluczowych pozycjach."]
+
+        adv_items_html = "".join(
+            [f"<li><span class='badge'>✓</span><span>{html.escape(txt)}</span></li>" for txt in advantages[:4]]
+        )
+        prob_items_html = "".join(
+            [f"<li><span class='badge'>!</span><span>{html.escape(txt)}</span></li>" for txt in problems[:4]]
+        )
+        st.markdown(
+            f"""
+            <style>
+              .match-eval-grid{{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0 8px 0;}}
+              .match-eval-card{{border:1px solid #d9e2ef;border-radius:14px;background:#fff;padding:12px 14px;}}
+              .match-eval-card.good{{box-shadow:inset 0 3px 0 #10b981;}}
+              .match-eval-card.warn{{box-shadow:inset 0 3px 0 #ef4444;}}
+              .match-eval-title{{margin:0 0 8px 0;font-size:14px;font-weight:900;color:#1f2f44;}}
+              .match-eval-list{{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;}}
+              .match-eval-list li{{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;color:#334155;font-size:13px;font-weight:700;line-height:1.35;}}
+              .match-eval-list .badge{{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;font-size:12px;font-weight:900;}}
+              .match-eval-card.good .badge{{background:#e8fbf1;color:#0f7a48;border:1px solid #b9eed3;}}
+              .match-eval-card.warn .badge{{background:#fff1f2;color:#b91c1c;border:1px solid #fecdd3;}}
+              @media (max-width:900px){{.match-eval-grid{{grid-template-columns:1fr;}}}}
+            </style>
+            <div class="match-eval-grid">
+              <div class="match-eval-card good">
+                <div class="match-eval-title">Główne zalety</div>
+                <ul class="match-eval-list">{adv_items_html}</ul>
+              </div>
+              <div class="match-eval-card warn">
+                <div class="match-eval-title">Główne problemy</div>
+                <ul class="match-eval-list">{prob_items_html}</ul>
+              </div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
 
@@ -4321,17 +4432,17 @@ def matching_view() -> None:
                 angularaxis=dict(
                     tickfont=dict(size=16),
                     tickvals=radar_tick_labels,
-                    ticktext=radar_tick_labels,
+                    ticktext=radar_tick_text,
                     rotation=90,
                     direction="clockwise",
                 ),
             ),
-            margin=dict(l=24, r=24, t=86, b=78),
+            margin=dict(l=24, r=24, t=66, b=86),
             showlegend=True,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.14,
+                y=1.11,
                 xanchor="center",
                 x=0.5,
                 font=dict(size=13),
@@ -4339,8 +4450,8 @@ def matching_view() -> None:
                 bordercolor="#cfd9e8",
                 borderwidth=1,
                 entrywidthmode="pixels",
-                entrywidth=320,
-                tracegroupgap=18,
+                entrywidth=360,
+                tracegroupgap=28,
                 itemclick="toggle",
                 itemdoubleclick="toggleothers",
             ),

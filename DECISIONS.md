@@ -694,3 +694,31 @@ Decyzja:
 - W kolejnym kroku kalibrujemy progi/opisy pasm oceny tak, aby werdykt nie brzmial `bardzo wysokie` przy duzych lukach na archetypach kluczowych (np. >20 pp).
 Uzasadnienie:
 - Zgloszony przypadek (duze luki na TOP3 polityka/JST) pokazal, ze obecna narracja werbalna moze byc zbyt optymistyczna wzgledem merytorycznej interpretacji.
+
+### D-080: `Główne zalety / Główne problemy` w Matching są wyliczane z tej samej logiki luk i TOP3
+Decyzja:
+- W `🧭 Matching / Podsumowanie` dodajemy blok interpretacyjny:
+  - `Główne zalety`,
+  - `Główne problemy`,
+  budowany automatycznie z:
+  - zgodnosci/różnicy priorytetu głównego,
+  - przecięcia TOP3,
+  - `KEY_MAE` i `KEY_MAX`,
+  - najlepiej dopasowanej pozycji (`min |Δ|`).
+- W opisie metryki jawnie utrzymujemy zasadę:
+  - brak dodatniej premii za dopasowanie,
+  - poprawa wyniku wynika wyłącznie z mniejszych luk (czyli mniejszej kary).
+Uzasadnienie:
+- User chciał bardziej praktycznej, natychmiastowej interpretacji stanu dopasowania bez przechodzenia przez same liczby.
+- Jednoznaczne zapisanie "model kar, bez bonusu" ogranicza ryzyko błędnej interpretacji wskaźnika.
+
+### D-081: Opis pasma dopasowania jest dodatkowo ograniczany przez luki kluczowe
+Decyzja:
+- Pasmo opisowe (`Niskie / Umiarkowane / Umiarkowanie wysokie / Bardzo wysokie`) nie zależy już wyłącznie od `match_score`.
+- Dla dużych luk kluczowych (`KEY_MAX`, `KEY_MAE`) stosujemy ogranicznik pasma opisowego:
+  - bardzo duże luki (`KEY_MAX >= 25` lub `KEY_MAE >= 18`) limitują opis do `Umiarkowane`,
+  - wysokie luki (`KEY_MAX >= 20` lub `KEY_MAE >= 14`) limitują opis do `Umiarkowanie wysokie`.
+- Wynik liczbowy pozostaje bez sztucznej premii dodatniej; korekta dotyczy warstwy interpretacji.
+Uzasadnienie:
+- User pokazał przypadek, gdzie duże rozjazdy na TOP3 dawały zbyt optymistyczny opis (`bardzo wysokie`).
+- Ogranicznik pasma lepiej odzwierciedla ryzyko strategiczne bez zmiany filozofii modelu kar.
