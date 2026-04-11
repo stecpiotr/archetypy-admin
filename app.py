@@ -4059,11 +4059,11 @@ def matching_view() -> None:
             score_color = "#0e7490"
             score_bg = "#ecfeff"
         elif score_pct >= 70:
-            score_color = "#1d4ed8"
-            score_bg = "#eff6ff"
+            score_color = "#6d28d9"
+            score_bg = "#f5f3ff"
         elif score_pct >= 60:
             score_color = "#1d4ed8"
-            score_bg = "#eef2ff"
+            score_bg = "#eff6ff"
         elif score_pct >= 50:
             score_color = "#b45309"
             score_bg = "#fffbeb"
@@ -4071,7 +4071,7 @@ def matching_view() -> None:
             score_color = "#c2410c"
             score_bg = "#fff7ed"
         elif score_pct >= 30:
-            score_color = "#b91c1c"
+            score_color = "#be123c"
             score_bg = "#fff1f2"
         else:
             score_color = "#7f1d1d"

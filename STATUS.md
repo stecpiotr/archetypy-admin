@@ -906,6 +906,17 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-022 (unikalne kolory pastylek pasm dopasowania)
+- `app.py` (`🧭 Matching`, karta `Poziom dopasowania`):
+  - rozdzielono kolory pasm:
+    - `70–79` (`Wysokie`) -> `#6d28d9` / `#f5f3ff`,
+    - `60–69` (`Znaczące`) -> `#1d4ed8` / `#eff6ff`,
+  - utrzymano zasadę unikalnych barw i dodatkowo rozdzielono odcień pasma `30–39` (`#be123c`).
+- Efekt:
+  - pastylki `Znaczące` i `Wysokie` nie wyglądają już identycznie.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

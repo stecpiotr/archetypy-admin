@@ -1067,3 +1067,18 @@ Wynik:
   - eliminuje to crash przy przypadkach TOP2.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-022 [DONE]
+Temat: Rozróżnienie kolorów pastylki `Ocena` dla pasm `Znaczące` i `Wysokie` (`🧭 Matching`).
+Kryteria ukończenia:
+1. Poziomy `60–69` i `70–79` mają wyraźnie różne kolory pastylki.
+2. Każde pasmo ma unikalny kolor (bez duplikatów kluczowych kolorów obramowania).
+Pierwszy krok wykonawczy:
+- skorygować paletę `score_color/score_bg` w bloku renderu `Poziom dopasowania`.
+Wynik:
+- `app.py`:
+  - `70–79` (`Wysokie`) zmieniono na fiolet (`#6d28d9`, tło `#f5f3ff`),
+  - `60–69` (`Znaczące`) pozostaje niebieskie (`#1d4ed8`, tło `#eff6ff`),
+  - dodatkowo rozdzielono odcień dla `30–39` (`#be123c`) aby utrzymać unikalność pasm.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

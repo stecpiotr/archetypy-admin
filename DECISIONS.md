@@ -839,3 +839,13 @@ Decyzja:
 Uzasadnienie:
 - Python ocenia klucze słownika natychmiast; przy TOP2 dostęp do `top3[2]` powodował `IndexError` mimo warunku w wartości.
 - Wariant inkrementalny jest odporny zarówno dla TOP2, jak i TOP3.
+
+### D-093: Każde pasmo `Poziomu dopasowania` ma mieć unikalny kolor pastylki
+Decyzja:
+- W karcie `Poziom dopasowania` rozdzielamy kolory pasm tak, aby `Znaczące` i `Wysokie` nie używały tego samego koloru.
+- Aktualna korekta:
+  - `60–69` (`Znaczące`) -> niebieski (`#1d4ed8`),
+  - `70–79` (`Wysokie`) -> fiolet (`#6d28d9`).
+Uzasadnienie:
+- User zgłosił, że oba poziomy były wizualnie nieodróżnialne.
+- Unikalna kolorystyka pasm poprawia czytelność szybkiej interpretacji w `🧭 Matching`.
