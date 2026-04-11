@@ -814,11 +814,11 @@ Uzasadnienie:
 - User wskazał, że status ma być częścią ustawień ankiety, a nie formularzy edycji danych.
 - Rozdzielenie upraszcza UX: edycja danych i administracja statusem są w osobnych modułach.
 
-### D-090: Kara kluczowa liczy TOP3 warunkowo jako TOP2 przy wysokiej 3. pozycji
+### D-090: Kara kluczowa liczy TOP3 warunkowo jako TOP2 przy niskiej 3. pozycji
 Decyzja:
 - Dla puli kluczowej (`KEY_MAE`, `KEY_MAX`) stosujemy regułę:
   - domyślnie TOP3 polityka i TOP3 mieszkańców,
-  - jeśli 3. pozycja profilu ma wynik `>70`, archetyp z 3. pozycji nie wchodzi do puli kluczowej (dla tego profilu liczymy TOP2).
+  - jeśli 3. pozycja profilu ma wynik `<70`, archetyp z 3. pozycji nie wchodzi do puli kluczowej (dla tego profilu liczymy TOP2).
 Uzasadnienie:
-- User wymagał, aby przy takim przypadku nie naliczać kary za „poboczny” archetyp z 3. miejsca.
+- User doprecyzował, że archetyp poniżej 70% nie powinien być klasyfikowany jako poboczny/kluczowy.
 - Reguła zmniejsza ryzyko przeszacowania kary kluczowej dla tego konkretnego przypadku.

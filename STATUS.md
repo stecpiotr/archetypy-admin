@@ -869,6 +869,24 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-019 (TOP2/TOP3 próg i UI + ankieta)
+- `app.py` (`🧭 Matching`):
+  - naprawiono próg klasyfikacji 3. archetypu:
+    - teraz 3. pozycja jest liczona do puli kluczowej tylko gdy ma `>=70`,
+    - przy `<70` profil traktowany jest jako TOP2 (bez pozycji pobocznej),
+  - reguła TOP2/TOP3 jest spójna w:
+    - karze kluczowej (`KEY_MAE`, `KEY_MAX`),
+    - kartach `TOP{N} ...`,
+    - legendach i markerach radaru (`TOP{N} polityka/mieszkańców`),
+    - opisie metodologicznym (`<70 -> TOP2`),
+  - dopracowano teksty pomocnicze (`Wspólne priorytety ...`) pod dynamiczny TOP2/TOP3.
+- `archetypy-ankieta/src/JstSurvey.tsx`:
+  - podmieniono treść odpowiedzi A17:
+    - `wyrazistość i brak kompromisów` -> `wyrazistość i bezkompromisowość`.
+- Testy:
+  - `python -m py_compile app.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -878,6 +896,6 @@
 
 ### Nastepny konkretny krok wykonawczy
 - Szybki smoke-test UI na środowisku użytkownika:
+  - potwierdzić na parze `Hetman` że przy 3. pozycji `<70` widok pokazuje `TOP2` i nie liczy tej pozycji do `Maks. luki kluczowej`,
   - potwierdzić, że `Status badania` jest dostępny tylko w `⚙️ Ustawienia ankiety` (personalne + mieszkańców),
-  - sprawdzić, że etykieta `RMSE (kara odchyleń)` nie ucina się dla różnych szerokości ekranu,
-  - zweryfikować na 2-3 parach, że kara kluczowa liczy TOP2, gdy 3. pozycja ma wynik `>70`.
+  - sprawdzić, że etykieta `RMSE (kara odchyleń)` nie ucina się dla różnych szerokości ekranu.

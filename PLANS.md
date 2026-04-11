@@ -1016,3 +1016,26 @@ Wynik:
     - jeśli 3. pozycja ma `>70`, do puli wchodzi TOP2 (dla polityka i/lub mieszkańców).
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-019 [DONE]
+Temat: Korekta klasyfikacji TOP2/TOP3 dla kar kluczowych i UI Matching + poprawka frazy w ankiecie.
+Kryteria ukończenia:
+1. Archetyp 3. pozycji jest liczony jako `poboczny` tylko gdy ma `>=70`; przy `<70` profil traktujemy jako TOP2.
+2. Kara kluczowa (`KEY_MAE/KEY_MAX`) nie uwzględnia 3. pozycji, gdy ta ma `<70`.
+3. UI Matching nie sugeruje błędnie TOP3, jeśli faktycznie obowiązuje TOP2.
+4. W ankiecie fraza `wyrazistość i brak kompromisów` jest zamieniona na `wyrazistość i bezkompromisowość`.
+Pierwszy krok wykonawczy:
+- poprawić próg w `app.py` (logika kar + render TOP list/legend) i zweryfikować kompilację.
+Wynik:
+- `app.py`:
+  - odwrócono warunek puli kluczowej:
+    - było: TOP2 przy `3. pozycja >70`,
+    - jest: TOP2 przy `3. pozycja <70` (TOP3 tylko dla `>=70`),
+  - analogicznie poprawiono listy TOP w sekcji wizualnej (`TOP2/TOP3`),
+  - tytuły kart i legend są dynamiczne (`TOP{N}`),
+  - opisy metodyki zaktualizowane do reguły `<70 -> TOP2`.
+- `archetypy-ankieta/src/JstSurvey.tsx`:
+  - podmieniono tekst: `wyrazistość i bezkompromisowość`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).

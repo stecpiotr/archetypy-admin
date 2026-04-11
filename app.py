@@ -3661,7 +3661,7 @@ def matching_view() -> None:
                     key=lambda a: (-float(profile.get(a, 0.0)), arch_order.index(a)),
                 )
                 top3 = ordered[:3]
-                if len(top3) >= 3 and float(profile.get(top3[2], 0.0)) > 70.0:
+                if len(top3) >= 3 and float(profile.get(top3[2], 0.0)) < 70.0:
                     return top3[:2]
                 return top3
 
@@ -3998,7 +3998,7 @@ def matching_view() -> None:
                     "match = clamp(0,100, base - kara_kluczowa); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
                     "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii priorytetów polityka i mieszkańców "
-                    "(TOP3, ale jeśli 3. pozycja ma >70, do puli kluczowej wchodzi tylko TOP2), "
+                    "(TOP3, ale jeśli 3. pozycja ma <70, do puli kluczowej wchodzi tylko TOP2), "
                     "KEY_MAX = największa |Δ| w tej samej puli kluczowej. "
                     "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania. "
                     "Model nie dodaje osobnej premii dodatniej za zgodność - niższa luka poprawia wynik tylko przez mniejszą karę."
@@ -4170,7 +4170,7 @@ def matching_view() -> None:
                     f"kara kluczowa `{float(metrics.get('key_penalty', 0.0)):.1f}`."
                 )
                 st.markdown(
-                    "**Archetypy kluczowe (TOP3, ale gdy 3. pozycja >70 -> TOP2):** "
+                    "**Archetypy kluczowe (TOP3, ale gdy 3. pozycja <70 -> TOP2):** "
                     f"{key_list_txt}."
                 )
             axis_entity_gen = "wartości" if current_axis_label == "Wartość" else "archetypu"
@@ -4507,7 +4507,7 @@ def matching_view() -> None:
         def _priority_top_for_ui(profile_100: Dict[str, float], order: List[str]) -> List[str]:
             ordered = sorted(order, key=lambda a: (-float(profile_100.get(a, 0.0)), order.index(a)))
             top3 = ordered[:3]
-            if len(top3) >= 3 and float(profile_100.get(top3[2], 0.0)) > 70.0:
+            if len(top3) >= 3 and float(profile_100.get(top3[2], 0.0)) < 70.0:
                 return top3[:2]
             return top3
 
@@ -4520,6 +4520,22 @@ def matching_view() -> None:
             radar_tick_text.append(f"<b>{safe_lbl}</b>" if arche in radar_top_union else safe_lbl)
         entity_gen = "archetypów" if current_axis_label == "Archetyp" else "wartości"
         rank_names = ["Główny", "Wspierający", "Poboczny"]
+        p_top_label = f"TOP{max(1, len(p_top))} polityka"
+        j_top_label = f"TOP{max(1, len(j_top))} mieszkańców"
+
+        def _role_legend_html(palette: Dict[str, str], marker: str, count: int) -> str:
+            role_defs = [("główny", "main"), ("wspierający", "aux"), ("poboczny", "supp")]
+            items: List[str] = []
+            for idx, (label, role_key) in enumerate(role_defs):
+                if idx >= max(0, int(count)):
+                    break
+                items.append(
+                    f"<span><span style=\"color:{palette[role_key]};\">{marker}</span> {label}</span>"
+                )
+            return "".join(items)
+
+        p_role_legend = _role_legend_html(person_top_colors, "●", len(p_top))
+        j_role_legend = _role_legend_html(jst_top_colors, "■", len(j_top))
 
         def _top3_compare_card(title: str, items: List[str]) -> str:
             rows: List[str] = []
@@ -4545,11 +4561,11 @@ def matching_view() -> None:
         st.markdown(
             "<div class='match-top3-compare'>"
             + _top3_compare_card(
-                f"TOP3 {entity_gen} dla {person_name_gen}",
+                f"TOP{max(1, len(p_top))} {entity_gen} dla {person_name_gen}",
                 p_top,
             )
             + _top3_compare_card(
-                f"TOP3 {entity_gen} dla {jst_name_gen}",
+                f"TOP{max(1, len(j_top))} {entity_gen} dla {jst_name_gen}",
                 j_top,
             )
             + "</div>",
@@ -4588,9 +4604,10 @@ def matching_view() -> None:
 
         if overlap_top:
             overlap_txt = ", ".join(_matching_entity_name(a, current_axis_label) for a in overlap_top)
-            advantages.append(f"Wspólne TOP3 ({len(overlap_top)}/3): {overlap_txt}.")
+            overlap_total = max(1, min(len(p_top), len(j_top)))
+            advantages.append(f"Wspólne priorytety ({len(overlap_top)}/{overlap_total}): {overlap_txt}.")
         else:
-            problems.append(f"Brak wspólnych pozycji w TOP3 polityka i mieszkańców.")
+            problems.append("Brak wspólnych pozycji w priorytetach polityka i mieszkańców.")
 
         if key_gap_mae_live <= 10.0:
             advantages.append(f"Średnia luka na kluczowych {axis_gen} jest niska ({key_gap_mae_live:.1f} pp).")
@@ -4703,18 +4720,18 @@ def matching_view() -> None:
                     theta=radar_tick_labels,
                     mode="markers",
                     marker=dict(size=16, symbol="circle", color=p_marker_c, opacity=0.92, line=dict(color="black", width=2.6)),
-                    name="TOP3 polityka",
+                    name=p_top_label,
                     showlegend=False,
-                    hovertemplate="<b>%{theta}</b><br>TOP3 polityka: %{r:.2f}<extra></extra>",
+                    hovertemplate=f"<b>%{{theta}}</b><br>{p_top_label}: %{{r:.2f}}<extra></extra>",
                 ),
                 go.Scatterpolar(
                     r=j_marker_r,
                     theta=radar_tick_labels,
                     mode="markers",
                     marker=dict(size=14, symbol="square", color=j_marker_c, opacity=0.94, line=dict(color="#0f172a", width=2.0)),
-                    name="TOP3 mieszkańców",
+                    name=j_top_label,
                     showlegend=False,
-                    hovertemplate="<b>%{theta}</b><br>TOP3 mieszkańców: %{r:.2f}<extra></extra>",
+                    hovertemplate=f"<b>%{{theta}}</b><br>{j_top_label}: %{{r:.2f}}<extra></extra>",
                 ),
             ]
         )
@@ -4761,20 +4778,12 @@ def matching_view() -> None:
             f"""
             <div class="match-top3-style-grid">
               <div class="match-top3-style-card">
-                <div class="title">TOP3 polityka</div>
-                <div class="line2">
-                  <span><span style="color:{person_top_colors['main']};">●</span> główny</span>
-                  <span><span style="color:{person_top_colors['aux']};">●</span> wspierający</span>
-                  <span><span style="color:{person_top_colors['supp']};">●</span> poboczny</span>
-                </div>
+                <div class="title">{html.escape(p_top_label)}</div>
+                <div class="line2">{p_role_legend}</div>
               </div>
               <div class="match-top3-style-card">
-                <div class="title">TOP3 mieszkańców</div>
-                <div class="line2">
-                  <span><span style="color:{jst_top_colors['main']};">■</span> główny</span>
-                  <span><span style="color:{jst_top_colors['aux']};">■</span> wspierający</span>
-                  <span><span style="color:{jst_top_colors['supp']};">■</span> poboczny</span>
-                </div>
+                <div class="title">{html.escape(j_top_label)}</div>
+                <div class="line2">{j_role_legend}</div>
               </div>
             </div>
             """,
