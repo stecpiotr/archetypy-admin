@@ -865,3 +865,13 @@ Decyzja:
 Uzasadnienie:
 - User pokazał przypadek z bardzo wysokimi lukami kluczowymi (`KEY_MAE` i `KEY_MAX`) i jednocześnie relatywnie łagodną oceną.
 - Sama kara amplitudowa była za słaba, bo nie odzwierciedlała jakościowego konfliktu priorytetów (brak części wspólnej i inny TOP1).
+
+### D-095: `Główne zalety / Główne problemy` mają odzwierciedlać przecięcia TOP priorytetów z lukami i dopasowaniami
+Decyzja:
+- W `🧭 Matching / Podsumowanie` sekcja interpretacyjna ma dodatkowo raportować:
+  - priorytety (`TOP2/TOP3`) obecne w `Najlepsze dopasowania` jako zaletę,
+  - priorytety (`TOP2/TOP3`) obecne w `Największe luki` jako problem.
+- Pula priorytetowa do tego sprawdzenia to unia TOP polityka i TOP mieszkańców (dynamicznie TOP2/TOP3 wg obowiązującej reguły).
+Uzasadnienie:
+- User wskazał, że strategicznie kluczowe jest jawne zaznaczenie sytuacji, gdy „ważny” archetyp jest jednocześnie dużą luką albo mocną zgodnością.
+- Bez tej reguły sekcja zalet/problemów była mniej diagnostyczna i mogła pomijać najważniejszy kontekst decyzyjny.

@@ -1101,3 +1101,22 @@ Wynik:
   - zaktualizowano opis wzoru i sekcję metodologiczną w expanderze.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-024 [DONE]
+Temat: Powiązanie sekcji `Główne zalety / Główne problemy` z listami `Najlepsze dopasowania / Największe luki`.
+Kryteria ukończenia:
+1. Jeśli archetyp priorytetowy (TOP2/TOP3) pojawia się w `Największe luki`, jest to jawnie pokazane w `Główne problemy`.
+2. Jeśli archetyp priorytetowy (TOP2/TOP3) pojawia się w `Najlepsze dopasowania`, jest to jawnie pokazane w `Główne zalety`.
+3. Logika działa dynamicznie dla Archetypów i Wartości.
+Pierwszy krok wykonawczy:
+- dopisać kontrolę przecięć pomiędzy pulą priorytetową (TOP2/TOP3 polityk + mieszkańcy) a top3 luk/dopasowań.
+Wynik:
+- `app.py`:
+  - dodano wykrywanie przecięć:
+    - `priority_in_best` (priorytety wśród najlepszych dopasowań),
+    - `priority_in_gaps` (priorytety wśród największych luk),
+  - dodano automatyczne wpisy do sekcji:
+    - `Główne zalety`: lista priorytetów w top dopasowaniach z `|Δ|`,
+    - `Główne problemy`: lista priorytetów w top lukach z `|Δ|`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

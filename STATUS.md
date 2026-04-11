@@ -936,6 +936,20 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-024 (TOP2/TOP3 vs luki/dopasowania w sekcji zalet/problemów)
+- `app.py` (`🧭 Matching`, `Podsumowanie`, blok `Główne zalety / Główne problemy`):
+  - dodano dynamiczne wykrywanie przecięć:
+    - `priority_in_best`: archetypy/wartości z puli priorytetowej (`TOP2/TOP3`) obecne w `Najlepsze dopasowania`,
+    - `priority_in_gaps`: archetypy/wartości z puli priorytetowej (`TOP2/TOP3`) obecne w `Największe luki`,
+  - dodano nowe automatyczne linie:
+    - do `Główne zalety`: „Priorytetowe pozycje są też wśród najlepszych dopasowań: ...”,
+    - do `Główne problemy`: „Priorytetowe pozycje są też wśród największych luk: ...”,
+  - każda pozycja pokazuje również `|Δ|` w pp.
+- Efekt:
+  - przypadki takie jak `Władca/Bohater` z TOP polityka jednocześnie w największych lukach są teraz jawnie odnotowane.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

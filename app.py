@@ -4607,6 +4607,8 @@ def matching_view() -> None:
         key_max_gap_live = float(diff_by_entity.get(key_max_entity, 0.0))
         best_entity = min(diff_by_entity.keys(), key=lambda a: float(diff_by_entity.get(a, 0.0)))
         best_gap_live = float(diff_by_entity.get(best_entity, 0.0))
+        strongest_fit_entities = sorted(diff_by_entity.keys(), key=lambda a: float(diff_by_entity.get(a, 0.0)))[:3]
+        largest_gap_entities = sorted(diff_by_entity.keys(), key=lambda a: float(diff_by_entity.get(a, 0.0)), reverse=True)[:3]
         overlap_top = [a for a in p_top if a in j_top]
 
         advantages: List[str] = []
@@ -4627,6 +4629,29 @@ def matching_view() -> None:
             advantages.append(f"Wspólne priorytety ({len(overlap_top)}/{overlap_total}): {overlap_txt}.")
         else:
             problems.append("Brak wspólnych pozycji w priorytetach polityka i mieszkańców.")
+
+        # Jeśli priorytety (TOP2/TOP3) pokrywają się z najlepszymi / największymi lukami,
+        # pokazujemy to jawnie w sekcji zalet/problemów.
+        priority_for_checks: List[str] = []
+        for arche in p_top + j_top:
+            if arche not in priority_for_checks:
+                priority_for_checks.append(arche)
+        priority_in_best = [a for a in strongest_fit_entities if a in priority_for_checks]
+        priority_in_gaps = [a for a in largest_gap_entities if a in priority_for_checks]
+
+        if priority_in_best:
+            best_priority_txt = ", ".join(
+                f"{_matching_entity_name(a, current_axis_label)} (|Δ| {float(diff_by_entity.get(a, 0.0)):.1f} pp)"
+                for a in priority_in_best
+            )
+            advantages.append(f"Priorytetowe pozycje są też wśród najlepszych dopasowań: {best_priority_txt}.")
+
+        if priority_in_gaps:
+            gap_priority_txt = ", ".join(
+                f"{_matching_entity_name(a, current_axis_label)} (|Δ| {float(diff_by_entity.get(a, 0.0)):.1f} pp)"
+                for a in priority_in_gaps
+            )
+            problems.append(f"Priorytetowe pozycje są też wśród największych luk: {gap_priority_txt}.")
 
         if key_gap_mae_live <= 10.0:
             advantages.append(f"Średnia luka na kluczowych {axis_gen} jest niska ({key_gap_mae_live:.1f} pp).")
