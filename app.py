@@ -3338,8 +3338,19 @@ def matching_view() -> None:
             color:#ffffff !important;
             box-shadow:0 7px 16px rgba(37,99,235,.30) !important;
             transform:translateY(-1px);
+            opacity:1 !important;
+          }
+          div[data-testid="stTabs"] [aria-selected="true"]:hover{
+            background:linear-gradient(180deg,#2f7fd8 0%, #2b70c2 100%) !important;
+            border-color:#1d4f8c !important;
+            color:#ffffff !important;
+            box-shadow:0 8px 18px rgba(37,99,235,.34) !important;
+            opacity:1 !important;
           }
           div[data-testid="stTabs"] [aria-selected="true"] *{
+            color:#ffffff !important;
+          }
+          div[data-testid="stTabs"] [aria-selected="true"]:hover *{
             color:#ffffff !important;
           }
           div[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
@@ -3985,8 +3996,11 @@ def matching_view() -> None:
                 padding:12px 0 0 0;
                 margin:18px 0 10px 0;
               }
+              .match-section-header.match-compare-header{
+                margin:14px 0 4px 0;
+              }
               .match-section-header.match-profile-header{
-                margin-top:28px;
+                margin-top:30px;
               }
               .match-section-header h3{
                 margin:0;
@@ -4114,7 +4128,7 @@ def matching_view() -> None:
               }
               .match-top3-style-card .title{
                 font-size:13px;
-                font-weight:800;
+                font-weight:500;
                 color:#1f2f44;
                 margin-bottom:4px;
               }
@@ -4130,6 +4144,10 @@ def matching_view() -> None:
               }
               .match-top3-style-card .line2 span{
                 white-space:nowrap;
+              }
+              .js-plotly-plot .legend rect.bg{
+                rx:10px !important;
+                ry:10px !important;
               }
               .match-wheel-legend{
                 margin-top:8px;
@@ -4223,7 +4241,7 @@ def matching_view() -> None:
         )
 
         compare_title = "Porównanie profili archetypowych" if current_axis_label == "Archetyp" else "Porównanie profili wartości"
-        st.markdown(f"<div class='match-section-header'><h3>{html.escape(compare_title)}</h3></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='match-section-header match-compare-header'><h3>{html.escape(compare_title)}</h3></div>", unsafe_allow_html=True)
 
         person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
         jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
@@ -4308,18 +4326,21 @@ def matching_view() -> None:
                     direction="clockwise",
                 ),
             ),
-            margin=dict(l=24, r=24, t=116, b=18),
+            margin=dict(l=24, r=24, t=86, b=78),
             showlegend=True,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.07,
+                y=1.14,
                 xanchor="center",
                 x=0.5,
                 font=dict(size=13),
-                bgcolor="rgba(255,255,255,0.88)",
-                bordercolor="#d6deea",
+                bgcolor="rgba(255,255,255,0.94)",
+                bordercolor="#cfd9e8",
                 borderwidth=1,
+                entrywidthmode="pixels",
+                entrywidth=320,
+                tracegroupgap=18,
                 itemclick="toggle",
                 itemdoubleclick="toggleothers",
             ),
@@ -4344,9 +4365,9 @@ def matching_view() -> None:
               <div class="match-top3-style-card">
                 <div class="title">TOP3 mieszkańców</div>
                 <div class="line2">
-                  <span><span style="color:{jst_top_colors['main']};">●</span> główny</span>
-                  <span><span style="color:{jst_top_colors['aux']};">●</span> wspierający</span>
-                  <span><span style="color:{jst_top_colors['supp']};">●</span> poboczny</span>
+                  <span><span style="color:{jst_top_colors['main']};">■</span> główny</span>
+                  <span><span style="color:{jst_top_colors['aux']};">■</span> wspierający</span>
+                  <span><span style="color:{jst_top_colors['supp']};">■</span> poboczny</span>
                 </div>
               </div>
             </div>

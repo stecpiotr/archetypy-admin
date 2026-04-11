@@ -705,7 +705,7 @@ Wynik Etapu 2 (czesc 2):
   - w expanderze dopisano nowy opis wzoru i listę archetypow kluczowych.
 - Smoke-check: `python -m py_compile app.py` (OK).
 
-Dogrywka A2 [PENDING, po Kroku B]:
+Dogrywka A2 [DONE]:
 1. `🧭 Matching` tabs:
    - poprawic nieczytelnosc aktywnej zakladki po najechaniu (hover nie moze "zjadac" kontrastu tekstu).
 2. `Porównanie profili archetypowych`:
@@ -717,6 +717,28 @@ Dogrywka A2 [PENDING, po Kroku B]:
    - zaokraglic rogi obramowania,
    - odrobine zwiekszyc odstep miedzy profilem polityka i mieszkancow,
    - zwiekszyc marginesy wewnetrzne (boczne oraz gorny/dolny).
+
+Wynik Dogrywki A2:
+- `app.py`:
+  - taby Matching: aktywny tab pozostaje czytelny po hover (wymuszone kolory i kontrast dla stanu `selected:hover`),
+  - radar porownawczy:
+    - gorna legenda przesunieta wyzej, z wiekszym odstępem między pozycjami i wiekszymi marginesami wewnetrznymi,
+    - caly blok wykresu z legendami zblizony do tytulu sekcji,
+    - dolny margines wykresu zwiekszony (koniec ucinania etykiety `Władca`),
+  - dolna legenda TOP3:
+    - `TOP3 polityka` i `TOP3 mieszkańców` bez pogrubienia,
+    - znaczniki dla `TOP3 mieszkańców` zmienione na kwadraty.
+- Smoke-check: `python -m py_compile app.py` (OK).
+
+Dogrywka A3 [PENDING]:
+1. `🧭 Matching / Podsumowanie`:
+   - pod blokami `TOP3 archetypów dla ...` dodac nowa sekcje:
+     - `Główne zalety`,
+     - `Główne problemy`,
+   - logika ma wyciagac wnioski z rozjazdow i zgodnosci (szczegolnie na kluczowych archetypach) i prezentowac je atrakcyjnie wizualnie (bez niebieskich gradientow).
+2. Metryka dopasowania:
+   - ocenic i ewentualnie dodac jawna premie za bliskosc kluczowych archetypow (obecnie jest tylko efekt posredni przez nizsze `KEY_MAE` i mniejsza karę),
+   - jesli premia zostanie dodana: zaktualizowac wzor i opis metodyki.
 
 Kryteria ukonczenia Etapu 2:
 1. Wszystkie elementy z punktow 1-8 usera odwzorowane 1:1 na zrzutach.

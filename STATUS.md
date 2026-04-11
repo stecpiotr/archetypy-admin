@@ -642,6 +642,28 @@
   - wiekszy odstep miedzy profilami,
   - wieksze marginesy boczne i pionowe.
 
+### Zrobione w Hotfix H-015 — Etap 2 (Dogrywka A2)
+- `app.py`:
+  - tabs Matching: poprawiono czytelnosc aktywnej zakladki po hover (`selected:hover` utrzymuje wysoki kontrast),
+  - `Porównanie profili archetypowych`:
+    - gorna legenda przesunieta wyzej i odsunieta od wykresu,
+    - zwiekszono odstep miedzy profilami w legendzie i padding legendy,
+    - wykres z legendami przesuniety blizej tytulu sekcji,
+    - zwiekszony dolny margines wykresu (bez ucinania etykiety `Władca`),
+  - dolna legenda TOP3:
+    - tytuly `TOP3 polityka`/`TOP3 mieszkańców` bez pogrubienia,
+    - znaczniki dla `TOP3 mieszkańców` jako kwadraty.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Dopisane do planu po ostatniej wiadomosci usera (Dogrywka A3)
+- Dodano nowy pakiet `Dogrywka A3`:
+  1. nowa sekcja `Główne zalety` / `Główne problemy` w `🧭 Matching / Podsumowanie`,
+  2. analiza ewentualnej jawnej premii za bliskosc kluczowych archetypow.
+- Uwaga metodyczna zapisana do realizacji:
+  - obecna metryka ma efekt "premii pośredniej" (niższy `KEY_MAE` i mniejsza kara),
+    ale nie ma oddzielnej, jawnej premii dodatniej.
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -650,4 +672,4 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Wykonac `H-015 / Etap 2 / Krok B`: przebudowa metryki `Poziom dopasowania` z dodatkowa kara za rozjazdy na archetypach kluczowych (TOP3 polityka + TOP3 JST) i aktualizacja opisu metodyki.
+- Wykonac `H-015 / Etap 3 / Krok D`: naprawa map w `Segmenty` i `Skupienia` (render + reakcja na suwak).

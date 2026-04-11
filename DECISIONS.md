@@ -647,3 +647,20 @@ Decyzja:
     - `match = clamp(0,100, base - kara_kluczowa)`.
 Uzasadnienie:
 - User zglosil, ze poprzednia metryka zbyt lagodnie ocenia przypadki, w ktorych archetypy kluczowe sa jednoczesnie najwiekszymi lukami.
+
+### D-074: Dogrywka A2 domyka czytelnosc tabs i legend radaru bez zmiany logiki danych
+Decyzja:
+- W `🧭 Matching` poprawki Dogrywki A2 obejmuja tylko warstwe prezentacji:
+  - kontrast aktywnej zakladki na hover,
+  - pozycjonowanie i estetyke legendy górnej,
+  - dolna legende TOP3 (normalna waga tytułów, kwadraty dla `TOP3 mieszkańców`),
+  - zwiekszenie dolnego marginesu wykresu, aby nie ucinać etykiet osi.
+Uzasadnienie:
+- User zglosil problemy wizualne i czytelnosci; nie bylo potrzeby ingerencji w obliczenia.
+
+### D-075: Premia za zgodnosc kluczowych archetypow jest na razie posrednia; jawna premia trafia do backlogu
+Decyzja:
+- Obecna metryka nie ma osobnego dodatniego bonusu; efekt "premii" wynika posrednio z nizszych wartosci `KEY_MAE` i `KEY_MAX` (czyli mniejszej kary).
+- Ewaluacja jawnej premii dodatniej zostaje zaplanowana jako osobny punkt (`Dogrywka A3`), z oceną ryzyka sztucznego zawyzania wyniku.
+Uzasadnienie:
+- User dopytal o premie; chcemy najpierw zweryfikowac wplyw merytoryczny, zanim dodamy nowy skladnik do wzoru.
