@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Tuple, Optional
 import contextlib
 from datetime import datetime, timedelta, timezone
 import warnings
@@ -25,9 +25,14 @@ from zoneinfo import ZoneInfo
 from db_utils import (
     get_supabase,
     fetch_studies,
+    fetch_personal_response_count,
     insert_study,
+    merge_personal_study_responses,
     update_study,
     check_slug_availability,
+    soft_delete_study,
+    set_study_status,
+    normalize_study_status as normalize_personal_study_status,
 )
 from db_jst_utils import (
     ARCHETYPES as JST_ARCHETYPES,
@@ -35,6 +40,7 @@ from db_jst_utils import (
     check_jst_slug_availability,
     ensure_jst_schema,
     fetch_jst_response_counts,
+    fetch_jst_study_by_id,
     fetch_jst_studies,
     insert_jst_response,
     insert_jst_study,
@@ -43,6 +49,8 @@ from db_jst_utils import (
     normalize_response_row as jst_normalize_response_row,
     response_rows_to_dataframe as jst_response_rows_to_dataframe,
     soft_delete_jst_study,
+    set_jst_study_status,
+    normalize_study_status as normalize_jst_study_status,
     update_jst_study,
 )
 from polish import (
@@ -638,6 +646,11 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
   border-color:#fed7aa;
   color:#9a3412;
 }
+.share-chip.closed{
+  background:#f1f5f9;
+  border-color:#cbd5e1;
+  color:#1f2937;
+}
 .share-chip.expired{
   background:#f8fafc;
   border-color:#cbd5e1;
@@ -1034,6 +1047,124 @@ def _require_jst_ready() -> bool:
             st.rerun()
     return False
 
+
+def _study_status_label(status: str, with_icon: bool = False) -> str:
+    s = str(status or "").strip().lower()
+    if s == "suspended":
+        return "🟠 zawieszone" if with_icon else "zawieszone"
+    if s == "closed":
+        return "⚫ zamknięte" if with_icon else "zamknięte"
+    if s == "deleted":
+        return "🔴 usunięte" if with_icon else "usunięte"
+    return "🟢 aktywne" if with_icon else "aktywne"
+
+
+def _study_status_meta(study: Dict[str, Any], *, kind: str) -> Dict[str, str]:
+    if kind == "jst":
+        status = normalize_jst_study_status(
+            study.get("study_status"),
+            is_active=study.get("is_active"),
+            deleted_at=study.get("deleted_at"),
+        )
+    else:
+        status = normalize_personal_study_status(
+            study.get("study_status"),
+            is_active=study.get("is_active"),
+            deleted_at=study.get("deleted_at"),
+        )
+    started_at = _fmt_local_ts(study.get("started_at")) or _fmt_local_ts(study.get("created_at")) or "—"
+    status_changed = (
+        _fmt_local_ts(study.get("status_changed_at"))
+        or _fmt_local_ts(study.get("updated_at"))
+        or _fmt_local_ts(study.get("created_at"))
+        or "—"
+    )
+    return {
+        "status": status,
+        "status_label": _study_status_label(status, with_icon=True),
+        "started_at": started_at,
+        "status_changed_at": status_changed,
+    }
+
+
+def _render_study_status_panel(
+    *,
+    kind: str,
+    study: Dict[str, Any],
+    on_suspend: Callable[[], None],
+    on_unsuspend: Callable[[], None],
+    on_close: Callable[[], None],
+    on_delete: Callable[[], None],
+    close_confirm_key: str,
+    delete_confirm_key: str,
+) -> None:
+    meta = _study_status_meta(study, kind=kind)
+    status = meta["status"]
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown("### Status badania")
+    status_df = pd.DataFrame(
+        [
+            {
+                "Status": meta["status_label"],
+                "Data uruchomienia badania": meta["started_at"],
+                "Data ostatniego statusu": meta["status_changed_at"],
+            }
+        ]
+    )
+    st.dataframe(status_df, use_container_width=True, hide_index=True)
+    st.markdown(
+        "<div class='share-manage-meta'>"
+        f"<span class='share-chip {status}'>status: {meta['status_label']}</span>"
+        f"<span class='share-chip'>start: {meta['started_at']}</span>"
+        f"<span class='share-chip'>ostatnia zmiana: {meta['status_changed_at']}</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    b1, b2, b3, b4, _sp = st.columns([0.17, 0.17, 0.20, 0.17, 0.29], gap="small")
+    with b1:
+        if st.button("⏸️ Zawieś", key=f"{kind}_suspend_{study.get('id')}", use_container_width=True, disabled=status != "active"):
+            on_suspend()
+    with b2:
+        if st.button("▶️ Odwieś", key=f"{kind}_unsuspend_{study.get('id')}", use_container_width=True, disabled=status != "suspended"):
+            on_unsuspend()
+    with b3:
+        close_disabled = status in {"closed", "deleted"}
+        if st.button("🔒 Zamknij badanie", key=f"{kind}_close_{study.get('id')}", use_container_width=True, disabled=close_disabled):
+            st.session_state[close_confirm_key] = True
+            st.rerun()
+    with b4:
+        if st.button("🗑️ Usuń badanie", key=f"{kind}_delete_{study.get('id')}", use_container_width=True):
+            st.session_state[delete_confirm_key] = True
+            st.rerun()
+
+    if status == "closed":
+        st.info("Badanie jest zamknięte na stałe. Nie można go ponownie uruchomić ani zbierać nowych głosów.")
+
+    if st.session_state.get(close_confirm_key, False):
+        st.warning("Po zamknięciu badania nie będzie można już przyjmować odpowiedzi ani ponownie uruchomić badania.")
+        c1, c2, _csp = st.columns([0.24, 0.16, 0.60], gap="small")
+        with c1:
+            if st.button("✅ Tak, zamknij", key=f"{kind}_close_yes_{study.get('id')}", use_container_width=True):
+                st.session_state.pop(close_confirm_key, None)
+                on_close()
+        with c2:
+            if st.button("↩️ Anuluj", key=f"{kind}_close_no_{study.get('id')}", use_container_width=True):
+                st.session_state.pop(close_confirm_key, None)
+                st.rerun()
+
+    if st.session_state.get(delete_confirm_key, False):
+        st.warning("Czy na pewno usunąć badanie? Tej operacji nie można cofnąć.")
+        d1, d2, _dsp = st.columns([0.22, 0.16, 0.62], gap="small")
+        with d1:
+            if st.button("✅ Tak, usuń", key=f"{kind}_delete_yes_{study.get('id')}", use_container_width=True):
+                st.session_state.pop(delete_confirm_key, None)
+                on_delete()
+        with d2:
+            if st.button("↩️ Anuluj", key=f"{kind}_delete_no_{study.get('id')}", use_container_width=True):
+                st.session_state.pop(delete_confirm_key, None)
+                st.rerun()
+
 CASES = ["nom", "gen", "dat", "acc", "ins", "loc", "voc"]
 
 def _split_two(s: str) -> Tuple[str, str]:
@@ -1425,7 +1556,7 @@ def home_personal_view() -> None:
     header("Badania personalne - panel")
     render_titlebar(["Panel", "Badania personalne"])
 
-    c1, c2, c3, c4 = st.columns(4, gap="medium")
+    c1, c2, c3, c4, c5, c6 = st.columns(6, gap="small")
     with c1:
         if st.button("➕\n\nDodaj badanie archetypu", key="tile_home_personal_add", type="secondary", use_container_width=True):
             goto("add")
@@ -1433,9 +1564,15 @@ def home_personal_view() -> None:
         if st.button("✏️\n\nEdytuj dane badania", key="tile_home_personal_edit", type="secondary", use_container_width=True):
             goto("edit")
     with c3:
+        if st.button("⚙️\n\nUstawienia ankiety", key="tile_home_personal_settings", type="secondary", use_container_width=True):
+            goto("personal_settings")
+    with c4:
         if st.button("✉️\n\nWyślij link do ankiety", key="tile_home_personal_send", type="secondary", use_container_width=True):
             goto("send")
-    with c4:
+    with c5:
+        if st.button("🔗\n\nPołącz badania", key="tile_home_personal_merge", type="secondary", use_container_width=True):
+            goto("personal_merge")
+    with c6:
         if st.button("📊\n\nSprawdź wyniki badania archetypu", key="tile_home_personal_results", type="secondary", use_container_width=True):
             goto("results")
 
@@ -1822,53 +1959,76 @@ def jst_edit_view() -> None:
         current_slug=str(study.get("slug") or ""),
     )
 
-    left, right = st.columns(2)
-    with left:
-        if st.button("Zapisz zmiany", type="primary"):
-            if not jst_name:
-                st.error("Uzupełnij nazwę JST.")
-                return
-            if not slug:
-                st.error("Uzupełnij końcówkę linku.")
-                return
-            if not slug_free and slug != str(study.get("slug") or ""):
-                st.error("Wybrany link jest zajęty.")
-                return
-            if any(not (forms.get(c) or "").strip() for c in JST_CASES):
-                st.error("Uzupełnij odmiany nazwy JST (mianownik–wołacz).")
-                return
-            payload = _jst_payload_from_form(jst_type, jst_name, forms, slug)
-            payload["population_15_plus"] = population_15_plus
-            if any(float(v or 0.0) > 0 for v in poststrat_targets.values()):
-                payload["poststrat_targets"] = {k: float(v) for k, v in poststrat_targets.items() if float(v or 0.0) > 0}
-            else:
-                payload["poststrat_targets"] = None
-            try:
-                update_jst_study(sb, str(study["id"]), payload)
-                st.success("✅ Zapisano zmiany.")
-            except Exception as e:
-                st.error(f"Błąd zapisu: {e}")
-    with right:
-        if st.button("🗑️ Usuń badanie", type="secondary"):
-            st.session_state["jst_delete_confirm_id"] = str(study["id"])
+    if st.button("Zapisz zmiany", type="primary"):
+        if not jst_name:
+            st.error("Uzupełnij nazwę JST.")
+            return
+        if not slug:
+            st.error("Uzupełnij końcówkę linku.")
+            return
+        if not slug_free and slug != str(study.get("slug") or ""):
+            st.error("Wybrany link jest zajęty.")
+            return
+        if any(not (forms.get(c) or "").strip() for c in JST_CASES):
+            st.error("Uzupełnij odmiany nazwy JST (mianownik–wołacz).")
+            return
+        payload = _jst_payload_from_form(jst_type, jst_name, forms, slug)
+        payload["population_15_plus"] = population_15_plus
+        if any(float(v or 0.0) > 0 for v in poststrat_targets.values()):
+            payload["poststrat_targets"] = {k: float(v) for k, v in poststrat_targets.items() if float(v or 0.0) > 0}
+        else:
+            payload["poststrat_targets"] = None
+        try:
+            update_jst_study(sb, str(study["id"]), payload)
+            st.success("✅ Zapisano zmiany.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Błąd zapisu: {e}")
 
-    if st.session_state.get("jst_delete_confirm_id") == str(study["id"]):
-        with modal("Czy na pewno usunąć to badanie?"):
-            st.warning("Tej operacji nie można cofnąć.")
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("Tak, usuń", type="primary"):
-                    try:
-                        soft_delete_jst_study(sb, str(study["id"]))
-                        st.session_state.pop("jst_delete_confirm_id", None)
-                        st.success("Badanie zostało usunięte.")
-                        goto("home_jst")
-                    except Exception as e:
-                        st.error(f"Błąd usuwania: {e}")
-            with c2:
-                if st.button("Anuluj", type="secondary"):
-                    st.session_state.pop("jst_delete_confirm_id", None)
-                    st.rerun()
+    study_status_row = fetch_jst_study_by_id(sb, str(study["id"])) or study
+
+    def _do_suspend_jst() -> None:
+        try:
+            set_jst_study_status(sb, str(study["id"]), "suspended")
+            st.success("Badanie zostało zawieszone.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zawiesić badania: {exc}")
+
+    def _do_unsuspend_jst() -> None:
+        try:
+            set_jst_study_status(sb, str(study["id"]), "active")
+            st.success("Badanie zostało odwieszone.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się odwiesić badania: {exc}")
+
+    def _do_close_jst() -> None:
+        try:
+            set_jst_study_status(sb, str(study["id"]), "closed")
+            st.success("Badanie zostało zamknięte na stałe.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zamknąć badania: {exc}")
+
+    def _do_delete_jst() -> None:
+        try:
+            soft_delete_jst_study(sb, str(study["id"]))
+            st.success("Badanie zostało usunięte.")
+            goto("home_jst")
+        except Exception as exc:
+            st.error(f"Błąd usuwania: {exc}")
+
+    _render_study_status_panel(
+        kind="jst",
+        study=study_status_row,
+        on_suspend=_do_suspend_jst,
+        on_unsuspend=_do_unsuspend_jst,
+        on_close=_do_close_jst,
+        on_delete=_do_delete_jst,
+        close_confirm_key=f"jst_close_confirm_{study.get('id')}",
+        delete_confirm_key=f"jst_delete_confirm_{study.get('id')}",
+    )
 
 
 def jst_send_view() -> None:
@@ -3386,8 +3546,37 @@ def matching_view() -> None:
     tab_pick, tab_summary, tab_demo, tab_strategy = st.tabs(["Wybierz badania", "Podsumowanie", "Demografia", "Strategia komunikacji"])
 
     with tab_pick:
-        pick_personal = st.selectbox("Badanie personalne", list(p_options.keys()))
-        pick_jst = st.selectbox("Badanie mieszkańców", list(j_options.keys()))
+        def _invalidate_matching_result() -> None:
+            st.session_state.pop("matching_result", None)
+            st.session_state.pop("matching_result_notice", None)
+
+        personal_choices = list(p_options.keys())
+        jst_choices = list(j_options.keys())
+        if st.session_state.get("matching_pick_personal") not in personal_choices:
+            st.session_state["matching_pick_personal"] = personal_choices[0]
+        if st.session_state.get("matching_pick_jst") not in jst_choices:
+            st.session_state["matching_pick_jst"] = jst_choices[0]
+
+        pick_personal = st.selectbox(
+            "Badanie personalne",
+            personal_choices,
+            key="matching_pick_personal",
+            on_change=_invalidate_matching_result,
+        )
+        pick_jst = st.selectbox(
+            "Badanie mieszkańców",
+            jst_choices,
+            key="matching_pick_jst",
+            on_change=_invalidate_matching_result,
+        )
+        existing_result = st.session_state.get("matching_result")
+        if isinstance(existing_result, dict):
+            if (
+                str(existing_result.get("person_label") or "") != str(pick_personal)
+                or str(existing_result.get("jst_label") or "") != str(pick_jst)
+            ):
+                _invalidate_matching_result()
+
         if st.button("Połącz i policz matching", type="primary"):
             person = p_options[pick_personal]
             jst_study = j_options[pick_jst]
@@ -3439,7 +3628,8 @@ def matching_view() -> None:
             score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
             score_key = max(0.0, min(100.0, 100.0 - key_gap_mae))
             base_score = 0.40 * score_mae + 0.20 * score_rmse + 0.20 * score_top3 + 0.20 * score_key
-            key_penalty = 0.45 * key_gap_mae + 0.22 * max(0.0, key_gap_max - 9.0)
+            # Kara kluczowa: nadal mocna, ale mniej "skokowa" dla pojedynczego ekstremum.
+            key_penalty = 0.42 * key_gap_mae + 0.16 * max(0.0, key_gap_max - 12.0)
             # Metryka mieszana z dodatkową karą za luki na archetypach kluczowych
             # (TOP3 polityka + TOP3 mieszkańców), żeby nie zawyżać wyniku przy strategicznych rozjazdach.
             match_score = max(0.0, min(100.0, base_score - key_penalty))
@@ -3465,21 +3655,17 @@ def matching_view() -> None:
                 score_band_idx = 1
             else:
                 score_band_idx = 0
-            # Korekta opisu pasma: nawet wysoki wynik liczbowy nie powinien dawać "bardzo wysokiej" oceny,
-            # jeżeli na archetypach kluczowych zostają duże luki.
-            key_guard_idx = 7
+            # Korekta opisu: przy bardzo dużych lukach kluczowych dopinamy ostrzeżenie,
+            # ale nie nadpisujemy podstawowego progu liczbowego (żeby zakresy 0-100 były czytelne).
+            key_guard_idx = score_band_idx
             guard_note = ""
             if key_gap_max >= 35.0 or key_gap_mae >= 24.0:
-                key_guard_idx = 2
-                guard_note = "Duże luki kluczowe obniżają ocenę opisową mimo wyniku bazowego."
+                guard_note = "Duże luki kluczowe oznaczają wysokie ryzyko rozjazdu strategicznego."
             elif key_gap_max >= 28.0 or key_gap_mae >= 19.0:
-                key_guard_idx = 3
                 guard_note = "Luki kluczowe pozostają wysokie i wymagają korekty przekazu."
             elif key_gap_max >= 22.0 or key_gap_mae >= 15.0:
-                key_guard_idx = 4
                 guard_note = "W obszarze kluczowych archetypów nadal widoczne są istotne rozjazdy."
             elif key_gap_max >= 18.0 or key_gap_mae >= 12.0:
-                key_guard_idx = 5
                 guard_note = "Drobne rozjazdy kluczowe ograniczają ocenę do poziomu wysokiego."
             final_band_idx = min(score_band_idx, key_guard_idx)
             match_bands: List[Tuple[str, str]] = [
@@ -3756,7 +3942,7 @@ def matching_view() -> None:
                 "target_audit": target_audit,
                 "match_formula": (
                     "base = 0.40*(100 - MAE) + 0.20*(100 - RMSE) + 0.20*(100 - TOP3_MAE) + 0.20*(100 - KEY_MAE); "
-                    "kara_kluczowa = 0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9); "
+                    "kara_kluczowa = 0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12); "
                     "match = clamp(0,100, base - kara_kluczowa); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
                     "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii TOP3 polityka i TOP3 mieszkańców, "
@@ -3765,6 +3951,9 @@ def matching_view() -> None:
                     "Model nie dodaje osobnej premii dodatniej za zgodność - niższa luka poprawia wynik tylko przez mniejszą karę."
                 ),
             }
+            st.session_state["matching_result_notice"] = True
+
+        if st.session_state.get("matching_result_notice") and st.session_state.get("matching_result"):
             st.success("Wynik dopasowania został obliczony.")
 
     result = st.session_state.get("matching_result")
@@ -3858,11 +4047,12 @@ def matching_view() -> None:
             unsafe_allow_html=True,
         )
         if metrics:
-            mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+            mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
             mcol1.metric("Średnia różnica (MAE)", f"{float(metrics.get('mae', 0.0)):.1f} pp")
             mcol2.metric("Różnica z karą za odchylenia (RMSE)", f"{float(metrics.get('rmse', 0.0)):.1f} pp")
             mcol3.metric("Średnia TOP3 luk", f"{float(metrics.get('top3_gap_mae', 0.0)):.1f} pp")
             mcol4.metric("Luki kluczowe (TOP3 P+JST)", f"{float(metrics.get('key_gap_mae', 0.0)):.1f} pp")
+            mcol5.metric("Maks. luka kluczowa", f"{float(metrics.get('key_gap_max', 0.0)):.1f} pp")
         st.caption(f"Próba personalna: {result['personal_n']} odpowiedzi · Próba mieszkańców: {result['jst_n']} odpowiedzi")
         sei_short = str(current_sei_short)
         sei_full = str(current_sei_full)
@@ -3907,7 +4097,7 @@ def matching_view() -> None:
                 "**Progi oceny (wynik bazowy):** "
                 "`0–29` marginalne dopasowanie, `30–39` bardzo niskie, `40–49` niskie, `50–59` umiarkowane, "
                 "`60–69` znaczące, `70–79` wysokie, `80–89` bardzo wysokie, `90–100` ekstremalnie wysokie. "
-                "Następnie opis jest korygowany w dół, jeśli luki kluczowe (`KEY_MAE`/`KEY_MAX`) są zbyt duże."
+                "Duże luki kluczowe (`KEY_MAE`/`KEY_MAX`) są dodatkowo sygnalizowane w opisie jakościowym."
             )
             st.caption(
                 "W modelu nie ma osobnej premii dodatniej za zgodność. Lepszy wynik wynika wyłącznie z niższych luk i mniejszej kary kluczowej."
@@ -4898,9 +5088,201 @@ def add_view() -> None:
         except Exception as e:
             st.error(f"❌ Błąd zapisu: {e}")
 
+
+def personal_settings_view() -> None:
+    require_auth()
+    header("⚙️ Ustawienia ankiety")
+    render_titlebar(["Panel", "Badania personalne", "Ustawienia ankiety"])
+    back_button("home_personal", "← Powrót do panelu personalnego")
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+
+    studies = fetch_studies(sb)
+    if not studies:
+        st.info("Brak badań personalnych.")
+        return
+
+    counts_by_slug: Dict[str, int] = {}
+    try:
+        c_res = sb.from_("study_response_count_v").select("slug,responses").execute()
+        for row in (c_res.data or []):
+            slug = str(row.get("slug") or "").strip()
+            if slug:
+                counts_by_slug[slug] = int(row.get("responses") or 0)
+    except Exception:
+        counts_by_slug = {}
+
+    options: Dict[str, Dict[str, Any]] = {}
+    for s in studies:
+        fn = str(s.get("first_name_nom") or s.get("first_name") or "").strip()
+        ln = str(s.get("last_name_nom") or s.get("last_name") or "").strip()
+        city = str(s.get("city") or "").strip()
+        slug = str(s.get("slug") or "").strip()
+        count = int(counts_by_slug.get(slug, 0))
+        label = f"{ln} {fn} ({city}) – /{slug} • {count} odp."
+        options[label] = s
+
+    pick = st.selectbox("Wybierz badanie", list(options.keys()), key="personal_settings_pick")
+    study = options[pick]
+    status_meta = _study_status_meta(study, kind="personal")
+    slug = str(study.get("slug") or "").strip()
+    survey_base = str(st.secrets.get("SURVEY_BASE_URL", "https://archetypy.badania.pro") or "").rstrip("/")
+    survey_url = f"{survey_base}/{slug}" if slug else "—"
+
+    info_rows = pd.DataFrame(
+        [
+            {
+                "Status": status_meta["status_label"],
+                "Liczba odpowiedzi": int(counts_by_slug.get(slug, 0)),
+                "Data uruchomienia": status_meta["started_at"],
+                "Ostatnia zmiana statusu": status_meta["status_changed_at"],
+                "Link ankiety": survey_url,
+            }
+        ]
+    )
+    st.dataframe(info_rows, use_container_width=True, hide_index=True)
+    st.info(
+        "Ta sekcja zbiera kluczowe ustawienia ankiety. "
+        "Szczegóły danych i statusu badania możesz dalej edytować też w module „Edytuj dane badania”."
+    )
+
+
+def personal_merge_view() -> None:
+    require_auth()
+    header("🔗 Połącz badania")
+    render_titlebar(["Panel", "Badania personalne", "Połącz badania"])
+    back_button("home_personal", "← Powrót do panelu personalnego")
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+
+    studies = fetch_studies(sb)
+    if len(studies) < 2:
+        st.info("Do łączenia potrzebne są co najmniej 2 aktywne badania personalne.")
+        return
+
+    counts_by_slug: Dict[str, int] = {}
+    try:
+        c_res = sb.from_("study_response_count_v").select("slug,responses").execute()
+        for row in (c_res.data or []):
+            slug = str(row.get("slug") or "").strip()
+            if slug:
+                counts_by_slug[slug] = int(row.get("responses") or 0)
+    except Exception:
+        counts_by_slug = {}
+
+    study_by_id: Dict[str, Dict[str, Any]] = {}
+    labels_by_id: Dict[str, str] = {}
+    for s in studies:
+        sid = str(s.get("id") or "").strip()
+        if not sid:
+            continue
+        fn = str(s.get("first_name_nom") or s.get("first_name") or "").strip()
+        ln = str(s.get("last_name_nom") or s.get("last_name") or "").strip()
+        city = str(s.get("city") or "").strip()
+        slug = str(s.get("slug") or "").strip()
+        cnt = int(counts_by_slug.get(slug, 0))
+        study_by_id[sid] = s
+        labels_by_id[sid] = f"{ln} {fn} ({city}) – /{slug} • {cnt} odp."
+
+    target_ids = list(study_by_id.keys())
+    target_id = st.selectbox(
+        "Badanie główne (do tego badania dodamy wyniki z innych):",
+        target_ids,
+        key="personal_merge_target_id",
+        format_func=lambda sid: labels_by_id.get(str(sid), str(sid)),
+    )
+    target_label = labels_by_id.get(target_id, target_id)
+    st.caption(
+        "Dodanie wyników nie usuwa odpowiedzi ze źródłowych badań. "
+        "Operacja tworzy kopie odpowiedzi w badaniu głównym."
+    )
+
+    slots = st.session_state.get("personal_merge_source_slots")
+    if not isinstance(slots, list) or not slots:
+        slots = [""]
+    slots = [str(x or "") for x in slots]
+    st.session_state["personal_merge_source_slots"] = slots
+
+    selected_ids: List[str] = []
+    all_source_ids = [sid for sid in study_by_id.keys() if sid != target_id]
+
+    for idx in range(len(slots)):
+        key = f"personal_merge_source_pick_{idx}"
+        current = slots[idx] if slots[idx] in all_source_ids else ""
+        available = [sid for sid in all_source_ids if sid == current or sid not in selected_ids]
+        choices = [""] + available
+        if st.session_state.get(key) not in choices:
+            st.session_state[key] = current if current in choices else ""
+        picked = st.selectbox(
+            f"Badanie źródłowe #{idx + 1}",
+            choices,
+            key=key,
+            format_func=lambda sid: "— wybierz badanie —" if not sid else labels_by_id.get(str(sid), str(sid)),
+        )
+        slots[idx] = str(picked or "")
+        if slots[idx]:
+            selected_ids.append(slots[idx])
+
+    st.session_state["personal_merge_source_slots"] = slots
+    selected_unique = [sid for sid in selected_ids if sid and sid != target_id]
+
+    a1, a2 = st.columns([1, 1])
+    with a1:
+        if st.button("➕ Dodaj badanie", key="personal_merge_add_slot", type="secondary", use_container_width=True):
+            st.session_state["personal_merge_source_slots"] = slots + [""]
+            st.rerun()
+    with a2:
+        if st.button(
+            "➖ Usuń ostatnie",
+            key="personal_merge_remove_slot",
+            type="secondary",
+            use_container_width=True,
+            disabled=len(slots) <= 1,
+        ):
+            st.session_state["personal_merge_source_slots"] = slots[:-1] if len(slots) > 1 else [""]
+            st.rerun()
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    if selected_unique:
+        plan_df = pd.DataFrame(
+            [
+                {
+                    "Badanie główne": target_label,
+                    "Badanie źródłowe": labels_by_id.get(sid, sid),
+                }
+                for sid in selected_unique
+            ]
+        )
+        st.dataframe(plan_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("Dodaj co najmniej jedno badanie źródłowe.")
+
+    if st.button("Dodaj", type="primary", disabled=not bool(selected_unique)):
+        with st.spinner("Trwa łączenie wyników badań..."):
+            before_count = fetch_personal_response_count(sb, target_id)
+            merge_result = merge_personal_study_responses(sb, target_id, selected_unique)
+            after_count = fetch_personal_response_count(sb, target_id)
+        st.success(
+            f"Dodano odpowiedzi: {int(merge_result.get('inserted_total') or 0)} "
+            f"(pominięto: {int(merge_result.get('skipped_total') or 0)}). "
+            f"Badanie główne: {before_count} → {after_count} odpowiedzi."
+        )
+        details = merge_result.get("details") or []
+        if details:
+            details_df = pd.DataFrame(details)
+            details_df["source_study_id"] = details_df["source_study_id"].map(lambda sid: labels_by_id.get(str(sid), str(sid)))
+            details_df = details_df.rename(
+                columns={
+                    "source_study_id": "Badanie źródłowe",
+                    "inserted": "Dodane odpowiedzi",
+                    "skipped": "Pominięte rekordy",
+                }
+            )
+            st.dataframe(details_df, use_container_width=True, hide_index=True)
+
+
 def edit_view() -> None:
     require_auth()
     header("✏️ Edytuj dane badania")
+    status_schema_ready = _ensure_jst_schema_initialized()
 
     back_button()
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
@@ -4935,45 +5317,68 @@ def edit_view() -> None:
     chosen_slug, free, url_base = url_fields("edit", last, current_slug=study["slug"])
 
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
-    cols = st.columns([1,1])
-    with cols[0]:
-        if st.button("Zapisz zmiany", type="primary"):
-            if chosen_slug != study["slug"] and not free:
-                st.error("Nowy link jest zajęty."); return
-            full_payload = _payload_from_cases(first, last, city, gender, chosen_slug, cases_vals, is_new=False)
-            payload = _payload_only_changes(study, full_payload)
-            if not payload:
-                st.info("Brak zmian do zapisania."); return
-            try:
-                upd = update_study(sb, study["id"], payload)
-                st.success(f"✅ Zaktualizowano: {upd.get('first_name_nom', first)} {upd.get('last_name_nom', last)} – /{upd['slug']}")
-            except Exception as e:
-                st.error(f"❌ Błąd zapisu: {e}")
+    if st.button("Zapisz zmiany", type="primary"):
+        if chosen_slug != study["slug"] and not free:
+            st.error("Nowy link jest zajęty."); return
+        full_payload = _payload_from_cases(first, last, city, gender, chosen_slug, cases_vals, is_new=False)
+        payload = _payload_only_changes(study, full_payload)
+        if not payload:
+            st.info("Brak zmian do zapisania."); return
+        try:
+            upd = update_study(sb, study["id"], payload)
+            st.success(f"✅ Zaktualizowano: {upd.get('first_name_nom', first)} {upd.get('last_name_nom', last)} – /{upd['slug']}")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Błąd zapisu: {e}")
 
-    with cols[1]:
-        st.markdown('<div id="danger-del-anchor"></div>', unsafe_allow_html=True)
-        if st.button("🗑️ Usuń badanie", key="del_btn", type="secondary"):
-            st.session_state["show_del_modal"] = True
+    fresh_res = sb.table("studies").select("*").eq("id", str(study.get("id"))).limit(1).execute()
+    study_status_row = (fresh_res.data or [study])[0]
 
-    if st.session_state.get("show_del_modal"):
-        with modal("Czy na pewno usunąć to badanie?"):
-            st.warning("Tej operacji nie można cofnąć.")
-            c = st.columns(2)
-            with c[0]:
-                if st.button("Tak, usuń", type="primary"):
-                    try:
-                        sb.table("studies").update({
-                            "is_active": False,
-                            "deleted_at": datetime.utcnow().isoformat()  # kolumna timestamp w studies
-                        }).eq("id", study["id"]).execute()
-                        st.session_state["show_del_modal"] = False
-                        st.success("Badanie oznaczone jako usunięte.");
-                        goto("home_personal")
-                    except Exception as e:
-                        st.error(f"Nie udało się usunąć: {e}")
-            with c[1]:
-                if st.button("Anuluj", type="secondary"):
-                    st.session_state["show_del_modal"] = False; st.rerun()
+    def _do_suspend_personal() -> None:
+        try:
+            set_study_status(sb, str(study["id"]), "suspended")
+            st.success("Badanie zostało zawieszone.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zawiesić badania: {exc}")
+
+    def _do_unsuspend_personal() -> None:
+        try:
+            set_study_status(sb, str(study["id"]), "active")
+            st.success("Badanie zostało odwieszone.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się odwiesić badania: {exc}")
+
+    def _do_close_personal() -> None:
+        try:
+            set_study_status(sb, str(study["id"]), "closed")
+            st.success("Badanie zostało zamknięte na stałe.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zamknąć badania: {exc}")
+
+    def _do_delete_personal() -> None:
+        try:
+            soft_delete_study(sb, str(study["id"]))
+            st.success("Badanie oznaczone jako usunięte.")
+            goto("home_personal")
+        except Exception as exc:
+            st.error(f"Nie udało się usunąć badania: {exc}")
+
+    if status_schema_ready:
+        _render_study_status_panel(
+            kind="personal",
+            study=study_status_row,
+            on_suspend=_do_suspend_personal,
+            on_unsuspend=_do_unsuspend_personal,
+            on_close=_do_close_personal,
+            on_delete=_do_delete_personal,
+            close_confirm_key=f"personal_close_confirm_{study.get('id')}",
+            delete_confirm_key=f"personal_delete_confirm_{study.get('id')}",
+        )
+    else:
+        st.warning("Nie udało się zainicjalizować sekcji „Status badania” (problem z połączeniem do bazy).")
 
 def fetch_stats_table() -> Tuple[int, pd.DataFrame]:
     counts: Dict[str,int] = {}
@@ -5711,6 +6116,10 @@ else:
         add_view()
     elif view == "edit":
         edit_view()
+    elif view == "personal_settings":
+        personal_settings_view()
+    elif view == "personal_merge":
+        personal_merge_view()
     elif view == "results":
         results_view()
     elif view == "send":

@@ -1,7 +1,9 @@
 # db_utils.py
 
 from __future__ import annotations
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
+import ast
+import json
 import os
 from datetime import datetime
 import streamlit as st
@@ -134,6 +136,24 @@ def _attach_inflections_for_insert(payload: Dict) -> Dict:
 # ────────────────────────────────────────────────────────────────────────────────
 # CRUD (z obsługą soft-delete)
 # ────────────────────────────────────────────────────────────────────────────────
+_ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
+
+
+def _utc_now_iso() -> str:
+    return datetime.utcnow().isoformat()
+
+
+def normalize_study_status(raw: Optional[str], *, is_active: Optional[bool] = None, deleted_at: Optional[str] = None) -> str:
+    status = str(raw or "").strip().lower()
+    if status in _ALLOWED_STUDY_STATUSES:
+        return status
+    if deleted_at:
+        return "deleted"
+    if is_active is False:
+        return "deleted"
+    return "active"
+
+
 def fetch_studies(sb: Client) -> List[Dict]:
     res = (
         sb.table("studies")
@@ -150,6 +170,10 @@ def insert_study(sb: Client, payload: Dict) -> Dict:
     Jeśli DB zwróci inny slug (np. trigger), spróbuj od razu przestawić na podany."""
     desired_slug = (payload.get("slug") or "").strip()
     payload = _attach_inflections_for_insert(payload.copy())
+    now_iso = _utc_now_iso()
+    payload.setdefault("study_status", "active")
+    payload.setdefault("status_changed_at", now_iso)
+    payload.setdefault("started_at", now_iso)
 
     ins = sb.table("studies").insert(payload).execute()
     if not ins.data:
@@ -197,8 +221,166 @@ def soft_delete_study(sb: Client, study_id: str) -> None:
     """Soft-delete: oznacza badanie jako nieaktywne zamiast fizycznego usuwania."""
     sb.table("studies").update({
         "is_active": False,
-        "deleted_at": datetime.utcnow().isoformat()
+        "deleted_at": _utc_now_iso(),
+        "study_status": "deleted",
+        "status_changed_at": _utc_now_iso(),
     }).eq("id", study_id).execute()
+
+
+def set_study_status(sb: Client, study_id: str, status: str) -> Dict:
+    sid = str(study_id or "").strip()
+    target = str(status or "").strip().lower()
+    if target not in {"active", "suspended", "closed"}:
+        raise ValueError("Nieprawidłowy status badania.")
+    row_res = sb.table("studies").select("*").eq("id", sid).limit(1).execute()
+    row = (row_res.data or [None])[0]
+    if not row:
+        raise ValueError("Nie znaleziono badania.")
+    current = normalize_study_status(
+        row.get("study_status"),
+        is_active=row.get("is_active"),
+        deleted_at=row.get("deleted_at"),
+    )
+    if current == "deleted":
+        raise ValueError("Usuniętego badania nie można zmienić.")
+    if current == "closed" and target != "closed":
+        raise ValueError("Badanie zamknięte jest trwałe i nie może zostać ponownie uruchomione.")
+    now_iso = _utc_now_iso()
+    updates = {
+        "study_status": target,
+        "status_changed_at": now_iso,
+    }
+    sb.table("studies").update(updates).eq("id", sid).execute()
+    fresh_res = sb.table("studies").select("*").eq("id", sid).limit(1).execute()
+    fresh = (fresh_res.data or [None])[0]
+    if not fresh:
+        raise RuntimeError("Nie udało się odświeżyć statusu badania.")
+    return fresh
+
+
+def _normalize_answers_for_merge(raw: Any) -> Optional[List[int]]:
+    if isinstance(raw, list):
+        out: List[int] = []
+        for item in raw:
+            try:
+                out.append(int(item))
+            except Exception:
+                return None
+        return out
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return None
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                parsed = parser(text)
+            except Exception:
+                continue
+            if isinstance(parsed, list):
+                out2: List[int] = []
+                ok = True
+                for item in parsed:
+                    try:
+                        out2.append(int(item))
+                    except Exception:
+                        ok = False
+                        break
+                if ok:
+                    return out2
+        return None
+    return None
+
+
+def fetch_personal_response_count(sb: Client, study_id: str) -> int:
+    sid = str(study_id or "").strip()
+    if not sid:
+        return 0
+    res = sb.table("responses").select("id", count="exact", head=True).eq("study_id", sid).execute()
+    return int(getattr(res, "count", 0) or 0)
+
+
+def merge_personal_study_responses(
+    sb: Client,
+    target_study_id: str,
+    source_study_ids: List[str],
+    *,
+    fetch_batch_size: int = 500,
+    insert_batch_size: int = 200,
+) -> Dict[str, Any]:
+    target_id = str(target_study_id or "").strip()
+    if not target_id:
+        raise ValueError("Brak badania docelowego.")
+    source_ids = []
+    for raw in (source_study_ids or []):
+        sid = str(raw or "").strip()
+        if sid and sid != target_id and sid not in source_ids:
+            source_ids.append(sid)
+    if not source_ids:
+        raise ValueError("Wybierz co najmniej jedno badanie źródłowe.")
+
+    total_inserted = 0
+    total_skipped = 0
+    details: List[Dict[str, Any]] = []
+
+    for source_id in source_ids:
+        inserted = 0
+        skipped = 0
+        offset = 0
+        while True:
+            rows_res = (
+                sb.table("responses")
+                .select("answers,scores,raw_total")
+                .eq("study_id", source_id)
+                .range(offset, offset + fetch_batch_size - 1)
+                .execute()
+            )
+            rows = rows_res.data or []
+            if not rows:
+                break
+
+            payload_batch: List[Dict[str, Any]] = []
+            for row in rows:
+                answers = _normalize_answers_for_merge(row.get("answers"))
+                if not answers:
+                    skipped += 1
+                    continue
+                payload_batch.append(
+                    {
+                        "study_id": target_id,
+                        "answers": answers,
+                        "scores": row.get("scores"),
+                        "raw_total": row.get("raw_total"),
+                    }
+                )
+
+            for b_start in range(0, len(payload_batch), insert_batch_size):
+                chunk = payload_batch[b_start : b_start + insert_batch_size]
+                if not chunk:
+                    continue
+                sb.table("responses").insert(chunk).execute()
+                inserted += len(chunk)
+
+            if len(rows) < fetch_batch_size:
+                break
+            offset += fetch_batch_size
+
+        total_inserted += inserted
+        total_skipped += skipped
+        details.append(
+            {
+                "source_study_id": source_id,
+                "inserted": inserted,
+                "skipped": skipped,
+            }
+        )
+
+    return {
+        "target_study_id": target_id,
+        "source_study_ids": source_ids,
+        "inserted_total": total_inserted,
+        "skipped_total": total_skipped,
+        "details": details,
+    }
 
 
 def check_slug_availability(sb: Client, slug: str) -> bool:

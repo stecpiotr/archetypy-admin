@@ -911,3 +911,82 @@ Wynik Etapu 3:
   - rebuild raportow:
     - `python D:\\PythonProject\\archetypy\\archetypy-admin\\JST_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK),
     - `python C:\\Poznan_Archetypy_Analiza\\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-016 [DONE]
+Temat: Czyszczenie stanu `Matching` po zmianie badań + sekcja `Status badania` (personalne/JST) z blokadą ankiet dla statusów nieaktywnych.
+Kryteria ukończenia:
+1. W `🧭 Matching` po zmianie któregokolwiek badania nie zostaje zielony komunikat sugerujący policzony wynik.
+2. W `✏️ Edytuj dane badania` i `✏️ Edytuj dane badania mieszkańców` jest sekcja `Status badania` z akcjami:
+   - `Zawieś`,
+   - `Odwieś`,
+   - `Zamknij badanie` (nieodwracalne),
+   - `Usuń badanie` (z dodatkowym potwierdzeniem).
+3. Sekcja statusu pokazuje: bieżący status, datę uruchomienia, datę ostatniej zmiany statusu.
+4. Wejście ankietowe po linku:
+   - dla `suspended`: komunikat `Badanie jest nieaktywne`,
+   - dla `closed`: komunikat `Badanie zakończone`.
+5. JST RPC zapisu odpowiedzi odrzuca zapis, jeśli badanie nie ma statusu `active`.
+Pierwszy krok wykonawczy:
+- dopisać trwałe statusy badań (`study_status`, `status_changed_at`, `started_at`) w warstwie DB i podpiąć je do paneli edycji.
+Wynik:
+- `Matching`: selectboxy dostały callback unieważniający (`matching_result` + komunikat), więc po zmianie badania znika zielony komunikat i stary wynik.
+- `app.py`:
+  - dodano wspólny renderer sekcji `Status badania` (tabela + chipy + akcje z ikonami + potwierdzenia),
+  - wdrożono akcje statusów w obu panelach edycji (personalne i JST),
+  - `Zamknij badanie` jest trwałe (bez możliwości ponownego uruchomienia).
+- `db_utils.py`:
+  - dodano statusy dla badań personalnych (`study_status`) i API zmiany statusu (`set_study_status`),
+  - `soft_delete_study` ustawia status `deleted`.
+- `db_jst_utils.py`:
+  - `ensure_jst_schema` rozszerzono o kolumny statusów dla `jst_studies` i `studies`,
+  - `get_jst_study_public` zwraca status,
+  - `add_jst_response_by_slug` blokuje zapis gdy status != `active` (`study_inactive`),
+  - dodano `set_jst_study_status`, a soft-delete ustawia status `deleted`.
+- `archetypy-ankieta`:
+  - `studies.ts` i `jstStudies.ts` obsługują pola statusowe,
+  - `App.tsx` pokazuje komunikat blokujący dla statusów `suspended/closed/deleted`,
+  - `JstSurvey.tsx` zwraca precyzyjny komunikat po RPC `study_inactive`.
+- Smoke-check:
+  - `python -m py_compile app.py db_utils.py db_jst_utils.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).
+
+### Hotfix H-017 [DONE]
+Temat: Kalibracja `Poziom dopasowania` + nowe moduły panelu personalnego (`Ustawienia ankiety`, `Połącz badania`).
+Kryteria ukończenia:
+1. Progi opisowe `Poziom dopasowania` działają spójnie z podziałem 0–29 / 30–39 / ... / 90–100 (bez niespodziewanego zbijania 50–59 do `Niskie`).
+2. Wskaźnik dopasowania jest mniej skokowy przy pojedynczym ekstremalnym archetypie (łagodniejsza kara `KEY_MAX`).
+3. W `Badania personalne - panel` są 2 nowe kafelki:
+   - `Ustawienia ankiety`,
+   - `Połącz badania`.
+4. Moduł `Połącz badania` pozwala:
+   - wybrać badanie główne,
+   - dodać wiele badań źródłowych (`Dodaj badanie`),
+   - skopiować odpowiedzi źródeł do badania głównego (`Dodaj`),
+   - bez usuwania odpowiedzi ze źródłowych badań.
+5. W `Matching` po zmianie badań nie zostaje zielony komunikat sugerujący stary wynik.
+Pierwszy krok wykonawczy:
+- dodać warstwę DB do kopiowania odpowiedzi personalnych (`responses`) i podpiąć nowy widok `Połącz badania` w `app.py`.
+Wynik:
+- `db_utils.py`:
+  - dodano `fetch_personal_response_count(...)`,
+  - dodano `merge_personal_study_responses(...)` (batch copy odpowiedzi `responses` ze źródeł do targetu),
+  - dodano normalizację `answers` dla kopiowania.
+- `app.py`:
+  - `Poziom dopasowania`:
+    - kara kluczowa przestawiona na mniej skokową:
+      - było: `0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9)`,
+      - jest: `0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12)`,
+    - opis pasma nie jest już ręcznie zbijany guardem; duże luki kluczowe są raportowane jako ostrzeżenie jakościowe,
+    - dodano metrykę `Maks. luka kluczowa`.
+  - `Badania personalne - panel`:
+    - dodano kafelki: `Ustawienia ankiety` i `Połącz badania`,
+    - dodano widoki `personal_settings_view()` i `personal_merge_view()`.
+  - `Połącz badania`:
+    - wybór badania głównego,
+    - dynamiczna lista badań źródłowych (`➕ Dodaj badanie` / `➖ Usuń ostatnie`),
+    - finalne wykonanie przez `Dodaj` z podsumowaniem `inserted/skipped`,
+    - źródłowe badania pozostają bez zmian.
+  - `Matching`:
+    - dodatkowy bezpiecznik czyści wynik/komunikat, jeśli aktualny wybór badań różni się od policzonego pairingu.
+- Smoke-check:
+  - `python -m py_compile app.py db_utils.py` (OK).

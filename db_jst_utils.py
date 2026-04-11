@@ -104,6 +104,9 @@ def ensure_jst_schema() -> None:
       poststrat_targets JSONB NULL,
       population_15_plus INTEGER NULL,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      study_status TEXT NOT NULL DEFAULT 'active',
+      status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      started_at TIMESTAMPTZ NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at TIMESTAMPTZ NULL
@@ -113,6 +116,75 @@ def ensure_jst_schema() -> None:
       ADD COLUMN IF NOT EXISTS poststrat_targets JSONB NULL;
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS population_15_plus INTEGER NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS study_status TEXT NOT NULL DEFAULT 'active';
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
+    DO $jst_status_chk$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'jst_studies_status_chk'
+      ) THEN
+        ALTER TABLE public.jst_studies
+          ADD CONSTRAINT jst_studies_status_chk
+          CHECK (study_status IN ('active','suspended','closed','deleted'));
+      END IF;
+    END;
+    $jst_status_chk$;
+
+    UPDATE public.jst_studies
+    SET study_status = CASE
+      WHEN COALESCE(is_active, true) = false OR deleted_at IS NOT NULL THEN 'deleted'
+      ELSE 'active'
+    END
+    WHERE COALESCE(study_status, '') = '';
+
+    UPDATE public.jst_studies
+    SET started_at = COALESCE(started_at, created_at, NOW())
+    WHERE started_at IS NULL;
+
+    DO $studies_status$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'studies'
+      ) THEN
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS study_status TEXT NOT NULL DEFAULT 'active';
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
+
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'studies_status_chk'
+        ) THEN
+          ALTER TABLE public.studies
+            ADD CONSTRAINT studies_status_chk
+            CHECK (study_status IN ('active','suspended','closed','deleted'));
+        END IF;
+
+        UPDATE public.studies
+        SET study_status = CASE
+          WHEN COALESCE(is_active, true) = false OR deleted_at IS NOT NULL THEN 'deleted'
+          ELSE 'active'
+        END
+        WHERE COALESCE(study_status, '') = '';
+
+        UPDATE public.studies
+        SET started_at = COALESCE(started_at, created_at, NOW())
+        WHERE started_at IS NULL;
+      END IF;
+    END;
+    $studies_status$;
 
     CREATE INDEX IF NOT EXISTS idx_jst_studies_active ON public.jst_studies(is_active);
     CREATE INDEX IF NOT EXISTS idx_jst_studies_slug ON public.jst_studies(slug);
@@ -188,7 +260,10 @@ def ensure_jst_schema() -> None:
           jst_full_loc,
           jst_full_voc,
           population_15_plus,
-          is_active
+          is_active,
+          study_status,
+          status_changed_at,
+          started_at
         FROM public.jst_studies
         WHERE slug = trim(coalesce(p_slug, ''))
           AND COALESCE(is_active, true)
@@ -210,6 +285,7 @@ def ensure_jst_schema() -> None:
     AS $func$
     DECLARE
       v_study_id text;
+      v_study_status text;
       v_slug text;
       v_payload jsonb;
       v_resp_id text;
@@ -222,7 +298,8 @@ def ensure_jst_schema() -> None:
         RETURN jsonb_build_object('ok', false, 'error', 'missing_slug');
       END IF;
 
-      SELECT id INTO v_study_id
+      SELECT id, COALESCE(NULLIF(trim(study_status), ''), 'active')
+      INTO v_study_id, v_study_status
       FROM public.jst_studies
       WHERE slug = v_slug
         AND COALESCE(is_active, true)
@@ -230,6 +307,13 @@ def ensure_jst_schema() -> None:
 
       IF v_study_id IS NULL THEN
         RETURN jsonb_build_object('ok', false, 'error', 'study_not_found');
+      END IF;
+      IF v_study_status <> 'active' THEN
+        RETURN jsonb_build_object(
+          'ok', false,
+          'error', 'study_inactive',
+          'study_status', v_study_status
+        );
       END IF;
 
       v_payload := COALESCE(p_payload, '{}'::jsonb);
@@ -664,13 +748,17 @@ def ensure_jst_schema() -> None:
           UPDATE public.jst_studies
           SET slug = v_new_slug,
               updated_at = NOW(),
-              deleted_at = COALESCE(deleted_at, NOW())
+              deleted_at = COALESCE(deleted_at, NOW()),
+              study_status = 'deleted',
+              status_changed_at = NOW()
           WHERE id = r.id;
         EXCEPTION WHEN unique_violation THEN
           UPDATE public.jst_studies
           SET slug = '__deleted__' || left(r.id::text, 8) || '__' || to_char(clock_timestamp(), 'YYYYMMDDHH24MISSMS'),
               updated_at = NOW(),
-              deleted_at = COALESCE(deleted_at, NOW())
+              deleted_at = COALESCE(deleted_at, NOW()),
+              study_status = 'deleted',
+              status_changed_at = NOW()
           WHERE id = r.id;
         END;
       END LOOP;
@@ -686,6 +774,20 @@ def ensure_jst_schema() -> None:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+_ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
+
+
+def normalize_study_status(raw: Optional[str], *, is_active: Optional[bool] = None, deleted_at: Optional[str] = None) -> str:
+    status = str(raw or "").strip().lower()
+    if status in _ALLOWED_STUDY_STATUSES:
+        return status
+    if deleted_at:
+        return "deleted"
+    if is_active is False:
+        return "deleted"
+    return "active"
 
 
 def _notify_postgrest_schema_reload() -> None:
@@ -724,10 +826,14 @@ def fetch_jst_study_by_id(sb: Client, study_id: str) -> Optional[Dict[str, Any]]
 
 def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data = dict(payload)
+    now_iso = _utc_now_iso()
     data.setdefault("id", str(uuid.uuid4()))
     data.setdefault("is_active", True)
-    data.setdefault("created_at", _utc_now_iso())
-    data.setdefault("updated_at", _utc_now_iso())
+    data.setdefault("study_status", "active")
+    data.setdefault("status_changed_at", now_iso)
+    data.setdefault("started_at", now_iso)
+    data.setdefault("created_at", now_iso)
+    data.setdefault("updated_at", now_iso)
     try:
         ins = sb.table("jst_studies").insert(data).execute()
     except Exception as e:
@@ -773,9 +879,41 @@ def soft_delete_jst_study(sb: Client, study_id: str) -> None:
             "is_active": False,
             "deleted_at": _utc_now_iso(),
             "updated_at": _utc_now_iso(),
+            "study_status": "deleted",
+            "status_changed_at": _utc_now_iso(),
             "slug": archived_slug,
         }
     ).eq("id", sid).execute()
+
+
+def set_jst_study_status(sb: Client, study_id: str, status: str) -> Dict[str, Any]:
+    sid = str(study_id or "").strip()
+    target = str(status or "").strip().lower()
+    if target not in {"active", "suspended", "closed"}:
+        raise ValueError("Nieprawidłowy status badania.")
+    row = fetch_jst_study_by_id(sb, sid) or {}
+    if not row:
+        raise ValueError("Nie znaleziono badania JST.")
+    current = normalize_study_status(
+        row.get("study_status"),
+        is_active=row.get("is_active"),
+        deleted_at=row.get("deleted_at"),
+    )
+    if current == "deleted":
+        raise ValueError("Usuniętego badania JST nie można zmienić.")
+    if current == "closed" and target != "closed":
+        raise ValueError("Badanie zamknięte jest trwałe i nie może zostać ponownie uruchomione.")
+    now_iso = _utc_now_iso()
+    updates = {
+        "study_status": target,
+        "status_changed_at": now_iso,
+        "updated_at": now_iso,
+    }
+    sb.table("jst_studies").update(updates).eq("id", sid).execute()
+    refreshed = fetch_jst_study_by_id(sb, sid)
+    if not refreshed:
+        raise RuntimeError("Nie udało się odświeżyć statusu badania JST.")
+    return refreshed
 
 
 def _release_inactive_slug_conflicts(sb: Client, slug: str, exclude_id: Optional[str] = None) -> None:
@@ -805,6 +943,8 @@ def _release_inactive_slug_conflicts(sb: Client, slug: str, exclude_id: Optional
                     "slug": archived_slug,
                     "deleted_at": row.get("deleted_at") or _utc_now_iso(),
                     "updated_at": _utc_now_iso(),
+                    "study_status": "deleted",
+                    "status_changed_at": _utc_now_iso(),
                 }
             ).eq("id", rid).execute()
         except Exception:
@@ -815,6 +955,8 @@ def _release_inactive_slug_conflicts(sb: Client, slug: str, exclude_id: Optional
                         "slug": f"__deleted__{rid[:8]}__{now_tag}",
                         "deleted_at": row.get("deleted_at") or _utc_now_iso(),
                         "updated_at": _utc_now_iso(),
+                        "study_status": "deleted",
+                        "status_changed_at": _utc_now_iso(),
                     }
                 ).eq("id", rid).execute()
             except Exception:

@@ -781,6 +781,76 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-016 (status badań + reset stanu Matching)
+- `app.py`:
+  - `🧭 Matching / Wybierz badania`:
+    - selectboxy mają callback unieważniający (`matching_result` + `matching_result_notice`),
+    - po zmianie badania znika zielony komunikat o policzonym dopasowaniu i stary wynik nie jest już sugerowany jako aktualny.
+  - `✏️ Edytuj dane badania` i `✏️ Edytuj dane badania mieszkańców`:
+    - dodano sekcję `Status badania` z tabelą:
+      - status,
+      - data uruchomienia,
+      - data ostatniej zmiany statusu,
+    - dodano akcje:
+      - `⏸️ Zawieś`,
+      - `▶️ Odwieś`,
+      - `🔒 Zamknij badanie` (z potwierdzeniem, nieodwracalne),
+      - `🗑️ Usuń badanie` (z dodatkowym potwierdzeniem).
+- `db_utils.py`:
+  - dodano obsługę statusu badań personalnych (`normalize_study_status`, `set_study_status`),
+  - `insert_study` ustawia domyślnie `study_status=active` + znaczniki czasu,
+  - `soft_delete_study` ustawia `study_status=deleted`.
+- `db_jst_utils.py`:
+  - `ensure_jst_schema` dodaje/uzupełnia kolumny statusów:
+    - `study_status`,
+    - `status_changed_at`,
+    - `started_at`,
+    dla `jst_studies` i `studies`,
+  - `get_jst_study_public` zwraca status badania,
+  - `add_jst_response_by_slug` odrzuca zapis przy statusie innym niż `active` (`study_inactive`),
+  - dodano `set_jst_study_status`,
+  - soft-delete JST ustawia `study_status=deleted`.
+- `archetypy-ankieta`:
+  - `src/lib/studies.ts` i `src/lib/jstStudies.ts` rozszerzone o pola statusowe,
+  - `src/App.tsx`:
+    - dla `suspended` pokazuje blokadę `Badanie jest nieaktywne`,
+    - dla `closed` pokazuje blokadę `Badanie zakończone`,
+    - dla `deleted` blokuje wejście i pokazuje komunikat niedostępności,
+  - `src/JstSurvey.tsx`:
+    - jeśli RPC zwróci `study_inactive`, wyświetlany jest dedykowany komunikat statusowy.
+- Testy:
+  - `python -m py_compile app.py db_utils.py db_jst_utils.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).
+
+### Zrobione w Hotfix H-017 (kalibracja dopasowania + nowe moduły personalne)
+- `Poziom dopasowania` (`app.py`):
+  - złagodzono skokowość kary kluczowej:
+    - było: `0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9)`,
+    - jest: `0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12)`,
+  - utrzymano 8-stopniową skalę progów (`0–29`, `30–39`, ..., `90–100`),
+  - usunięto wymuszone zbijanie etykiety pasma przez guard; duże luki kluczowe są teraz dopisywane jako ostrzeżenie jakościowe,
+  - dodano dodatkowy KPI: `Maks. luka kluczowa`.
+- `Matching` (`app.py`):
+  - dodano dodatkową walidację pary badań; jeśli aktualny wybór różni się od policzonego, wynik i zielony komunikat są czyszczone.
+- `Badania personalne - panel` (`app.py`):
+  - dodano dwa kafelki:
+    - `⚙️ Ustawienia ankiety`,
+    - `🔗 Połącz badania`,
+  - dodano nowe widoki:
+    - `personal_settings_view()` (status/link/liczba odpowiedzi dla wybranego badania),
+    - `personal_merge_view()` (łączenie wyników wielu badań do jednego badania głównego).
+- `Połącz badania`:
+  - wybór badania głównego,
+  - dynamiczne dokładanie wielu badań źródłowych (`➕ Dodaj badanie`),
+  - wykonanie operacji przyciskiem `Dodaj`,
+  - kopiowanie odpowiedzi bez usuwania ich z badań źródłowych.
+- Warstwa danych (`db_utils.py`):
+  - dodano `fetch_personal_response_count(...)`,
+  - dodano `merge_personal_study_responses(...)` (batch copy z `responses`),
+  - dodano normalizację `answers` przy kopiowaniu.
+- Test techniczny:
+  - `python -m py_compile app.py db_utils.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
@@ -789,4 +859,6 @@
   - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
 
 ### Nastepny konkretny krok wykonawczy
-- Wykonac szybki smoke-check wizualny `🧭 Matching` po Dogrywce A8 i zebrać ewentualne ostatnie mikro-uwagi; merytorycznie `H-015` jest domknięty.
+- Szybki smoke-test UI na środowisku użytkownika:
+  - potwierdzić nowe etykiety progów `Poziom dopasowania` na realnych parach badań,
+  - przejść E2E przez `Połącz badania` (2+ źródła) i potwierdzić wzrost liczby odpowiedzi w badaniu głównym.

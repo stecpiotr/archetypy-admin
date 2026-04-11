@@ -772,3 +772,34 @@ Decyzja:
 Uzasadnienie:
 - User poprosił o bardziej rozróżnione progi i opis jakościowy zbliżony do tabeli interpretacji natężenia archetypu.
 - 8-stopniowa skala daje czytelniejszy „język jakościowy” przy zachowaniu tej samej logiki obliczeń.
+
+### D-086: Guard kluczowych luk nie nadpisuje już pasma progowego
+Decyzja:
+- Etykieta pasma `Poziom dopasowania` jest wyznaczana bezpośrednio z progów 0–100 (0–29, 30–39, ..., 90–100).
+- Duże luki kluczowe (`KEY_MAE`/`KEY_MAX`) pozostają raportowane jako ostrzeżenie jakościowe (`band_desc`), ale bez ręcznego zbijania etykiety do niższego progu.
+Uzasadnienie:
+- User zgłosił niespójność interpretacyjną (np. wynik >50 wpadał w opis `Niskie`), mimo że progi były już jawnie zdefiniowane.
+- Rozdzielenie „progu liczbowego” od „ostrzeżenia jakościowego” zwiększa czytelność.
+
+### D-087: Kara kluczowa została wygładzona, aby ograniczyć skokowość oceny
+Decyzja:
+- Wzór kary kluczowej zmieniono z:
+  - `0.45*KEY_MAE + 0.22*max(0, KEY_MAX - 9)`
+  na:
+  - `0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12)`.
+Uzasadnienie:
+- User zgłosił zbyt duże rozjazdy wyniku końcowego dla par wizualnie zbliżonych profili.
+- Zmiana utrzymuje karę za luki kluczowe, ale osłabia efekt „jednego ekstremum”.
+
+### D-088: Panel personalny dostaje osobny moduł łączenia badań
+Decyzja:
+- W `Badania personalne - panel` dodano dwa kafelki:
+  - `Ustawienia ankiety`,
+  - `Połącz badania`.
+- `Połącz badania` realizuje kopiowanie odpowiedzi z wielu badań źródłowych do jednego badania głównego:
+  - źródła wybierane dynamicznie (`Dodaj badanie`),
+  - finalizacja przyciskiem `Dodaj`,
+  - odpowiedzi źródłowe pozostają w swoich badaniach (brak przenoszenia/usuwania).
+- Warstwa DB: dodano `merge_personal_study_responses(...)` na tabeli `responses`.
+Uzasadnienie:
+- User potrzebował operacji konsolidacji wyników personalnych bez utraty oryginalnych danych w badaniach źródłowych.
