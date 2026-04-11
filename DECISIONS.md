@@ -849,3 +849,19 @@ Decyzja:
 Uzasadnienie:
 - User zgłosił, że oba poziomy były wizualnie nieodróżnialne.
 - Unikalna kolorystyka pasm poprawia czytelność szybkiej interpretacji w `🧭 Matching`.
+
+### D-094: Kara kluczowa ma uwzględniać nie tylko lukę, ale też strukturę priorytetów
+Decyzja:
+- Zaostrzono bazową karę kluczową:
+  - z `0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12)`,
+  - na `0.56*KEY_MAE + 0.26*max(0, KEY_MAX - 10)`.
+- Dodano składniki strukturalne:
+  - kara za brak wspólnych priorytetów TOP:
+    - `5.5` gdy brak wspólnych pozycji,
+    - `2.0` gdy wspólna jest tylko 1 pozycja,
+  - kara `2.5` za różny priorytet główny (TOP1 polityka vs TOP1 mieszkańców).
+- Finalnie:
+  - `key_penalty = penalty_key_gap + penalty_shared_priority + penalty_main_priority_mismatch`.
+Uzasadnienie:
+- User pokazał przypadek z bardzo wysokimi lukami kluczowymi (`KEY_MAE` i `KEY_MAX`) i jednocześnie relatywnie łagodną oceną.
+- Sama kara amplitudowa była za słaba, bo nie odzwierciedlała jakościowego konfliktu priorytetów (brak części wspólnej i inny TOP1).

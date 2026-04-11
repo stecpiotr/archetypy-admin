@@ -3674,14 +3674,26 @@ def matching_view() -> None:
             key_gap_vals = [float(diffs.get(a, 0.0)) for a in key_archetypes]
             key_gap_mae = float(sum(key_gap_vals) / max(1, len(key_gap_vals)))
             key_gap_max = float(max(key_gap_vals)) if key_gap_vals else 0.0
+            shared_priority_count = len(set(person_top3).intersection(set(jst_top3)))
+            main_priority_mismatch_penalty = (
+                2.5 if (person_top3 and jst_top3 and person_top3[0] != jst_top3[0]) else 0.0
+            )
+            shared_priority_penalty = (
+                5.5 if shared_priority_count == 0 else (2.0 if shared_priority_count == 1 else 0.0)
+            )
 
             score_mae = max(0.0, min(100.0, 100.0 - mae))
             score_rmse = max(0.0, min(100.0, 100.0 - rmse))
             score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
             score_key = max(0.0, min(100.0, 100.0 - key_gap_mae))
             base_score = 0.40 * score_mae + 0.20 * score_rmse + 0.20 * score_top3 + 0.20 * score_key
-            # Kara kluczowa: nadal mocna, ale mniej "skokowa" dla pojedynczego ekstremum.
-            key_penalty = 0.42 * key_gap_mae + 0.16 * max(0.0, key_gap_max - 12.0)
+            # Kara kluczowa: mocniej dociąża duże luki na priorytetach oraz brak wspólnego TOP.
+            key_penalty = (
+                0.56 * key_gap_mae
+                + 0.26 * max(0.0, key_gap_max - 10.0)
+                + shared_priority_penalty
+                + main_priority_mismatch_penalty
+            )
             # Metryka mieszana z dodatkową karą za luki na archetypach kluczowych
             # (TOP3 polityka + TOP3 mieszkańców), żeby nie zawyżać wyniku przy strategicznych rozjazdach.
             match_score = max(0.0, min(100.0, base_score - key_penalty))
@@ -3984,6 +3996,9 @@ def matching_view() -> None:
                     "score_top3": round(score_top3, 1),
                     "score_key": round(score_key, 1),
                     "key_archetypes": list(key_archetypes),
+                    "shared_priority_count": int(shared_priority_count),
+                    "shared_priority_penalty": round(shared_priority_penalty, 1),
+                    "main_priority_mismatch_penalty": round(main_priority_mismatch_penalty, 1),
                     "band_label": str(match_band[0]),
                     "band_desc": str(match_band[1]),
                 },
@@ -3994,12 +4009,14 @@ def matching_view() -> None:
                 "target_audit": target_audit,
                 "match_formula": (
                     "base = 0.40*(100 - MAE) + 0.20*(100 - RMSE) + 0.20*(100 - TOP3_MAE) + 0.20*(100 - KEY_MAE); "
-                    "kara_kluczowa = 0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12); "
+                    "kara_kluczowa = 0.56*KEY_MAE + 0.26*max(0, KEY_MAX - 10) + kara_wspolnych_priorytetow + kara_roznicy_priorytetu_glownego; "
                     "match = clamp(0,100, base - kara_kluczowa); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
                     "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii priorytetów polityka i mieszkańców "
                     "(TOP3, ale jeśli 3. pozycja ma <70, do puli kluczowej wchodzi tylko TOP2), "
-                    "KEY_MAX = największa |Δ| w tej samej puli kluczowej. "
+                    "KEY_MAX = największa |Δ| w tej samej puli kluczowej; "
+                    "kara_wspolnych_priorytetow = 5.5 gdy brak części wspólnej TOP, 2.0 gdy wspólna jest tylko 1 pozycja, inaczej 0; "
+                    "kara_roznicy_priorytetu_glownego = 2.5 gdy TOP1 polityka i mieszkańców są różne. "
                     "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania. "
                     "Model nie dodaje osobnej premii dodatniej za zgodność - niższa luka poprawia wynik tylko przez mniejszą karę."
                 ),
@@ -4144,7 +4161,7 @@ def matching_view() -> None:
             st.markdown(
                 "Metryka celowo mocniej karze strategiczne rozjazdy: oprócz MAE, RMSE i średniej 3 największych luk "
                 "uwzględnia też luki na archetypach kluczowych (unia priorytetów polityka i mieszkańców) "
-                "oraz dodatkową karę za skrajny rozjazd w tej puli."
+                "oraz dodatkowe kary za skrajny rozjazd w tej puli, brak wspólnych priorytetów i różny priorytet główny."
             )
             st.markdown(
                 "**Progi oceny (wynik bazowy):** "

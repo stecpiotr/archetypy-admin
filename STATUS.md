@@ -917,6 +917,25 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-023 (mocniejsza kara za rozjazdy kluczowe)
+- `app.py` (`🧭 Matching`, obliczanie `Poziom dopasowania`):
+  - zwiększono siłę kary kluczowej:
+    - było: `0.42*KEY_MAE + 0.16*max(0, KEY_MAX - 12)`,
+    - jest: `0.56*KEY_MAE + 0.26*max(0, KEY_MAX - 10)`.
+  - dodano kary strategiczne:
+    - `shared_priority_penalty`:
+      - `5.5` przy braku wspólnych pozycji TOP,
+      - `2.0` gdy wspólna jest tylko 1 pozycja TOP,
+    - `main_priority_mismatch_penalty = 2.5` przy różnym TOP1.
+  - finalna kara:
+    - `key_penalty = base_key_penalty + shared_priority_penalty + main_priority_mismatch_penalty`.
+- `app.py` (metodyka w UI):
+  - wzór i opis w expanderze zaktualizowane o nowe składniki kar.
+- Efekt:
+  - przypadki z dużymi lukami kluczowymi i brakiem wspólnych priorytetów spadają wyraźniej z poziomu „przyzwoitego” do niższych pasm.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

@@ -1082,3 +1082,22 @@ Wynik:
   - dodatkowo rozdzielono odcień dla `30–39` (`#be123c`) aby utrzymać unikalność pasm.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-023 [DONE]
+Temat: Dalsze zaostrzenie kary kluczowej w `Poziom dopasowania` dla dużych rozjazdów strategicznych.
+Kryteria ukończenia:
+1. Wysokie `KEY_MAE/KEY_MAX` mocniej obniżają wynik końcowy.
+2. Brak wspólnych priorytetów i różny TOP1 dodatkowo obniżają wynik.
+3. Opis metodologii odzwierciedla nową logikę kary.
+Pierwszy krok wykonawczy:
+- podnieść współczynniki kary `KEY_MAE/KEY_MAX` i dodać składniki kar za brak wspólnych priorytetów.
+Wynik:
+- `app.py`:
+  - nowa kara kluczowa:
+    - `0.56*KEY_MAE + 0.26*max(0, KEY_MAX - 10)`,
+    - `+ 5.5` gdy brak wspólnych pozycji TOP,
+    - `+ 2.0` gdy wspólna jest tylko 1 pozycja TOP,
+    - `+ 2.5` gdy polityk i mieszkańcy mają różny priorytet główny (TOP1),
+  - zaktualizowano opis wzoru i sekcję metodologiczną w expanderze.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
