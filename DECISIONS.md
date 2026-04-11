@@ -875,3 +875,14 @@ Decyzja:
 Uzasadnienie:
 - User wskazał, że strategicznie kluczowe jest jawne zaznaczenie sytuacji, gdy „ważny” archetyp jest jednocześnie dużą luką albo mocną zgodnością.
 - Bez tej reguły sekcja zalet/problemów była mniej diagnostyczna i mogła pomijać najważniejszy kontekst decyzyjny.
+
+### D-096: Przecięcia TOP liczymy z tych samych list, które są renderowane jako chipy
+Decyzja:
+- Dla sekcji `Główne zalety / Główne problemy` przecięcia TOP są wyznaczane z:
+  - `result["strengths"]` (widoczne chipy `Najlepsze dopasowania`),
+  - `result["gaps"]` (widoczne chipy `Największe luki`),
+  zamiast z osobnego lokalnego sortowania pomocniczego.
+- Wpisy o przecięciach TOP mają priorytet widoczności (`insert(0, ...)`) przed innymi punktami.
+Uzasadnienie:
+- User zgłosił, że wpisy nie pojawiały się mimo widocznego przecięcia na ekranie.
+- Źródło „jedno do jednego z chipami” + priorytet pozycji eliminuje rozjazd narracji i ryzyko ucięcia przez limit 4 punktów.

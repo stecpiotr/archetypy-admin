@@ -950,6 +950,21 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-025 (spójność przecięć TOP z chipami + priorytet widoczności)
+- `app.py` (`🧭 Matching`, `Podsumowanie`):
+  - przecięcia priorytetów TOP są liczone już nie z lokalnie sortowanych list pomocniczych, tylko bezpośrednio z:
+    - `result["strengths"]` (`Najlepsze dopasowania`),
+    - `result["gaps"]` (`Największe luki`),
+    czyli dokładnie z tych samych danych, które user widzi w chipach.
+  - wpisy o przecięciach TOP są dodawane na początek list:
+    - `advantages.insert(0, ...)`,
+    - `problems.insert(0, ...)`,
+    dzięki czemu nie wypadają przez limit renderu `[:4]`.
+- Efekt:
+  - przypadki jak na screenie (`Władca`, `Bohater` z TOP i jednocześnie w największych lukach) są teraz jawnie widoczne w `Główne problemy`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

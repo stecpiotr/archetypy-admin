@@ -4609,6 +4609,22 @@ def matching_view() -> None:
         best_gap_live = float(diff_by_entity.get(best_entity, 0.0))
         strongest_fit_entities = sorted(diff_by_entity.keys(), key=lambda a: float(diff_by_entity.get(a, 0.0)))[:3]
         largest_gap_entities = sorted(diff_by_entity.keys(), key=lambda a: float(diff_by_entity.get(a, 0.0)), reverse=True)[:3]
+        # Priorytetowo bierzemy dokładnie te same listy, które są pokazane w chipach
+        # "Najlepsze dopasowania" i "Największe luki", żeby nie było rozjazdu narracji.
+        strengths_src = result.get("strengths") if isinstance(result.get("strengths"), list) else []
+        gaps_src = result.get("gaps") if isinstance(result.get("gaps"), list) else []
+        if strengths_src:
+            strongest_fit_entities = [
+                str(r.get("archetyp"))
+                for r in strengths_src
+                if isinstance(r, dict) and str(r.get("archetyp") or "") in diff_by_entity
+            ]
+        if gaps_src:
+            largest_gap_entities = [
+                str(r.get("archetyp"))
+                for r in gaps_src
+                if isinstance(r, dict) and str(r.get("archetyp") or "") in diff_by_entity
+            ]
         overlap_top = [a for a in p_top if a in j_top]
 
         advantages: List[str] = []
@@ -4644,14 +4660,14 @@ def matching_view() -> None:
                 f"{_matching_entity_name(a, current_axis_label)} (|Δ| {float(diff_by_entity.get(a, 0.0)):.1f} pp)"
                 for a in priority_in_best
             )
-            advantages.append(f"Priorytetowe pozycje są też wśród najlepszych dopasowań: {best_priority_txt}.")
+            advantages.insert(0, f"Priorytetowe pozycje są też wśród najlepszych dopasowań: {best_priority_txt}.")
 
         if priority_in_gaps:
             gap_priority_txt = ", ".join(
                 f"{_matching_entity_name(a, current_axis_label)} (|Δ| {float(diff_by_entity.get(a, 0.0)):.1f} pp)"
                 for a in priority_in_gaps
             )
-            problems.append(f"Priorytetowe pozycje są też wśród największych luk: {gap_priority_txt}.")
+            problems.insert(0, f"Priorytetowe pozycje są też wśród największych luk: {gap_priority_txt}.")
 
         if key_gap_mae_live <= 10.0:
             advantages.append(f"Średnia luka na kluczowych {axis_gen} jest niska ({key_gap_mae_live:.1f} pp).")

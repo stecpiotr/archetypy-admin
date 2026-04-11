@@ -1120,3 +1120,20 @@ Wynik:
     - `Główne problemy`: lista priorytetów w top lukach z `|Δ|`.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-025 [DONE]
+Temat: Wymuszenie spójności sekcji `Główne zalety/problemy` z widocznymi chipami i priorytet widoczności wpisów TOP.
+Kryteria ukończenia:
+1. Przecięcia priorytetów TOP z `Najlepsze dopasowania` i `Największe luki` są liczone z tych samych list, które są renderowane jako chipy.
+2. Wpisy o przecięciach TOP są widoczne nawet przy limicie 4 punktów (mają priorytet na początku listy).
+Pierwszy krok wykonawczy:
+- przepiąć źródło przecięć na `result['strengths']` / `result['gaps']` i wstawiać wpisy TOP na początek list `advantages/problems`.
+Wynik:
+- `app.py`:
+  - przecięcia TOP są teraz liczone z `result['strengths']` i `result['gaps']` (te same dane co chipy na ekranie),
+  - wpisy:
+    - `Priorytetowe pozycje ... wśród najlepszych dopasowań`,
+    - `Priorytetowe pozycje ... wśród największych luk`,
+    są wstawiane przez `insert(0, ...)`, więc nie wypadają przy `[:4]`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
