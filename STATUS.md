@@ -1044,16 +1044,89 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-033 (ustawienia ankiety + single-screen + kontekst Demografii + `|Δ|` no-wrap)
+- `app.py`:
+  - `⚙️ Ustawienia ankiety` (personalne i JST):
+    - nagłówek `Wybierz badanie` pogrubiony i większy (`+1px`),
+    - dodano sekcję `Parametry ankiety` pomiędzy selektorem badania a `Status badania`,
+    - personalne:
+      - `Wyświetlanie ankiety`: `Macierz` / `Pojedyncze ekrany`,
+      - `Nawigacja ankiety`: `Pokaż pasek postępu`, `Wyświetlaj przycisk Wstecz`,
+      - `Losuj kolejność pytań`,
+      - `Automatyczny start i zakończenie badania` (data + godzina),
+    - JST:
+      - `Nawigacja ankiety`,
+      - `Automatyczny start i zakończenie badania` (data + godzina).
+  - dodano helpery harmonogramu:
+    - parsowanie dat UTC/local (Europe/Warsaw),
+    - jednorazowe przejścia statusu wg planu:
+      - przed startem (przy aktywnym harmonogramie) badanie przechodzi w `suspended`,
+      - po wybiciu godziny startu może wrócić do `active`,
+      - po wybiciu godziny końca przechodzi do `suspended` (bez trwałego `closed`).
+  - `🧭 Matching -> Demografia`: dodano czytelną linię kontekstu (`polityk` + `JST`).
+  - `Główne zalety/problemy`: frazy `(|Δ| ... pp)` sklejone NBSP, aby nie łamały się na dwie linie.
+- `db_jst_utils.py`:
+  - `ensure_jst_schema()` rozszerzony o pola ustawień ankiety dla `public.studies` i `public.jst_studies`:
+    - `survey_display_mode`,
+    - `survey_show_progress`,
+    - `survey_allow_back`,
+    - `survey_randomize_questions`,
+    - `survey_auto_start_enabled`,
+    - `survey_auto_start_at`,
+    - `survey_auto_start_applied_at`,
+    - `survey_auto_end_enabled`,
+    - `survey_auto_end_at`,
+    - `survey_auto_end_applied_at`,
+  - dodano constrainty `survey_display_mode IN ('matrix','single')`,
+  - `get_jst_study_public` zwraca nowe pola ustawień,
+  - `add_jst_response_by_slug` respektuje harmonogram auto-start/auto-end i aktualizuje status przy pierwszym wejściu po przekroczeniu czasu.
+- `archetypy-ankieta/src/App.tsx`:
+  - odczyt ustawień ankiety z rekordu badania (personalne/JST),
+  - status ankiety uwzględnia okna start/koniec,
+  - przekazanie ustawień nawigacji do `Questionnaire` i `JstSurvey`.
+- `archetypy-ankieta/src/Questionnaire.tsx` + `src/SingleQuestionnaire.css`:
+  - nowy tryb `Pojedyncze ekrany`:
+    - jedno pytanie na ekranie,
+    - kolorowa skala 5 odpowiedzi,
+    - `Dalej` (zablokowane bez odpowiedzi),
+    - `Wyślij` po 48. pytaniu,
+    - opcjonalny `Wstecz`,
+    - opcjonalny pasek postępu,
+  - tryb `Macierz` zachowany,
+  - losowa kolejność pytań działa w obu trybach,
+  - kodowanie odpowiedzi pozostaje poprawne (zapis po indeksach pytań źródłowych),
+  - fraza `... (polityka/polityczki)` zależna od płci.
+- `archetypy-ankieta/src/JstSurvey.tsx` + `src/JstSurvey.css`:
+  - dodano opcjonalną górną nawigację JST:
+    - pasek postępu,
+    - przycisk `Wstecz`.
+- `archetypy-ankieta/src/lib/studies.ts` i `src/lib/jstStudies.ts`:
+  - modele rozszerzone o pola ustawień ankiety,
+  - personalne `loadStudyBySlug` pobiera nowe kolumny z fallbackiem dla starszego schematu.
+- Testy techniczne:
+  - `python -m py_compile app.py db_jst_utils.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-034 (2026-04-12, smoke-check po H-033)
+- Potwierdzono brak regresji technicznej po zmianach H-033:
+  - `python -m py_compile app.py db_jst_utils.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+- Zakres dalszego kroku pozostaje bez zmian:
+  - ręczny smoke-test UI na środowisku użytkownika po deployu.
+
 ### BLOKERY / RYZYKA
-- Brak blockerow technicznych.
+- BLOKER operacyjny:
+  - brak możliwości pełnego UAT UI bez deployu i dostępu do środowiska użytkownika (weryfikacja ekranów settings + flow ankiety).
 - Ryzyko wdrozeniowe:
-  - nowa funkcja RPC `get_jst_token_meta` musi zostac zastosowana w bazie (przez uruchomienie `ensure_jst_schema()` po deployu `archetypy-admin`).
-  - do potwierdzenia na danych produkcyjnych: manualny E2E scenariusz resend SMS + ponowne wejscie tym samym tokenem.
-  - do potwierdzenia na danych produkcyjnych: czy wszystkie badania JST maja uzupelnione cele poststratyfikacyjne (jesli nie, fallback jest surowy i komunikowany notka).
+  - nowe kolumny ustawień ankiety wymagają uruchomienia `ensure_jst_schema()` po deployu `archetypy-admin`.
+  - do potwierdzenia na danych produkcyjnych: E2E dla harmonogramu (start/koniec, auto-przejście w `suspended`, ręczne odwieszenie po auto-końcu).
+  - do potwierdzenia na danych produkcyjnych: E2E dla trybu `Pojedyncze ekrany` (desktop + mobile) oraz poprawność randomizacji przy eksporcie/analityce.
 
 ### Nastepny konkretny krok wykonawczy
-- Szybki smoke-test UI na środowisku użytkownika:
-  - potwierdzić na parze `Hetman` że błąd runtime zniknął i widok `Podsumowanie` renderuje się do końca,
-  - potwierdzić na parze `Hetman` że przy 3. pozycji `<70` widok pokazuje `TOP2` i nie liczy tej pozycji do `Maks. luki kluczowej`,
-  - potwierdzić, że `Status badania` jest dostępny tylko w `⚙️ Ustawienia ankiety` (personalne + mieszkańców),
-  - sprawdzić, że etykieta `RMSE (kara odchyleń)` nie ucina się dla różnych szerokości ekranu.
+- Smoke-test UI na środowisku użytkownika dla Hotfix H-033:
+  - `Badania personalne -> ⚙️ Ustawienia ankiety`: sprawdzić zapis `Macierz/Pojedyncze ekrany`, pasek postępu, `Wstecz`, auto-start/auto-end,
+  - `Badania mieszkańców -> ⚙️ Ustawienia ankiety`: sprawdzić zapis opcji nawigacji i harmonogramu,
+  - ankieta personalna `/slug`: potwierdzić tryb pojedynczych ekranów (48 pytań, `Dalej`/`Wyślij`, blokada bez odpowiedzi),
+  - `🧭 Matching -> Demografia`: potwierdzić widoczny kontekst polityk/JST i brak łamania `(|Δ| ... pp)` w `Główne zalety/problemy`.

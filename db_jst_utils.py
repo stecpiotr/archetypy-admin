@@ -107,6 +107,16 @@ def ensure_jst_schema() -> None:
       study_status TEXT NOT NULL DEFAULT 'active',
       status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       started_at TIMESTAMPTZ NULL,
+      survey_display_mode TEXT NOT NULL DEFAULT 'matrix',
+      survey_show_progress BOOLEAN NOT NULL DEFAULT TRUE,
+      survey_allow_back BOOLEAN NOT NULL DEFAULT TRUE,
+      survey_randomize_questions BOOLEAN NOT NULL DEFAULT FALSE,
+      survey_auto_start_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      survey_auto_start_at TIMESTAMPTZ NULL,
+      survey_auto_start_applied_at TIMESTAMPTZ NULL,
+      survey_auto_end_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      survey_auto_end_at TIMESTAMPTZ NULL,
+      survey_auto_end_applied_at TIMESTAMPTZ NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at TIMESTAMPTZ NULL
@@ -122,6 +132,26 @@ def ensure_jst_schema() -> None:
       ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_display_mode TEXT NOT NULL DEFAULT 'matrix';
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_show_progress BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_allow_back BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_randomize_questions BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_auto_start_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_auto_start_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_auto_start_applied_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_auto_end_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_auto_end_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_auto_end_applied_at TIMESTAMPTZ NULL;
     DO $jst_status_chk$
     BEGIN
       IF NOT EXISTS (
@@ -135,6 +165,20 @@ def ensure_jst_schema() -> None:
       END IF;
     END;
     $jst_status_chk$;
+
+    DO $jst_survey_mode_chk$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'jst_studies_survey_mode_chk'
+      ) THEN
+        ALTER TABLE public.jst_studies
+          ADD CONSTRAINT jst_studies_survey_mode_chk
+          CHECK (survey_display_mode IN ('matrix','single'));
+      END IF;
+    END;
+    $jst_survey_mode_chk$;
 
     UPDATE public.jst_studies
     SET study_status = CASE
@@ -161,6 +205,26 @@ def ensure_jst_schema() -> None:
           ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
         ALTER TABLE public.studies
           ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_display_mode TEXT NOT NULL DEFAULT 'matrix';
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_show_progress BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_allow_back BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_randomize_questions BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_auto_start_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_auto_start_at TIMESTAMPTZ NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_auto_start_applied_at TIMESTAMPTZ NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_auto_end_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_auto_end_at TIMESTAMPTZ NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_auto_end_applied_at TIMESTAMPTZ NULL;
 
         IF NOT EXISTS (
           SELECT 1
@@ -170,6 +234,16 @@ def ensure_jst_schema() -> None:
           ALTER TABLE public.studies
             ADD CONSTRAINT studies_status_chk
             CHECK (study_status IN ('active','suspended','closed','deleted'));
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'studies_survey_mode_chk'
+        ) THEN
+          ALTER TABLE public.studies
+            ADD CONSTRAINT studies_survey_mode_chk
+            CHECK (survey_display_mode IN ('matrix','single'));
         END IF;
 
         UPDATE public.studies
@@ -263,7 +337,17 @@ def ensure_jst_schema() -> None:
           is_active,
           study_status,
           status_changed_at,
-          started_at
+          started_at,
+          survey_display_mode,
+          survey_show_progress,
+          survey_allow_back,
+          survey_randomize_questions,
+          survey_auto_start_enabled,
+          survey_auto_start_at,
+          survey_auto_start_applied_at,
+          survey_auto_end_enabled,
+          survey_auto_end_at,
+          survey_auto_end_applied_at
         FROM public.jst_studies
         WHERE slug = trim(coalesce(p_slug, ''))
           AND COALESCE(is_active, true)
@@ -286,6 +370,12 @@ def ensure_jst_schema() -> None:
     DECLARE
       v_study_id text;
       v_study_status text;
+      v_auto_start_enabled boolean;
+      v_auto_start_at timestamptz;
+      v_auto_start_applied_at timestamptz;
+      v_auto_end_enabled boolean;
+      v_auto_end_at timestamptz;
+      v_auto_end_applied_at timestamptz;
       v_slug text;
       v_payload jsonb;
       v_resp_id text;
@@ -298,8 +388,24 @@ def ensure_jst_schema() -> None:
         RETURN jsonb_build_object('ok', false, 'error', 'missing_slug');
       END IF;
 
-      SELECT id, COALESCE(NULLIF(trim(study_status), ''), 'active')
-      INTO v_study_id, v_study_status
+      SELECT
+        id,
+        COALESCE(NULLIF(trim(study_status), ''), 'active'),
+        COALESCE(survey_auto_start_enabled, false),
+        survey_auto_start_at,
+        survey_auto_start_applied_at,
+        COALESCE(survey_auto_end_enabled, false),
+        survey_auto_end_at,
+        survey_auto_end_applied_at
+      INTO
+        v_study_id,
+        v_study_status,
+        v_auto_start_enabled,
+        v_auto_start_at,
+        v_auto_start_applied_at,
+        v_auto_end_enabled,
+        v_auto_end_at,
+        v_auto_end_applied_at
       FROM public.jst_studies
       WHERE slug = v_slug
         AND COALESCE(is_active, true)
@@ -308,6 +414,54 @@ def ensure_jst_schema() -> None:
       IF v_study_id IS NULL THEN
         RETURN jsonb_build_object('ok', false, 'error', 'study_not_found');
       END IF;
+
+      IF v_auto_start_enabled AND v_auto_start_at IS NOT NULL AND v_auto_start_applied_at IS NULL THEN
+        IF NOW() >= v_auto_start_at THEN
+          UPDATE public.jst_studies
+          SET
+            survey_auto_start_applied_at = NOW(),
+            study_status = CASE
+              WHEN COALESCE(NULLIF(trim(study_status), ''), 'active') = 'suspended' THEN 'active'
+              ELSE COALESCE(NULLIF(trim(study_status), ''), 'active')
+            END,
+            status_changed_at = CASE
+              WHEN COALESCE(NULLIF(trim(study_status), ''), 'active') = 'suspended' THEN NOW()
+              ELSE status_changed_at
+            END
+          WHERE id = v_study_id;
+          SELECT COALESCE(NULLIF(trim(study_status), ''), 'active'), survey_auto_start_applied_at
+          INTO v_study_status, v_auto_start_applied_at
+          FROM public.jst_studies
+          WHERE id = v_study_id
+          LIMIT 1;
+        ELSIF v_study_status = 'active' THEN
+          UPDATE public.jst_studies
+          SET study_status = 'suspended', status_changed_at = NOW()
+          WHERE id = v_study_id;
+          v_study_status := 'suspended';
+        END IF;
+      END IF;
+
+      IF v_auto_end_enabled AND v_auto_end_at IS NOT NULL AND v_auto_end_applied_at IS NULL AND NOW() >= v_auto_end_at THEN
+        UPDATE public.jst_studies
+        SET
+          survey_auto_end_applied_at = NOW(),
+          study_status = CASE
+            WHEN COALESCE(NULLIF(trim(study_status), ''), 'active') = 'active' THEN 'suspended'
+            ELSE COALESCE(NULLIF(trim(study_status), ''), 'active')
+          END,
+          status_changed_at = CASE
+            WHEN COALESCE(NULLIF(trim(study_status), ''), 'active') = 'active' THEN NOW()
+            ELSE status_changed_at
+          END
+        WHERE id = v_study_id;
+        SELECT COALESCE(NULLIF(trim(study_status), ''), 'active'), survey_auto_end_applied_at
+        INTO v_study_status, v_auto_end_applied_at
+        FROM public.jst_studies
+        WHERE id = v_study_id
+        LIMIT 1;
+      END IF;
+
       IF v_study_status <> 'active' THEN
         RETURN jsonb_build_object(
           'ok', false,
@@ -810,6 +964,11 @@ def _is_postgrest_missing_column_error(err: Exception, table_name: str, column_n
     )
 
 
+def _is_postgrest_missing_any_column_error(err: Exception, table_name: str) -> bool:
+    msg = (getattr(err, "message", "") or str(err) or "").lower()
+    return "pgrst204" in msg and str(table_name or "").lower() in msg
+
+
 def fetch_jst_studies(sb: Client, include_inactive: bool = False) -> List[Dict[str, Any]]:
     q = sb.table("jst_studies").select("*").order("created_at", desc=True)
     if not include_inactive:
@@ -832,12 +991,18 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data.setdefault("study_status", "active")
     data.setdefault("status_changed_at", now_iso)
     data.setdefault("started_at", now_iso)
+    data.setdefault("survey_display_mode", "matrix")
+    data.setdefault("survey_show_progress", True)
+    data.setdefault("survey_allow_back", True)
+    data.setdefault("survey_randomize_questions", False)
+    data.setdefault("survey_auto_start_enabled", False)
+    data.setdefault("survey_auto_end_enabled", False)
     data.setdefault("created_at", now_iso)
     data.setdefault("updated_at", now_iso)
     try:
         ins = sb.table("jst_studies").insert(data).execute()
     except Exception as e:
-        if "population_15_plus" in data and _is_postgrest_missing_column_error(e, "jst_studies", "population_15_plus"):
+        if _is_postgrest_missing_any_column_error(e, "jst_studies"):
             _notify_postgrest_schema_reload()
             ins = sb.table("jst_studies").insert(data).execute()
         else:
@@ -853,7 +1018,7 @@ def update_jst_study(sb: Client, study_id: str, payload: Dict[str, Any]) -> Dict
     try:
         sb.table("jst_studies").update(data).eq("id", str(study_id)).execute()
     except Exception as e:
-        if "population_15_plus" in data and _is_postgrest_missing_column_error(e, "jst_studies", "population_15_plus"):
+        if _is_postgrest_missing_any_column_error(e, "jst_studies"):
             _notify_postgrest_schema_reload()
             sb.table("jst_studies").update(data).eq("id", str(study_id)).execute()
         else:

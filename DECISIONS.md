@@ -940,3 +940,61 @@ Decyzja:
 Uzasadnienie:
 - User zgłosił brak legendy dla `Profile archetypowe 0-100`.
 - Sortowanie po kolumnach przy stringach dawało nieintuicyjny porządek (sort tekstowy zamiast numerycznego).
+
+### D-103: `Ustawienia ankiety` dostają stałą sekcję `Parametry ankiety` między wyborem badania a statusem
+Decyzja:
+- W obu modułach:
+  - `Badania personalne -> ⚙️ Ustawienia ankiety`,
+  - `Badania mieszkańców -> ⚙️ Ustawienia ankiety`,
+  po selektorze badania renderujemy sekcję `Parametry ankiety`, a dopiero niżej `Status badania`.
+- Etykieta `Wybierz badanie` jest wizualnie mocniejsza (`+1px`, pogrubienie).
+Uzasadnienie:
+- User jednoznacznie wskazał docelową kolejność i hierarchię informacji na ekranie ustawień.
+
+### D-104: Harmonogram start/koniec działa jako jednorazowe przejścia statusu (bez trwałego zamykania)
+Decyzja:
+- Dodano pola:
+  - `survey_auto_start_enabled`, `survey_auto_start_at`, `survey_auto_start_applied_at`,
+  - `survey_auto_end_enabled`, `survey_auto_end_at`, `survey_auto_end_applied_at`.
+- Logika:
+  - przed godziną startu badanie ma być nieaktywne (`suspended`),
+  - po wybiciu startu może wrócić do `active`,
+  - po wybiciu końca przechodzi do `suspended`,
+  - przejścia harmonogramowe są jednorazowe (znaczniki `*_applied_at`), więc ręczne `Odwieś` po auto-końcu nie jest natychmiast nadpisywane.
+Uzasadnienie:
+- Wymóg biznesowy: zakończone czasowo badanie ma przejść w `Zawieszone`, ale pozostać odwracalne (nie `closed`).
+
+### D-105: Personalna ankieta wspiera dwa tryby renderu: `Macierz` i `Pojedyncze ekrany`
+Decyzja:
+- `survey_display_mode` steruje trybem:
+  - `matrix`: dotychczasowy widok tabeli Likerta,
+  - `single`: jedno pytanie na ekranie, przyciski odpowiedzi, `Dalej/Wyślij`.
+- W trybie `single`:
+  - bez odpowiedzi nie można przejść dalej,
+  - po pytaniu 48 przycisk zmienia się na `Wyślij`,
+  - zapis odpowiedzi pozostaje identyczny jak wcześniej.
+Uzasadnienie:
+- User wymaga alternatywnego, mobilnego sposobu wypełniania przy zachowaniu tej samej logiki danych.
+
+### D-106: Randomizacja pytań jest obsługiwana po stronie prezentacji, nie kodowania
+Decyzja:
+- Dodano flagę `survey_randomize_questions`.
+- Randomizujemy wyłącznie kolejność wyświetlania pytań (matrix: kolejność wierszy, single: kolejność ekranów).
+- Wewnętrzne mapowanie odpowiedzi pozostaje po indeksach pytań źródłowych, a payload wysyłany jest w stałej kolejności.
+Uzasadnienie:
+- To spełnia potrzebę randomizacji i jednocześnie chroni poprawne kodowanie archetypów oraz porównywalność analityki.
+
+### D-107: Forma `polityka/polityczki` jest zależna od płci badanej osoby
+Decyzja:
+- W zdaniu instrukcyjnym ankiety personalnej używamy:
+  - `(polityka)` dla `gender = M`,
+  - `(polityczki)` dla `gender = F`.
+Uzasadnienie:
+- User wskazał potrzebę precyzji językowej i zgodności formy z płcią.
+
+### D-108: W `Matching` doprecyzowujemy kontekst Demografii i stabilizujemy łamanie `(|Δ| ... pp)`
+Decyzja:
+- W zakładce `Demografia` renderujemy jawny kontekst (`polityk` + `JST`) nad tabelami/kaflami.
+- Fragment `(|Δ| ... pp)` w sekcjach `Główne zalety/problemy` budujemy z niełamliwymi odstępami.
+Uzasadnienie:
+- User zgłosił brak orientacji „czego dotyczy Demografia” oraz nieczytelne łamanie końcówek metrycznych na dwa wiersze.

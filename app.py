@@ -853,6 +853,146 @@ def _fmt_local_ts(ts) -> str:
         return str(ts)
 
 
+def _bool_from_any(raw: Any, default: bool = False) -> bool:
+    if raw is None:
+        return bool(default)
+    if isinstance(raw, bool):
+        return raw
+    txt = str(raw).strip().lower()
+    if txt in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if txt in {"0", "false", "f", "no", "n", "off", ""}:
+        return False
+    return bool(default)
+
+
+def _parse_utc_dt(raw: Any) -> Optional[datetime]:
+    if raw in (None, ""):
+        return None
+    try:
+        ts = pd.to_datetime(raw, utc=True, errors="coerce")
+    except Exception:
+        return None
+    if pd.isna(ts):
+        return None
+    try:
+        return ts.to_pydatetime()
+    except Exception:
+        return None
+
+
+def _utc_to_warsaw_input_defaults(raw: Any, *, fallback_hour: int, fallback_minute: int) -> Tuple[Any, Any]:
+    local_now = datetime.now(ZoneInfo("Europe/Warsaw"))
+    local_default_dt = local_now.replace(hour=fallback_hour, minute=fallback_minute, second=0, microsecond=0)
+    dt_utc = _parse_utc_dt(raw)
+    if dt_utc is None:
+        return local_default_dt.date(), local_default_dt.time()
+    local_dt = dt_utc.astimezone(ZoneInfo("Europe/Warsaw"))
+    local_dt = local_dt.replace(second=0, microsecond=0)
+    return local_dt.date(), local_dt.time()
+
+
+def _local_date_time_to_utc_iso(day_value: Any, time_value: Any) -> Optional[str]:
+    if not day_value or time_value is None:
+        return None
+    try:
+        local_dt = datetime.combine(day_value, time_value)
+    except Exception:
+        return None
+    if local_dt.tzinfo is None:
+        local_dt = local_dt.replace(tzinfo=ZoneInfo("Europe/Warsaw"))
+    return local_dt.astimezone(timezone.utc).isoformat()
+
+
+def _normalize_survey_display_mode(raw: Any, *, allow_single: bool) -> str:
+    mode = str(raw or "").strip().lower()
+    if allow_single and mode == "single":
+        return "single"
+    return "matrix"
+
+
+def _extract_survey_settings(study: Dict[str, Any], *, allow_single: bool) -> Dict[str, Any]:
+    return {
+        "display_mode": _normalize_survey_display_mode(study.get("survey_display_mode"), allow_single=allow_single),
+        "show_progress": _bool_from_any(study.get("survey_show_progress"), True),
+        "allow_back": _bool_from_any(study.get("survey_allow_back"), True),
+        "randomize_questions": _bool_from_any(study.get("survey_randomize_questions"), False),
+        "auto_start_enabled": _bool_from_any(study.get("survey_auto_start_enabled"), False),
+        "auto_start_at": study.get("survey_auto_start_at"),
+        "auto_start_applied_at": study.get("survey_auto_start_applied_at"),
+        "auto_end_enabled": _bool_from_any(study.get("survey_auto_end_enabled"), False),
+        "auto_end_at": study.get("survey_auto_end_at"),
+        "auto_end_applied_at": study.get("survey_auto_end_applied_at"),
+    }
+
+
+def _scheduled_survey_transition_updates(study: Dict[str, Any], *, kind: str, now_utc: Optional[datetime] = None) -> Dict[str, Any]:
+    cfg = _extract_survey_settings(study, allow_single=(kind == "personal"))
+    if kind == "jst":
+        status = normalize_jst_study_status(
+            study.get("study_status"),
+            is_active=study.get("is_active"),
+            deleted_at=study.get("deleted_at"),
+        )
+    else:
+        status = normalize_personal_study_status(
+            study.get("study_status"),
+            is_active=study.get("is_active"),
+            deleted_at=study.get("deleted_at"),
+        )
+    if status in {"closed", "deleted"}:
+        return {}
+
+    now_val = now_utc or datetime.now(timezone.utc)
+    now_iso = now_val.isoformat()
+    updates: Dict[str, Any] = {}
+    next_status = status
+
+    start_at = _parse_utc_dt(cfg.get("auto_start_at"))
+    start_applied_at = _parse_utc_dt(cfg.get("auto_start_applied_at"))
+    end_at = _parse_utc_dt(cfg.get("auto_end_at"))
+    end_applied_at = _parse_utc_dt(cfg.get("auto_end_applied_at"))
+
+    if cfg.get("auto_start_enabled") and start_at and start_applied_at is None:
+        if now_val >= start_at:
+            updates["survey_auto_start_applied_at"] = now_iso
+            if next_status == "suspended":
+                next_status = "active"
+        else:
+            if next_status == "active":
+                next_status = "suspended"
+
+    if cfg.get("auto_end_enabled") and end_at and end_applied_at is None and now_val >= end_at:
+        updates["survey_auto_end_applied_at"] = now_iso
+        if next_status == "active":
+            next_status = "suspended"
+
+    if next_status != status:
+        updates["study_status"] = next_status
+        updates["status_changed_at"] = now_iso
+
+    return updates
+
+
+def _apply_scheduled_survey_transitions(study: Dict[str, Any], *, kind: str) -> Dict[str, Any]:
+    sid = str(study.get("id") or "").strip()
+    if not sid:
+        return study
+    updates = _scheduled_survey_transition_updates(study, kind=kind)
+    if not updates:
+        return study
+    try:
+        if kind == "jst":
+            update_jst_study(sb, sid, updates)
+            fresh = fetch_jst_study_by_id(sb, sid)
+            return fresh or study
+        update_study(sb, sid, updates)
+        fresh_res = sb.table("studies").select("*").eq("id", sid).limit(1).execute()
+        return (fresh_res.data or [study])[0]
+    except Exception:
+        return study
+
+
 def _download_button_supports_ignore() -> bool:
     try:
         sig = inspect.signature(st.download_button)
@@ -2012,10 +2152,17 @@ def jst_settings_view() -> None:
         count = int(counts_by_id.get(sid, 0))
         options[f"{jst_label} • {count} odp."] = s
 
-    choice = st.selectbox("Wybierz badanie", list(options.keys()), key="jst_settings_pick")
+    st.markdown("<div style='font-size:17px;font-weight:800;margin-bottom:6px;'>Wybierz badanie</div>", unsafe_allow_html=True)
+    choice = st.selectbox(
+        "Wybierz badanie",
+        list(options.keys()),
+        key="jst_settings_pick",
+        label_visibility="collapsed",
+    )
     study = options[choice]
     sid = str(study.get("id") or "").strip()
     study_row = fetch_jst_study_by_id(sb, sid) or study
+    study_row = _apply_scheduled_survey_transitions(study_row, kind="jst")
     status_meta = _study_status_meta(study_row, kind="jst")
     slug = str(study_row.get("slug") or "").strip()
     survey_base = str(st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
@@ -2033,6 +2180,122 @@ def jst_settings_view() -> None:
         ]
     )
     st.dataframe(info_rows, use_container_width=True, hide_index=True)
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown("### Parametry ankiety")
+    cfg = _extract_survey_settings(study_row, allow_single=False)
+
+    st.markdown("#### Nawigacja ankiety")
+    show_progress = st.checkbox(
+        "Pokaż pasek postępu",
+        value=bool(cfg.get("show_progress")),
+        key=f"jst_settings_progress_{sid}",
+    )
+    allow_back = st.checkbox(
+        "Wyświetlaj przycisk Wstecz",
+        value=bool(cfg.get("allow_back")),
+        key=f"jst_settings_back_{sid}",
+    )
+
+    st.markdown("#### Automatyczny start i zakończenie badania")
+    start_def_date, start_def_time = _utc_to_warsaw_input_defaults(
+        cfg.get("auto_start_at"), fallback_hour=0, fallback_minute=0
+    )
+    end_def_date, end_def_time = _utc_to_warsaw_input_defaults(
+        cfg.get("auto_end_at"), fallback_hour=23, fallback_minute=59
+    )
+
+    start_enabled = st.checkbox(
+        "Aktywuj ankietę wybranego dnia",
+        value=bool(cfg.get("auto_start_enabled")),
+        key=f"jst_settings_auto_start_enabled_{sid}",
+    )
+    jst_scol1, jst_scol2 = st.columns([1, 1], gap="small")
+    with jst_scol1:
+        start_date = st.date_input(
+            "Data startu JST",
+            value=start_def_date,
+            key=f"jst_settings_auto_start_date_{sid}",
+            disabled=not start_enabled,
+            label_visibility="collapsed",
+        )
+    with jst_scol2:
+        start_time = st.time_input(
+            "Godzina startu JST",
+            value=start_def_time,
+            key=f"jst_settings_auto_start_time_{sid}",
+            disabled=not start_enabled,
+            label_visibility="collapsed",
+        )
+
+    end_enabled = st.checkbox(
+        "Zakończ ankietę wybranego dnia",
+        value=bool(cfg.get("auto_end_enabled")),
+        key=f"jst_settings_auto_end_enabled_{sid}",
+    )
+    jst_ecol1, jst_ecol2 = st.columns([1, 1], gap="small")
+    with jst_ecol1:
+        end_date = st.date_input(
+            "Data zakończenia JST",
+            value=end_def_date,
+            key=f"jst_settings_auto_end_date_{sid}",
+            disabled=not end_enabled,
+            label_visibility="collapsed",
+        )
+    with jst_ecol2:
+        end_time = st.time_input(
+            "Godzina zakończenia JST",
+            value=end_def_time,
+            key=f"jst_settings_auto_end_time_{sid}",
+            disabled=not end_enabled,
+            label_visibility="collapsed",
+        )
+
+    if st.button("💾 Zapisz parametry ankiety", type="primary", key=f"jst_settings_save_params_{sid}"):
+        start_iso = _local_date_time_to_utc_iso(start_date, start_time) if start_enabled else None
+        end_iso = _local_date_time_to_utc_iso(end_date, end_time) if end_enabled else None
+        if start_enabled and not start_iso:
+            st.error("Nie udało się odczytać daty/godziny startu ankiety.")
+            return
+        if end_enabled and not end_iso:
+            st.error("Nie udało się odczytać daty/godziny zakończenia ankiety.")
+            return
+        start_dt = _parse_utc_dt(start_iso)
+        end_dt = _parse_utc_dt(end_iso)
+        if start_enabled and end_enabled and start_dt and end_dt and start_dt >= end_dt:
+            st.error("Data i godzina zakończenia muszą być późniejsze niż data i godzina startu.")
+            return
+
+        updates: Dict[str, Any] = {
+            "survey_show_progress": bool(show_progress),
+            "survey_allow_back": bool(allow_back),
+            "survey_auto_start_enabled": bool(start_enabled),
+            "survey_auto_start_at": start_iso if start_enabled else None,
+            "survey_auto_end_enabled": bool(end_enabled),
+            "survey_auto_end_at": end_iso if end_enabled else None,
+        }
+        if (bool(start_enabled) != bool(cfg.get("auto_start_enabled"))) or (
+            bool(start_enabled) and str(start_iso or "") != str(cfg.get("auto_start_at") or "")
+        ):
+            updates["survey_auto_start_applied_at"] = None
+        if not start_enabled:
+            updates["survey_auto_start_applied_at"] = None
+        if (bool(end_enabled) != bool(cfg.get("auto_end_enabled"))) or (
+            bool(end_enabled) and str(end_iso or "") != str(cfg.get("auto_end_at") or "")
+        ):
+            updates["survey_auto_end_applied_at"] = None
+        if not end_enabled:
+            updates["survey_auto_end_applied_at"] = None
+
+        preview_study = dict(study_row)
+        preview_study.update(updates)
+        updates.update(_scheduled_survey_transition_updates(preview_study, kind="jst"))
+        try:
+            update_jst_study(sb, sid, updates)
+            st.success("Zapisano parametry ankiety.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")
 
     def _do_suspend_jst() -> None:
         try:
@@ -4682,17 +4945,18 @@ def matching_view() -> None:
         gaps_canon = {_canon_name(a) for a in gaps_names_for_check if str(a or "").strip()}
         priority_in_best = [a for a in priority_for_checks if _canon_name(a) in best_canon]
         priority_in_gaps = [a for a in priority_for_checks if _canon_name(a) in gaps_canon]
+        _delta_nbsp = lambda diff: f"(|Δ|\u00a0{float(diff):.1f}\u00a0pp)"
 
         if priority_in_best:
             best_priority_txt = ", ".join(
-                f"{_matching_entity_name(a, current_axis_label)} (|Δ| {float(diff_by_entity.get(a, 0.0)):.1f} pp)"
+                f"{_matching_entity_name(a, current_axis_label)} {_delta_nbsp(diff_by_entity.get(a, 0.0))}"
                 for a in priority_in_best
             )
             advantages.insert(0, f"Priorytetowe pozycje są też wśród najlepszych dopasowań: {best_priority_txt}.")
 
         if priority_in_gaps:
             gap_priority_txt = ", ".join(
-                f"{_matching_entity_name(a, current_axis_label)} (|Δ| {float(diff_by_entity.get(a, 0.0)):.1f} pp)"
+                f"{_matching_entity_name(a, current_axis_label)} {_delta_nbsp(diff_by_entity.get(a, 0.0))}"
                 for a in priority_in_gaps
             )
             problems.insert(0, f"Priorytetowe pozycje są też wśród największych luk: {gap_priority_txt}.")
@@ -4704,10 +4968,10 @@ def matching_view() -> None:
 
         if key_max_gap_live >= 20.0:
             key_max_name = _matching_entity_name(key_max_entity, current_axis_label)
-            problems.append(f"Największa luka kluczowa: {key_max_name} (|Δ| {key_max_gap_live:.1f} pp).")
+            problems.append(f"Największa luka kluczowa: {key_max_name} {_delta_nbsp(key_max_gap_live)}.")
 
         best_name = _matching_entity_name(best_entity, current_axis_label)
-        advantages.append(f"Najlepsza zgodność dotyczy pozycji {best_name} (|Δ| {best_gap_live:.1f} pp).")
+        advantages.append(f"Najlepsza zgodność dotyczy pozycji {best_name} {_delta_nbsp(best_gap_live)}.")
 
         if not advantages:
             advantages = ["Brak wyraźnych przewag w tym porównaniu — potrzebna dalsza kalibracja przekazu."]
@@ -4938,6 +5202,12 @@ def matching_view() -> None:
             st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")
 
     with tab_demo:
+        demo_person_name = str(result.get("person_name_nom") or result.get("person_label") or "").strip()
+        demo_jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "").strip()
+        if demo_person_name or demo_jst_name:
+            st.markdown(
+                f"**Kontekst:** polityk: `{demo_person_name or '—'}` • JST: `{demo_jst_name or '—'}`"
+            )
         st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
         st.markdown(
             """
@@ -5248,6 +5518,8 @@ def add_view() -> None:
 
 def personal_settings_view() -> None:
     require_auth()
+    if not _ensure_jst_schema_initialized():
+        st.warning("Nie udało się potwierdzić schematu parametrów ankiety. Część ustawień może być chwilowo niedostępna.")
     header("⚙️ Ustawienia ankiety")
     render_titlebar(["Panel", "Badania personalne", "Ustawienia ankiety"])
     back_button("home_personal", "← Powrót do panelu personalnego")
@@ -5278,8 +5550,24 @@ def personal_settings_view() -> None:
         label = f"{ln} {fn} ({city}) – /{slug} • {count} odp."
         options[label] = s
 
-    pick = st.selectbox("Wybierz badanie", list(options.keys()), key="personal_settings_pick")
+    st.markdown("<div style='font-size:17px;font-weight:800;margin-bottom:6px;'>Wybierz badanie</div>", unsafe_allow_html=True)
+    pick = st.selectbox(
+        "Wybierz badanie",
+        list(options.keys()),
+        key="personal_settings_pick",
+        label_visibility="collapsed",
+    )
     study = options[pick]
+    study_id = str(study.get("id") or "").strip()
+    if study_id:
+        try:
+            fresh_res = sb.table("studies").select("*").eq("id", study_id).limit(1).execute()
+            fresh_row = (fresh_res.data or [None])[0]
+            if isinstance(fresh_row, dict):
+                study = fresh_row
+        except Exception:
+            pass
+    study = _apply_scheduled_survey_transitions(study, kind="personal")
     status_meta = _study_status_meta(study, kind="personal")
     slug = str(study.get("slug") or "").strip()
     survey_base = str(st.secrets.get("SURVEY_BASE_URL", "https://archetypy.badania.pro") or "").rstrip("/")
@@ -5297,6 +5585,144 @@ def personal_settings_view() -> None:
         ]
     )
     st.dataframe(info_rows, use_container_width=True, hide_index=True)
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown("### Parametry ankiety")
+    cfg = _extract_survey_settings(study, allow_single=True)
+
+    st.markdown("#### Wyświetlanie ankiety")
+    mode_ui = st.radio(
+        "Tryb wyświetlania pytań",
+        ["Macierz", "Pojedyncze ekrany"],
+        horizontal=True,
+        key=f"personal_settings_mode_{study_id or slug}",
+        index=1 if str(cfg.get("display_mode")) == "single" else 0,
+    )
+    randomize_questions = st.checkbox(
+        "Losuj kolejność pytań",
+        value=bool(cfg.get("randomize_questions")),
+        key=f"personal_settings_randomize_{study_id or slug}",
+        help="Działa zarówno dla widoku macierzowego (losowa kolejność wierszy), jak i pojedynczych ekranów.",
+    )
+
+    st.markdown("#### Nawigacja ankiety")
+    show_progress = st.checkbox(
+        "Pokaż pasek postępu",
+        value=bool(cfg.get("show_progress")),
+        key=f"personal_settings_progress_{study_id or slug}",
+    )
+    allow_back = st.checkbox(
+        "Wyświetlaj przycisk Wstecz",
+        value=bool(cfg.get("allow_back")),
+        key=f"personal_settings_back_{study_id or slug}",
+    )
+
+    st.markdown("#### Automatyczny start i zakończenie badania")
+    start_def_date, start_def_time = _utc_to_warsaw_input_defaults(
+        cfg.get("auto_start_at"), fallback_hour=0, fallback_minute=0
+    )
+    end_def_date, end_def_time = _utc_to_warsaw_input_defaults(
+        cfg.get("auto_end_at"), fallback_hour=23, fallback_minute=59
+    )
+
+    start_enabled = st.checkbox(
+        "Aktywuj ankietę wybranego dnia",
+        value=bool(cfg.get("auto_start_enabled")),
+        key=f"personal_settings_auto_start_enabled_{study_id or slug}",
+    )
+    s_col1, s_col2 = st.columns([1, 1], gap="small")
+    with s_col1:
+        start_date = st.date_input(
+            "Data startu",
+            value=start_def_date,
+            key=f"personal_settings_auto_start_date_{study_id or slug}",
+            disabled=not start_enabled,
+            label_visibility="collapsed",
+        )
+    with s_col2:
+        start_time = st.time_input(
+            "Godzina startu",
+            value=start_def_time,
+            key=f"personal_settings_auto_start_time_{study_id or slug}",
+            disabled=not start_enabled,
+            label_visibility="collapsed",
+        )
+
+    end_enabled = st.checkbox(
+        "Zakończ ankietę wybranego dnia",
+        value=bool(cfg.get("auto_end_enabled")),
+        key=f"personal_settings_auto_end_enabled_{study_id or slug}",
+    )
+    e_col1, e_col2 = st.columns([1, 1], gap="small")
+    with e_col1:
+        end_date = st.date_input(
+            "Data zakończenia",
+            value=end_def_date,
+            key=f"personal_settings_auto_end_date_{study_id or slug}",
+            disabled=not end_enabled,
+            label_visibility="collapsed",
+        )
+    with e_col2:
+        end_time = st.time_input(
+            "Godzina zakończenia",
+            value=end_def_time,
+            key=f"personal_settings_auto_end_time_{study_id or slug}",
+            disabled=not end_enabled,
+            label_visibility="collapsed",
+        )
+
+    if st.button(
+        "💾 Zapisz parametry ankiety",
+        type="primary",
+        key=f"personal_settings_save_params_{study_id or slug}",
+    ):
+        start_iso = _local_date_time_to_utc_iso(start_date, start_time) if start_enabled else None
+        end_iso = _local_date_time_to_utc_iso(end_date, end_time) if end_enabled else None
+        if start_enabled and not start_iso:
+            st.error("Nie udało się odczytać daty/godziny startu ankiety.")
+            return
+        if end_enabled and not end_iso:
+            st.error("Nie udało się odczytać daty/godziny zakończenia ankiety.")
+            return
+        start_dt = _parse_utc_dt(start_iso)
+        end_dt = _parse_utc_dt(end_iso)
+        if start_enabled and end_enabled and start_dt and end_dt and start_dt >= end_dt:
+            st.error("Data i godzina zakończenia muszą być późniejsze niż data i godzina startu.")
+            return
+
+        mode_value = "single" if mode_ui == "Pojedyncze ekrany" else "matrix"
+        updates: Dict[str, Any] = {
+            "survey_display_mode": mode_value,
+            "survey_show_progress": bool(show_progress),
+            "survey_allow_back": bool(allow_back),
+            "survey_randomize_questions": bool(randomize_questions),
+            "survey_auto_start_enabled": bool(start_enabled),
+            "survey_auto_start_at": start_iso if start_enabled else None,
+            "survey_auto_end_enabled": bool(end_enabled),
+            "survey_auto_end_at": end_iso if end_enabled else None,
+        }
+        if (bool(start_enabled) != bool(cfg.get("auto_start_enabled"))) or (
+            bool(start_enabled) and str(start_iso or "") != str(cfg.get("auto_start_at") or "")
+        ):
+            updates["survey_auto_start_applied_at"] = None
+        if not start_enabled:
+            updates["survey_auto_start_applied_at"] = None
+        if (bool(end_enabled) != bool(cfg.get("auto_end_enabled"))) or (
+            bool(end_enabled) and str(end_iso or "") != str(cfg.get("auto_end_at") or "")
+        ):
+            updates["survey_auto_end_applied_at"] = None
+        if not end_enabled:
+            updates["survey_auto_end_applied_at"] = None
+
+        preview_study = dict(study)
+        preview_study.update(updates)
+        updates.update(_scheduled_survey_transition_updates(preview_study, kind="personal"))
+        try:
+            update_study(sb, study_id, updates)
+            st.success("Zapisano parametry ankiety.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")
 
     def _do_suspend_personal() -> None:
         try:
