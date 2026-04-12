@@ -4619,21 +4619,27 @@ def matching_view() -> None:
         largest_gap_entities = sorted(diff_by_entity.keys(), key=lambda a: float(diff_by_entity.get(a, 0.0)), reverse=True)[:3]
         # Priorytetowo bierzemy dokładnie te same listy, które są pokazane w chipach
         # "Najlepsze dopasowania" i "Największe luki", żeby nie było rozjazdu narracji.
-        strengths_src = result.get("strengths") if isinstance(result.get("strengths"), list) else []
-        gaps_src = result.get("gaps") if isinstance(result.get("gaps"), list) else []
+        strengths_src = strengths_rows if isinstance(strengths_rows, list) else []
+        gaps_src = gaps_rows if isinstance(gaps_rows, list) else []
 
         def _safe_src_names(rows: List[Any]) -> List[str]:
             names: List[str] = []
             for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                raw = str(row.get("archetyp") or "").strip()
+                raw = ""
+                if isinstance(row, dict):
+                    raw = str(row.get("archetyp") or row.get("entity") or row.get("name") or "").strip()
+                else:
+                    raw = str(row or "").strip()
                 if raw:
                     names.append(raw)
             return names
 
-        src_best_names = _safe_src_names(strengths_src) if strengths_src else strongest_fit_entities
-        src_gap_names = _safe_src_names(gaps_src) if gaps_src else largest_gap_entities
+        src_best_names = _safe_src_names(strengths_src) if strengths_src else []
+        src_gap_names = _safe_src_names(gaps_src) if gaps_src else []
+        if not src_best_names:
+            src_best_names = strongest_fit_entities
+        if not src_gap_names:
+            src_gap_names = largest_gap_entities
         overlap_top = [a for a in p_top if a in j_top]
 
         advantages: List[str] = []
@@ -4658,14 +4664,22 @@ def matching_view() -> None:
         # Jeśli priorytety (TOP2/TOP3) pokrywają się z najlepszymi / największymi lukami,
         # pokazujemy to jawnie w sekcji zalet/problemów.
         def _canon_name(name: str) -> str:
-            return slugify(str(name or "").strip()).lower()
+            raw_name = str(name or "").strip()
+            if str(current_axis_label) == "Wartość":
+                raw_name = str(_JST_ARCH_BY_VALUE.get(raw_name, raw_name))
+            return slugify(raw_name).lower()
 
         priority_for_checks: List[str] = []
         for arche in p_top + j_top:
             if arche not in priority_for_checks:
                 priority_for_checks.append(arche)
-        best_canon = {_canon_name(a) for a in src_best_names}
-        gaps_canon = {_canon_name(a) for a in src_gap_names}
+        # Łączymy nazwy z aktualnie wyrenderowanych chipów oraz z list live
+        # wyliczonych z bieżącej tabeli różnic. Dzięki temu overlap TOP<->luki/
+        # TOP<->najlepsze dopasowania nie zależy od formatu źródłowych nazw.
+        best_names_for_check = list(src_best_names) + list(strongest_fit_entities)
+        gaps_names_for_check = list(src_gap_names) + list(largest_gap_entities)
+        best_canon = {_canon_name(a) for a in best_names_for_check if str(a or "").strip()}
+        gaps_canon = {_canon_name(a) for a in gaps_names_for_check if str(a or "").strip()}
         priority_in_best = [a for a in priority_for_checks if _canon_name(a) in best_canon]
         priority_in_gaps = [a for a in priority_for_checks if _canon_name(a) in gaps_canon]
 

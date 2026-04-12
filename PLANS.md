@@ -1181,3 +1181,57 @@ Wynik:
   - w trybie `Wartość` renderowana jest jedna wspólna legenda pod oboma wykresami.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-029 [DONE]
+Temat: Domknięcie wykrywania TOP-priorytetów w `Główne zalety / Główne problemy` zgodnie z realnie wyświetlanymi chipami.
+Kryteria ukończenia:
+1. Wpis o priorytetach obecnych w `Największe luki` pojawia się, gdy takie przecięcie jest widoczne na ekranie.
+2. Źródło do przecięć jest identyczne jak źródło chipów (`strengths_rows/gaps_rows`), bez rozjazdu pól.
+3. Działa poprawnie także dla trybu `Wartości`.
+Pierwszy krok wykonawczy:
+- przepiąć logikę przecięć na `strengths_rows/gaps_rows`, dodać bezpieczne pobieranie nazw + fallback.
+Wynik:
+- `app.py`:
+  - przecięcia TOP są liczone na `strengths_rows/gaps_rows` (te same dane co chipy),
+  - `_safe_src_names(...)` obsługuje zarówno dict, jak i string,
+  - gdy lista źródłowa jest pusta po parsingu, działa fallback do lokalnego rankingu,
+  - normalizacja nazw dla trybu `Wartości` mapuje etykiety wartości na archetypy przed porównaniem.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-030 [DONE]
+Temat: Czyszczenie rzeczywistych błędów TypeScript w `archetypy-ankieta` (zgodnie ze screenami z PyCharm).
+Kryteria ukończenia:
+1. `tsc -p tsconfig.app.json --noEmit` przechodzi bez błędów.
+2. Build frontendu przechodzi po poprawkach.
+Pierwszy krok wykonawczy:
+- naprawić wskazane błędy: `replaceAll`, nieużywane stany/props, błędne pole `item.text`.
+Wynik:
+- `archetypy-ankieta/src/App.tsx`:
+  - usunięto nieużywany stan `personInstr` i jego setter.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - usunięto nieużywane stany (`fullAcc`, `fullIns`, `fullLoc`) i odpowiadające settery.
+- `archetypy-ankieta/src/LikertRow.tsx`:
+  - usunięto nieużywany prop `hoveredCol`,
+  - poprawiono odczyt pytania z `item.text` na `item.textM` (zgodnie z typem `Ap48Item`).
+- `archetypy-ankieta/src/lib/jstStudies.ts`:
+  - zastąpiono `replaceAll(...)` wersją kompatybilną z ES2020 (`split/join` w helperze).
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Hotfix H-031 [DONE]
+Temat: Domknięcie przecięć TOP vs `Najlepsze dopasowania/Największe luki` w `🧭 Matching` dla przypadków rozjazdu źródeł nazw.
+Kryteria ukończenia:
+1. Wpisy o przecięciach TOP pojawiają się także wtedy, gdy format nazw w źródle chipów różni się od formatu lokalnego rankingu.
+2. `Główne problemy` pokazują priorytetowe archetypy obecne w `Największe luki` (przypadek ze screenów 2900/2901).
+Pierwszy krok wykonawczy:
+- połączyć źródła nazw do przecięć: `strengths_rows/gaps_rows` + lokalne rankingi live i porównywać je po tej samej normalizacji.
+Wynik:
+- `app.py`:
+  - przecięcia TOP dla sekcji `Główne zalety/problemy` liczone są na łączonym źródle nazw:
+    - z renderowanych chipów (`strengths_rows`, `gaps_rows`),
+    - z rankingów live (`strongest_fit_entities`, `largest_gap_entities`),
+  - redukuje to ryzyko „znikania” wpisu przy różnicach formatu źródłowej nazwy.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

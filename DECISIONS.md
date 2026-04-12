@@ -903,3 +903,32 @@ Decyzja:
 Uzasadnienie:
 - Filtr exact-match potrafił wyczyścić listę źródłową przy drobnym rozjeździe zapisu i blokował wpisy, które powinny trafić do `Główne problemy`.
 - Rozdzielenie „pobrania źródła” od „logiki porównania” usuwa ten punkt awarii.
+
+### D-099: Przecięcia TOP w Matching mają bazować na `strengths_rows/gaps_rows` (źródło 1:1 z UI chipów)
+Decyzja:
+- W sekcji `Główne zalety / Główne problemy` przecięcia TOP liczymy na `strengths_rows` i `gaps_rows`, czyli tym samym payloadzie, który renderuje chipy `Najlepsze dopasowania/Największe luki`.
+- Dodatkowo:
+  - parser nazw jest odporny na typ `dict|string`,
+  - przy pustym wyniku parsera działa fallback do lokalnego rankingu,
+  - w trybie `Wartości` nazwy są mapowane do archetypów przed porównaniem.
+Uzasadnienie:
+- User pokazał przypadki, gdzie chipy wskazywały przecięcie TOP↔luki, a sekcja problemów tego nie raportowała.
+- Ujednolicenie źródła danych z warstwą renderu eliminuje ten rozjazd.
+
+### D-100: `archetypy-ankieta` utrzymujemy w zgodności z TS `ES2020`
+Decyzja:
+- W kodzie ankiety nie używamy API wymagających wyższego targetu niż `ES2020` (np. `String.prototype.replaceAll`) bez polyfilla.
+- Przy czyszczeniu warningów utrzymujemy zasadę: usuwamy nieużywane stany/props i błędne pola typów, które podnoszą błędy w `tsc`.
+Uzasadnienie:
+- `tsconfig.app.json` ma `target/lib` na `ES2020`, więc użycie nowszych API powoduje błędy kompilacji.
+- Dzięki temu `npx tsc -p tsconfig.app.json --noEmit` pozostaje zielony i łatwiej wychwycić prawdziwe regresje.
+
+### D-101: Przecięcia TOP w `Główne zalety/problemy` liczymy na źródle łączonym (chipy + ranking live)
+Decyzja:
+- Dla wykrywania przecięć TOP z `Najlepsze dopasowania/Największe luki` używamy źródła łączonego:
+  - nazwy z renderowanych chipów (`strengths_rows`, `gaps_rows`),
+  - oraz nazwy z lokalnego rankingu live (`strongest_fit_entities`, `largest_gap_entities`).
+- Finalne porównanie pozostaje po normalizacji nazw (`slugify(...).lower()`).
+Uzasadnienie:
+- User zgłosił przypadki, gdzie przecięcie było widoczne na ekranie, ale nie trafiało do sekcji `Główne problemy`.
+- Źródło łączone eliminuje zależność od pojedynczego formatu danych i domyka ten typ regresji.

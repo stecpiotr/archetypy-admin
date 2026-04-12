@@ -997,6 +997,43 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-029 (przecięcia TOP liczone z tych samych danych co chipy)
+- `app.py` (`🧭 Matching`, sekcja `Główne zalety / Główne problemy`):
+  - logikę przecięć TOP przepięto na `strengths_rows/gaps_rows` (czyli dokładnie to samo źródło, które renderuje chipy),
+  - `_safe_src_names(...)` obsługuje zarówno rekordy dict, jak i stringi,
+  - dodano fallback, jeśli lista źródłowa po parsingu jest pusta,
+  - normalizacja nazw dla trybu `Wartości` mapuje etykietę wartości na archetyp przed porównaniem.
+- Efekt:
+  - wpisy typu `Priorytetowe pozycje ... wśród największych luk` nie znikają już przy faktycznym przecięciu widocznym na ekranie.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-030 (`archetypy-ankieta` — realne błędy TS ze screenów)
+- `archetypy-ankieta/src/App.tsx`:
+  - usunięto nieużywany stan `personInstr` i setter.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - usunięto nieużywane stany `fullAcc`, `fullIns`, `fullLoc` i odpowiadające settery.
+- `archetypy-ankieta/src/LikertRow.tsx`:
+  - usunięto nieużywany prop `hoveredCol`,
+  - poprawiono pole pytania z `item.text` na `item.textM` (zgodnie z typem `Ap48Item`).
+- `archetypy-ankieta/src/lib/jstStudies.ts`:
+  - usunięto zależność od `replaceAll` (ES2021) na rzecz kompatybilnego helpera `split/join` (ES2020).
+- Testy:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-031 (domknięcie przecięć TOP vs luki/dopasowania dla przypadków 2900/2901)
+- `app.py` (`🧭 Matching`, sekcja `Główne zalety / Główne problemy`):
+  - źródło porównań przecięć TOP zostało dodatkowo uodpornione:
+    - łączone są nazwy z chipów (`strengths_rows`, `gaps_rows`) oraz rankingi live (`strongest_fit_entities`, `largest_gap_entities`),
+    - porównanie nadal idzie po tej samej normalizacji nazw.
+  - efekt: wpisy o priorytetach obecnych w `Największe luki` i `Najlepsze dopasowania` nie znikają przez różnice formatu źródeł.
+- Dodatkowy smoke-check frontendu ankiety:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:
