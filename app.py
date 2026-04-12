@@ -4648,12 +4648,17 @@ def matching_view() -> None:
 
         # Jeśli priorytety (TOP2/TOP3) pokrywają się z najlepszymi / największymi lukami,
         # pokazujemy to jawnie w sekcji zalet/problemów.
+        def _canon_name(name: str) -> str:
+            return slugify(str(name or "").strip()).lower()
+
         priority_for_checks: List[str] = []
         for arche in p_top + j_top:
             if arche not in priority_for_checks:
                 priority_for_checks.append(arche)
-        priority_in_best = [a for a in strongest_fit_entities if a in priority_for_checks]
-        priority_in_gaps = [a for a in largest_gap_entities if a in priority_for_checks]
+        best_canon = {_canon_name(a) for a in strongest_fit_entities}
+        gaps_canon = {_canon_name(a) for a in largest_gap_entities}
+        priority_in_best = [a for a in priority_for_checks if _canon_name(a) in best_canon]
+        priority_in_gaps = [a for a in priority_for_checks if _canon_name(a) in gaps_canon]
 
         if priority_in_best:
             best_priority_txt = ", ".join(

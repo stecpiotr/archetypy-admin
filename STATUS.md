@@ -965,6 +965,16 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-026 (normalizacja nazw przy przecięciach TOP)
+- `app.py` (`🧭 Matching`, sekcja zalet/problemów):
+  - dodano normalizację porównań nazw (`_canon_name = slugify(...).lower()`),
+  - przecięcia TOP vs chipy (`priority_in_best` / `priority_in_gaps`) liczone są po znormalizowanych kluczach,
+    a nie po surowym porównaniu stringów 1:1.
+- Efekt:
+  - wpis o priorytetowych pozycjach w największych lukach nie ginie przez różnice zapisu nazw.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

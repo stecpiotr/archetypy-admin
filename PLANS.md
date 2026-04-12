@@ -1137,3 +1137,17 @@ Wynik:
     są wstawiane przez `insert(0, ...)`, więc nie wypadają przy `[:4]`.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-026 [DONE]
+Temat: Uodpornienie wykrywania przecięć TOP vs chipy (normalizacja nazw).
+Kryteria ukończenia:
+1. Wykrywanie przecięć działa nawet przy różnicach zapisu nazw (spacje/diakrytyki/warianty formatowania).
+2. Wpisy o przecięciach TOP pojawiają się stabilnie w `Główne zalety/problemy`.
+Pierwszy krok wykonawczy:
+- porównywać listy przez znormalizowane klucze nazw.
+Wynik:
+- `app.py`:
+  - dodano normalizację nazw (`_canon_name` przez `slugify(...).lower()`),
+  - przecięcia `priority_in_best` / `priority_in_gaps` liczone są po znormalizowanych zbiorach nazw.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

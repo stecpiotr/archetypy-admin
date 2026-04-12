@@ -886,3 +886,12 @@ Decyzja:
 Uzasadnienie:
 - User zgłosił, że wpisy nie pojawiały się mimo widocznego przecięcia na ekranie.
 - Źródło „jedno do jednego z chipami” + priorytet pozycji eliminuje rozjazd narracji i ryzyko ucięcia przez limit 4 punktów.
+
+### D-097: Przecięcia TOP vs chipy porównujemy po nazwach znormalizowanych
+Decyzja:
+- Wykrywanie przecięć (`priority_in_best`, `priority_in_gaps`) działa przez klucze znormalizowane:
+  - `slugify(name).lower()`.
+- Surowe stringi pozostają tylko do renderu etykiet w UI.
+Uzasadnienie:
+- User dalej widział brak wpisu mimo widocznego przecięcia; najbardziej prawdopodobna przyczyna to rozjazd formatu nazw (spacje/znaki).
+- Normalizacja zamyka tę klasę błędów bez wpływu na prezentację nazw.
