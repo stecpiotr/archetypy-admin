@@ -4136,9 +4136,9 @@ def matching_view() -> None:
             cmp_rows.append(
                 {
                     current_axis_label: _matching_entity_name(a, current_axis_label),
-                    "Profil polityka": f"{pol:.1f}",
-                    f"Oczekiwania mieszkańców ({sei_short})": f"{ocz:.1f}",
-                    "Różnica |Δ|": f"{diff:.1f}",
+                    "Profil polityka": round(pol, 1),
+                    f"Oczekiwania mieszkańców ({sei_short})": round(ocz, 1),
+                    "Różnica |Δ|": round(diff, 1),
                     "__sort_diff": diff,
                 }
             )
@@ -4921,20 +4921,19 @@ def matching_view() -> None:
                     unsafe_allow_html=True,
                 )
                 _show_image_compat(jst_profile_img, max_width_px=520)
-            if current_axis_label == "Wartość":
-                st.markdown(
-                    """
-                    <div class="match-wheel-legend-wrap">
-                      <div class="match-wheel-legend">
-                        <span><i style="background:#e53935"></i>Zmiana</span>
-                        <span><i style="background:#1e88e5"></i>Ludzie</span>
-                        <span><i style="background:#2e7d32"></i>Porządek</span>
-                        <span><i style="background:#7e57c2"></i>Niezależność</span>
-                      </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            st.markdown(
+                """
+                <div class="match-wheel-legend-wrap">
+                  <div class="match-wheel-legend">
+                    <span><i style="background:#e53935"></i>Zmiana</span>
+                    <span><i style="background:#1e88e5"></i>Ludzie</span>
+                    <span><i style="background:#2e7d32"></i>Porządek</span>
+                    <span><i style="background:#7e57c2"></i>Niezależność</span>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         except Exception as e:
             st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")
 

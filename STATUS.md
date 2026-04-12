@@ -1034,6 +1034,16 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-032 (legenda pod profilem 0-100 + sortowanie tabeli)
+- `app.py` (`🧭 Matching`, `Podsumowanie`):
+  - legenda pod sekcją `Profile archetypowe 0-100 (siła archetypu, skala: 0-100)` nie jest już ograniczona do trybu `Wartość` — renderuje się również dla `Archetypów`,
+  - tabela porównawcza profilu używa wartości liczbowych (`round(..., 1)`) zamiast stringów, więc sortowanie po kolumnach działa numerycznie.
+- Efekt:
+  - pod dwoma kołami 0-100 jest widoczna wspólna legenda,
+  - klikane sortowanie kolumn (`↑/↓`) nie daje już losowego porządku przez sortowanie tekstowe.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

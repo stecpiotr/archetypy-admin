@@ -1235,3 +1235,17 @@ Wynik:
   - redukuje to ryzyko „znikania” wpisu przy różnicach formatu źródłowej nazwy.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-032 [DONE]
+Temat: Legenda pod `Profile archetypowe 0-100` + naprawa sortowania tabeli porównawczej.
+Kryteria ukończenia:
+1. W `🧭 Matching -> Podsumowanie` legenda kategorii pod dwoma wykresami 0-100 jest widoczna także w trybie `Archetypy`.
+2. Sortowanie po kolumnach tabeli porównawczej (`Profil polityka`, `Oczekiwania mieszkańców`, `Różnica`) działa numerycznie.
+Pierwszy krok wykonawczy:
+- usunąć warunek renderu legendy tylko dla trybu `Wartość` i przełączyć wartości tabeli z tekstu na liczby `float`.
+Wynik:
+- `app.py`:
+  - legenda `Zmiana/Ludzie/Porządek/Niezależność` renderuje się stale pod sekcją dwóch wykresów 0-100,
+  - kolumny liczbowe tabeli porównawczej są trzymane jako liczby (`round(...,1)`), więc sortowanie działa poprawnie.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

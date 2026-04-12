@@ -932,3 +932,11 @@ Decyzja:
 Uzasadnienie:
 - User zgłosił przypadki, gdzie przecięcie było widoczne na ekranie, ale nie trafiało do sekcji `Główne problemy`.
 - Źródło łączone eliminuje zależność od pojedynczego formatu danych i domyka ten typ regresji.
+
+### D-102: Legenda kół 0-100 ma być stałym elementem sekcji oraz sortowanie tabeli ma działać liczbowo
+Decyzja:
+- W `🧭 Matching -> Podsumowanie` wspólna legenda pod dwoma wykresami 0-100 (`Zmiana/Ludzie/Porządek/Niezależność`) jest renderowana stale, niezależnie od trybu `Archetypy/Wartości`.
+- W tabeli porównawczej wartości kolumn liczbowych przechowujemy jako liczby (`float` zaokrąglone do 1 miejsca), nie jako string.
+Uzasadnienie:
+- User zgłosił brak legendy dla `Profile archetypowe 0-100`.
+- Sortowanie po kolumnach przy stringach dawało nieintuicyjny porządek (sort tekstowy zamiast numerycznego).
