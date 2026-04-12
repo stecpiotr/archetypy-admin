@@ -1151,3 +1151,33 @@ Wynik:
   - przecięcia `priority_in_best` / `priority_in_gaps` liczone są po znormalizowanych zbiorach nazw.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-027 [DONE]
+Temat: Ostateczne domknięcie przecięć TOP vs chipy (bez filtrowania exact-match po surowych nazwach).
+Kryteria ukończenia:
+1. Przecięcia TOP z `Najlepsze dopasowania/Największe luki` działają nawet gdy nazwy źródłowe mają inny format.
+2. Brak sytuacji, w której lista źródłowa z chipów staje się pusta przez zbyt restrykcyjny filtr.
+Pierwszy krok wykonawczy:
+- usunąć filtr `name in diff_by_entity` przy pobieraniu nazw z `result['strengths']/result['gaps']` i porównywać po znormalizowanych kluczach.
+Wynik:
+- `app.py`:
+  - źródła chipów są czytane przez `_safe_src_names(...)` bez wymogu exact-match na surowym stringu,
+  - przecięcia są liczone po `slugify(...).lower()` (`best_canon` / `gaps_canon`),
+  - eliminuje to przypadki, gdzie przecięcie logicznie istnieje, ale nie pojawia się w `Główne problemy`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-028 [DONE]
+Temat: Jedna wspólna legenda kategorii pod wykresami `Profile wartości 0-100` w `🧭 Matching`.
+Kryteria ukończenia:
+1. W trybie `Wartości` pod dwoma wykresami 0-100 jest jedna wspólna, wyśrodkowana legenda.
+2. Legenda ma układ i semantykę jak referencja (`Zmiana`, `Ludzie`, `Porządek`, `Niezależność`).
+3. Brak duplikacji legendy pod każdym wykresem osobno.
+Pierwszy krok wykonawczy:
+- dopracować CSS legendy (`match-wheel-legend`) oraz render HTML po obu wykresach 0-100.
+Wynik:
+- `app.py`:
+  - dodano wrapper `match-wheel-legend-wrap` i odświeżony styl legendy (ramka, padding, wyśrodkowanie),
+  - w trybie `Wartość` renderowana jest jedna wspólna legenda pod oboma wykresami.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

@@ -4473,18 +4473,26 @@ def matching_view() -> None:
                 rx:10px !important;
                 ry:10px !important;
               }
-              .match-wheel-legend{
-                margin-top:8px;
+              .match-wheel-legend-wrap{
+                margin-top:6px;
                 display:flex;
                 justify-content:center;
-                gap:16px;
+              }
+              .match-wheel-legend{
+                display:flex;
+                justify-content:center;
+                gap:20px;
                 flex-wrap:wrap;
                 align-items:center;
+                border:1px solid #dbe4ef;
+                border-radius:12px;
+                background:#fff;
+                padding:8px 14px;
               }
               .match-wheel-legend span{
                 display:inline-flex;
                 align-items:center;
-                gap:6px;
+                gap:7px;
                 font-size:13px;
                 color:#334155;
                 font-weight:700;
@@ -4492,7 +4500,7 @@ def matching_view() -> None:
               .match-wheel-legend i{
                 width:10px;
                 height:10px;
-                border-radius:3px;
+                border-radius:2px;
                 display:inline-block;
               }
               @media (max-width: 900px){
@@ -4613,18 +4621,19 @@ def matching_view() -> None:
         # "Najlepsze dopasowania" i "Największe luki", żeby nie było rozjazdu narracji.
         strengths_src = result.get("strengths") if isinstance(result.get("strengths"), list) else []
         gaps_src = result.get("gaps") if isinstance(result.get("gaps"), list) else []
-        if strengths_src:
-            strongest_fit_entities = [
-                str(r.get("archetyp"))
-                for r in strengths_src
-                if isinstance(r, dict) and str(r.get("archetyp") or "") in diff_by_entity
-            ]
-        if gaps_src:
-            largest_gap_entities = [
-                str(r.get("archetyp"))
-                for r in gaps_src
-                if isinstance(r, dict) and str(r.get("archetyp") or "") in diff_by_entity
-            ]
+
+        def _safe_src_names(rows: List[Any]) -> List[str]:
+            names: List[str] = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                raw = str(row.get("archetyp") or "").strip()
+                if raw:
+                    names.append(raw)
+            return names
+
+        src_best_names = _safe_src_names(strengths_src) if strengths_src else strongest_fit_entities
+        src_gap_names = _safe_src_names(gaps_src) if gaps_src else largest_gap_entities
         overlap_top = [a for a in p_top if a in j_top]
 
         advantages: List[str] = []
@@ -4655,8 +4664,8 @@ def matching_view() -> None:
         for arche in p_top + j_top:
             if arche not in priority_for_checks:
                 priority_for_checks.append(arche)
-        best_canon = {_canon_name(a) for a in strongest_fit_entities}
-        gaps_canon = {_canon_name(a) for a in largest_gap_entities}
+        best_canon = {_canon_name(a) for a in src_best_names}
+        gaps_canon = {_canon_name(a) for a in src_gap_names}
         priority_in_best = [a for a in priority_for_checks if _canon_name(a) in best_canon]
         priority_in_gaps = [a for a in priority_for_checks if _canon_name(a) in gaps_canon]
 
@@ -4901,11 +4910,13 @@ def matching_view() -> None:
             if current_axis_label == "Wartość":
                 st.markdown(
                     """
-                    <div class="match-wheel-legend">
-                      <span><i style="background:#e53935"></i>Zmiana</span>
-                      <span><i style="background:#1e88e5"></i>Ludzie</span>
-                      <span><i style="background:#2e7d32"></i>Porządek</span>
-                      <span><i style="background:#7e57c2"></i>Niezależność</span>
+                    <div class="match-wheel-legend-wrap">
+                      <div class="match-wheel-legend">
+                        <span><i style="background:#e53935"></i>Zmiana</span>
+                        <span><i style="background:#1e88e5"></i>Ludzie</span>
+                        <span><i style="background:#2e7d32"></i>Porządek</span>
+                        <span><i style="background:#7e57c2"></i>Niezależność</span>
+                      </div>
                     </div>
                     """,
                     unsafe_allow_html=True,

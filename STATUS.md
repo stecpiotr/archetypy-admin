@@ -975,6 +975,28 @@
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
 
+### Zrobione w Hotfix H-027 (usunięcie restrykcyjnego filtra surowych nazw)
+- `app.py` (`🧭 Matching`, sekcja zalet/problemów):
+  - usunięto zbyt restrykcyjny filtr `name in diff_by_entity` przy zaciąganiu nazw z `result['strengths']` / `result['gaps']`,
+  - dodano `_safe_src_names(...)` (pobieranie nazw bez exact-match po surowym stringu),
+  - przecięcia TOP vs chipy finalnie liczone po znormalizowanych kluczach (`slugify(...).lower()`).
+- Efekt:
+  - przypadki `TOP` obecne jednocześnie w `Największe luki` nie znikają już z `Główne problemy` przez różnice formatu nazwy.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-028 (wspólna legenda pod `Profile wartości 0-100`)
+- `app.py` (`🧭 Matching`, `Podsumowanie`, sekcja dwóch wykresów 0-100):
+  - dodano jeden wspólny, wyśrodkowany blok legendy pod oboma wykresami (bez duplikacji per-wykres),
+  - legenda w trybie `Wartości` pokazuje kategorie:
+    - `Zmiana`,
+    - `Ludzie`,
+    - `Porządek`,
+    - `Niezależność`,
+    w układzie zbliżonym do referencji (ramka + padding + wyśrodkowanie).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
 ### BLOKERY / RYZYKA
 - Brak blockerow technicznych.
 - Ryzyko wdrozeniowe:

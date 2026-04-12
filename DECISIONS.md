@@ -895,3 +895,11 @@ Decyzja:
 Uzasadnienie:
 - User dalej widział brak wpisu mimo widocznego przecięcia; najbardziej prawdopodobna przyczyna to rozjazd formatu nazw (spacje/znaki).
 - Normalizacja zamyka tę klasę błędów bez wpływu na prezentację nazw.
+
+### D-098: Dane z chipów nie mogą być filtrowane po exact-match surowej nazwy
+Decyzja:
+- Nazwy z `result["strengths"]` / `result["gaps"]` pobieramy bez warunku `name in diff_by_entity`.
+- Dopiero etap porównania przecięć wykorzystuje normalizację (`slugify(...).lower()`).
+Uzasadnienie:
+- Filtr exact-match potrafił wyczyścić listę źródłową przy drobnym rozjeździe zapisu i blokował wpisy, które powinny trafić do `Główne problemy`.
+- Rozdzielenie „pobrania źródła” od „logiki porównania” usuwa ten punkt awarii.
