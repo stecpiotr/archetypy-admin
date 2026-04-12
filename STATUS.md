@@ -1116,9 +1116,31 @@
 - Zakres dalszego kroku pozostaje bez zmian:
   - ręczny smoke-test UI na środowisku użytkownika po deployu.
 
+### Zrobione w Hotfix H-035 (2026-04-12, poprawki po screenach UAT)
+- `app.py`:
+  - domknięto no-wrap dla `(|Δ| ... pp)` w `Główne zalety/problemy` przez dedykowany `span.match-delta-nowrap`,
+  - `Kontekst` w `🧭 Matching -> Demografia` dostał uporządkowany styl typu chip (bez brzydkiego kodowego markdown),
+  - po `💾 Zapisz parametry ankiety` (personal/JST) działa widoczny feedback `Zapisano parametry ankiety` przez toast kompatybilny ze starszym Streamlit.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - przywrócono paletę kolorów skali zgodną z referencją 2899 (nagłówki macierzy + skala w single-screen),
+  - `Pojedyncze ekrany`:
+    - usunięto etykiety nad skalą (`Zdecydowanie się nie zgadzam ...`),
+    - przeniesiono `Pamiętaj: ...` na górę i wystylowano na szaro,
+    - usunięto pogrubienie nazwiska w zdaniu `Czy zgadzasz się ... na temat ...?`,
+    - przebudowano strukturę pod zawężony desktopowy layout.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - zawężono obszar treści na desktopie,
+  - podniesiono sekcję odpowiedzi (bez przyklejania do samego dołu),
+  - przycisk `Dalej` ma lżejszy, mniej dominujący styl,
+  - `Wstecz` dopasowano wizualnie do referencji mobilnej.
+- Testy techniczne:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### BLOKERY / RYZYKA
 - BLOKER operacyjny:
-  - brak możliwości pełnego UAT UI bez deployu i dostępu do środowiska użytkownika (weryfikacja ekranów settings + flow ankiety).
+  - brak możliwości pełnego UAT UI bez deployu i dostępu do środowiska użytkownika (weryfikacja finalnego wyglądu matrix/single + kontekst + toasty).
 - Ryzyko wdrozeniowe:
   - nowe kolumny ustawień ankiety wymagają uruchomienia `ensure_jst_schema()` po deployu `archetypy-admin`.
   - do potwierdzenia na danych produkcyjnych: E2E dla harmonogramu (start/koniec, auto-przejście w `suspended`, ręczne odwieszenie po auto-końcu).

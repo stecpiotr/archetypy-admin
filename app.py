@@ -1017,6 +1017,23 @@ def _download_button_compat(*args, **kwargs):
     return st.download_button(*args, **kwargs)
 
 
+def _toast_success_compat(message: str) -> None:
+    toast_fn = getattr(st, "toast", None)
+    if callable(toast_fn):
+        try:
+            toast_fn(message, icon="✅")
+            return
+        except TypeError:
+            try:
+                toast_fn(message)
+                return
+            except Exception:
+                pass
+        except Exception:
+            pass
+    st.success(message)
+
+
 def _sanitize_base_url(raw: str) -> str:
     txt = (raw or "").strip()
     if not txt:
@@ -2167,6 +2184,10 @@ def jst_settings_view() -> None:
     slug = str(study_row.get("slug") or "").strip()
     survey_base = str(st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
     survey_url = f"{survey_base}/{slug}" if slug else "—"
+    save_flash_key = f"jst_settings_saved_flash_{sid}"
+    flash_msg = st.session_state.pop(save_flash_key, None)
+    if flash_msg:
+        _toast_success_compat(str(flash_msg))
 
     info_rows = pd.DataFrame(
         [
@@ -2292,7 +2313,7 @@ def jst_settings_view() -> None:
         updates.update(_scheduled_survey_transition_updates(preview_study, kind="jst"))
         try:
             update_jst_study(sb, sid, updates)
-            st.success("Zapisano parametry ankiety.")
+            st.session_state[save_flash_key] = "Zapisano parametry ankiety."
             st.rerun()
         except Exception as exc:
             st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")
@@ -4945,7 +4966,15 @@ def matching_view() -> None:
         gaps_canon = {_canon_name(a) for a in gaps_names_for_check if str(a or "").strip()}
         priority_in_best = [a for a in priority_for_checks if _canon_name(a) in best_canon]
         priority_in_gaps = [a for a in priority_for_checks if _canon_name(a) in gaps_canon]
-        _delta_nbsp = lambda diff: f"(|Δ|\u00a0{float(diff):.1f}\u00a0pp)"
+        _delta_nbsp = lambda diff: f"(|Δ| {float(diff):.1f} pp)"
+        _delta_re = re.compile(r"\(\|Δ\|[\s\u00a0]*([-+]?\d+(?:[.,]\d+)?)\s*pp\)")
+
+        def _render_eval_line_html(raw_text: str) -> str:
+            safe = html.escape(str(raw_text or ""))
+            return _delta_re.sub(
+                lambda m: f"<span class='match-delta-nowrap'>(|Δ| {m.group(1)} pp)</span>",
+                safe,
+            )
 
         if priority_in_best:
             best_priority_txt = ", ".join(
@@ -4979,10 +5008,10 @@ def matching_view() -> None:
             problems = ["Brak krytycznych rozjazdów na kluczowych pozycjach."]
 
         adv_items_html = "".join(
-            [f"<li><span class='badge'>✓</span><span>{html.escape(txt)}</span></li>" for txt in advantages[:4]]
+            [f"<li><span class='badge'>✓</span><span>{_render_eval_line_html(txt)}</span></li>" for txt in advantages[:4]]
         )
         prob_items_html = "".join(
-            [f"<li><span class='badge'>!</span><span>{html.escape(txt)}</span></li>" for txt in problems[:4]]
+            [f"<li><span class='badge'>!</span><span>{_render_eval_line_html(txt)}</span></li>" for txt in problems[:4]]
         )
         st.markdown(
             f"""
@@ -4995,6 +5024,7 @@ def matching_view() -> None:
               .match-eval-list{{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;}}
               .match-eval-list li{{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;color:#334155;font-size:13px;font-weight:700;line-height:1.35;}}
               .match-eval-list .badge{{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;font-size:12px;font-weight:900;}}
+              .match-delta-nowrap{{white-space:nowrap;display:inline-block;}}
               .match-eval-card.good .badge{{background:#e8fbf1;color:#0f7a48;border:1px solid #b9eed3;}}
               .match-eval-card.warn .badge{{background:#fff1f2;color:#b91c1c;border:1px solid #fecdd3;}}
               @media (max-width:900px){{.match-eval-grid{{grid-template-columns:1fr;}}}}
@@ -5206,7 +5236,51 @@ def matching_view() -> None:
         demo_jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "").strip()
         if demo_person_name or demo_jst_name:
             st.markdown(
-                f"**Kontekst:** polityk: `{demo_person_name or '—'}` • JST: `{demo_jst_name or '—'}`"
+                """
+                <style>
+                  .match-demo-context{
+                    display:inline-flex;
+                    align-items:center;
+                    gap:8px;
+                    flex-wrap:wrap;
+                    padding:7px 12px;
+                    border:1px solid #dbe4ef;
+                    border-radius:999px;
+                    background:#f8fbff;
+                    margin:0 0 8px 0;
+                  }
+                  .match-demo-context-label{
+                    font-size:12.5px;
+                    font-weight:800;
+                    color:#64748b;
+                    letter-spacing:.02em;
+                    text-transform:uppercase;
+                  }
+                  .match-demo-context-item{
+                    font-size:14px;
+                    font-weight:700;
+                    color:#1f2f44;
+                  }
+                  .match-demo-context-sep{
+                    font-size:13px;
+                    font-weight:700;
+                    color:#94a3b8;
+                    margin:0 2px;
+                  }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"""
+                <div class="match-demo-context">
+                  <span class="match-demo-context-label">Kontekst</span>
+                  <span class="match-demo-context-item">Polityk: {html.escape(demo_person_name or "—")}</span>
+                  <span class="match-demo-context-sep">•</span>
+                  <span class="match-demo-context-item">JST: {html.escape(demo_jst_name or "—")}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
         st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
         st.markdown(
@@ -5572,6 +5646,10 @@ def personal_settings_view() -> None:
     slug = str(study.get("slug") or "").strip()
     survey_base = str(st.secrets.get("SURVEY_BASE_URL", "https://archetypy.badania.pro") or "").rstrip("/")
     survey_url = f"{survey_base}/{slug}" if slug else "—"
+    save_flash_key = f"personal_settings_saved_flash_{study_id or slug}"
+    flash_msg = st.session_state.pop(save_flash_key, None)
+    if flash_msg:
+        _toast_success_compat(str(flash_msg))
 
     info_rows = pd.DataFrame(
         [
@@ -5719,7 +5797,7 @@ def personal_settings_view() -> None:
         updates.update(_scheduled_survey_transition_updates(preview_study, kind="personal"))
         try:
             update_study(sb, study_id, updates)
-            st.success("Zapisano parametry ankiety.")
+            st.session_state[save_flash_key] = "Zapisano parametry ankiety."
             st.rerun()
         except Exception as exc:
             st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")

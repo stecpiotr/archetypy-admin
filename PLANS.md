@@ -1339,3 +1339,35 @@ Wynik:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
 - Kolejny krok operacyjny pozostaje ręcznym UAT UI na środowisku użytkownika (po deployu).
+
+### Hotfix H-035 [DONE]
+Temat: Korekty UX po screenach UAT (no-wrap `|Δ|`, estetyka kontekstu Demografii, feedback zapisu, przywrócenie wyglądu macierzy, poprawa desktop `Pojedyncze ekrany`).
+Kryteria ukończenia:
+1. Fragmenty `(|Δ| ... pp)` w `Główne zalety/problemy` nie rozbijają się na dwie linie.
+2. Linia `Kontekst` w `🧭 Matching -> Demografia` ma schludny, czytelny styl.
+3. Po kliknięciu `💾 Zapisz parametry ankiety` użytkownik dostaje widoczny komunikat `Zapisano parametry ankiety`.
+4. W macierzy wracają kolory nagłówków skali zgodne z referencją (2899) bez przebudowy układu tabeli.
+5. Tryb `Pojedyncze ekrany` na desktopie ma zawężony layout, odpowiedzi wyżej, usunięte etykiety nad skalą i lżejsze przyciski `Wstecz/Dalej`.
+Pierwszy krok wykonawczy:
+- poprawić punktowo `app.py` i `archetypy-ankieta/src/Questionnaire.tsx` + `src/SingleQuestionnaire.css`, bez zmian w niepowiązanych modułach.
+Wynik:
+- `app.py`:
+  - dodano `match-delta-nowrap` i bezpieczny render linii z automatycznym oplataniem `(|Δ| ... pp)` w niełamliwy `<span>`,
+  - przebudowano linię `Kontekst` w Demografii na estetyczny chip/pill (bez brzydkiego markdown z backtickami),
+  - dodano kompatybilny toast helper (`_toast_success_compat`) i flash po zapisie parametrów ankiety w obu widokach settings.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - przywrócono paletę kolorów skali pod referencję 2899 (dla nagłówków macierzy i przycisków single-screen),
+  - w `Pojedyncze ekrany`:
+    - usunięto etykiety `Zdecydowanie się nie zgadzam / ... zgadzam` nad odpowiedziami,
+    - `Pamiętaj: ...` przeniesiono na górę i wystylowano na szaro,
+    - usunięto pogrubienie nazwiska w zdaniu `Czy zgadzasz... na temat ...?`,
+    - przebudowano strukturę pod nowy, zawężony shell desktop.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - zawężono desktopową szerokość treści,
+  - podniesiono sekcję odpowiedzi (nieprzyklejona do dolnej krawędzi),
+  - uproszczono styl przycisku `Dalej` (mniej dominujący),
+  - dopracowano styl `Wstecz` pod referencję mobilną.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

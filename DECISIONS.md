@@ -998,3 +998,51 @@ Decyzja:
 - Fragment `(|Δ| ... pp)` w sekcjach `Główne zalety/problemy` budujemy z niełamliwymi odstępami.
 Uzasadnienie:
 - User zgłosił brak orientacji „czego dotyczy Demografia” oraz nieczytelne łamanie końcówek metrycznych na dwa wiersze.
+
+### D-109: Blok `(|Δ| ... pp)` w `Główne zalety/problemy` jest zabezpieczony niełamliwym wrapperem HTML
+Decyzja:
+- W sekcji `Główne zalety/problemy` fragment `(|Δ| ... pp)` renderujemy jako:
+  - `<span class="match-delta-nowrap">...</span>` z `white-space: nowrap`.
+- Nie polegamy wyłącznie na `NBSP` w surowym stringu.
+Uzasadnienie:
+- Sam `NBSP` nie był wystarczający w praktyce (ciąg nadal łamał się na części przy zawijaniu tekstu).
+- Wrapper CSS daje deterministyczny brak łamania dla całego tokenu różnicy.
+
+### D-110: Kontekst Demografii ma formę lekkiego chipa zamiast markdown z backtickami
+Decyzja:
+- W `🧭 Matching -> Demografia` kontekst (`Polityk` + `JST`) renderujemy jako estetyczny chip:
+  - subtelne tło,
+  - obramowanie,
+  - czytelna typografia.
+Uzasadnienie:
+- Poprzednia wersja (`**Kontekst:** ... \`...\``) była wizualnie ciężka i nieczytelna dla użytkownika.
+
+### D-111: Po zapisie parametrów ankiety używamy feedbacku typu toast (z fallbackiem)
+Decyzja:
+- Po `💾 Zapisz parametry ankiety` w personal/JST:
+  - zapisujemy komunikat flash w `st.session_state`,
+  - po `st.rerun()` pokazujemy `st.toast("Zapisano parametry ankiety")`,
+  - gdy `toast` nie jest dostępny, fallback do `st.success(...)`.
+Uzasadnienie:
+- Użytkownik oczekuje natychmiastowego, widocznego potwierdzenia zapisu (preferencyjnie prawy górny róg).
+- Flash + rerun zachowuje świeży stan widoku i jednocześnie nie gubi komunikatu.
+
+### D-112: Paleta skali odpowiedzi wraca do referencji wizualnej z ekranu 2899
+Decyzja:
+- Kolory 5 poziomów skali (`zdecydowanie nie` ... `zdecydowanie tak`) są przywrócone do referencyjnej, jaśniejszej palety i używane spójnie:
+  - w nagłówkach macierzy,
+  - oraz w przyciskach trybu `Pojedyncze ekrany`.
+Uzasadnienie:
+- User zgłosił regresję kolorów i wymagał przywrócenia wyglądu 1:1 względem wcześniejszego wzorca.
+
+### D-113: Desktop `Pojedyncze ekrany` ma zawężony layout i lżejszą nawigację
+Decyzja:
+- Tryb `Pojedyncze ekrany` na desktopie:
+  - renderujemy w zawężonym shellu (bez rozciągania na pełną szerokość),
+  - odpowiedzi są podniesione wyżej (nie przyklejone do dołu strony),
+  - usuwamy etykiety nad skalą (`Zdecydowanie się nie zgadzam ...`),
+  - `Pamiętaj: ...` jest u góry, wyśrodkowane i szare,
+  - zdanie `Czy zgadzasz się ... na temat ...` bez pogrubienia nazwiska,
+  - `Wstecz` i `Dalej` mają lżejszy, mniej agresywny styl.
+Uzasadnienie:
+- User jednoznacznie wskazał słaby odbiór desktopowego single-screen i podał konkretne wymagania kompozycyjne.
