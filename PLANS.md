@@ -1732,3 +1732,28 @@ Wynik:
   - `python -m py_compile app.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-050 [DONE]
+Temat: Korekta układu licznika w raporcie publicznym + dopracowanie suwaka JST (dark + wyrównanie B).
+Kryteria ukończenia:
+1. W raporcie publicznym licznik uczestników jest w tej samej linii co nagłówek `Informacje na temat archetypów ...` (tytuł po lewej, licznik po prawej).
+2. Oś suwaka JST w dark mode jest wyraźnie widoczna.
+3. Teksty po stronie B pod suwakami są wyrównane do prawej.
+Pierwszy krok wykonawczy:
+- przenieść render licznika z `app.py` do `admin_dashboard.py::show_report(public_view=True)` i dopracować style suwaka w `JstSurvey.css`.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - w `show_report(..., public_view=True)` nagłówek raportu ma teraz wspólny wiersz:
+    - lewa strona: `Informacje na temat archetypów ...`,
+    - prawa strona: licznik `X uczestnik(ów) badania`,
+  - dodano responsywny i dark-mode-friendly styl dla tego wiersza.
+- `archetypy-admin/app.py`:
+  - usunięto wcześniejszy, globalnie wstrzyknięty kafelek licznika nad raportem publicznym (żeby nie „uciekał” w prawy górny róg).
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - w dark mode wzmocniono tor suwaka (jaśniejszy kolor, obrys, mocniejszy kontrast),
+  - ticki osi są grubsze i jaśniejsze,
+  - prawa etykieta B pod suwakami wyrównana do prawej (`.jst-slider-head > span:last-child { text-align:right; }`).
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

@@ -1409,3 +1409,18 @@
   - `python -m py_compile app.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-050 (2026-04-14, public heading row + slider dark contrast + B align)
+- `archetypy-admin/admin_dashboard.py`:
+  - licznik uczestników w publicznym raporcie został przeniesiony do tej samej linii co nagłówek `Informacje na temat archetypów ...`,
+  - układ jest: tytuł po lewej, licznik po prawej (responsive + dark mode).
+- `archetypy-admin/app.py`:
+  - usunięto wcześniejszy kafelek licznika renderowany globalnie nad raportem (to on powodował „uciekanie” w prawy górny róg strony).
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - tor suwaka w dark mode ma mocniejszy kontrast (jaśniejszy fill + obrys),
+  - ticki są bardziej widoczne (grubsze i jaśniejsze),
+  - opisy po prawej stronie suwaka (`B`) są wyrównane do prawej.
+- Testy techniczne:
+  - `python -m py_compile app.py admin_dashboard.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

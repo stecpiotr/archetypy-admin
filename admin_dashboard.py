@@ -6093,7 +6093,81 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             results_df = results_df.sort_values("Czas ankiety", ascending=True)
 
-            st.markdown(f'<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów {personGen}</div>', unsafe_allow_html=True)
+            if public_view:
+                participants_label = "uczestnik badania" if int(num_ankiet or 0) == 1 else "uczestników badania"
+                st.markdown(
+                    """
+                    <style>
+                      .ap-public-heading-row{
+                        display:flex;
+                        align-items:flex-end;
+                        justify-content:space-between;
+                        gap:18px;
+                        margin-bottom:22px;
+                        flex-wrap:wrap;
+                      }
+                      .ap-public-heading-title{
+                        font-size:2.1em;
+                        font-weight:600;
+                        line-height:1.15;
+                      }
+                      .ap-public-heading-count{
+                        display:flex;
+                        align-items:baseline;
+                        gap:8px;
+                        white-space:nowrap;
+                        color:#1f4f8d;
+                        font-weight:700;
+                      }
+                      .ap-public-heading-count-value{
+                        font-size:1.7em;
+                        line-height:1;
+                        font-weight:800;
+                      }
+                      .ap-public-heading-count-label{
+                        font-size:0.98em;
+                        color:#3f5873;
+                      }
+                      @media (max-width: 900px){
+                        .ap-public-heading-row{
+                          align-items:flex-start;
+                        }
+                        .ap-public-heading-title{
+                          font-size:1.62em;
+                        }
+                        .ap-public-heading-count{
+                          width:100%;
+                        }
+                      }
+                      @media (prefers-color-scheme: dark){
+                        .ap-public-heading-count{
+                          color:#9dc6ff;
+                        }
+                        .ap-public-heading-count-label{
+                          color:#c2d6ec;
+                        }
+                      }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f"""
+                    <div class="ap-public-heading-row">
+                      <div class="ap-public-heading-title">Informacje na temat archetypów {personGen}</div>
+                      <div class="ap-public-heading-count">
+                        <span class="ap-public-heading-count-value">{int(num_ankiet or 0)}</span>
+                        <span class="ap-public-heading-count-label">{participants_label}</span>
+                      </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div style="font-size:2.1em;font-weight:600;margin-bottom:22px;">Informacje na temat archetypów {personGen}</div>',
+                    unsafe_allow_html=True,
+                )
 
             # --- ⬇️ RANKING I WYKRES NA BAZIE ŚREDNIEJ (0–20), NIE LICZEBNOŚCI! ---
             # Kolejność zgodna z "Rozkład archetypów na osiach potrzeb"

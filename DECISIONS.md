@@ -1318,3 +1318,26 @@ Decyzja:
 Uzasadnienie:
 - W publicznym widoku brakowało kluczowego kontekstu skali badania, który jest obecny w panelu administracyjnym.
 - Dodanie licznika zwiększa czytelność raportu dla odbiorców zewnętrznych.
+
+### D-148: Licznik uczestników w publicznym raporcie jest częścią wiersza nagłówka sekcji
+Decyzja:
+- W publicznym `show_report(..., public_view=True)` licznik uczestników renderujemy w tej samej linii co nagłówek `Informacje na temat archetypów ...`:
+  - tytuł po lewej,
+  - licznik po prawej.
+- Wycofujemy wcześniejsze globalne wstrzyknięcie kafelka nad raportem.
+Uzasadnienie:
+- Użytkownik zgłosił, że osobny kafelek „ucieka” wizualnie i zaburza kompozycję.
+- Wspólny wiersz z nagłówkiem daje czytelniejszy, bardziej naturalny układ.
+
+### D-149: W JST dark mode suwak ma priorytet kontrastu osi nad subtelną estetyką
+Decyzja:
+- Tor suwaka w dark mode otrzymuje jaśniejsze tło, obrys i mocniejszy kontrast.
+- Ticki osi są grubsze i jaśniejsze.
+Uzasadnienie:
+- W praktyce użytkowej oś była nadal zbyt słabo widoczna, co utrudniało ocenę pozycji suwaka.
+
+### D-150: Etykiety po stronie B pod suwakiem są zawsze wyrównane do prawej
+Decyzja:
+- W `.jst-slider-head` oba pola etykiet mają równy udział szerokości, a prawa etykieta (`span:last-child`) ma `text-align:right`.
+Uzasadnienie:
+- Wyrównanie do prawej stabilizuje kompozycję i poprawia czytelność par A/B, szczególnie przy dłuższych opisach.
