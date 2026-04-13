@@ -1216,3 +1216,136 @@
   - `Badania mieszkańców -> ⚙️ Ustawienia ankiety`: sprawdzić zapis opcji nawigacji i harmonogramu,
   - ankieta personalna `/slug`: potwierdzić tryb pojedynczych ekranów (48 pytań, `Dalej`/`Wyślij`, blokada bez odpowiedzi),
   - `🧭 Matching -> Demografia`: potwierdzić widoczny kontekst polityk/JST i brak łamania `(|Δ| ... pp)` w `Główne zalety/problemy`.
+
+### Zrobione w Hotfix H-039 (2026-04-13, mobile-only + matrix rotate fix)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - zastąpiono prostą detekcję orientacji stanem `viewport` (szer./wys.) aktualizowanym przez `resize`, `orientationchange` i `visualViewport.resize`,
+  - ekran `Prosimy, obróć telefon poziomo` dla macierzy opiera się na bieżącym viewport i nie zalega po obrocie,
+  - na mobile w trybie macierzy logo `Badania.pro` jest ukryte.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait:
+    - pasek odpowiedzi podniesiony wyżej,
+    - `Czy zgadzasz się...` delikatnie powiększone,
+  - mobile landscape:
+    - licznik `x/48` wyśrodkowany pod paskiem postępu,
+    - `Dalej` przeniesiony do prawego górnego obszaru nawigacji.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### RYZYKO / do potwierdzenia UAT
+- Zachowanie macierzy po obrocie (pion -> poziom) zostało naprawione logicznie w kodzie; wymaga potwierdzenia na realnym urządzeniu użytkownika, bo wcześniejszy biały ekran był zależny od konkretnej przeglądarki mobile.
+
+### Zrobione w Hotfix H-040 (2026-04-13, desktop fixed bar + mobile nav/fullscreen + matrix rotate fallback)
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - desktop: pasek odpowiedzi i akcja `Dalej` osadzone w stałym miejscu (`position: fixed`),
+  - mobile: dopięto override `left/transform/width` w media-query, by nie dziedziczyć desktopowego kotwiczenia,
+  - mobile landscape: `Dalej` podniesione na wysokość nawigacji (`Wstecz`).
+- `archetypy-ankieta/src/App.tsx`:
+  - dodano `tryEnterFullscreenMobile()` (best effort) uruchamiane po `Zaczynamy` i po wejściu do ankiety,
+  - stan startu ankiety synchronizowany przez hash `#q`, żeby ewentualny reload nie cofał do ekranu powitalnego,
+  - `Questionnaire` objęty `AppErrorBoundary`, więc ewentualny runtime error nie kończy się białym ekranem.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - matrix mobile: dodano fallback `orientationchange -> reload` z guardem czasowym, aby po obrocie do poziomu wymusić czysty render strony ankiety.
+- `archetypy-ankieta/index.html`:
+  - dodano meta pod mobile/fullscreen (`viewport-fit=cover`, `mobile-web-app-capable`, `apple-mobile-web-app-capable`, `theme-color`).
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### RYZYKO / ograniczenie platformy
+- Ukrycie paska adresu nie jest gwarantowane na każdej przeglądarce mobile; Fullscreen API działa jako best effort i zależy od polityki przeglądarki/OS.
+
+### Zrobione w Hotfix H-041 (2026-04-13, rollback regresji i korekta pozycji)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - usunięto fallback `orientationchange -> reload` z H-040,
+  - `singleProgress` nie używa już `useMemo`; liczony jest jako zwykła wartość,
+  - to eliminuje ryzyko `Minified React error #310` przy zmianie orientacji i ekranie `obróć telefon`.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - desktop: pasek odpowiedzi i `Dalej` podniesione z dolnej krawędzi do poziomu referencyjnego (jak 2944),
+  - mobile landscape: `Dalej` podniesione do linii nawigacji (`Wstecz`) bez rozwalania wcześniejszego układu,
+  - dodano obsługę landscape dla niskiej wysokości (`max-height:560px`), niezależnie od szerokości.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-042 (2026-04-13, twarde spacje + finalne dosunięcia mobile)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - dodano helper `withHardSpaces` i podpięto go do głównych tekstów pytania (single + matrix),
+  - dzięki temu krótkie słowa (`i`, `z`, `na`, `by` itd.) nie wiszą na końcach linii,
+  - w matrix mobile kontener nagłówka ma `flex:1; minWidth:0`, więc po ukryciu logo tekst wypełnia wolne miejsce.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait: pasek odpowiedzi podniesiony wyżej,
+  - mobile landscape: `Dalej` obniżony (bliżej `Wstecz`, pod paskiem postępu) w obu media-query landscape.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-043 (2026-04-13, orientacja matrix + dalsze dosunięcia mobile)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - `withHardSpaces` sklejający frazy (`gdzie inni`, `nawet jeśli`) działa teraz na wszystkich białych znakach w dopasowaniu (`\s+ -> NBSP` globalnie),
+  - odczyt viewportu przeszedł na helper `readViewport()` (priorytet `visualViewport`, fallback `documentElement`, potem `innerWidth/innerHeight`),
+  - orientacja macierzy jest wyznaczana odporniej (`dimensions first`, potem `screen.orientation`, na końcu `matchMedia`),
+  - polling viewportu dla macierzy przyspieszono do `180ms`, żeby szybciej wychodzić ze stanu „obróć telefon”.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait:
+    - pasek odpowiedzi podniesiony jeszcze wyżej (`bottom +174px`),
+    - zwiększony bufor dolny treści (`padding-bottom +236px`), żeby uniknąć kolizji z fixed strefą,
+  - mobile landscape:
+    - `Dalej` przesunięty wyżej (`top +44px`) w obu media-query landscape.
+- `Enter -> Dalej`:
+  - logika jest aktywna w `Questionnaire.tsx` (single-screen, po zaznaczeniu odpowiedzi) i została utrzymana.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-044 (2026-04-13, fix #300/#310 + `←` + mobile landscape)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - naprawiono główną przyczynę `Minified React error #300/#310`:
+    - warunkowy ekran `obróć telefon` nie przerywa już renderu przed kolejnymi hookami,
+    - teraz jest liczony jako `showOrientationWarning`, a renderowany po wywołaniu wszystkich hooków,
+  - dodano kolejne sklejenia fraz przez NBSP:
+    - `których reprezentuje`,
+    - `jest podstawą`,
+    - `których głos`,
+  - w trybie single-screen klawisz `ArrowLeft` działa jak `Wstecz` (z poszanowaniem `allowBack` i indeksu pytania).
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile landscape:
+    - podniesiono czytelność `Pamiętaj...` i `Czy zgadzasz...` (większe fonty),
+    - zwiększono delikatnie górny oddech sekcji pytania,
+    - `Dalej` przesunięto wyżej (`top +34px`) bliżej linii nawigacji pod paskiem postępu.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-045 (2026-04-13, czytelność mobile + `→` do przodu)
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait:
+    - górny margines sekcji pytań zmniejszony (`single-question-zone`), więc treści startują wcześniej,
+    - zwiększono czytelność tekstów:
+      - `single-sublead` -> większy font,
+      - `single-lead` -> większy font,
+  - mobile landscape:
+    - zwiększono fonty `single-sublead` i `single-lead`,
+    - zwiększono lekko górny oddech sekcji pytań,
+    - `Dalej` podniesiono jeszcze wyżej (`top +22px`) w obu media-query landscape.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - dodano skrót `ArrowRight`:
+    - przejście do następnego pytania (`Dalej/Wyślij`) działa, jeśli bieżące pytanie jest zaznaczone.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-046 (2026-04-13, mikro-typografia mobile landscape)
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - w mobile landscape (`max-width:900`) zwiększono:
+    - `single-sublead`,
+    - `single-lead`,
+    - `single-question-text` (docelowo ~+2px),
+  - dodano większy odstęp po linii `Czy zgadzasz...` przez:
+    - `single-lead { margin-bottom: ... }`,
+    - większy `single-question-text { margin-top: ... }`,
+  - analogiczny tuning wykonano dla wariantu `max-height:560` (landscape low-height).
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

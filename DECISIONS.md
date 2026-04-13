@@ -1091,3 +1091,171 @@ Decyzja:
 Uzasadnienie:
 - User oczekuje formatu `76.0` / `x.y` w każdym wierszu.
 - Konwersja na tekst psułaby sortowanie numeryczne, więc formatujemy warstwę prezentacji, nie typ danych.
+
+### D-118: Matrix mobile używa reaktywnej detekcji viewport/orientacji
+Decyzja:
+- W `Questionnaire.tsx` orientacja i tryb mobile dla macierzy są liczone z bieżącego stanu viewport (`width/height`),
+  aktualizowanego na `resize`, `orientationchange` oraz `visualViewport.resize`.
+Uzasadnienie:
+- Poprzednia logika oparta o jednorazowy odczyt i sam `resize` mogła zostawiać błędny stan po obrocie telefonu,
+  co dawało niestabilne zachowanie (w tym biały ekran po przejściu do poziomu).
+
+### D-119: W matrix mobile ukrywamy logo w prawym górnym rogu
+Decyzja:
+- W nagłówku macierzy logo `Badania.pro` renderujemy tylko poza mobile viewport.
+Uzasadnienie:
+- Na telefonie logo nie jest wymagane funkcjonalnie i zabiera cenne miejsce w górnej części ekranu.
+
+### D-120: W mobile landscape `Pojedyncze ekrany` mają rozdzielone role nawigacji
+Decyzja:
+- Licznik postępu (`x/48`) jest wyśrodkowany pod paskiem postępu.
+- `Dalej` jest umieszczony w prawym górnym obszarze nawigacji.
+Uzasadnienie:
+- Taki układ poprawia czytelność i ogranicza kolizje z długą treścią pytania w poziomie.
+
+### D-121: Desktop `Pojedyncze ekrany` ma stałą geometrię paska odpowiedzi
+Decyzja:
+- Na desktopie (`>900px`) pasek odpowiedzi i strefa akcji `Dalej` są kotwiczone (`position: fixed`) względem viewport.
+Uzasadnienie:
+- User zgłosił „wędrowanie” paska odpowiedzi między pytaniami; stała kotwica eliminuje wpływ różnej wysokości tekstu pytania.
+
+### D-122: Matrix mobile dostaje fallback odświeżenia po obrocie
+Decyzja:
+- W trybie `matrix` na mobile po `orientationchange` do poziomu wykonujemy kontrolowany reload bieżącej strony ankiety (z guardem czasowym).
+Uzasadnienie:
+- Na części urządzeń/przeglądarek po obrocie pojawiał się biały ekran; twardy reload stabilizuje render bez zmiany ścieżki URL.
+
+### D-123: Stan wejścia do ankiety personalnej utrzymujemy przez hash `#q`
+Decyzja:
+- Po starcie ankiety URL dostaje hash `#q`; przy reloadzie tej samej strony aplikacja startuje od razu w ankiecie (bez ekranu powitalnego).
+Uzasadnienie:
+- To umożliwia bezpieczny fallback reload (np. po obrocie) bez cofania użytkownika do intro i bez ingerencji w backend.
+
+### D-124: Ukrycie paska adresu mobile realizujemy jako best effort
+Decyzja:
+- Po kliknięciu `Zaczynamy` próbujemy wejść w Fullscreen API (`requestFullscreen` + vendor fallback).
+- Dodatkowo ustawiamy meta dla mobile app-capable/viewport-fit.
+Uzasadnienie:
+- Przeglądarki mobile różnią się polityką UI; pełne ukrycie paska adresu nie zawsze jest wymuszalne kodem aplikacji webowej.
+
+### D-125: W `Questionnaire` nie używamy hooków po warunkowym `return` ekranu orientacji
+Decyzja:
+- `singleProgress` liczymy bez `useMemo` (jako zwykłą wartość), aby nie mieć hooka za gałęzią warunkowego `return`.
+Uzasadnienie:
+- To eliminuje klasę błędów React z nierówną liczbą hooków między renderami (w praktyce `#310` przy przejściu portrait/landscape w macierzy).
+
+### D-126: Fallback `orientationchange -> reload` został wycofany
+Decyzja:
+- Usunięto automatyczny reload strony z `Questionnaire` wykonywany przy obrocie.
+Uzasadnienie:
+- Rozwiązanie było zbyt inwazyjne i razem z układem hooków doprowadziło do regresji runtime na urządzeniach użytkownika.
+
+### D-127: Desktop single-screen ma stabilny pasek odpowiedzi, ale nie przy dolnej krawędzi
+Decyzja:
+- W desktopie pozycja stała zostaje, ale z podniesioną geometrią (`bottom` przez `clamp`) zgodną z referencją 2944.
+Uzasadnienie:
+- User wymagał stałej pozycji paska odpowiedzi na konkretnej wysokości, nie „przyklejonej” do dołu.
+
+### D-128: Typografia pytań używa automatycznego „klejenia” krótkich słów (NBSP)
+Decyzja:
+- W renderze pytań/leadów ankiety personalnej stosujemy helper, który zamienia spacje po krótkich słowach na twarde spacje.
+Uzasadnienie:
+- Eliminuje „sieroty” typograficzne (np. `i`, `z`, `na`, `by`) na końcach linii na desktopie i mobile.
+
+### D-129: Matrix mobile po ukryciu logo ma pełną szerokość tekstu nagłówka
+Decyzja:
+- Lewy kontener nagłówka macierzy ma `flex:1` i `minWidth:0`, aby zajmował całą dostępną szerokość, gdy logo jest schowane.
+Uzasadnienie:
+- Zapobiega pozostawianiu pustej strefy po prawej stronie i poprawia kompozycję nagłówków na telefonie.
+
+### D-130: Mobile landscape `Dalej` kotwimy nieco niżej (`top +58px`)
+Decyzja:
+- W landscape mobile `Dalej` jest pozycjonowane niżej niż w poprzedniej iteracji, ale nadal na wysokości nawigacji pod paskiem postępu.
+Uzasadnienie:
+- User zgłosił, że przycisk był zbyt wysoko i wizualnie odklejał się od linii `Wstecz`.
+
+### D-131: Matrix mobile orientację wyznaczamy logiką wieloźródłową z priorytetem wymiarów viewport
+Decyzja:
+- W `Questionnaire.tsx` orientacja dla macierzy jest liczona w kolejności:
+  1) relacja `viewport.width/viewport.height`,
+  2) `screen.orientation.type`,
+  3) `matchMedia("(orientation: portrait)")`.
+- Stan `viewport` jest odczytywany helperem `readViewport()` z priorytetem `visualViewport`.
+Uzasadnienie:
+- Część przeglądarek mobile raportuje orientację niespójnie podczas sekwencji obrotów.
+- Priorytet realnych wymiarów viewport zmniejsza ryzyko „fałszywego” ekranu `obróć telefon poziomo` w poziomie.
+
+### D-132: Typograficzne klejenie fraz ma obejmować pełne sekwencje białych znaków
+Decyzja:
+- W helperze `withHardSpaces` zamiana dla fraz (`gdzie inni`, `nawet jeśli`) używa globalnej podmiany `\s+` na NBSP.
+Uzasadnienie:
+- Chroni przed rozbiciem fraz także wtedy, gdy w źródle pojawią się niestandardowe odstępy (np. wielokrotne spacje).
+
+### D-133: Mobile single-screen — priorytet to ergonomia górnej nawigacji i wyżej osadzona skala
+Decyzja:
+- Mobile portrait:
+  - pasek odpowiedzi podnosimy wyżej (`bottom +174px`) i zwiększamy bufor dolny treści.
+- Mobile landscape:
+  - `Dalej` pozycjonujemy wyżej (`top +44px`) tak, aby pozostawał pod paskiem postępu i na linii nawigacji.
+Uzasadnienie:
+- User konsekwentnie zgłaszał zbyt niskie osadzenie skali oraz `Dalej` poza oczekiwaną strefą nawigacji.
+
+### D-134: Ekran orientacji macierzy nie może warunkowo omijać późniejszych hooków
+Decyzja:
+- `showOrientationWarning` liczymy jako flagę i renderujemy dopiero po wywołaniu wszystkich hooków komponentu.
+- Nie stosujemy wczesnego `return` przed dalszymi hookami zależnie od orientacji.
+Uzasadnienie:
+- Sekwencja obrotów mobile prowadziła do zmiany liczby hooków między renderami i błędów React `#300/#310`.
+
+### D-135: Desktopowe skróty klawiaturowe w single-screen
+Decyzja:
+- W trybie single-screen:
+  - `Enter` uruchamia `Dalej/Wyślij` (po wybraniu odpowiedzi),
+  - `ArrowLeft` uruchamia `Wstecz` (jeśli nawigacja wstecz jest włączona i to nie pierwsze pytanie).
+Uzasadnienie:
+- Użytkownik oczekuje szybszej obsługi ankiety na desktopie bez klikania myszą.
+
+### D-136: Mobile landscape wymaga osobnego balansu: większa czytelność leadów i niższy „offset napięcia”
+Decyzja:
+- W landscape mobile:
+  - zwiększamy fonty `Pamiętaj...` i `Czy zgadzasz...`,
+  - zwiększamy lekko górny prześwit sekcji pytania,
+  - `Dalej` przesuwamy bliżej linii nawigacji (`top +34px`).
+Uzasadnienie:
+- User zgłosił, że teksty były za małe i zbyt „przyklejone” do górnej strefy, a `Dalej` nadal bywał zbyt nisko.
+
+### D-137: Mobile portrait ma osobny balans startu treści niż mobile landscape
+Decyzja:
+- W portrait zmniejszamy górny margines sekcji pytań (treści zaczynają się wcześniej), a jednocześnie podnosimy czytelność dwóch linii pomocniczych przez większy font.
+Uzasadnienie:
+- User wskazał, że w pionie treści są zbyt późno i jednocześnie słabo widoczne.
+
+### D-138: `ArrowRight` w single-screen działa jako „Dalej” pod warunkiem zaznaczonej odpowiedzi
+Decyzja:
+- Rozszerzamy skróty klawiaturowe:
+  - `ArrowLeft` = `Wstecz` (gdy dostępny),
+  - `ArrowRight` = `Dalej/Wyślij` (tylko dla wypełnionego bieżącego ekranu).
+Uzasadnienie:
+- User potrzebuje szybkiego „odwijania” i „przewijania do przodu” po pytaniach bez klikania myszą.
+
+### D-139: W mobile landscape przycisk `Dalej` ma priorytet pionowego wyrównania do linii nawigacji
+Decyzja:
+- `Dalej` kotwimy wyżej (`top +22px`), aby był optycznie na tej samej linii co obszar nawigacji pod paskiem postępu.
+Uzasadnienie:
+- User nadal raportował, że `Dalej` jest „za nisko”, mimo wcześniejszych korekt.
+
+### D-140: Mobile landscape dostaje dodatkowy margines po `Czy zgadzasz...`
+Decyzja:
+- W `SingleQuestionnaire.css` dla landscape zwiększamy odstęp między leadem a pytaniem głównym:
+  - przez `single-lead { margin-bottom: ... }`,
+  - oraz większy `single-question-text { margin-top: ... }`.
+Uzasadnienie:
+- User poprosił o wyraźnie większy „oddech” po tekście `Czy zgadzasz...`.
+
+### D-141: W landscape zwiększamy czytelność tekstów pomocniczych i pytania głównego
+Decyzja:
+- W obu wariantach landscape (`max-width:900` i `max-height:560`) podbijamy:
+  - `single-sublead` i `single-lead` o ok. 1px,
+  - `single-question-text` o ok. 2px.
+Uzasadnienie:
+- User wskazał, że górne teksty były zbyt małe i „ginęły” na ekranie poziomym.
