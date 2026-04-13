@@ -1349,3 +1349,45 @@
 - Testy techniczne:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-047 (2026-04-13, auto-odmiana JST dla nazw `-o`)
+- `app.py`:
+  - w `_guess_word_cases(...)` dodano dedykowaną gałąź dla nazw miejscowych nijakich kończących się na `-o`,
+  - nowe formy:
+    - `gen = base + "a"`,
+    - `dat = base + "u"`,
+    - `acc = nom`,
+    - `ins = base + "em"`,
+    - `loc = base + "ie"`,
+    - `voc = nom`,
+  - dzięki temu auto-uzupełnianie w `➕ Dodaj badanie mieszkańców` nie generuje już błędów typu `Testowoa`, `Testowoowi`.
+- Kontrola funkcjonalna (lokalny probe funkcji):
+  - `Testowo` -> `Testowa / Testowu / Testowo / Testowem / Testowie`,
+  - `Braniewo` -> `Braniewa / Braniewu / Braniewo / Braniewem / Braniewie`,
+  - `Gniezno` -> `Gniezna / Gnieznu / Gniezno / Gnieznem / Gnieznie`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-048 (2026-04-13, frazy NBSP + wyjątki JST)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - rozszerzono `PHRASE_GLUE_PATTERNS` o:
+    - `nawet jeśli jest`,
+    - `nawet jeśli koszt`,
+  - dzięki temu wskazane frazy nie łamią się między wierszami.
+- `app.py`:
+  - dodano słownik wyjątków odmiany dla nieregularnych nazw JST:
+    - `JST_WORD_CASE_OVERRIDES`,
+    - `JST_PHRASE_CASE_OVERRIDES`,
+  - `_guess_word_cases(...)` i `_guess_phrase_cases(...)` najpierw stosują override, a dopiero potem reguły heurystyczne.
+- Kontrola funkcjonalna (lokalny probe):
+  - poprawne formy m.in. dla:
+    - `Ełk`,
+    - `Sopot`,
+    - `Kielce`,
+    - `Zakopane`,
+    - `Zielona Góra`,
+    - `Nowy Sącz`.
+- Testy techniczne:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

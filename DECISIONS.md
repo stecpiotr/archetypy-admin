@@ -1259,3 +1259,37 @@ Decyzja:
   - `single-question-text` o ok. 2px.
 Uzasadnienie:
 - User wskazał, że górne teksty były zbyt małe i „ginęły” na ekranie poziomym.
+
+### D-142: Auto-odmiana JST dla nazw kończących się na `-o` ma osobną regułę
+Decyzja:
+- W `app.py` (`_guess_word_cases`) nazwy miejscowe nijakie kończące się na `-o` odmieniamy przez:
+  - `gen = base + "a"`,
+  - `dat = base + "u"`,
+  - `acc = nom`,
+  - `ins = base + "em"`,
+  - `loc = base + "ie"`,
+  - `voc = nom`.
+- Reguła jest wykonywana przed fallbackiem dla zakończeń spółgłoskowych.
+Uzasadnienie:
+- Bez tej reguły nazwy typu `Testowo` wpadały w fallback i dostawały błędne formy (`Testowoa`, `Testowoowi`).
+- Poprawka domyka krytyczny błąd UX w formularzu `➕ Dodaj badanie mieszkańców` przy `Uzupełnij odmiany automatycznie`.
+
+### D-143: Klejenie fraz NBSP rozszerzamy o pełne sekwencje „nawet jeśli ...”
+Decyzja:
+- W `Questionnaire.tsx` (`PHRASE_GLUE_PATTERNS`) dodajemy wzorce:
+  - `nawet jeśli jest`,
+  - `nawet jeśli koszt`.
+Uzasadnienie:
+- User wskazał konkretne pytania, gdzie samo klejenie `nawet jeśli` było niewystarczające i trzeci wyraz spadał do nowej linii.
+
+### D-144: Auto-odmiana JST wspiera słownik wyjątków (word + phrase overrides)
+Decyzja:
+- W `app.py` wprowadzamy dwa słowniki override:
+  - `JST_WORD_CASE_OVERRIDES` dla pojedynczych nazw nieregularnych,
+  - `JST_PHRASE_CASE_OVERRIDES` dla pełnych nazw wielowyrazowych.
+- Kolejność logiki:
+  1) override,
+  2) heurystyka końcówek.
+Uzasadnienie:
+- Sama heurystyka końcówek nie pokrywa poprawnie wszystkich nazw JST (zwłaszcza nieregularnych i wielowyrazowych).
+- Słownik wyjątków podnosi jakość domyślnej auto-odmiany i pozostaje łatwy do dalszego rozszerzania.

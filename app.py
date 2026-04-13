@@ -1456,6 +1456,94 @@ JST_CASES = ["nom", "gen", "dat", "acc", "ins", "loc", "voc"]
 POSTSTRAT_GENDER = [(1, "kobieta"), (2, "mężczyzna")]
 POSTSTRAT_AGE = [(1, "15-39"), (2, "40-59"), (3, "60 i więcej")]
 
+# Wyjątki dla nieregularnych nazw JST (łatwe do dalszego rozszerzania).
+JST_WORD_CASE_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "ełk": {
+        "nom": "Ełk",
+        "gen": "Ełku",
+        "dat": "Ełkowi",
+        "acc": "Ełk",
+        "ins": "Ełkiem",
+        "loc": "Ełku",
+        "voc": "Ełku",
+    },
+    "sopot": {
+        "nom": "Sopot",
+        "gen": "Sopotu",
+        "dat": "Sopotowi",
+        "acc": "Sopot",
+        "ins": "Sopotem",
+        "loc": "Sopocie",
+        "voc": "Sopocie",
+    },
+    "kielce": {
+        "nom": "Kielce",
+        "gen": "Kielc",
+        "dat": "Kielcom",
+        "acc": "Kielce",
+        "ins": "Kielcami",
+        "loc": "Kielcach",
+        "voc": "Kielce",
+    },
+    "katowice": {
+        "nom": "Katowice",
+        "gen": "Katowic",
+        "dat": "Katowicom",
+        "acc": "Katowice",
+        "ins": "Katowicami",
+        "loc": "Katowicach",
+        "voc": "Katowice",
+    },
+    "suwałki": {
+        "nom": "Suwałki",
+        "gen": "Suwałk",
+        "dat": "Suwałkom",
+        "acc": "Suwałki",
+        "ins": "Suwałkami",
+        "loc": "Suwałkach",
+        "voc": "Suwałki",
+    },
+    "tychy": {
+        "nom": "Tychy",
+        "gen": "Tychów",
+        "dat": "Tychom",
+        "acc": "Tychy",
+        "ins": "Tychami",
+        "loc": "Tychach",
+        "voc": "Tychy",
+    },
+    "zakopane": {
+        "nom": "Zakopane",
+        "gen": "Zakopanego",
+        "dat": "Zakopanemu",
+        "acc": "Zakopane",
+        "ins": "Zakopanem",
+        "loc": "Zakopanem",
+        "voc": "Zakopane",
+    },
+}
+
+JST_PHRASE_CASE_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "zielona góra": {
+        "nom": "Zielona Góra",
+        "gen": "Zielonej Góry",
+        "dat": "Zielonej Górze",
+        "acc": "Zieloną Górę",
+        "ins": "Zieloną Górą",
+        "loc": "Zielonej Górze",
+        "voc": "Zielona Góra",
+    },
+    "nowy sącz": {
+        "nom": "Nowy Sącz",
+        "gen": "Nowego Sącza",
+        "dat": "Nowemu Sączowi",
+        "acc": "Nowy Sącz",
+        "ins": "Nowym Sączem",
+        "loc": "Nowym Sączu",
+        "voc": "Nowy Sączu",
+    },
+}
+
 
 def _jst_type_forms(jst_type: str) -> Dict[str, str]:
     jt = (jst_type or "miasto").strip().lower()
@@ -1487,6 +1575,10 @@ def _guess_word_cases(word: str, is_secondary: bool) -> Dict[str, str]:
 
     low = w.lower()
 
+    override = JST_WORD_CASE_OVERRIDES.get(low)
+    if override:
+        return {c: (override.get(c) or "") for c in JST_CASES}
+
     # Częsty przymiotnik w drugim członie (np. Biała Podlaska, Niedrzwica Duża)
     if is_secondary and low.endswith(
         (
@@ -1502,6 +1594,19 @@ def _guess_word_cases(word: str, is_secondary: bool) -> Dict[str, str]:
             "acc": base + "ą",
             "ins": base + "ą",
             "loc": base + "ej",
+            "voc": w,
+        }
+
+    # Częste nazwy miejscowe nijakie zakończone na -o (np. Testowo, Braniewo, Gniezno)
+    if low.endswith("o") and len(w) > 1:
+        base = w[:-1]
+        return {
+            "nom": w,
+            "gen": base + "a",
+            "dat": base + "u",
+            "acc": w,
+            "ins": base + "em",
+            "loc": base + "ie",
             "voc": w,
         }
 
@@ -1546,7 +1651,12 @@ def _guess_word_cases(word: str, is_secondary: bool) -> Dict[str, str]:
 
 
 def _guess_phrase_cases(phrase: str) -> Dict[str, str]:
-    words = [w for w in (phrase or "").split() if w.strip()]
+    phrase_clean = re.sub(r"\s+", " ", (phrase or "").strip())
+    phrase_override = JST_PHRASE_CASE_OVERRIDES.get(phrase_clean.lower())
+    if phrase_override:
+        return {c: (phrase_override.get(c) or phrase_clean) for c in JST_CASES}
+
+    words = [w for w in phrase_clean.split() if w.strip()]
     if not words:
         return {c: "" for c in JST_CASES}
 

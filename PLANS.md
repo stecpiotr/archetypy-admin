@@ -1664,3 +1664,48 @@ Wynik:
 - Smoke-check:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-047 [DONE]
+Temat: Poprawa automatycznej odmiany JST w `➕ Dodaj badanie mieszkańców` dla nazw zakończonych na `-o`.
+Kryteria ukończenia:
+1. Auto-uzupełnianie nie tworzy błędnych form typu `Testowoa`, `Testowoowi`.
+2. Dla nazw typu `Testowo` generowane są poprawne formy:
+   - dopełniacz `Testowa`,
+   - celownik `Testowu`,
+   - biernik `Testowo`,
+   - narzędnik `Testowem`,
+   - miejscownik `Testowie`.
+Pierwszy krok wykonawczy:
+- poprawić heurystykę w `app.py` (`_guess_word_cases`) przez dedykowaną gałąź dla nazw kończących się na `-o`.
+Wynik:
+- `app.py`:
+  - dodano regułę dla nazw miejscowych nijakich kończących się na `-o` (np. `Testowo`, `Braniewo`, `Gniezno`),
+  - reguła działa przed fallbackiem spółgłoskowym, więc nie powstają już formy z doklejonym `...oa/...owi`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK),
+  - kontrolny probe funkcji dla `Testowo/Braniewo/Gniezno` (OK).
+
+### Hotfix H-048 [DONE]
+Temat: Dopięcie klejenia fraz w ankiecie + wyjątki dla nieregularnych nazw JST.
+Kryteria ukończenia:
+1. W pytaniach ankiety frazy:
+   - `nawet jeśli jest`,
+   - `nawet jeśli koszt`
+   nie rozbijają się między liniami.
+2. Auto-odmiana JST ma słownik wyjątków dla nieregularnych nazw (bardziej odporna niż sama heurystyka końcówek).
+Pierwszy krok wykonawczy:
+- dodać wzorce do `withHardSpaces` w `Questionnaire.tsx` i słownik override do odmiany JST w `app.py`.
+Wynik:
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - rozszerzono `PHRASE_GLUE_PATTERNS` o:
+    - `nawet jeśli jest`,
+    - `nawet jeśli koszt`.
+- `app.py`:
+  - dodano `JST_WORD_CASE_OVERRIDES` (m.in. `Ełk`, `Sopot`, `Kielce`, `Katowice`, `Suwałki`, `Tychy`, `Zakopane`),
+  - dodano `JST_PHRASE_CASE_OVERRIDES` (m.in. `Zielona Góra`, `Nowy Sącz`),
+  - `_guess_word_cases` i `_guess_phrase_cases` najpierw sprawdzają wyjątki, potem lecą heurystyki.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK),
+  - kontrolny probe funkcji odmiany dla wyjątków (OK).
