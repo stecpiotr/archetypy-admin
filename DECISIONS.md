@@ -1355,3 +1355,28 @@ Decyzja:
 Uzasadnienie:
 - Na części mobile browserów (szczególnie w dark mode) natywne pseudo-elementy `range` renderują się zbyt słabo lub niespójnie.
 - Osobna warstwa toru daje przewidywalny, czytelny efekt.
+
+### D-153: W JST dark mode priorytetem jest subtelność — unikamy „ciężkiej” warstwy toru
+Decyzja:
+- Wycofujemy dodatkową warstwę `.jst-range-wrap::before`, jeśli daje zbyt agresywny efekt wizualny.
+- Tor suwaka dopieszczamy minimalnie: lekko jaśniejsze tło + cienkie obramowanie bez mocnych efektów.
+Uzasadnienie:
+- User wskazał, że poprzednia poprawka poprawiała kontrast kosztem estetyki.
+- Docelowo tor ma być czytelny, ale nadal lekki i zgodny z resztą UI.
+
+### D-154: Iteracyjnie rozjaśniamy tor suwaka JST w dark mode bez zmiany geometrii
+Decyzja:
+- Gdy tor nadal jest odbierany jako zbyt ciemny, podnosimy jasność wyłącznie przez kolory:
+  - jaśniejszy `background`,
+  - minimalnie jaśniejszy `border`,
+  - subtelnie mocniejszy `inset`.
+- Nie zmieniamy wysokości/układu suwaka.
+Uzasadnienie:
+- Pozwala poprawić czytelność na konkretnym ekranie użytkownika bez ponownego psucia estetyki całego komponentu.
+
+### D-155: Dla JST dark mode stosujemy fallback toru na samym `.jst-range`
+Decyzja:
+- Oprócz stylu `::-webkit-slider-runnable-track` i `::-moz-range-track`, ustawiamy jasny kolor toru bezpośrednio na `.jst-range`.
+Uzasadnienie:
+- Część przeglądarek mobilnych renderuje pseudo-elementy `range` niekonsekwentnie.
+- Fallback na bazowym elemencie gwarantuje, że oś suwaka nie „zniknie” nawet przy ograniczonym wsparciu silnika renderującego.

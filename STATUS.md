@@ -1436,3 +1436,29 @@
   - `python -m py_compile send_link.py app.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-052 (2026-04-14, rollback ciężkiej osi suwaka JST)
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - usunięto agresywną, dodatkową warstwę toru (`.jst-range-wrap::before`),
+  - przywrócono lżejszy, wcześniejszy wygląd suwaka,
+  - dark mode: zostawiono jedynie subtelne rozjaśnienie toru i cienkie obramowanie,
+  - ticki osi wróciły do cienkiego wariantu.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-053 (2026-04-14, dodatkowe rozjaśnienie toru suwaka JST)
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - tor suwaka w dark mode został jeszcze rozjaśniony (jaśniejsze tło + lżejsze obramowanie + mocniejszy wewnętrzny highlight).
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-054 (2026-04-14, jasny tor suwaka + fallback na `.jst-range`)
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - w dark mode tor suwaka został istotnie rozjaśniony,
+  - dodano fallback jasnego toru na samym `.jst-range`, aby oś była widoczna także przy kapryśnym renderze pseudo-elementów `range` na mobile browserach,
+  - ticki osi zostały dodatkowo rozjaśnione.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

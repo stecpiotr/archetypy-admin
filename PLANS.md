@@ -1778,3 +1778,53 @@ Wynik:
   - `python -m py_compile send_link.py app.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-052 [DONE]
+Temat: Korekta estetyki toru suwaka JST po regresji wizualnej (dark mode mobile).
+Kryteria ukończenia:
+1. Tor suwaka wraca do subtelnego wyglądu (bez „ciężkiej” dodatkowej warstwy).
+2. W dark mode zostaje tylko delikatnie jaśniejsze tło/obramowanie toru, zgodne z poprzednim stylem.
+Pierwszy krok wykonawczy:
+- cofnąć agresywną warstwę `.jst-range-wrap::before` i zostawić lekki tuning samych tracków `range`.
+Wynik:
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - usunięto dodatkową warstwę toru (`.jst-range-wrap::before`),
+  - przywrócono klasyczny układ suwaka bez dodatkowego `z-index`,
+  - dark mode: tor suwaka ma subtelnie jaśniejsze tło i cienkie obramowanie (bez mocnych gradientów/shadow),
+  - ticki wróciły do cieńszego, lżejszego stylu.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Hotfix H-053 [DONE]
+Temat: Dalsze rozjaśnienie toru suwaka JST w dark mode (mobile).
+Kryteria ukończenia:
+1. Tor suwaka jest wyraźnie jaśniejszy niż w H-052, ale nadal subtelny.
+Pierwszy krok wykonawczy:
+- podnieść jasność `background` + lekko podbić `border` i `inset` toru `range` tylko w dark mode.
+Wynik:
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - dark mode:
+    - `background` toru: `#315f7b`,
+    - `border`: jaśniejszy (`rgba(170, 203, 226, 0.42)`),
+    - delikatnie mocniejszy wewnętrzny highlight (`inset`).
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Hotfix H-054 [DONE]
+Temat: Wymuszenie wysokiej widoczności toru suwaka JST w dark mode na mobile.
+Kryteria ukończenia:
+1. Tor suwaka jest wyraźnie widoczny nawet wtedy, gdy przeglądarka słabo wspiera stylowanie pseudo-elementów `range`.
+Pierwszy krok wykonawczy:
+- rozjaśnić jednocześnie `::-webkit-slider-runnable-track`, `::-moz-range-track` oraz bazowy `.jst-range` (fallback).
+Wynik:
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - dark mode:
+    - tor suwaka ustawiony na wyraźnie jaśniejszy kolor (`#7394ac`),
+    - jaśniejsze obramowanie i highlight wewnętrzny,
+    - dodany fallback na samym `.jst-range` (ta sama jasna oś),
+    - ticki osi dodatkowo rozjaśnione.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
