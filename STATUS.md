@@ -1462,3 +1462,18 @@
 - Testy techniczne:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-055 (2026-04-14, usuwanie rekordów JST w Import/Eksport)
+- `db_jst_utils.py`:
+  - dodano funkcję `delete_jst_responses_by_respondent_ids(sb, study_id, respondent_ids)`,
+  - funkcja:
+    - normalizuje i deduplikuje `respondent_id`,
+    - kasuje rekordy partiami (`chunk`) tylko w obrębie wskazanego `study_id`,
+    - zwraca liczbę faktycznie usuniętych odpowiedzi.
+- `app.py` (`jst_io_view`):
+  - tabela `Eksport odpowiedzi` została rozbudowana o checkboxy (`Usuń`) w każdym wierszu,
+  - dodano przycisk `🗑️ Usuń zaznaczone`,
+  - dodano etap potwierdzenia (`✅ Tak, usuń zaznaczone` / `↩️ Anuluj`),
+  - po usunięciu jest komunikat sukcesu i automatyczne odświeżenie widoku.
+- Test techniczny:
+  - `python -m py_compile app.py db_jst_utils.py` (OK).

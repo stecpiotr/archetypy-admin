@@ -38,6 +38,7 @@ from db_jst_utils import (
     ARCHETYPES as JST_ARCHETYPES,
     CANONICAL_COLUMNS as JST_CANONICAL_COLUMNS,
     check_jst_slug_availability,
+    delete_jst_responses_by_respondent_ids,
     ensure_jst_schema,
     fetch_jst_response_counts,
     fetch_jst_study_by_id,
@@ -2594,7 +2595,101 @@ def jst_io_view() -> None:
             use_container_width=True,
         )
 
-    st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
+    st.markdown("#### Podgląd odpowiedzi")
+    preview_df = out_df.copy()
+    if "respondent_id" not in preview_df.columns:
+        fallback_ids = [str(r.get("respondent_id") or "").strip() for r in rows]
+        if len(fallback_ids) != len(preview_df.index):
+            fallback_ids = [f"R{idx:04d}" for idx in range(1, len(preview_df.index) + 1)]
+        preview_df.insert(0, "respondent_id", fallback_ids)
+    preview_df.insert(0, "Usuń", False)
+
+    selected_ids: List[str] = []
+    editor_key = f"jst_io_editor_{study_id}"
+    try:
+        edited_df = st.data_editor(
+            preview_df,
+            use_container_width=True,
+            hide_index=True,
+            height=420,
+            key=editor_key,
+            disabled=[col for col in preview_df.columns if col != "Usuń"],
+            column_config={
+                "Usuń": st.column_config.CheckboxColumn(
+                    "Usuń",
+                    help="Zaznacz rekordy do usunięcia z bazy.",
+                    default=False,
+                )
+            },
+        )
+        if isinstance(edited_df, pd.DataFrame):
+            sel_series = edited_df.loc[edited_df["Usuń"] == True, "respondent_id"]  # noqa: E712
+            selected_ids = [str(v).strip() for v in sel_series.tolist() if str(v).strip()]
+    except Exception:
+        st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
+        options = [str(v).strip() for v in out_df.get("respondent_id", pd.Series(dtype=str)).tolist() if str(v).strip()]
+        selected_ids = st.multiselect(
+            "Wybierz respondentów do usunięcia",
+            options=options,
+            key=f"jst_io_delete_multiselect_{study_id}",
+        )
+
+    selected_unique = sorted(set(selected_ids))
+    delete_confirm_key = f"jst_io_delete_confirm_{study_id}"
+    delete_ids_key = f"jst_io_delete_ids_{study_id}"
+
+    a1, a2, _sp = st.columns([0.28, 0.20, 0.52], gap="small")
+    with a1:
+        if st.button(
+            "🗑️ Usuń zaznaczone",
+            key=f"jst_io_delete_btn_{study_id}",
+            use_container_width=True,
+        ):
+            if not selected_unique:
+                st.warning("Zaznacz co najmniej jeden rekord do usunięcia.")
+            else:
+                st.session_state[delete_ids_key] = selected_unique
+                st.session_state[delete_confirm_key] = True
+                st.rerun()
+    with a2:
+        st.caption(f"Zaznaczone: {len(selected_unique)}")
+
+    pending_delete_ids = [str(v).strip() for v in st.session_state.get(delete_ids_key, []) if str(v).strip()]
+    if st.session_state.get(delete_confirm_key, False):
+        if not pending_delete_ids:
+            st.session_state.pop(delete_confirm_key, None)
+            st.session_state.pop(delete_ids_key, None)
+        else:
+            st.warning(
+                f"Czy na pewno usunąć zaznaczone rekordy? ({len(pending_delete_ids)}). "
+                "Tej operacji nie można cofnąć."
+            )
+            d1, d2, _dsp = st.columns([0.26, 0.16, 0.58], gap="small")
+            with d1:
+                if st.button(
+                    "✅ Tak, usuń zaznaczone",
+                    key=f"jst_io_delete_yes_{study_id}",
+                    use_container_width=True,
+                ):
+                    try:
+                        removed = delete_jst_responses_by_respondent_ids(sb, study_id, pending_delete_ids)
+                        st.session_state.pop(delete_confirm_key, None)
+                        st.session_state.pop(delete_ids_key, None)
+                        st.success(f"Usunięto {removed} rekordów.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.session_state.pop(delete_confirm_key, None)
+                        st.session_state.pop(delete_ids_key, None)
+                        st.error(f"Nie udało się usunąć zaznaczonych rekordów: {exc}")
+            with d2:
+                if st.button(
+                    "↩️ Anuluj",
+                    key=f"jst_io_delete_no_{study_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state.pop(delete_confirm_key, None)
+                    st.session_state.pop(delete_ids_key, None)
+                    st.rerun()
 
 
 def _estimate_report_iframe_height(html_text: str, wide_mode: bool) -> int:

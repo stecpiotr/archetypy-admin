@@ -1380,3 +1380,14 @@ Decyzja:
 Uzasadnienie:
 - Część przeglądarek mobilnych renderuje pseudo-elementy `range` niekonsekwentnie.
 - Fallback na bazowym elemencie gwarantuje, że oś suwaka nie „zniknie” nawet przy ograniczonym wsparciu silnika renderującego.
+
+### D-156: Usuwanie odpowiedzi JST realizujemy przez zaznaczenie wierszy w tabeli eksportu
+Decyzja:
+- W `💾 Import i eksport baz danych` (JST) usuwanie rekordów odbywa się bezpośrednio w tabeli odpowiedzi:
+  - checkbox `Usuń` przy wierszach,
+  - akcja zbiorcza `🗑️ Usuń zaznaczone`,
+  - obowiązkowe potwierdzenie operacji.
+- Kasowanie backendowe wykonujemy po `respondent_id` w obrębie `study_id` (batch/chunk).
+Uzasadnienie:
+- User potrzebuje kasować pojedyncze i wiele wypełnień bez ręcznej edycji bazy.
+- `respondent_id` jest stabilnym identyfikatorem w zakresie badania (`UNIQUE (study_id, respondent_id)`), więc nadaje się do bezpiecznego bulk-delete.

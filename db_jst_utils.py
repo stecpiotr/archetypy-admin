@@ -1212,6 +1212,64 @@ def list_jst_responses(sb: Client, study_id: str) -> List[Dict[str, Any]]:
     )
 
 
+def delete_jst_responses_by_respondent_ids(
+    sb: Client,
+    study_id: str,
+    respondent_ids: Iterable[str],
+) -> int:
+    sid = str(study_id or "").strip()
+    if not sid:
+        return 0
+
+    unique_ids: List[str] = []
+    seen: set[str] = set()
+    for raw in respondent_ids:
+        rid = str(raw or "").strip()
+        if not rid or rid in seen:
+            continue
+        seen.add(rid)
+        unique_ids.append(rid)
+
+    if not unique_ids:
+        return 0
+
+    chunk_size = 200
+    existing_ids: set[str] = set()
+
+    for idx in range(0, len(unique_ids), chunk_size):
+        chunk = unique_ids[idx : idx + chunk_size]
+        try:
+            res = (
+                sb.table("jst_responses")
+                .select("respondent_id")
+                .eq("study_id", sid)
+                .in_("respondent_id", chunk)
+                .execute()
+            )
+            for row in (res.data or []):
+                rid = str(row.get("respondent_id") or "").strip()
+                if rid:
+                    existing_ids.add(rid)
+        except Exception:
+            continue
+
+    if not existing_ids:
+        return 0
+
+    ids_to_delete = sorted(existing_ids)
+    for idx in range(0, len(ids_to_delete), chunk_size):
+        chunk = ids_to_delete[idx : idx + chunk_size]
+        (
+            sb.table("jst_responses")
+            .delete()
+            .eq("study_id", sid)
+            .in_("respondent_id", chunk)
+            .execute()
+        )
+
+    return len(ids_to_delete)
+
+
 def insert_jst_response(
     sb: Client,
     study_id: str,

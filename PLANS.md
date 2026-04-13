@@ -1828,3 +1828,21 @@ Wynik:
 - Smoke-check:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-055 [DONE]
+Temat: Usuwanie pojedynczych i wielu wypełnień JST w `💾 Import i eksport baz danych`.
+Kryteria ukończenia:
+1. W tabeli odpowiedzi JST można zaznaczyć rekordy checkboxami.
+2. Dostępny jest przycisk `Usuń zaznaczone` z potwierdzeniem operacji.
+3. Usuwanie działa dla wielu rekordów naraz i odświeża widok po operacji.
+Pierwszy krok wykonawczy:
+- dodać backendową funkcję kasowania odpowiedzi po `respondent_id` oraz podpiąć ją pod UI tabeli eksportu w `app.py`.
+Wynik:
+- `db_jst_utils.py`:
+  - dodano `delete_jst_responses_by_respondent_ids(...)` (batch delete po `respondent_id` w obrębie `study_id`).
+- `app.py` (`jst_io_view`):
+  - tabela eksportu ma kolumnę `Usuń` (checkbox),
+  - dodano akcję `🗑️ Usuń zaznaczone` + etap potwierdzenia,
+  - po usunięciu rekordów widok odświeża się i pokazuje komunikat o liczbie usuniętych odpowiedzi.
+- Smoke-check:
+  - `python -m py_compile app.py db_jst_utils.py` (OK).
