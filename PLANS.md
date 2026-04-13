@@ -1371,3 +1371,103 @@ Wynik:
   - `python -m py_compile app.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-036 [DONE]
+Temat: Dalsze dopracowanie `Pojedyncze ekrany` (desktop + mobile) po kolejnych screenach UAT.
+Kryteria ukończenia:
+1. `Dalej` jest zielony (jak pozostałe CTA), czytelny i osadzony niżej pod odpowiedziami.
+2. `Wstecz` ma tę samą typografię co `Dalej` i wyraźny hover.
+3. Odstępy pytanie ↔ odpowiedzi są większe (desktop i mobile).
+4. `Pamiętaj...` jest mniejszy; `Czy zgadzasz...` ma mniejszy rozmiar i wagę `590`.
+5. Licznik `1/48` ma `font-size: 0.95rem`.
+6. Mobile:
+   - większy dystans odpowiedzi od pytania,
+   - `Dalej` w prawym dolnym rogu z marginesem od krawędzi,
+   - etykiety odpowiedzi mieszczą się w równych kafelkach.
+Pierwszy krok wykonawczy:
+- dopracować wyłącznie `archetypy-ankieta/src/SingleQuestionnaire.css` (bez zmiany logiki ankiety).
+Wynik:
+- `SingleQuestionnaire.css`:
+  - `Dalej`:
+    - styl CTA zielony (`#14b8a6`), hover i cień,
+    - desktop: większy odstęp od siatki odpowiedzi,
+    - mobile: pozycjonowanie w prawym dolnym rogu z bezpiecznym marginesem (`safe-area`).
+  - `Wstecz`:
+    - ujednolicona typografia z `Dalej`,
+    - dodany hover highlight.
+  - typografia i spacing:
+    - `single-counter` ustawiony na `0.95rem`,
+    - mniejsze `Pamiętaj...`,
+    - mniejsze `Czy zgadzasz...` z wagą `590`,
+    - większy prześwit między tekstami wprowadzającymi a pytaniem głównym,
+    - odpowiedzi przesunięte niżej (większy dystans od pytania).
+  - mobile:
+    - większy dolny padding treści (miejsce na fixed CTA),
+    - ciaśniejsza siatka i mniejszy font etykiet odpowiedzi, by długie etykiety mieściły się w równych kafelkach.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Hotfix H-037 [DONE]
+Temat: Stabilizacja geometrii `Pojedyncze ekrany` (hover desktop, stały pasek odpowiedzi mobile, orientacja pozioma).
+Kryteria ukończenia:
+1. `Dalej` bez cienia.
+2. Na desktopie hover odpowiedzi podświetla kafelek kolorem docelowym (lub zbliżonym), a klik utrzymuje stan docelowy.
+3. Na mobile teksty i pytanie są niżej, z większym pionowym oddechem.
+4. Pasek odpowiedzi na mobile jest w stałym miejscu (bez „skakania” między pytaniami).
+5. Dla mobile landscape działa osobne formatowanie, by zmieścić całość na jednym ekranie.
+Pierwszy krok wykonawczy:
+- dopracować tylko warstwę CSS/UX `SingleQuestionnaire` + drobne style przycisków odpowiedzi (bez zmian w logice ankiety i backendzie).
+Wynik:
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - przyciski odpowiedzi przekazują kolory przez zmienne CSS (`--opt-*`) zamiast sztywnego inline `background/border`,
+  - umożliwia to spójne style hover/selected sterowane przez CSS.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - usunięto cień z `Dalej` (desktop i mobile),
+  - hover/selected dla odpowiedzi:
+    - hover podświetla kafelek kolorem danej opcji,
+    - selected utrzymuje kolor docelowy,
+    - usunięto efekt „unoszenia” jako główny sygnał hover,
+  - mobile portrait:
+    - większe odsunięcie sekcji pytania w dół,
+    - większy prześwit do odpowiedzi,
+    - stały pasek odpowiedzi (`position: fixed`) nad przyciskiem `Dalej`,
+  - mobile landscape:
+    - osobny layout oparty o `@media (orientation: landscape)`,
+    - mniejsze fonty i ciaśniejsze odstępy, żeby kluczowe elementy mieściły się na jednym ekranie,
+    - stała pozycja paska odpowiedzi i CTA.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Hotfix H-038 [DONE]
+Temat: Podniesienie paska odpowiedzi w mobile + tuning landscape + format `x.0` w tabeli Matching bez utraty sortowania liczbowego.
+Kryteria ukończenia:
+1. Mobile portrait: pasek odpowiedzi jest wyżej i nie ucina ostatniego kafelka.
+2. Mobile landscape: treść pytania jest lżejsza, pasek odpowiedzi nie ucina się; `Dalej` przeniesione na górę po prawej.
+3. `🧭 Matching` tabela profili pokazuje zawsze 1 miejsce po przecinku (także `76.0`) i dalej sortuje liczbowo.
+Pierwszy krok wykonawczy:
+- poprawić tylko `SingleQuestionnaire.css`, `Questionnaire.tsx` i punktowo render tabeli w `app.py`.
+Wynik:
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait:
+    - pasek odpowiedzi podniesiony wyżej,
+    - dodane `width:auto` + `box-sizing:border-box` w fixed zone, aby uniknąć obcinania ostatniego kafelka,
+    - większy oddech pionowy dla bloków tekstowych.
+  - mobile landscape:
+    - zmniejszona typografia (`Pamiętaj`, lead, pytanie główne),
+    - stała strefa odpowiedzi z bezpieczną szerokością,
+    - `Dalej` przeniesiony na górę po prawej.
+  - utrzymano brak cienia CTA i kolorowe hover/selected odpowiedzi.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - zachowano sterowanie kolorami opcji przez CSS variables (`--opt-*`) dla hover/selected.
+- `app.py`:
+  - tabela porównawcza w `🧭 Matching` dostała `column_config` z `NumberColumn(format="%.1f")` dla trzech kolumn liczbowych:
+    - `Profil polityka`,
+    - `Oczekiwania mieszkańców (...)`,
+    - `Różnica |Δ|`,
+  - fallback kompatybilny dla starszego Streamlit (`TypeError` -> render bez `column_config`).
+- Smoke-check:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

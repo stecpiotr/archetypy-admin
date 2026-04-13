@@ -4429,12 +4429,27 @@ def matching_view() -> None:
         df_cmp = pd.DataFrame(cmp_rows).sort_values("__sort_diff", ascending=True).drop(columns="__sort_diff")
         cmp_rows_n = len(df_cmp.index)
         cmp_height = max(92, min(760, 40 + cmp_rows_n * 35))
-        st.dataframe(
-            df_cmp,
-            use_container_width=True,
-            hide_index=True,
-            height=cmp_height,
-        )
+        ocz_col = f"Oczekiwania mieszkańców ({sei_short})"
+        cmp_col_config = {
+            "Profil polityka": st.column_config.NumberColumn("Profil polityka", format="%.1f"),
+            ocz_col: st.column_config.NumberColumn(ocz_col, format="%.1f"),
+            "Różnica |Δ|": st.column_config.NumberColumn("Różnica |Δ|", format="%.1f"),
+        }
+        try:
+            st.dataframe(
+                df_cmp,
+                use_container_width=True,
+                hide_index=True,
+                height=cmp_height,
+                column_config=cmp_col_config,
+            )
+        except TypeError:
+            st.dataframe(
+                df_cmp,
+                use_container_width=True,
+                hide_index=True,
+                height=cmp_height,
+            )
         st.caption(update_matching_summary_description(sei_short, sei_full, sei_basis))
         with st.expander("Jak liczony jest poziom dopasowania?", expanded=False):
             st.markdown(result.get("match_formula", ""))

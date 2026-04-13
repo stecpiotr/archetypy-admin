@@ -1138,6 +1138,70 @@
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
 
+### Zrobione w Hotfix H-036 (2026-04-13, druga iteracja `Pojedyncze ekrany`)
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - `Dalej`:
+    - zielony styl CTA + hover,
+    - desktop: większy odstęp poniżej odpowiedzi,
+    - mobile: stałe pozycjonowanie w prawym dolnym rogu z marginesem od krawędzi (`safe-area`).
+  - `Wstecz`:
+    - ta sama typografia co `Dalej`,
+    - dodany efekt podświetlenia na hover.
+  - dopracowano odstępy i typografię:
+    - większy dystans pytanie ↔ odpowiedzi,
+    - mniejszy tekst `Pamiętaj...`,
+    - mniejszy `Czy zgadzasz...` z wagą `590`,
+    - licznik `1/48` ustawiony na `0.95rem`.
+  - mobile polish:
+    - większy pionowy oddech między sekcjami,
+    - mniejsze fonty etykiet odpowiedzi + ciaśniejsza siatka, żeby długie etykiety mieściły się w równych kafelkach.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-037 (2026-04-13, stabilizacja mobile + hover desktop)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - odpowiedzi w `Pojedyncze ekrany` korzystają ze zmiennych CSS (`--opt-color`, `--opt-bg`, `--opt-border`),
+    co pozwala kontrolować kolor hover/selected po stronie CSS.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - `Dalej`:
+    - usunięto cień (desktop i mobile),
+  - odpowiedzi desktop:
+    - hover podświetla kafelek kolorami opcji,
+    - kliknięty kafelek zachowuje kolor docelowy,
+    - usunięto dominujący efekt „unoszenia” jako jedyny sygnał hover,
+  - mobile portrait:
+    - obniżono sekcję tekstów/pytania (większy pionowy oddech),
+    - odpowiedzi ustawione niżej i na stałej pozycji,
+    - pasek odpowiedzi nie skacze między pytaniami (fixed zone),
+  - mobile landscape:
+    - dodano osobne style orientacji poziomej (mniejsze fonty/odstępy, stałe pozycje),
+    - cel: kluczowe elementy widoczne jednocześnie na ekranie.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-038 (2026-04-13, geometra mobile + tabela Matching `x.0`)
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait:
+    - pasek odpowiedzi podniesiony wyżej,
+    - fixed zone ma `width:auto` i `box-sizing:border-box`, co eliminuje obcinanie ostatniego kafelka,
+    - większy pionowy oddech sekcji tekstowych.
+  - mobile landscape:
+    - mniejsza typografia pytania i tekstów pomocniczych,
+    - stała strefa odpowiedzi z dopasowaną szerokością,
+    - `Dalej` przeniesiony na górę po prawej.
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - utrzymano kolorowanie opcji przez CSS variables (`--opt-*`) dla precyzyjnego hover/selected.
+- `app.py` (`🧭 Matching`, tabela porównawcza profili):
+  - dodano `column_config` z `NumberColumn(format="%.1f")` dla kolumn liczbowych,
+  - efekt: wyświetlanie zawsze z 1 miejscem po przecinku (także `76.0`) przy zachowaniu sortowania liczbowego.
+  - dodano fallback dla starszego Streamlit (`TypeError` -> render bez `column_config`).
+- Testy techniczne:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### BLOKERY / RYZYKA
 - BLOKER operacyjny:
   - brak możliwości pełnego UAT UI bez deployu i dostępu do środowiska użytkownika (weryfikacja finalnego wyglądu matrix/single + kontekst + toasty).

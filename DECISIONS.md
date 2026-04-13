@@ -1046,3 +1046,48 @@ Decyzja:
   - `Wstecz` i `Dalej` mają lżejszy, mniej agresywny styl.
 Uzasadnienie:
 - User jednoznacznie wskazał słaby odbiór desktopowego single-screen i podał konkretne wymagania kompozycyjne.
+
+### D-114: `Pojedyncze ekrany` — finalny tuning CTA/spacing pod mobile i desktop
+Decyzja:
+- W trybie `Pojedyncze ekrany`:
+  - `Dalej` jest zielonym CTA (spójny z innymi akcjami),
+  - `Wstecz` ma tę samą typografię co `Dalej` oraz hover highlight,
+  - licznik postępu ma `font-size: 0.95rem`,
+  - zwiększamy dystans między blokiem pytania i blokiem odpowiedzi.
+- Na mobile:
+  - `Dalej` jest przypięty w prawym dolnym rogu z bezpiecznym marginesem (`safe-area`),
+  - sekcja treści ma dodatkowy dolny padding,
+  - etykiety odpowiedzi używają mniejszego fontu i ciaśniejszej siatki, żeby mieściły się w równych kafelkach.
+Uzasadnienie:
+- User zgłosił konkretne regresje po pierwszej iteracji (zbyt mały oddech pionowy, słaba ekspozycja CTA, zbyt duże fonty/licznik, ścinanie etykiet odpowiedzi na telefonie).
+
+### D-115: `Pojedyncze ekrany` — odpowiedzi mobile są kotwiczone, a landscape ma dedykowany tryb
+Decyzja:
+- W mobile portrait pasek odpowiedzi działa jako stała strefa (`position: fixed`) nad przyciskiem `Dalej`, aby nie zmieniał pozycji między pytaniami.
+- W mobile landscape używamy osobnego zestawu stylów (`@media (orientation: landscape)`), z mniejszymi fontami i ciaśniejszym spacingiem.
+- Interakcja odpowiedzi:
+  - hover (desktop) podświetla kafelek kolorem opcji,
+  - selected utrzymuje kolor opcji,
+  - `Dalej` jest bez cienia.
+Uzasadnienie:
+- User zgłosił dwa krytyczne problemy UX:
+  - „skaczący” pasek odpowiedzi na telefonie,
+  - brak czytelnego dopasowania widoku w orientacji poziomej.
+- Dodatkowo poprosił o czytelniejszy stan hover/selected oraz usunięcie cienia CTA.
+
+### D-116: Mobile `Pojedyncze ekrany` — fixed zone odpowiedzi wymaga `width:auto` dla uniknięcia obcinania kafelków
+Decyzja:
+- W media-query mobile (portrait i landscape) dla `.single-scale-zone` ustawiamy:
+  - `position: fixed`,
+  - `left/right` + `width:auto`,
+  - `box-sizing:border-box`.
+Uzasadnienie:
+- Samo `left/right` przy odziedziczonym `width:100%` powodowało praktyczne przepełnienie szerokości i obcinanie ostatniego kafelka po prawej stronie.
+
+### D-117: `🧭 Matching` — stały format jednego miejsca po przecinku bez utraty sortowania
+Decyzja:
+- W tabeli porównawczej profili używamy `st.column_config.NumberColumn(format="%.1f")` dla kolumn liczbowych.
+- Dane pozostają numeryczne (`float`) i sortowanie kolumn działa liczbowo.
+Uzasadnienie:
+- User oczekuje formatu `76.0` / `x.y` w każdym wierszu.
+- Konwersja na tekst psułaby sortowanie numeryczne, więc formatujemy warstwę prezentacji, nie typ danych.
