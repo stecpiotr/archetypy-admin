@@ -768,7 +768,6 @@ def render(back_btn: Callable[[], None]) -> None:
     if method == "E-mail":
         st.text_input(
             "Temat (e-mail)",
-            value=st.session_state.email_subject,
             key="email_subject",
             label_visibility="visible",
             on_change=_mark_email_subject_edited  # <- zaznacz, że użytkownik ruszył temat

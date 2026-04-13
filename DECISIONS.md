@@ -1341,3 +1341,17 @@ Decyzja:
 - W `.jst-slider-head` oba pola etykiet mają równy udział szerokości, a prawa etykieta (`span:last-child`) ma `text-align:right`.
 Uzasadnienie:
 - Wyrównanie do prawej stabilizuje kompozycję i poprawia czytelność par A/B, szczególnie przy dłuższych opisach.
+
+### D-151: Streamlit widgety z `key` nie dostają równolegle `value`, gdy stan idzie przez `st.session_state`
+Decyzja:
+- W `send_link.py` dla pola `email_subject` usuwamy parametr `value=...` i zostawiamy wyłącznie `key="email_subject"` oraz kontrolę przez `st.session_state`.
+Uzasadnienie:
+- Równoległe ustawianie `value` i tego samego klucza sesji wywołuje warning Streamlit i może powodować niespójności inicjalizacji pola.
+
+### D-152: Widoczność toru suwaka JST nie może zależeć tylko od pseudo-elementów `range` przeglądarki
+Decyzja:
+- W `JstSurvey.css` dodajemy własną warstwę toru (`.jst-range-wrap::before`) jako stałe tło osi suwaka.
+- Styl pseudo-elementów `::-webkit-slider-runnable-track` / `::-moz-range-track` pozostaje dodatkowym wzmocnieniem, ale nie jedynym nośnikiem widoczności.
+Uzasadnienie:
+- Na części mobile browserów (szczególnie w dark mode) natywne pseudo-elementy `range` renderują się zbyt słabo lub niespójnie.
+- Osobna warstwa toru daje przewidywalny, czytelny efekt.

@@ -1424,3 +1424,15 @@
   - `python -m py_compile app.py admin_dashboard.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-051 (2026-04-14, send_link warning + dark track visibility)
+- `archetypy-admin/send_link.py`:
+  - usunięto konflikt inicjalizacji pola `email_subject` (jednoczesne `value=` i `st.session_state`),
+  - pole tematu e-mail działa teraz wyłącznie przez `key="email_subject"` + stan sesji.
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - dodano niezależną warstwę toru suwaka (`.jst-range-wrap::before`) dla stabilnej widoczności na mobile,
+  - w dark mode tor jest dodatkowo wzmocniony (kolor, obrys, shadow).
+- Testy techniczne:
+  - `python -m py_compile send_link.py app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

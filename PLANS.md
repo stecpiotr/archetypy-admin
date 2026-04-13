@@ -1757,3 +1757,24 @@ Wynik:
   - `python -m py_compile app.py admin_dashboard.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-051 [DONE]
+Temat: Eliminacja warningu `email_subject` w „Wyślij link do ankiety” + dalsze wzmocnienie toru suwaka JST w dark mode.
+Kryteria ukończenia:
+1. Przy przejściu na metodę `E-mail` nie pojawia się warning Streamlit:
+   `The widget with key "email_subject" was created with a default value but also had its value set via the Session State API.`
+2. Tor suwaka (linia, po której przesuwa się kropka) jest wyraźnie widoczny w dark mode na mobile.
+Pierwszy krok wykonawczy:
+- poprawić inicjalizację `email_subject` w `send_link.py`, a następnie dodać niezależną warstwę toru suwaka w `JstSurvey.css`.
+Wynik:
+- `archetypy-admin/send_link.py`:
+  - `st.text_input(..., key="email_subject")` nie używa już jednocześnie parametru `value=...`,
+  - źródłem wartości pola pozostaje wyłącznie `st.session_state`, więc warning zniknie.
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - dodano stałą warstwę toru suwaka (`.jst-range-wrap::before`) widoczną niezależnie od stylowania pseudo-elementów przeglądarki,
+  - tor ma wyższy kontrast w dark mode (jaśniejszy kolor, obrys, shadow),
+  - input range ustawiony nad warstwą toru (`z-index`) tak, by interakcja działała bez zmian.
+- Smoke-check:
+  - `python -m py_compile send_link.py app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
