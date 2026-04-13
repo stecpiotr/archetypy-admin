@@ -1864,3 +1864,22 @@ Wynik:
   - dodano `_archetype_card_cache_token(...)` i podpięto go przy renderze sekcji kart (`5.1.2`).
 - Smoke-check:
   - `python -m py_compile admin_dashboard.py` (OK).
+
+### Hotfix H-057 [DONE]
+Temat: Reguła kolejności przy remisach w tabeli `Podsumowanie archetypów (liczebność i natężenie)`.
+Kryteria ukończenia:
+1. Przy tej samej wartości `%` o kolejności decyduje kolejno:
+   - `Główny archetyp`,
+   - `Wspierający archetyp`,
+   - `Poboczny archetyp`,
+   - a na końcu alfabetycznie.
+2. `%` porównywane jest tak, jak w tabeli (1 miejsce po przecinku).
+Pierwszy krok wykonawczy:
+- poprawić sortowanie w `admin_dashboard.py` i usunąć wtórne sortowanie DataFrame po samym `%`, które kasowało tie-break.
+Wynik:
+- `admin_dashboard.py`:
+  - dodano `_summary_rank_key(...)` z logiką:
+    `(-pct_1dp, -main_cnt, -aux_cnt, -supp_cnt, alpha)`,
+  - usunięto dodatkowe sortowanie DataFrame po `_sort`.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py` (OK).

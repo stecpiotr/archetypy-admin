@@ -1497,3 +1497,17 @@
   - po podmianie `assets/card/*.png` aplikacja bierze nową wersję obrazu bez potrzeby restartu procesu.
 - Test techniczny:
   - `python -m py_compile admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-057 (2026-04-14, tie-break kolejności archetypów przy tym samym %)
+- `admin_dashboard.py` (`Podsumowanie archetypów (liczebność i natężenie)`):
+  - wprowadzono nową regułę kolejności wierszy:
+    1) `% natężenia` malejąco (po zaokrągleniu do 1 miejsca, jak w tabeli),
+    2) `Główny archetyp` malejąco,
+    3) `Wspierający archetyp` malejąco,
+    4) `Poboczny archetyp` malejąco,
+    5) alfabetycznie rosnąco.
+  - usunięto wtórne sortowanie DataFrame po samym `%`, które mogło nadpisywać tie-break.
+- Efekt:
+  - przy remisie `%` kolejność jest stabilna i zgodna z regułą biznesową.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py` (OK).

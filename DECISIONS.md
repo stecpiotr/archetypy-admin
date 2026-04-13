@@ -1400,3 +1400,12 @@ Uzasadnienie:
 - Użytkownik widział starą kartę mimo podmiany pliku na serwerze.
 - Sam cache po nazwie archetypu/ścieżce nie odświeżał się po zmianie zawartości pliku o tej samej nazwie.
 - Priorytet exact-match eliminuje ryzyko przypadkowego wyboru nieaktualnego wariantu pliku.
+
+### D-158: Tie-break rankingu archetypów w tabeli podsumowania
+Decyzja:
+- W `Podsumowanie archetypów (liczebność i natężenie)` kolejność wierszy ustalamy przez klucz:
+  `(-%_1dp, -główny, -wspierający, -poboczny, alfabetycznie)`.
+- `%` do porównania liczymy po zaokrągleniu do jednego miejsca po przecinku (spójnie z tym, co widzi użytkownik).
+Uzasadnienie:
+- User wymaga jawnej reguły rozstrzygania remisów.
+- Wtórne sortowanie po samym `%` mogło zaburzać kolejność przy remisach, więc ranking musi być nadawany jednokrotnie pełnym kluczem.

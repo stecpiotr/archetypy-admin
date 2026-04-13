@@ -6296,12 +6296,19 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     unsafe_allow_html=True
                 )
 
-                # 2) kolejność wierszy – sortujemy malejąco po procencie
-                ordered_names = sorted(
-                    archetype_names,
-                    key=lambda n: means_pct.get(n, 0.0),
-                    reverse=True
-                )
+                # 2) kolejność wierszy – tie-break:
+                #    % natężenia (1 miejsce po przecinku) ↓,
+                #    liczba wskazań: główny ↓, wspierający ↓, poboczny ↓,
+                #    na końcu alfabetycznie ↑.
+                def _summary_rank_key(arche_name: str) -> tuple[float, int, int, int, str]:
+                    pct_val = round(float(means_pct.get(arche_name, 0.0) or 0.0), 1)
+                    main_cnt = int(counts_main.get(normalize(arche_name), 0) or 0)
+                    aux_cnt = int(counts_aux.get(normalize(arche_name), 0) or 0)
+                    supp_cnt = int(counts_supp.get(normalize(arche_name), 0) or 0)
+                    alpha_key = _slug_pl(disp_name(arche_name) or arche_name)
+                    return (-pct_val, -main_cnt, -aux_cnt, -supp_cnt, alpha_key)
+
+                ordered_names = sorted(archetype_names, key=_summary_rank_key)
 
                 # 3) budowa tabeli z nową kolumną „% natężenie archetypu”
                 # 1) nagłówek grupy + link „i” (bez JS – otwiera modal CSS)
@@ -6340,13 +6347,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     (NAT_GRP, "opis"): _labels_ico,
                 }, columns=_cols)
 
-                # 4) sortowanie po wartości %
-                archetype_table["_sort"] = _pct_vals
-                archetype_table = (
-                    archetype_table.sort_values("_sort", ascending=False)
-                    .drop(columns=["_sort"])
-                    .reset_index(drop=True)
-                )
+                # 4) kolejność jest już nadana przez ordered_names (z tie-break),
+                #    więc nie wykonujemy dodatkowego sortowania DataFrame.
+                archetype_table = archetype_table.reset_index(drop=True)
 
                 # 5) HTML + CSS tabeli
                 # --- ŁATWE DO ZMIANY SZEROKOŚCI (procenty) ---
