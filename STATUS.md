@@ -1477,3 +1477,23 @@
   - po usunięciu jest komunikat sukcesu i automatyczne odświeżenie widoku.
 - Test techniczny:
   - `python -m py_compile app.py db_jst_utils.py` (OK).
+
+### Zrobione w Hotfix H-056 (2026-04-14, stara karta archetypu po podmianie PNG)
+- Objaw:
+  - w `📊 Sprawdź wyniki badania archetypu` sekcja karty archetypu (`5.1.2`) potrafiła pokazywać starą wersję grafiki mimo podmienionego `assets/card/bohater.png`.
+- Przyczyna:
+  - cache data URI obrazka był trzymany po samej nazwie archetypu i ścieżce, bez uwzględnienia zmiany pliku (`mtime/size`),
+  - dodatkowo dobór pliku w `_card_file_for(...)` mógł wejść w fallback prefiksowy zanim trafił idealny plik.
+- `admin_dashboard.py`:
+  - `_card_file_for(...)`:
+    - etap 1: dokładne dopasowanie nazwy (priorytet),
+    - etap 2: deterministyczny fallback prefiksowy (sort + minimalna różnica długości),
+  - `_file_to_data_uri(...)`:
+    - dodano opcjonalny `cache_buster` do klucza cache,
+  - `_archetype_card_data_uri(...)`:
+    - przy generowaniu data URI używa tokenu `mtime_ns:size`,
+  - dodano `_archetype_card_cache_token(...)` i podpięto w renderze kart rozszerzonych.
+- Efekt:
+  - po podmianie `assets/card/*.png` aplikacja bierze nową wersję obrazu bez potrzeby restartu procesu.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py` (OK).

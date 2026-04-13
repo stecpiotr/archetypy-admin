@@ -411,16 +411,35 @@ def _card_file_for(archetype_name: str):
             return None
 
         if ARCHETYPE_CARD_DIR.exists():
-            for path in ARCHETYPE_CARD_DIR.iterdir():
-                if not path.is_file() or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
-                    continue
+            files = sorted(
+                [
+                    p
+                    for p in ARCHETYPE_CARD_DIR.iterdir()
+                    if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
+                ],
+                key=lambda p: p.name.lower(),
+            )
+
+            # 1) Najpierw tylko dokładne dopasowania nazwy (najbezpieczniejsze)
+            for path in files:
+                stem_norm = _norm(path.stem)
+                if stem_norm and stem_norm in target_keys:
+                    return path
+
+            # 2) Dopiero potem fallback prefiksowy (deterministyczny)
+            fallback_hits: list[tuple[int, str, Path]] = []
+            for path in files:
                 stem_norm = _norm(path.stem)
                 if not stem_norm:
                     continue
-                if stem_norm in target_keys:
-                    return path
-                if any(stem_norm.startswith(k) or k.startswith(stem_norm) for k in target_keys):
-                    return path
+                matched = [k for k in target_keys if stem_norm.startswith(k) or k.startswith(stem_norm)]
+                if not matched:
+                    continue
+                best_delta = min(abs(len(stem_norm) - len(k)) for k in matched)
+                fallback_hits.append((best_delta, path.name.lower(), path))
+            if fallback_hits:
+                fallback_hits.sort(key=lambda x: (x[0], x[1]))
+                return fallback_hits[0][2]
 
         # Fallback: jeśli brak dedykowanej karty w assets/card, pokaż ikonę persony.
         # Działa też gdy katalog assets/card nie istnieje na danym środowisku.
@@ -4209,7 +4228,8 @@ def palette_boxes_html(palette, color_name_map=COLOR_NAME_MAP):
 import base64
 
 @lru_cache(maxsize=512)
-def _file_to_data_uri(path: str) -> str:
+def _file_to_data_uri(path: str, cache_buster: str = "") -> str:
+    _ = cache_buster  # parametr celowo używany tylko do klucza cache
     ext = Path(path).suffix.lower()
     mime = {
         ".svg": "image/svg+xml",
@@ -4803,14 +4823,28 @@ def _norm_archetype_key(value: str) -> str:
 
 
 @lru_cache(maxsize=96)
-def _archetype_card_data_uri(archetype_name: str) -> str:
+def _archetype_card_data_uri(archetype_name: str, card_cache_token: str = "") -> str:
+    _ = card_cache_token  # parametr celowo używany tylko do klucza cache
     try:
         path = _card_file_for(archetype_name)
         if path and path.exists():
-            return _file_to_data_uri(str(path))
+            stat = path.stat()
+            file_token = f"{stat.st_mtime_ns}:{stat.st_size}"
+            return _file_to_data_uri(str(path), file_token)
     except Exception:
         return ""
     return ""
+
+
+def _archetype_card_cache_token(archetype_name: str) -> str:
+    try:
+        path = _card_file_for(archetype_name)
+        if path and path.exists():
+            stat = path.stat()
+            return f"{path}:{stat.st_mtime_ns}:{stat.st_size}"
+    except Exception:
+        pass
+    return f"missing:{_norm_archetype_key(archetype_name)}"
 
 
 def _expanded_subsection_content_html(content_lines: list[str], subsection_title: str = "", archetype_name: str = "") -> str:
@@ -5027,7 +5061,11 @@ def _expanded_subsection_content_html(content_lines: list[str], subsection_title
             if items:
                 out.append(ul(items))
         left_html = "".join(out)
-        card_uri = _archetype_card_data_uri(archetype_name) if archetype_name else ""
+        card_uri = (
+            _archetype_card_data_uri(archetype_name, _archetype_card_cache_token(archetype_name))
+            if archetype_name
+            else ""
+        )
         if not card_uri:
             return left_html
         modal_id = f"ap-card-modal-{_norm_archetype_key(archetype_name)}-{abs(hash('||'.join(lines))) % 1000000}"

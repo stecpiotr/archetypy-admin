@@ -1846,3 +1846,21 @@ Wynik:
   - po usunięciu rekordów widok odświeża się i pokazuje komunikat o liczbie usuniętych odpowiedzi.
 - Smoke-check:
   - `python -m py_compile app.py db_jst_utils.py` (OK).
+
+### Hotfix H-056 [DONE]
+Temat: `📊 Sprawdź wyniki badania archetypu` pokazywało starą kartę archetypu po podmianie PNG.
+Kryteria ukończenia:
+1. Po podmianie `assets/card/*.png` raport pokazuje aktualny plik bez restartu usługi.
+2. Wybór pliku karty jest deterministyczny i preferuje dokładne dopasowanie nazwy.
+Pierwszy krok wykonawczy:
+- poprawić cache data URI kart (cache-buster po `mtime/size`) i utwardzić `_card_file_for(...)`.
+Wynik:
+- `admin_dashboard.py`:
+  - `_card_file_for(...)` działa teraz dwuetapowo:
+    - najpierw dokładne dopasowanie nazwy,
+    - dopiero potem deterministyczny fallback prefiksowy,
+  - `_file_to_data_uri(...)` otrzymało parametr `cache_buster`,
+  - `_archetype_card_data_uri(...)` używa tokenu opartego o `mtime_ns` i `size` pliku,
+  - dodano `_archetype_card_cache_token(...)` i podpięto go przy renderze sekcji kart (`5.1.2`).
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py` (OK).

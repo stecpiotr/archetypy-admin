@@ -1391,3 +1391,12 @@ Decyzja:
 Uzasadnienie:
 - User potrzebuje kasować pojedyncze i wiele wypełnień bez ręcznej edycji bazy.
 - `respondent_id` jest stabilnym identyfikatorem w zakresie badania (`UNIQUE (study_id, respondent_id)`), więc nadaje się do bezpiecznego bulk-delete.
+
+### D-157: Cache kart archetypów musi uwzględniać zmianę pliku na dysku
+Decyzja:
+- W `admin_dashboard.py` data URI kart archetypów (`assets/card/*.png`) cache’ujemy z tokenem opartym o metadane pliku (`mtime_ns`, `size`).
+- Dobór pliku `_card_file_for(...)` ma priorytet dokładnego dopasowania nazwy; fallback prefiksowy działa tylko awaryjnie i deterministycznie.
+Uzasadnienie:
+- Użytkownik widział starą kartę mimo podmiany pliku na serwerze.
+- Sam cache po nazwie archetypu/ścieżce nie odświeżał się po zmianie zawartości pliku o tej samej nazwie.
+- Priorytet exact-match eliminuje ryzyko przypadkowego wyboru nieaktualnego wariantu pliku.
