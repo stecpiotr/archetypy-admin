@@ -1709,3 +1709,26 @@ Wynik:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK),
   - kontrolny probe funkcji odmiany dla wyjątków (OK).
+
+### Hotfix H-049 [DONE]
+Temat: JST mobile/dark mode + licznik uczestników w podglądzie raportu publicznego.
+Kryteria ukończenia:
+1. JST (`jst.badania.pro`) nie wymusza chwilowo obrotu do poziomu.
+2. W pytaniach suwakowych JST oś suwaka jest czytelna w trybie ciemnym.
+3. W publicznym podglądzie raportu (token/email) jest na górze estetyczny licznik uczestników badania.
+Pierwszy krok wykonawczy:
+- poprawić punktowo `archetypy-ankieta/src/JstSurvey.tsx`, `archetypy-ankieta/src/JstSurvey.css` i `archetypy-admin/app.py`.
+Wynik:
+- `archetypy-ankieta/src/JstSurvey.tsx`:
+  - dodano flagę `ENFORCE_JST_LANDSCAPE_ON_MOBILE = false`,
+  - warunek `shouldRotate` został podpięty pod tę flagę (obligo obrotu wyłączone tymczasowo).
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - w dark mode zwiększono kontrast toru suwaka (`::-webkit-slider-runnable-track`, `::-moz-range-track`),
+  - dodano obrys/box-shadow toru i jaśniejsze ticki (`.jst-tick`) dla lepszej widoczności osi.
+- `archetypy-admin/app.py`:
+  - w `public_report_view` dodano pobranie liczby odpowiedzi (`fetch_personal_response_count`),
+  - dodano górny kafelek „X uczestników badania” (responsive + dark mode friendly).
+- Smoke-check:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

@@ -1391,3 +1391,21 @@
   - `python -m py_compile app.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-049 (2026-04-13, JST mobile rotate off + dark slider axis + public report participants)
+- `archetypy-ankieta/src/JstSurvey.tsx`:
+  - wymuszenie obrotu JST na mobile zostało tymczasowo wyłączone przez flagę `ENFORCE_JST_LANDSCAPE_ON_MOBILE = false`.
+- `archetypy-ankieta/src/JstSurvey.css`:
+  - poprawiono widoczność osi suwaka w dark mode:
+    - jaśniejszy tor suwaka (WebKit + Firefox),
+    - dodany kontrastujący obrys/shadow toru,
+    - jaśniejsze ticki osi.
+- `archetypy-admin/app.py`:
+  - `public_report_view` pobiera liczbę uczestników badania i renderuje u góry raportu dedykowany kafelek:
+    - wartość liczbowa,
+    - podpis `uczestnik badania` / `uczestników badania`,
+    - wersja responsywna i zgodna z dark mode.
+- Testy techniczne:
+  - `python -m py_compile app.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

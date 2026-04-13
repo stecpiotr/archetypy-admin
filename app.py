@@ -1141,6 +1141,10 @@ def _person_genitive(study: Dict) -> str:
     return full or "tej osoby"
 
 
+def _participants_label(count: int) -> str:
+    return "uczestnik badania" if int(count) == 1 else "uczestników badania"
+
+
 def _fetch_study_by_id(study_id: str) -> Optional[Dict]:
     try:
         res = sb.table("studies").select("*").eq("id", study_id).limit(1).execute()
@@ -6439,12 +6443,88 @@ def public_report_view(token: str) -> None:
         st.error("Nie udało się odnaleźć badania przypisanego do tego linku.")
         st.stop()
 
+    participant_count: Optional[int] = None
+    try:
+        participant_count = int(fetch_personal_response_count(sb, str(study.get("id") or "")))
+    except Exception:
+        participant_count = None
+
     st.markdown(
-        "<style>.block-container{max-width:98vw !important;padding-left:1.2rem !important;padding-right:1.2rem !important;}</style>",
+        """
+        <style>
+          .block-container{
+            max-width:98vw !important;
+            padding-left:1.2rem !important;
+            padding-right:1.2rem !important;
+          }
+          .public-participants-wrap{
+            display:flex;
+            justify-content:flex-end;
+            margin:0 0 14px;
+          }
+          .public-participants-card{
+            min-width:230px;
+            text-align:right;
+            background:linear-gradient(145deg, #f6f9ff 0%, #eef3fb 100%);
+            border:1px solid #d4dff1;
+            border-radius:14px;
+            padding:14px 18px 12px;
+            box-shadow:0 4px 14px rgba(40, 72, 112, 0.10);
+          }
+          .public-participants-value{
+            font-size:2rem;
+            line-height:1;
+            font-weight:800;
+            color:#1b4d93;
+            letter-spacing:0.01em;
+          }
+          .public-participants-label{
+            margin-top:4px;
+            font-size:0.95rem;
+            color:#35516f;
+            font-weight:600;
+          }
+          @media (max-width: 900px){
+            .public-participants-wrap{
+              justify-content:center;
+            }
+            .public-participants-card{
+              width:100%;
+              max-width:360px;
+              text-align:center;
+            }
+          }
+          @media (prefers-color-scheme: dark){
+            .public-participants-card{
+              background:linear-gradient(145deg, #15273b 0%, #1a2f47 100%);
+              border-color:#2f4966;
+              box-shadow:0 4px 14px rgba(3, 9, 18, 0.42);
+            }
+            .public-participants-value{
+              color:#9cc5ff;
+            }
+            .public-participants-label{
+              color:#c4d7ec;
+            }
+          }
+        </style>
+        """,
         unsafe_allow_html=True,
     )
     _inject_report_dark_fix_css()
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+    if participant_count is not None:
+        st.markdown(
+            f"""
+            <div class="public-participants-wrap">
+              <div class="public-participants-card">
+                <div class="public-participants-value">{participant_count}</div>
+                <div class="public-participants-label">{_participants_label(participant_count)}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     try:
         import admin_dashboard as AD
         if hasattr(AD, "show_report"):

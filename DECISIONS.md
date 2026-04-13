@@ -1293,3 +1293,28 @@ Decyzja:
 Uzasadnienie:
 - Sama heurystyka końcówek nie pokrywa poprawnie wszystkich nazw JST (zwłaszcza nieregularnych i wielowyrazowych).
 - Słownik wyjątków podnosi jakość domyślnej auto-odmiany i pozostaje łatwy do dalszego rozszerzania.
+
+### D-145: JST mobile — wymuszenie obrotu zostaje chwilowo wyłączone flagą
+Decyzja:
+- W `JstSurvey.tsx` dodajemy flagę `ENFORCE_JST_LANDSCAPE_ON_MOBILE` i ustawiamy ją tymczasowo na `false`.
+- Logika ekranu `Proszę obrócić telefon poziomo...` pozostaje w kodzie, ale jest nieaktywna do czasu ponownego włączenia flagi.
+Uzasadnienie:
+- User poprosił o szybki UAT wyglądu ankiety JST bez blokady orientacji.
+- Flaga umożliwia bezpieczny powrót do poprzedniego zachowania bez refaktoru komponentu.
+
+### D-146: JST dark mode — tor suwaka musi być wysokokontrastowy
+Decyzja:
+- W `JstSurvey.css` dark mode tor suwaka (`::-webkit-slider-runnable-track`, `::-moz-range-track`) dostał jaśniejszy gradient i dodatkowy obrys.
+- Ticki osi (`.jst-tick`) są renderowane jaśniejszym kolorem.
+Uzasadnienie:
+- W aktualnym ciemnym motywie oś suwaka była praktycznie niewidoczna na części ekranów.
+- Wysoki kontrast osi poprawia czytelność i precyzję odpowiedzi w pytaniach suwakowych.
+
+### D-147: Publiczny raport archetypowy pokazuje licznik uczestników
+Decyzja:
+- W `public_report_view` (token/email) renderujemy na górze raportu kafelek z liczbą uczestników badania.
+- Licznik pobieramy przez `fetch_personal_response_count(...)`.
+- Kafelek jest responsywny i ma wariant dark mode.
+Uzasadnienie:
+- W publicznym widoku brakowało kluczowego kontekstu skali badania, który jest obecny w panelu administracyjnym.
+- Dodanie licznika zwiększa czytelność raportu dla odbiorców zewnętrznych.
