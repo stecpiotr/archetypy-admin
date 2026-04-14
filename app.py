@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Any, Callable, Dict, List, Tuple, Optional
+from copy import deepcopy
 import contextlib
 from datetime import datetime, timedelta, timezone
 import threading
@@ -86,6 +87,10 @@ from report_share import (
     verify_token_credentials as verify_report_token_credentials,
     get_access_by_token as get_report_access_by_token,
     mark_sent as mark_report_access_sent,
+)
+from metryczka_config import (
+    normalize_jst_metryczka_config,
+    normalize_personal_metryczka_config,
 )
 
 warnings.filterwarnings(
@@ -2064,7 +2069,7 @@ def home_personal_view() -> None:
     header("Badania personalne - panel")
     render_titlebar(["Panel", "Badania personalne"])
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6, gap="small")
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7, gap="small")
     with c1:
         if st.button("➕\n\nDodaj badanie archetypu", key="tile_home_personal_add", type="secondary", use_container_width=True):
             goto("add")
@@ -2075,12 +2080,15 @@ def home_personal_view() -> None:
         if st.button("⚙️\n\nUstawienia ankiety", key="tile_home_personal_settings", type="secondary", use_container_width=True):
             goto("personal_settings")
     with c4:
+        if st.button("🧾\n\nMetryczka", key="tile_home_personal_metryczka", type="secondary", use_container_width=True):
+            goto("personal_metryczka")
+    with c5:
         if st.button("✉️\n\nWyślij link do ankiety", key="tile_home_personal_send", type="secondary", use_container_width=True):
             goto("send")
-    with c5:
+    with c6:
         if st.button("🔗\n\nPołącz badania", key="tile_home_personal_merge", type="secondary", use_container_width=True):
             goto("personal_merge")
-    with c6:
+    with c7:
         if st.button("📊\n\nSprawdź wyniki badania archetypu", key="tile_home_personal_results", type="secondary", use_container_width=True):
             goto("results")
 
@@ -2120,7 +2128,7 @@ def home_jst_view() -> None:
     header("Badania mieszkańców - panel")
     render_titlebar(["Panel", "Badania mieszkańców"])
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6, gap="small")
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7, gap="small")
     with c1:
         if st.button("➕\n\nDodaj badanie\nmieszkańców", key="tile_home_jst_add", type="secondary", use_container_width=True):
             goto("jst_add")
@@ -2131,12 +2139,15 @@ def home_jst_view() -> None:
         if st.button("⚙️\n\nUstawienia\nankiety", key="tile_home_jst_settings", type="secondary", use_container_width=True):
             goto("jst_settings")
     with c4:
+        if st.button("🧾\n\nMetryczka", key="tile_home_jst_metryczka", type="secondary", use_container_width=True):
+            goto("jst_metryczka")
+    with c5:
         if st.button("✉️\n\nWyślij link\ndo ankiety", key="tile_home_jst_send", type="secondary", use_container_width=True):
             goto("jst_send")
-    with c5:
+    with c6:
         if st.button("💾\n\nImport i eksport\nbaz danych", key="tile_home_jst_io", type="secondary", use_container_width=True):
             goto("jst_io")
-    with c6:
+    with c7:
         if st.button("📊\n\nAnaliza\nbadania", key="tile_home_jst_analysis", type="secondary", use_container_width=True):
             goto("jst_analysis")
 
@@ -2495,6 +2506,376 @@ def jst_edit_view() -> None:
             st.rerun()
         except Exception as e:
             st.error(f"Błąd zapisu: {e}")
+
+_METRY_CORE_IDS: Tuple[str, ...] = ("M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_MATERIAL")
+_METRY_CUSTOM_CODE_RE = re.compile(r"^M_[A-Z0-9_]{2,40}$")
+
+
+def _metryczka_normalize_config(kind: str, raw: Any) -> Dict[str, Any]:
+    return normalize_jst_metryczka_config(raw) if kind == "jst" else normalize_personal_metryczka_config(raw)
+
+
+def _metryczka_editor_state_key(kind: str, study_key: str) -> str:
+    return f"{kind}_metryczka_editor_cfg_{study_key}"
+
+
+def _metryczka_editor_nonce_key(kind: str, study_key: str) -> str:
+    return f"{kind}_metryczka_editor_nonce_{study_key}"
+
+
+def _metryczka_editor_widget_prefix(kind: str, study_key: str) -> str:
+    nonce_key = _metryczka_editor_nonce_key(kind, study_key)
+    try:
+        nonce = int(st.session_state.get(nonce_key, 0) or 0)
+    except Exception:
+        nonce = 0
+    return f"{kind}_metryczka_editor_widget_{study_key}_{nonce}_"
+
+
+def _bump_metryczka_editor_nonce(kind: str, study_key: str) -> None:
+    nonce_key = _metryczka_editor_nonce_key(kind, study_key)
+    try:
+        current = int(st.session_state.get(nonce_key, 0) or 0)
+    except Exception:
+        current = 0
+    st.session_state[nonce_key] = current + 1
+
+
+def _metryczka_options_to_df(options: Any) -> pd.DataFrame:
+    rows: List[Dict[str, str]] = []
+    if isinstance(options, list):
+        for opt in options:
+            if not isinstance(opt, dict):
+                continue
+            rows.append(
+                {
+                    "Odpowiedź": str(opt.get("label") or "").strip(),
+                    "Kodowanie": str(opt.get("code") or "").strip(),
+                }
+            )
+    if not rows:
+        rows = [{"Odpowiedź": "", "Kodowanie": ""}]
+    return pd.DataFrame(rows)
+
+
+def _metryczka_options_from_df(df: Any) -> List[Dict[str, str]]:
+    if not isinstance(df, pd.DataFrame):
+        return []
+    out: List[Dict[str, str]] = []
+    seen_codes: set[str] = set()
+    for _, row in df.iterrows():
+        label = str(row.get("Odpowiedź") or "").strip()
+        code = str(row.get("Kodowanie") or "").strip()
+        if not label or not code:
+            continue
+        code_norm = code.upper()
+        if code_norm in seen_codes:
+            continue
+        seen_codes.add(code_norm)
+        out.append({"label": label, "code": code_norm})
+    return out
+
+
+def _next_custom_metryczka_code(questions: List[Dict[str, Any]]) -> str:
+    used: set[str] = set()
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        used.add(str(q.get("db_column") or "").strip().upper())
+        used.add(str(q.get("id") or "").strip().upper())
+    i = 1
+    while i < 1000:
+        cand = f"M_CUSTOM_{i}"
+        if cand not in used:
+            return cand
+        i += 1
+    return f"M_CUSTOM_{int(time.time())}"
+
+
+def _new_custom_metryczka_question(questions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    code = _next_custom_metryczka_code(questions)
+    return {
+        "id": code,
+        "scope": "custom",
+        "db_column": code,
+        "_ui_key": f"q_{int(time.time() * 1_000_000)}",
+        "prompt": "",
+        "required": True,
+        "multiple": False,
+        "aliases": [],
+        "options": [
+            {"label": "", "code": "1"},
+            {"label": "", "code": "2"},
+        ],
+    }
+
+
+def _validate_metryczka_before_save(raw_cfg: Dict[str, Any]) -> Tuple[bool, str]:
+    questions = raw_cfg.get("questions")
+    if not isinstance(questions, list) or not questions:
+        return False, "Metryczka nie zawiera pytań."
+
+    seen_columns: set[str] = set()
+    for idx, q in enumerate(questions, start=1):
+        if not isinstance(q, dict):
+            return False, f"Pytanie #{idx} ma nieprawidłowy format."
+
+        scope = str(q.get("scope") or "").strip().lower()
+        prompt = str(q.get("prompt") or "").strip()
+        db_column = str(q.get("db_column") or "").strip().upper()
+        options = q.get("options")
+
+        if not prompt:
+            return False, f"Pytanie #{idx}: uzupełnij treść pytania."
+        if not db_column:
+            return False, f"Pytanie #{idx}: uzupełnij pole 'Kodowanie'."
+        if db_column in seen_columns:
+            return False, f"Pole 'Kodowanie' musi być unikalne. Duplikat: {db_column}."
+        seen_columns.add(db_column)
+
+        if scope == "custom" and not _METRY_CUSTOM_CODE_RE.fullmatch(db_column):
+            return False, (
+                f"Pytanie #{idx}: kodowanie '{db_column}' ma zły format. "
+                "Użyj np. M_POWIAT (duże litery, cyfry i podkreślenie)."
+            )
+
+        if not isinstance(options, list) or len(options) < 2:
+            return False, f"Pytanie #{idx}: dodaj co najmniej 2 odpowiedzi."
+
+        seen_option_codes: set[str] = set()
+        for opt_idx, opt in enumerate(options, start=1):
+            if not isinstance(opt, dict):
+                return False, f"Pytanie #{idx}: odpowiedź #{opt_idx} ma nieprawidłowy format."
+            label = str(opt.get("label") or "").strip()
+            code = str(opt.get("code") or "").strip().upper()
+            if not label:
+                return False, f"Pytanie #{idx}: odpowiedź #{opt_idx} nie ma treści."
+            if not code:
+                return False, f"Pytanie #{idx}: odpowiedź #{opt_idx} nie ma kodowania."
+            if code in seen_option_codes:
+                return False, f"Pytanie #{idx}: zduplikowane kodowanie odpowiedzi '{code}'."
+            seen_option_codes.add(code)
+
+    return True, ""
+
+
+def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    state_key = _metryczka_editor_state_key(kind, study_key)
+    widget_prefix = _metryczka_editor_widget_prefix(kind, study_key)
+    normalized_cfg = _metryczka_normalize_config(kind, current_cfg)
+
+    if state_key not in st.session_state:
+        st.session_state[state_key] = deepcopy(normalized_cfg)
+
+    r1, r2 = st.columns([0.36, 0.64], gap="small")
+    with r1:
+        if st.button("↩️ Odrzuć niezapisane zmiany", key=f"{widget_prefix}reset", use_container_width=True):
+            st.session_state[state_key] = deepcopy(normalized_cfg)
+            _bump_metryczka_editor_nonce(kind, study_key)
+            st.rerun()
+    with r2:
+        st.caption(
+            "Pierwsze 5 pytań to rdzeń metryczki (stałe kodowanie kolumn). "
+            "Możesz edytować treść pytań i odpowiedzi oraz dodawać pytania dodatkowe."
+        )
+
+    cfg_state = st.session_state.get(state_key) or deepcopy(normalized_cfg)
+    questions = list((cfg_state.get("questions") or []))
+    rebuilt_questions: List[Dict[str, Any]] = []
+    remove_idx: Optional[int] = None
+
+    for idx, q in enumerate(questions, start=1):
+        q_dict = dict(q or {})
+        scope = str(q_dict.get("scope") or "custom").strip().lower()
+        is_core = scope == "core"
+        ui_key = str(q_dict.get("_ui_key") or f"q_{idx}_{str(q_dict.get('id') or '')}".strip())
+        db_column = str(q_dict.get("db_column") or q_dict.get("id") or "").strip().upper()
+        if is_core and db_column in _METRY_CORE_IDS:
+            qid = db_column
+        else:
+            qid = str(q_dict.get("id") or db_column or f"M_CUSTOM_{idx}").strip().upper()
+        prompt_default = str(q_dict.get("prompt") or "").strip()
+        options_default = q_dict.get("options") or []
+
+        st.markdown("---")
+        h1, h2 = st.columns([0.72, 0.28], gap="small")
+        with h1:
+            role_txt = "rdzeń" if is_core else "pytanie dodatkowe"
+            st.markdown(f"**{idx}. {qid}**")
+            st.caption(f"Typ: {role_txt}")
+        with h2:
+            if not is_core:
+                if st.button("🗑️ Usuń pytanie", key=f"{widget_prefix}rm_q_{ui_key}", use_container_width=True):
+                    remove_idx = idx - 1
+
+        p_col, c_col = st.columns([0.72, 0.28], gap="small")
+        with p_col:
+            prompt = st.text_area(
+                "Pytanie",
+                value=prompt_default,
+                key=f"{widget_prefix}prompt_{ui_key}",
+                height=96,
+                placeholder="Treść pytania widoczna dla respondenta",
+            )
+        with c_col:
+            code_value = st.text_input(
+                "Kodowanie",
+                value=db_column,
+                key=f"{widget_prefix}code_{ui_key}",
+                disabled=is_core,
+                placeholder="np. M_POWIAT",
+            )
+            if is_core:
+                st.caption("Kodowanie rdzenia jest stałe.")
+
+        st.markdown("**Odpowiedzi**")
+        options_df = _metryczka_options_to_df(options_default)
+        edited_options_df = st.data_editor(
+            options_df,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            key=f"{widget_prefix}opts_{ui_key}",
+            column_config={
+                "Odpowiedź": st.column_config.TextColumn(
+                    "Odpowiedź",
+                    help="Tekst widoczny dla respondenta.",
+                    width="large",
+                ),
+                "Kodowanie": st.column_config.TextColumn(
+                    "Kodowanie",
+                    help="Kod zapisywany dla tej odpowiedzi.",
+                    width="medium",
+                ),
+            },
+        )
+        options = _metryczka_options_from_df(edited_options_df)
+
+        final_code = str(code_value or "").strip().upper()
+        if is_core:
+            final_code = db_column
+        final_id = final_code if not is_core else qid
+        rebuilt_questions.append(
+            {
+                "id": final_id,
+                "scope": "core" if is_core else "custom",
+                "db_column": final_code,
+                "_ui_key": ui_key,
+                "prompt": str(prompt or "").strip(),
+                "required": True,
+                "multiple": False,
+                "aliases": list(q_dict.get("aliases") or []),
+                "options": options,
+            }
+        )
+
+    cfg_out = {
+        "version": int(cfg_state.get("version") or 1),
+        "questions": rebuilt_questions,
+    }
+    st.session_state[state_key] = deepcopy(cfg_out)
+
+    if remove_idx is not None:
+        working = deepcopy(st.session_state[state_key])
+        q_list = list(working.get("questions") or [])
+        if 0 <= remove_idx < len(q_list):
+            q_list.pop(remove_idx)
+            working["questions"] = q_list
+            st.session_state[state_key] = working
+            st.rerun()
+
+    if st.button("➕ Dodaj pytanie metryczkowe", key=f"{widget_prefix}add_q", type="secondary"):
+        working = deepcopy(st.session_state.get(state_key) or cfg_out)
+        q_list = list(working.get("questions") or [])
+        q_list.append(_new_custom_metryczka_question(q_list))
+        working["questions"] = q_list
+        st.session_state[state_key] = working
+        st.rerun()
+
+    return deepcopy(st.session_state.get(state_key) or cfg_out)
+
+
+def jst_metryczka_view() -> None:
+    require_auth()
+    if not _require_jst_ready():
+        return
+    header("🧾 Metryczka ankiety")
+    render_titlebar(["Panel", "Badania mieszkańców", "Metryczka"])
+    back_button("home_jst", "← Powrót do panelu mieszkańców")
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+
+    studies = fetch_jst_studies(sb)
+    if not studies:
+        st.info("Brak badań JST w bazie.")
+        return
+
+    counts_by_id = fetch_jst_response_counts(sb)
+    options: Dict[str, Dict[str, Any]] = {}
+    for s in studies:
+        sid = str(s.get("id") or "").strip()
+        if not sid:
+            continue
+        options[f"{_jst_option_label(s)} • {int(counts_by_id.get(sid, 0))} odp."] = s
+
+    st.markdown(
+        "<div style='font-size:17px;font-weight:800;margin-bottom:6px;'>Wybierz badanie</div>",
+        unsafe_allow_html=True,
+    )
+    choice = st.selectbox(
+        "Wybierz badanie JST",
+        list(options.keys()),
+        key="jst_metryczka_pick",
+        label_visibility="collapsed",
+    )
+    study = options[choice]
+    sid = str(study.get("id") or "").strip()
+    study_row = fetch_jst_study_by_id(sb, sid) or study
+    study_row = _apply_scheduled_survey_transitions(study_row, kind="jst")
+    status_meta = _study_status_meta(study_row, kind="jst")
+    slug = str(study_row.get("slug") or "").strip()
+    survey_base = str(st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
+    survey_url = f"{survey_base}/{slug}" if slug else "—"
+
+    info_df = pd.DataFrame(
+        [
+            {
+                "Status": status_meta["status_label"],
+                "Liczba odpowiedzi": int(counts_by_id.get(sid, 0)),
+                "Link ankiety": survey_url,
+            }
+        ]
+    )
+    st.dataframe(info_df, use_container_width=True, hide_index=True)
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown("### Konfiguracja metryczki")
+    edited_cfg = _render_metryczka_editor(
+        "jst",
+        sid,
+        normalize_jst_metryczka_config(study_row.get("metryczka_config")),
+    )
+
+    if st.button("💾 Zapisz metryczkę", type="primary", key=f"jst_metryczka_save_{sid}"):
+        valid, msg = _validate_metryczka_before_save(edited_cfg)
+        if not valid:
+            st.error(msg)
+            return
+        cfg_norm = normalize_jst_metryczka_config(edited_cfg)
+        try:
+            update_jst_study(
+                sb,
+                sid,
+                {
+                    "metryczka_config": cfg_norm,
+                    "metryczka_config_version": int(cfg_norm.get("version") or 1),
+                },
+            )
+            st.session_state[_metryczka_editor_state_key("jst", sid)] = deepcopy(cfg_norm)
+            st.success("Zapisano konfigurację metryczki.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zapisać metryczki: {exc}")
+
 
 def jst_settings_view() -> None:
     require_auth()
@@ -6081,6 +6462,113 @@ def add_view() -> None:
             st.error(f"❌ Błąd zapisu: {e}")
 
 
+def personal_metryczka_view() -> None:
+    require_auth()
+    if not _ensure_jst_schema_initialized():
+        st.warning("Nie udało się potwierdzić schematu metryczki. Spróbuj ponownie za chwilę.")
+        return
+    header("🧾 Metryczka ankiety")
+    render_titlebar(["Panel", "Badania personalne", "Metryczka"])
+    back_button("home_personal", "← Powrót do panelu personalnego")
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+
+    studies = fetch_studies(sb)
+    if not studies:
+        st.info("Brak badań personalnych.")
+        return
+
+    counts_by_slug: Dict[str, int] = {}
+    try:
+        c_res = sb.from_("study_response_count_v").select("slug,responses").execute()
+        for row in (c_res.data or []):
+            slug = str(row.get("slug") or "").strip()
+            if slug:
+                counts_by_slug[slug] = int(row.get("responses") or 0)
+    except Exception:
+        counts_by_slug = {}
+
+    options: Dict[str, Dict[str, Any]] = {}
+    for s in studies:
+        fn = str(s.get("first_name_nom") or s.get("first_name") or "").strip()
+        ln = str(s.get("last_name_nom") or s.get("last_name") or "").strip()
+        city = str(s.get("city") or "").strip()
+        slug = str(s.get("slug") or "").strip()
+        count = int(counts_by_slug.get(slug, 0))
+        label = f"{ln} {fn} ({city}) – /{slug} • {count} odp."
+        options[label] = s
+
+    st.markdown(
+        "<div style='font-size:17px;font-weight:800;margin-bottom:6px;'>Wybierz badanie</div>",
+        unsafe_allow_html=True,
+    )
+    pick = st.selectbox(
+        "Wybierz badanie",
+        list(options.keys()),
+        key="personal_metryczka_pick",
+        label_visibility="collapsed",
+    )
+    study = options[pick]
+    study_id = str(study.get("id") or "").strip()
+    if study_id:
+        try:
+            fresh_res = sb.table("studies").select("*").eq("id", study_id).limit(1).execute()
+            fresh_row = (fresh_res.data or [None])[0]
+            if isinstance(fresh_row, dict):
+                study = dict(fresh_row)
+        except Exception:
+            pass
+
+    study = _apply_scheduled_survey_transitions(study, kind="personal")
+    status_meta = _study_status_meta(study, kind="personal")
+    slug = str(study.get("slug") or "").strip()
+    survey_base = str(st.secrets.get("SURVEY_BASE_URL", "https://archetypy.badania.pro") or "").rstrip("/")
+    survey_url = f"{survey_base}/{slug}" if slug else "—"
+
+    info_rows = pd.DataFrame(
+        [
+            {
+                "Status": status_meta["status_label"],
+                "Liczba odpowiedzi": int(counts_by_slug.get(slug, 0)),
+                "Link ankiety": survey_url,
+            }
+        ]
+    )
+    st.dataframe(info_rows, use_container_width=True, hide_index=True)
+    st.caption("W ankiecie personalnej metryczka będzie częścią flow po ekranie powitalnym.")
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown("### Konfiguracja metryczki")
+    edited_cfg = _render_metryczka_editor(
+        "personal",
+        study_id or slug,
+        _metryczka_normalize_config("personal", study.get("metryczka_config")),
+    )
+
+    if st.button("💾 Zapisz metryczkę", type="primary", key=f"personal_metryczka_save_{study_id or slug}"):
+        if not study_id:
+            st.error("Brak identyfikatora badania.")
+            return
+        valid, msg = _validate_metryczka_before_save(edited_cfg)
+        if not valid:
+            st.error(msg)
+            return
+        cfg_norm = normalize_personal_metryczka_config(edited_cfg)
+        try:
+            update_study(
+                sb,
+                study_id,
+                {
+                    "metryczka_config": cfg_norm,
+                    "metryczka_config_version": int(cfg_norm.get("version") or 1),
+                },
+            )
+            st.session_state[_metryczka_editor_state_key("personal", study_id or slug)] = deepcopy(cfg_norm)
+            st.success("Zapisano konfigurację metryczki.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Nie udało się zapisać metryczki: {exc}")
+
+
 def personal_settings_view() -> None:
     require_auth()
     if not _ensure_jst_schema_initialized():
@@ -7303,6 +7791,8 @@ else:
         edit_view()
     elif view == "personal_settings":
         personal_settings_view()
+    elif view == "personal_metryczka":
+        personal_metryczka_view()
     elif view == "personal_merge":
         personal_merge_view()
     elif view == "results":
@@ -7315,6 +7805,8 @@ else:
         jst_edit_view()
     elif view == "jst_settings":
         jst_settings_view()
+    elif view == "jst_metryczka":
+        jst_metryczka_view()
     elif view == "jst_send":
         jst_send_view()
     elif view == "jst_io":

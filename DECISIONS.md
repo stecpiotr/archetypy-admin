@@ -1496,3 +1496,23 @@ Decyzja:
 Uzasadnienie:
 - Raporty i ważenie poststratyfikacyjne opierają się na stabilnych identyfikatorach rdzenia; ich zmienność rozwaliłaby kompatybilność analityczną.
 - Jednocześnie model musi pozwalać rozszerzać metryczkę o nowe zmienne demograficzne.
+
+### D-168: Metryczka ma być osobnym modułem panelu (osobny kafelek), nie częścią `⚙️ Ustawienia ankiety`
+Decyzja:
+- W panelach `Badania personalne` i `Badania mieszkańców` dodajemy osobny kafelek `🧾 Metryczka`.
+- Edycja metryczki działa w dedykowanych widokach:
+  - `personal_metryczka_view`,
+  - `jst_metryczka_view`.
+Uzasadnienie:
+- User wskazał, że metryczka w ustawieniach ankiety jest mniej czytelna.
+- Oddzielenie metryczki od ustawień technicznych (nawigacja, harmonogram, powiadomienia) porządkuje UX.
+
+### D-169: Ankiety personalne korzystają z tego samego modelu metryczki co JST
+Decyzja:
+- Tabela `studies` dostaje:
+  - `metryczka_config (JSONB)`,
+  - `metryczka_config_version (INTEGER)`.
+- Konfiguracja metryczki personalnej jest normalizowana tak samo jak JST (wspólny rdzeń 5 pytań + custom).
+Uzasadnienie:
+- User wymaga, aby metryczka była dostępna również dla `archetypy.badania.pro`.
+- Wspólny model minimalizuje ryzyko rozjazdu logiki między modułami i upraszcza dalsze wdrożenie raportowania demograficznego.

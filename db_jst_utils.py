@@ -252,6 +252,10 @@ def ensure_jst_schema() -> None:
           ADD COLUMN IF NOT EXISTS survey_notify_last_count INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE public.studies
           ADD COLUMN IF NOT EXISTS survey_notify_last_sent_at TIMESTAMPTZ NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS metryczka_config JSONB NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS metryczka_config_version INTEGER NOT NULL DEFAULT 1;
 
         IF NOT EXISTS (
           SELECT 1

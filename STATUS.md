@@ -1601,3 +1601,31 @@
   - plan dalszego wdrożenia (UI admin + render ankiety + parser raportów dla custom zmiennych).
 - Test techniczny:
   - `python -m py_compile db_jst_utils.py metryczka_config.py app.py` (OK).
+
+### Zrobione w Hotfix H-062 (2026-04-14, osobny kafelek + edytor metryczki JST/personal)
+- `app.py`:
+  - dodano osobny kafelek `🧾 Metryczka` w panelach:
+    - `Badania mieszkańców`,
+    - `Badania personalne`,
+  - dodano nowe widoki:
+    - `jst_metryczka_view`,
+    - `personal_metryczka_view`,
+  - dodano wspólny edytor metryczki:
+    - 5 pytań rdzeniowych (stałe kodowanie kolumn),
+    - możliwość edycji treści pytań i list odpowiedzi,
+    - możliwość dodawania/usuwania pytań dodatkowych z kodowaniem (`M_...`),
+    - walidacja spójności kodowania i odpowiedzi przed zapisem.
+- `metryczka_config.py`:
+  - dodano funkcje dla badań personalnych:
+    - `default_personal_metryczka_config(...)`,
+    - `normalize_personal_metryczka_config(...)`.
+- `db_utils.py`:
+  - `fetch_studies(...)` normalizuje i zwraca `metryczka_config`,
+  - `insert_study(...)` zapisuje domyślną konfigurację metryczki,
+  - `update_study(...)` normalizuje konfigurację przy zapisie.
+- `db_jst_utils.py`:
+  - migracja schematu rozszerza także tabelę `studies` o:
+    - `metryczka_config`,
+    - `metryczka_config_version`.
+- Test techniczny:
+  - `python -m py_compile app.py db_utils.py db_jst_utils.py metryczka_config.py` (OK).

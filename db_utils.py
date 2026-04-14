@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 import streamlit as st
 from supabase import create_client, Client
+from metryczka_config import default_personal_metryczka_config, normalize_personal_metryczka_config
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Łagodne importy z polish.py (fallbacki jeśli czegoś brak)
@@ -162,7 +163,14 @@ def fetch_studies(sb: Client) -> List[Dict]:
         .order("created_at", desc=True)
         .execute()
     )
-    return res.data or []
+    out: List[Dict[str, Any]] = []
+    for row in (res.data or []):
+        rec = dict(row)
+        cfg = normalize_personal_metryczka_config(rec.get("metryczka_config"))
+        rec["metryczka_config"] = cfg
+        rec["metryczka_config_version"] = int(cfg.get("version") or 1)
+        out.append(rec)
+    return out
 
 
 def insert_study(sb: Client, payload: Dict) -> Dict:
@@ -170,6 +178,8 @@ def insert_study(sb: Client, payload: Dict) -> Dict:
     Jeśli DB zwróci inny slug (np. trigger), spróbuj od razu przestawić na podany."""
     desired_slug = (payload.get("slug") or "").strip()
     payload = _attach_inflections_for_insert(payload.copy())
+    raw_metryczka = payload.get("metryczka_config")
+    cfg_metryczka = normalize_personal_metryczka_config(raw_metryczka)
     now_iso = _utc_now_iso()
     payload.setdefault("study_status", "active")
     payload.setdefault("status_changed_at", now_iso)
@@ -178,6 +188,8 @@ def insert_study(sb: Client, payload: Dict) -> Dict:
     payload.setdefault("survey_notify_email", None)
     payload.setdefault("survey_notify_last_count", 0)
     payload.setdefault("survey_notify_last_sent_at", None)
+    payload["metryczka_config"] = cfg_metryczka if raw_metryczka is not None else default_personal_metryczka_config()
+    payload.setdefault("metryczka_config_version", int(cfg_metryczka.get("version") or 1))
 
     ins = sb.table("studies").insert(payload).execute()
     if not ins.data:
@@ -214,10 +226,19 @@ def update_study(sb: Client, study_id: str, payload: Dict) -> Dict:
     if not (upd.get("slug") or "").strip():
         upd.pop("slug", None)
 
+    if "metryczka_config" in upd:
+        cfg = normalize_personal_metryczka_config(upd.get("metryczka_config"))
+        upd["metryczka_config"] = cfg
+        upd["metryczka_config_version"] = int(cfg.get("version") or 1)
+
     sb.table("studies").update(upd).eq("id", study_id).execute()
     res = sb.table("studies").select("*").eq("id", study_id).limit(1).execute()
     if res.data:
-        return res.data[0]
+        rec = dict(res.data[0])
+        cfg = normalize_personal_metryczka_config(rec.get("metryczka_config"))
+        rec["metryczka_config"] = cfg
+        rec["metryczka_config_version"] = int(cfg.get("version") or 1)
+        return rec
     raise RuntimeError("Update failed (no data returned).")
 
 

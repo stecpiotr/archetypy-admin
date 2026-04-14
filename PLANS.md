@@ -2005,3 +2005,41 @@ Wynik:
   - strategia spójności i kolejność wdrożenia kolejnych etapów.
 - Smoke-check:
   - `python -m py_compile db_jst_utils.py metryczka_config.py app.py` (OK).
+
+### Hotfix H-062 [DONE]
+Temat: Osobny kafelek `Metryczka` + edytor metryczki dla JST i badań personalnych.
+Kryteria ukończenia:
+1. W panelach `Badania personalne` i `Badania mieszkańców` jest osobny kafelek `🧾 Metryczka` (nie w `⚙️ Ustawienia ankiety`).
+2. Dla wybranego badania można edytować 5 pytań rdzeniowych metryczki (treść + odpowiedzi + kodowanie odpowiedzi).
+3. Można dodać pytanie metryczkowe dodatkowe z polami:
+   - `Pytanie`,
+   - `Kodowanie`,
+   - `Odpowiedzi` + `Kodowanie` odpowiedzi.
+4. Konfiguracja zapisuje się per badanie dla JST i personalnych.
+Pierwszy krok wykonawczy:
+- dodać widoki `jst_metryczka_view` i `personal_metryczka_view`, podpiąć kafelki/routing oraz rozszerzyć model danych `studies`.
+Wynik:
+- `app.py`:
+  - dodano osobne kafelki `🧾 Metryczka` w `home_jst_view` i `home_personal_view`,
+  - dodano routing widoków:
+    - `jst_metryczka_view`,
+    - `personal_metryczka_view`,
+  - dodano wspólny edytor metryczki:
+    - 5 pytań rdzeniowych (stałe kodowanie kolumn),
+    - dynamiczne dodawanie/usuwanie pytań dodatkowych,
+    - edycja treści pytań i tabel odpowiedzi (`Odpowiedź` + `Kodowanie`),
+    - walidacja konfiguracji przed zapisem.
+- `metryczka_config.py`:
+  - dodano aliasy dla badań personalnych:
+    - `default_personal_metryczka_config`,
+    - `normalize_personal_metryczka_config`.
+- `db_utils.py`:
+  - `fetch_studies(...)` zwraca znormalizowaną konfigurację metryczki,
+  - `insert_study(...)` ustawia domyślną metryczkę personalną,
+  - `update_study(...)` normalizuje `metryczka_config` przy zapisie.
+- `db_jst_utils.py`:
+  - `ensure_jst_schema()` rozszerza tabelę `studies` o:
+    - `metryczka_config JSONB`,
+    - `metryczka_config_version INTEGER`.
+- Smoke-check:
+  - `python -m py_compile app.py db_utils.py db_jst_utils.py metryczka_config.py` (OK).

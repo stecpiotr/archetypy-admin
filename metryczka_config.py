@@ -106,6 +106,10 @@ def default_jst_metryczka_config() -> Dict[str, Any]:
     }
 
 
+def default_personal_metryczka_config() -> Dict[str, Any]:
+    return default_jst_metryczka_config()
+
+
 def _safe_text(value: Any, fallback: str = "") -> str:
     txt = str(value or "").strip()
     return txt if txt else fallback
@@ -237,6 +241,10 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
         "version": version,
         "questions": normalized_questions,
     }
+
+
+def normalize_personal_metryczka_config(raw: Any) -> Dict[str, Any]:
+    return normalize_jst_metryczka_config(raw)
 
 
 def metryczka_questions(config: Any) -> List[Dict[str, Any]]:
