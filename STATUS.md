@@ -1557,3 +1557,27 @@
   - `Łączna liczba wypełnionych ankiet dla tego badania to: {N}.`
 - Test techniczny:
   - `python -m py_compile app.py db_jst_utils.py db_utils.py` (OK).
+
+### Zrobione w Hotfix H-060 (2026-04-14, copy + natychmiastowość powiadomień + klawiatura JST)
+- `archetypy-admin/app.py`:
+  - poprawiono opis badania używany w mailach:
+    - personalne: `archetypu {imię i nazwisko w dopełniaczu} ({miasto})`,
+    - JST: `mieszkańców {nazwa JST w dopełniaczu}`,
+  - dzięki temu:
+    - tytuł personalny ma formę `Nowa odpowiedź w badaniu archetypu ...`,
+    - tytuł JST ma formę `Nowa odpowiedź w badaniu mieszkańców ...`,
+    - treść maila ma analogicznie poprawione formy.
+  - dispatcher notyfikacji dostał tryb pracy w tle:
+    - uruchamiany raz przez `@st.cache_resource`,
+    - działa cyklicznie w osobnym wątku (`survey-notify-dispatcher`),
+    - nie wymaga ręcznego odświeżenia panelu, aby wysłać powiadomienie po nowej odpowiedzi.
+- `archetypy-ankieta/src/JstSurvey.tsx`:
+  - dodano desktopowe skróty klawiaturowe:
+    - `Enter` = przejście dalej / wyślij,
+    - `ArrowRight` = przejście dalej,
+    - `ArrowLeft` = cofnięcie (`Wstecz`) przy `allowBack`,
+  - skróty są blokowane, gdy fokus jest w polu edycji (`input`, `textarea`, `select`), żeby nie kolidować z wpisywaniem danych.
+- Testy techniczne:
+  - `python -m py_compile app.py db_jst_utils.py db_utils.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

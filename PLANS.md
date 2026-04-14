@@ -1946,3 +1946,32 @@ Wynik:
     - po sukcesie aktualizuje `survey_notify_last_count` i `survey_notify_last_sent_at`.
 - Smoke-check:
   - `python -m py_compile app.py db_jst_utils.py db_utils.py` (OK).
+
+### Hotfix H-060 [DONE]
+Temat: Korekta treści powiadomień + natychmiastowość wysyłki + skróty klawiaturowe w ankiecie JST.
+Kryteria ukończenia:
+1. Powiadomienie nie wymaga ręcznego odświeżania panelu / ponownego logowania.
+2. Personalne: tytuł i treść używają poprawnej formy (`archetypu {imię i nazwisko w dopełniaczu}`).
+3. JST: tytuł i treść używają poprawnej formy (`mieszkańców {nazwa JST w dopełniaczu}`).
+4. Ankieta JST (`jst.badania.pro`) wspiera desktopowe skróty klawiaturowe:
+   - `Enter` = `Przejdź dalej` / `Wyślij`,
+   - `ArrowRight` = dalej,
+   - `ArrowLeft` = wstecz (jeśli wstecz włączone).
+Pierwszy krok wykonawczy:
+- przebudować dispatcher powiadomień w `app.py` na pętlę w tle + skorygować formatowanie etykiet badania i dodać keydown handler do `JstSurvey.tsx`.
+Wynik:
+- `app.py`:
+  - powiadomienia działają przez dispatcher w tle uruchamiany raz per proces (`@st.cache_resource` + thread),
+  - usunięto zależność od ręcznego odświeżenia panelu do wysłania alertu,
+  - poprawiono składnię treści i tytułów:
+    - personalne: `... w badaniu archetypu {imię+nazwisko gen} ({miasto})`,
+    - JST: `... w badaniu mieszkańców {JST w dopełniaczu}`.
+- `archetypy-ankieta/src/JstSurvey.tsx`:
+  - dodano obsługę klawiatury na desktopie:
+    - `Enter` i `ArrowRight` przechodzą do kolejnego kroku (z walidacją jak przy kliknięciu),
+    - `ArrowLeft` uruchamia `Wstecz` (z poszanowaniem `allowBack`),
+    - skróty nie działają podczas focusu w polach `input/textarea/select`, żeby nie psuć wpisywania danych.
+- Smoke-check:
+  - `python -m py_compile app.py db_jst_utils.py db_utils.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Tuple, Optional
 import contextlib
 from datetime import datetime, timedelta, timezone
+import threading
+import time
 import warnings
 import re
 import html
@@ -946,24 +948,25 @@ def _normalize_notify_email(raw: Any) -> str:
     return email
 
 
-def _survey_notify_title(study: Dict[str, Any], *, kind: str) -> str:
+def _survey_notify_descriptor(study: Dict[str, Any], *, kind: str) -> str:
     if kind == "jst":
-        full_nom = str(study.get("jst_full_nom") or "").strip()
-        if full_nom:
-            return full_nom
-        fallback = f"{str(study.get('jst_type') or '').title()} {str(study.get('jst_name') or '').strip()}".strip()
-        return fallback or "badaniu mieszkańców"
+        full_gen = str(study.get("jst_full_gen") or "").strip()
+        if not full_gen:
+            full_gen = str(study.get("jst_full_nom") or "").strip()
+        if not full_gen:
+            full_gen = f"{str(study.get('jst_type') or '').title()} {str(study.get('jst_name') or '').strip()}".strip()
+        return f"mieszkańców {full_gen}".strip() if full_gen else "mieszkańców tego badania"
 
-    first = str(study.get("first_name_nom") or study.get("first_name") or "").strip()
-    last = str(study.get("last_name_nom") or study.get("last_name") or "").strip()
+    first_gen = str(study.get("first_name_gen") or study.get("first_name_nom") or study.get("first_name") or "").strip()
+    last_gen = str(study.get("last_name_gen") or study.get("last_name_nom") or study.get("last_name") or "").strip()
     city = str(study.get("city") or "").strip()
-    base = f"{first} {last}".strip()
-    if base and city:
-        return f"{base} ({city})"
-    if base:
-        return base
-    slug = str(study.get("slug") or "").strip()
-    return f"/{slug}" if slug else "badaniu personalnym"
+    person = f"{first_gen} {last_gen}".strip()
+    if person and city:
+        person = f"{person} ({city})"
+    if not person:
+        slug = str(study.get("slug") or "").strip()
+        person = f"/{slug}" if slug else "tej osoby"
+    return f"archetypu {person}".strip()
 
 
 def _survey_public_url(slug: str, *, kind: str) -> str:
@@ -975,15 +978,15 @@ def _survey_public_url(slug: str, *, kind: str) -> str:
     return f"{base}/{clean_slug}" if clean_slug else base
 
 
-def _survey_notify_body(study_title: str, survey_url: str, total_count: int) -> str:
+def _survey_notify_body(study_descriptor: str, survey_url: str, total_count: int) -> str:
     safe_count = max(0, int(total_count or 0))
     return (
-        f"Została udzielona odpowiedź w badaniu {study_title}, dostępnym pod adresem {survey_url}.\n\n"
+        f"Została udzielona odpowiedź w badaniu {study_descriptor}, dostępnym pod adresem {survey_url}.\n\n"
         f"Łączna liczba wypełnionych ankiet dla tego badania to: {safe_count}."
     )
 
 
-def _send_response_notify_email(*, to_email: str, study_title: str, survey_url: str, total_count: int) -> Tuple[bool, str]:
+def _send_response_notify_email(*, to_email: str, study_descriptor: str, survey_url: str, total_count: int) -> Tuple[bool, str]:
     try:
         host, port, user, pwd, secure, from_email, from_name = _email_env()
     except Exception as exc:
@@ -997,8 +1000,8 @@ def _send_response_notify_email(*, to_email: str, study_title: str, survey_url: 
         from_email=from_email,
         from_name=from_name,
         to_email=to_email,
-        subject=f"Nowa odpowiedź w badaniu {study_title}",
-        text=_survey_notify_body(study_title, survey_url, total_count),
+        subject=f"Nowa odpowiedź w badaniu {study_descriptor}",
+        text=_survey_notify_body(study_descriptor, survey_url, total_count),
     )
     return bool(ok), str(err or "")
 
@@ -1046,11 +1049,11 @@ def _dispatch_personal_response_notifications() -> None:
                 except Exception:
                     pass
             continue
-        study_title = _survey_notify_title(study, kind="personal")
+        study_descriptor = _survey_notify_descriptor(study, kind="personal")
         survey_url = _survey_public_url(slug, kind="personal")
         ok, _err = _send_response_notify_email(
             to_email=notify_email,
-            study_title=study_title,
+            study_descriptor=study_descriptor,
             survey_url=survey_url,
             total_count=current_count,
         )
@@ -1092,11 +1095,11 @@ def _dispatch_jst_response_notifications() -> None:
                 except Exception:
                     pass
             continue
-        study_title = _survey_notify_title(study, kind="jst")
+        study_descriptor = _survey_notify_descriptor(study, kind="jst")
         survey_url = _survey_public_url(slug, kind="jst")
         ok, _err = _send_response_notify_email(
             to_email=notify_email,
-            study_title=study_title,
+            study_descriptor=study_descriptor,
             survey_url=survey_url,
             total_count=current_count,
         )
@@ -1113,8 +1116,6 @@ def _dispatch_jst_response_notifications() -> None:
 
 
 def _run_response_notifications_dispatcher() -> None:
-    if not logged_in():
-        return
     now_utc = datetime.now(timezone.utc)
     last_run = st.session_state.get("_notify_dispatch_last_run_utc")
     if isinstance(last_run, datetime):
@@ -1129,6 +1130,41 @@ def _run_response_notifications_dispatcher() -> None:
     except Exception:
         # Dispatcher nie może blokować panelu.
         pass
+
+
+def _notification_dispatcher_loop(poll_seconds: int) -> None:
+    interval = max(5, int(poll_seconds or 5))
+    while True:
+        try:
+            if _ensure_jst_schema_initialized():
+                _dispatch_personal_response_notifications()
+                _dispatch_jst_response_notifications()
+        except Exception:
+            # Pętla nie może się wywrócić przez chwilową niedostępność DB/SMTP.
+            pass
+        time.sleep(interval)
+
+
+@st.cache_resource
+def _start_notification_dispatcher_background() -> Dict[str, Any]:
+    enabled_raw = st.secrets.get("SURVEY_NOTIFY_BACKGROUND_ENABLED", True)
+    enabled = _bool_from_any(enabled_raw, True)
+    poll_raw = st.secrets.get("SURVEY_NOTIFY_POLL_SECONDS", 5)
+    try:
+        poll_seconds = max(5, int(poll_raw or 5))
+    except Exception:
+        poll_seconds = 5
+    if not enabled:
+        return {"enabled": False, "poll_seconds": poll_seconds}
+
+    worker = threading.Thread(
+        target=_notification_dispatcher_loop,
+        args=(poll_seconds,),
+        daemon=True,
+        name="survey-notify-dispatcher",
+    )
+    worker.start()
+    return {"enabled": True, "poll_seconds": poll_seconds}
 
 
 def _scheduled_survey_transition_updates(study: Dict[str, Any], *, kind: str, now_utc: Optional[datetime] = None) -> Dict[str, Any]:
@@ -7237,7 +7273,9 @@ def send_link_view() -> None:
 # ───────────────────────── routing ─────────────────────────
 if "view" not in st.session_state:
     st.session_state["view"] = "login"
-_run_response_notifications_dispatcher()
+_notify_bg_meta = _start_notification_dispatcher_background()
+if not bool((_notify_bg_meta or {}).get("enabled")):
+    _run_response_notifications_dispatcher()
 render_build_badge()
 with st.sidebar:
     if logged_in():

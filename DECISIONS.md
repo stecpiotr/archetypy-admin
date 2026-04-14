@@ -1451,3 +1451,29 @@ Decyzja:
 Uzasadnienie:
 - Ankiety publiczne zapisują odpowiedzi bezpośrednio przez RPC do bazy, więc najbezpieczniej było dołożyć mechanizm monitorowania po stronie panelu administracyjnego bez ingerencji w frontendowe flow zapisu.
 - Baseline eliminuje ryzyko masowej wysyłki „wstecznej” przy pierwszym uruchomieniu opcji.
+
+### D-163: Dispatcher notyfikacji działa jako pętla w tle procesu panelu
+Decyzja:
+- Notyfikacje po nowych odpowiedziach uruchamiamy w osobnym wątku tła (`survey-notify-dispatcher`), startowanym jednokrotnie przez `@st.cache_resource`.
+- Fallback ręcznego dispatchera zostaje tylko gdy background jest wyłączony przez sekret.
+Uzasadnienie:
+- Sam dispatch uruchamiany wyłącznie przy interakcji UI (rerun Streamlit) powodował opóźnienie: mail pojawiał się dopiero po odświeżeniu panelu / ponownym logowaniu.
+- Wątek cykliczny eliminuje ten efekt i umożliwia wysyłkę bez ręcznego triggera w UI.
+
+### D-164: Treść i tytuł notyfikacji muszą używać jawnych form domenowych
+Decyzja:
+- Personalne: w copy notyfikacji używamy formy `archetypu {imię i nazwisko w dopełniaczu} ({miasto})`.
+- JST: w copy notyfikacji używamy formy `mieszkańców {nazwa JST w dopełniaczu}`.
+Uzasadnienie:
+- User zgłosił nienaturalne i merytorycznie niespójne copy (`Miłosław Mirosław`, `Gmina Masoneria` bez kontekstu badania mieszkańców).
+- Poprawa domyka spójność językową i kontekst raportowy.
+
+### D-165: Ankieta JST dostaje desktopowe skróty klawiaturowe analogiczne do ankiety personalnej
+Decyzja:
+- W `JstSurvey.tsx`:
+  - `Enter` i `ArrowRight` wykonują akcję `dalej`/`wyślij` z pełną walidacją bieżącego kroku,
+  - `ArrowLeft` wykonuje `Wstecz` tylko gdy `allowBack`,
+  - skróty są wyłączone przy focusie w `input/textarea/select`.
+Uzasadnienie:
+- User oczekuje spójnej ergonomii klawiatury między `archetypy.badania.pro` i `jst.badania.pro`.
+- Blokada skrótów w polach edycyjnych zapobiega przypadkowym przejściom podczas wpisywania tekstu.
