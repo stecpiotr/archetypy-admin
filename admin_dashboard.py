@@ -2717,13 +2717,23 @@ def ap_section_heading(
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
 
 @st.cache_data
-def load_base_arche_img():
-    p = Path(__file__).with_name("assets").joinpath("archetype_wheel.png")
-    return Image.open(p).convert("RGBA")
+def load_base_arche_img(gender_code: str = "M"):
+    assets_dir = Path(__file__).with_name("assets")
+    g = normalize_gender(gender_code)
+    candidates = (
+        ["archetype_wheel_female.png", "archetype_wheel.png"]
+        if g == "K"
+        else ["archetype_wheel_male.png", "archetype_wheel.png"]
+    )
+    for name in candidates:
+        p = assets_dir.joinpath(name)
+        if p.exists():
+            return Image.open(p).convert("RGBA")
+    raise FileNotFoundError(f"Brak pliku koła archetypów. Szukano: {candidates}")
 
 
-def mask_for(idx, color):
-    base = load_base_arche_img()
+def mask_for(idx, color, gender_code: str = "M"):
+    base = load_base_arche_img(gender_code)
     w, h = base.size
     cx, cy = w//2, h//2
     rad = w//2
@@ -2734,22 +2744,22 @@ def mask_for(idx, color):
     draw.pieslice([cx-rad, cy-rad, cx+rad, cy+rad], start, end, fill=color)
     return mask
 
-def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None):
-    base = load_base_arche_img().copy()
+def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None, gender_code: str = "M"):
+    base = load_base_arche_img(gender_code).copy()
 
     # Najpierw poboczny (żeby nakryło go potem żółte/czerwone, jeśli overlap)
     if idx_supplement is not None and idx_supplement not in [idx_main, idx_aux] and idx_supplement < 12:
-        mask_supplement = mask_for(idx_supplement, (64,185,0,140))  # zielony półtransparentny
+        mask_supplement = mask_for(idx_supplement, (64,185,0,140), gender_code=gender_code)  # zielony półtransparentny
         base.alpha_composite(mask_supplement)
 
     # Potem wspierający
     if idx_aux is not None and idx_aux != idx_main and idx_aux < 12:
-        mask_aux = mask_for(idx_aux, (255,210,47,140))  # żółty
+        mask_aux = mask_for(idx_aux, (255,210,47,140), gender_code=gender_code)  # żółty
         base.alpha_composite(mask_aux)
 
     # Na końcu główny (przykrywa wszystko)
     if idx_main is not None:
-        mask_main = mask_for(idx_main, (255,0,0,140))  # czerwony
+        mask_main = mask_for(idx_main, (255,0,0,140), gender_code=gender_code)  # czerwony
         base.alpha_composite(mask_main)
 
     return base
@@ -2762,18 +2772,25 @@ KOLO_NAMES_ORDER = [
 ANGLE_OFFSET_DEG = -15  # przesunięcie o 2.5 min w lewo (2.5 × 6° = 15°)
 
 @st.cache_data
-def load_axes_wheel_img():
+def load_axes_wheel_img(gender_code: str = "M"):
     base_dir = Path(__file__).with_name("assets")
-    png = base_dir / "archetypy_kolo.png"
-    if png.exists():
-        return Image.open(png).convert("RGBA")
-    svg = base_dir / "archetypy_kolo.svg"
-    if svg.exists():
+    g = normalize_gender(gender_code)
+    candidates = (
+        [("png", "archetypy_kolo_female.png"), ("svg", "archetypy_kolo2.svg"), ("png", "archetypy_kolo.png")]
+        if g == "K"
+        else [("png", "archetypy_kolo.png"), ("svg", "archetypy_kolo2_male.svg"), ("svg", "archetypy_kolo2.svg")]
+    )
+    for ftype, name in candidates:
+        p = base_dir / name
+        if not p.exists():
+            continue
+        if ftype == "png":
+            return Image.open(p).convert("RGBA")
         import cairosvg
         from io import BytesIO
-        buf = BytesIO(cairosvg.svg2png(url=str(svg)))
+        buf = BytesIO(cairosvg.svg2png(url=str(p)))
         return Image.open(buf).convert("RGBA")
-    raise FileNotFoundError("Brak pliku assets/archetypy_kolo.(png|svg)")
+    raise FileNotFoundError(f"Brak pliku koła osi. Szukano: {candidates}")
 
 def _mask_pie_ring(base: Image.Image, idx: int, rgba,
                    r_out_frac=0.39, r_in_frac=0.10):
@@ -2801,9 +2818,9 @@ def _mask_pie_ring(base: Image.Image, idx: int, rgba,
     base.alpha_composite(layer)
     return base
 
-def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None) -> Image.Image:
+def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None, gender_code: str = "M") -> Image.Image:
     """Koło z podświetleniem: zielony (poboczny), żółty (wspierający), czerwony (główny)."""
-    img = load_axes_wheel_img().copy()
+    img = load_axes_wheel_img(gender_code).copy()
 
     def idx(n):
         try:
@@ -8044,11 +8061,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None
                         )
                         try:
-                            kola_img = compose_archetype_highlight(idx_main_wheel, idx_aux_wheel, idx_supp_wheel)
+                            kola_img = compose_archetype_highlight(
+                                idx_main_wheel,
+                                idx_aux_wheel,
+                                idx_supp_wheel,
+                                gender_code=report_gender_code,
+                            )
                             if not isinstance(kola_img, Image.Image):
                                 raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                         except Exception:
-                            kola_img = load_base_arche_img()
+                            kola_img = load_base_arche_img(gender_code=report_gender_code)
                         st.image(
                             kola_img,
                             caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
@@ -8073,11 +8095,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg, aux_avg] else None
                             )
                             try:
-                                kola_img = compose_archetype_highlight(idx_main_wheel, idx_aux_wheel, idx_supp_wheel)
+                                kola_img = compose_archetype_highlight(
+                                    idx_main_wheel,
+                                    idx_aux_wheel,
+                                    idx_supp_wheel,
+                                    gender_code=report_gender_code,
+                                )
                                 if not isinstance(kola_img, Image.Image):
                                     raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                             except Exception:
-                                kola_img = load_base_arche_img()
+                                kola_img = load_base_arche_img(gender_code=report_gender_code)
                             st.image(
                                 kola_img,
                                 caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
@@ -8117,7 +8144,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     )
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
-                    kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
+                    kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
                     st.image(kolo_axes_img, use_column_width=True)
                 else:
                     k_pad_l, k_mid, k_pad_r = st.columns([0.09, 0.88, 0.03], gap="small")
@@ -8133,7 +8160,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         )
                         aux = aux_avg if aux_avg != main_avg else None
                         supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
-                        kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
+                        kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
                         st.image(kolo_axes_img, width=axes_img_width)
 
             segment_profile_png_path = make_segment_profile_wheel_png(
@@ -8227,7 +8254,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 # 2) Koło osi potrzeb → PNG
                 aux = aux_avg if aux_avg != main_avg else None
                 supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
-                kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp)
+                kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
                 kolo_axes_img.save("axes_wheel.png")
 
                 # 3) Dominujący pierścień koloru → SVG/PNG
@@ -8263,7 +8290,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 idx_aux = archetype_name_to_img_idx(aux_avg) if aux_avg != main_avg else None
                 idx_supp = archetype_name_to_img_idx(supp_avg) if supp_avg not in [main_avg,
                                                                                    aux_avg] else None
-                panel_img = compose_archetype_highlight(idx_main, idx_aux, idx_supp)
+                panel_img = compose_archetype_highlight(
+                    idx_main,
+                    idx_aux,
+                    idx_supp,
+                    gender_code=report_gender_code,
+                )
                 panel_img_path = f"panel_{(main_avg or '').lower()}_{(aux_avg or '').lower()}_{(supp_avg or '').lower()}.png"
                 panel_img.save(panel_img_path)
 

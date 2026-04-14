@@ -5,9 +5,9 @@
    viewBox="0 0 1200 1200"
    version="1.1"
    id="svg106"
-   sodipodi:docname="archetypy_kolo2.svg"
+   sodipodi:docname="archetypy_kolo.svg"
    inkscape:version="1.4 (86a8ad7, 2024-10-11)"
-   inkscape:export-filename="archetype_wheel.png"
+   inkscape:export-filename="archetypy_kolo.png"
    inkscape:export-xdpi="96"
    inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
@@ -25,8 +25,8 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="1.3258252"
-     inkscape:cx="566.06256"
-     inkscape:cy="724.45448"
+     inkscape:cx="817.22689"
+     inkscape:cy="430.29805"
      inkscape:window-width="1920"
      inkscape:window-height="1129"
      inkscape:window-x="2552"
@@ -653,12 +653,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text62"
        style="font-size:21.3333px"
-       transform="translate(0.54903312,6.6366133)"><textPath
+       transform="translate(9.6,14.933333)"><textPath
          href="#edge4"
          startOffset="50%"
          text-anchor="middle"
          id="textPath62"
-         style="font-size:21.3333px">TOWARZYSZKA</textPath></text>
+         style="font-size:21.3333px">TOWARZYSZ</textPath></text>
     <path
        class="slice"
        d="M 896.985,896.985 A 420,420 0 0 1 708.704,1005.689 L 656.940,812.504 A 220,220 0 0 0 755.563,755.563 Z"
@@ -687,12 +687,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text65"
        style="font-size:21.3333px"
-       transform="translate(5.3333333,30.491506)"><textPath
+       transform="translate(5.3333333,32)"><textPath
          href="#edge5"
          startOffset="50%"
          text-anchor="middle"
          id="textPath65"
-         style="font-size:21.3333px">NIEWINNA</textPath></text>
+         style="font-size:21.3333px">NIEWINNY</textPath></text>
     <path
        class="slice"
        d="M 491.49911,1006.577 A 420,420 0 0 1 303.21825,897.873 L 444.63969,756.45188 a 220,220 0 0 0 98.62298,56.94 z"
@@ -753,12 +753,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text72"
        style="font-size:21.3333px"
-       transform="rotate(180,384.85598,848.30723)"><textPath
+       transform="rotate(180,380.3305,854.3412)"><textPath
          href="#edge7"
          startOffset="50%"
          text-anchor="middle"
          id="textPath72"
-         style="font-size:21.3333px">MĘDRCZYNI</textPath></text>
+         style="font-size:21.3333px">MĘDRZEC</textPath></text>
     <path
        class="slice"
        d="M 303.015,896.985 A 420,420 0 0 1 194.311,708.704 L 387.496,656.940 A 220,220 0 0 0 444.437,755.563 Z"
@@ -853,12 +853,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text85"
        style="font-size:21.3333px"
-       transform="rotate(180,296.27003,703.264)"><textPath
+       transform="rotate(180,289.10468,707.41236)"><textPath
          href="#edge8"
          startOffset="50%"
          text-anchor="middle"
          id="textPath85"
-         style="font-size:21.3333px">CZARODZIEJKA</textPath></text>
+         style="font-size:21.3333px">CZARODZIEJ</textPath></text>
     <path
        class="slice"
        d="m 192.84656,706.6381 a 420,420 0 0 1 1.63692,-217.40196 l 192.79081,53.21719 a 220,220 0 0 0 -0.85833,113.87729 z"
@@ -925,12 +925,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text93"
        style="font-size:21.3333px"
-       transform="rotate(180,352.14581,383.1917)"><textPath
+       transform="rotate(180,343.84909,379.04334)"><textPath
          href="#edge10"
          startOffset="50%"
          text-anchor="middle"
          id="textPath93"
-         style="font-size:21.3333px">TWÓRCZYNI</textPath></text>
+         style="font-size:21.3333px">TWÓRCA</textPath></text>
     <path
        class="slice"
        d="m 302.21499,301.14833 a 420,420 0 0 1 188.281,-108.704 l 51.764,193.185 a 220,220 0 0 0 -98.623,56.941 z"
@@ -978,43 +978,43 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
     <text
        class="nameEdge"
        id="text69"
-       transform="rotate(180,538.07172,923.684)"
+       transform="rotate(180,533.92336,930.84934)"
        style="font-size:21.3333px"><textPath
          href="#edge6"
          startOffset="50%"
          text-anchor="middle"
          id="textPath69"
-         style="font-size:21.3333px">WŁADCZYNI</textPath></text>
+         style="font-size:21.3333px">WŁADCA</textPath></text>
     <text
        class="nameEdge"
        id="text41"
        style="font-size:21.3333px"
-       transform="translate(23.703281,-16.602636)"><textPath
+       transform="translate(32,-30.933333)"><textPath
          href="#edge1"
          startOffset="50%"
          text-anchor="middle"
          id="textPath41"
-         style="font-size:21.3333px">KOMICZKA</textPath></text>
+         style="font-size:21.3333px">BŁAZEN</textPath></text>
     <text
        class="nameEdge"
        id="text90"
        style="font-size:21.3333px"
-       transform="rotate(180,276.63721,537.7166)"><textPath
+       transform="rotate(180,271.7346,536.96235)"><textPath
          href="#edge9"
          startOffset="50%"
          text-anchor="middle"
          id="textPath90"
-         style="font-size:21.3333px">BOHATERKA</textPath></text>
+         style="font-size:21.3333px">BOHATER</textPath></text>
     <text
        class="nameEdge"
        id="text100"
        style="font-size:21.3333px"
-       transform="rotate(180,496.83116,293.97685)"><textPath
+       transform="rotate(180,493.43704,287.94287)"><textPath
          href="#edge11"
          startOffset="50%"
          text-anchor="middle"
          id="textPath100"
-         style="font-size:21.3333px">ODKRYWCZYNI</textPath></text>
+         style="font-size:21.3333px">ODKRYWCA</textPath></text>
     <line
        x1="600"
        y1="600.0506"
@@ -1071,12 +1071,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text44"
        style="font-size:21.3333px"
-       transform="translate(22.270591,-5.6457528)"><textPath
+       transform="translate(24.533333,-6.4)"><textPath
          href="#edge2"
          startOffset="50%"
          text-anchor="middle"
          id="textPath44"
-         style="font-size:21.3333px">KOCHANKA</textPath></text>
+         style="font-size:21.3333px">KOCHANEK</textPath></text>
     <text
        x="600"
        y="1148"
@@ -1131,12 +1131,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text49"
        style="font-size:21.3333px"
-       transform="translate(23.315054,9.2875806)"><textPath
+       transform="translate(38.4,8.5333333)"><textPath
          href="#edge3"
          startOffset="50%"
          text-anchor="middle"
          id="textPath49"
-         style="font-size:21.3333px">OPIEKUNKA</textPath></text>
+         style="font-size:21.3333px">OPIEKUN</textPath></text>
     <text
        xml:space="preserve"
        id="text113"
@@ -1145,12 +1145,12 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text37"
        style="font-size:21.3333px"
-       transform="translate(4.0078499,-1.3189795)"><textPath
+       transform="translate(8.5333333,-18.666666)"><textPath
          href="#edge0"
          startOffset="50%"
          text-anchor="middle"
          id="textPath37"
-         style="font-size:21.3333px">BUNTOWNICZKA</textPath></text>
+         style="font-size:21.3333px">BUNTOWNIK</textPath></text>
     <text
        xml:space="preserve"
        id="text114"

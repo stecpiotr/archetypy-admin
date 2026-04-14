@@ -5,9 +5,9 @@
    viewBox="0 0 1200 1200"
    version="1.1"
    id="svg106"
-   sodipodi:docname="archetypy_kolo2.svg"
+   sodipodi:docname="archetypy_kolo2 - Copy.svg"
    inkscape:version="1.4 (86a8ad7, 2024-10-11)"
-   inkscape:export-filename="archetype_wheel.png"
+   inkscape:export-filename="archetypy_kolo.png"
    inkscape:export-xdpi="96"
    inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
@@ -25,8 +25,8 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="1.3258252"
-     inkscape:cx="566.06256"
-     inkscape:cy="724.45448"
+     inkscape:cx="453.30259"
+     inkscape:cy="490.63783"
      inkscape:window-width="1920"
      inkscape:window-height="1129"
      inkscape:window-x="2552"
@@ -653,7 +653,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text62"
        style="font-size:21.3333px"
-       transform="translate(0.54903312,6.6366133)"><textPath
+       transform="translate(2.0575276,9.6536023)"><textPath
          href="#edge4"
          startOffset="50%"
          text-anchor="middle"
@@ -687,7 +687,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text65"
        style="font-size:21.3333px"
-       transform="translate(5.3333333,30.491506)"><textPath
+       transform="translate(5.3333333,32)"><textPath
          href="#edge5"
          startOffset="50%"
          text-anchor="middle"
@@ -753,7 +753,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text72"
        style="font-size:21.3333px"
-       transform="rotate(180,384.85598,848.30723)"><textPath
+       transform="rotate(180,384.47886,848.68435)"><textPath
          href="#edge7"
          startOffset="50%"
          text-anchor="middle"
@@ -853,7 +853,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text85"
        style="font-size:21.3333px"
-       transform="rotate(180,296.27003,703.264)"><textPath
+       transform="rotate(180,296.27003,704.77249)"><textPath
          href="#edge8"
          startOffset="50%"
          text-anchor="middle"
@@ -925,7 +925,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text93"
        style="font-size:21.3333px"
-       transform="rotate(180,352.14581,383.1917)"><textPath
+       transform="rotate(180,350.26019,382.81458)"><textPath
          href="#edge10"
          startOffset="50%"
          text-anchor="middle"
@@ -978,7 +978,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
     <text
        class="nameEdge"
        id="text69"
-       transform="rotate(180,538.07172,923.684)"
+       transform="rotate(180,537.31747,925.19249)"
        style="font-size:21.3333px"><textPath
          href="#edge6"
          startOffset="50%"
@@ -989,7 +989,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text41"
        style="font-size:21.3333px"
-       transform="translate(23.703281,-16.602636)"><textPath
+       transform="translate(24.457528,-18.11113)"><textPath
          href="#edge1"
          startOffset="50%"
          text-anchor="middle"
@@ -999,7 +999,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text90"
        style="font-size:21.3333px"
-       transform="rotate(180,276.63721,537.7166)"><textPath
+       transform="rotate(180,275.50584,536.96235)"><textPath
          href="#edge9"
          startOffset="50%"
          text-anchor="middle"
@@ -1009,7 +1009,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text100"
        style="font-size:21.3333px"
-       transform="rotate(180,496.83116,293.97685)"><textPath
+       transform="rotate(180,495.69979,291.33698)"><textPath
          href="#edge11"
          startOffset="50%"
          text-anchor="middle"
@@ -1071,7 +1071,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text44"
        style="font-size:21.3333px"
-       transform="translate(22.270591,-5.6457528)"><textPath
+       transform="translate(24.533333,-6.4)"><textPath
          href="#edge2"
          startOffset="50%"
          text-anchor="middle"
@@ -1131,7 +1131,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text49"
        style="font-size:21.3333px"
-       transform="translate(23.315054,9.2875806)"><textPath
+       transform="translate(27.086291,7.7790861)"><textPath
          href="#edge3"
          startOffset="50%"
          text-anchor="middle"
@@ -1145,7 +1145,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text37"
        style="font-size:21.3333px"
-       transform="translate(4.0078499,-1.3189795)"><textPath
+       transform="translate(4.7620971,-2.0732267)"><textPath
          href="#edge0"
          startOffset="50%"
          text-anchor="middle"
