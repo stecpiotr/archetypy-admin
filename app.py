@@ -2571,6 +2571,10 @@ def _metryczka_scroll_target_key(kind: str, study_key: str) -> str:
     return f"{kind}_metryczka_editor_scroll_target_{study_key}"
 
 
+def _metryczka_scroll_nonce_key(kind: str, study_key: str) -> str:
+    return f"{kind}_metryczka_editor_scroll_nonce_{study_key}"
+
+
 
 def _metryczka_anchor_id(kind: str, study_key: str, ui_key: str) -> str:
     raw = f"metryczka-{kind}-{study_key}-{ui_key}"
@@ -2786,6 +2790,7 @@ def _validate_metryczka_before_save(raw_cfg: Dict[str, Any]) -> Tuple[bool, str]
 def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, Any]) -> Dict[str, Any]:
     state_key = _metryczka_editor_state_key(kind, study_key)
     scroll_target_key = _metryczka_scroll_target_key(kind, study_key)
+    scroll_nonce_key = _metryczka_scroll_nonce_key(kind, study_key)
     widget_prefix = _metryczka_editor_widget_prefix(kind, study_key)
     normalized_cfg = _metryczka_normalize_config(kind, current_cfg)
 
@@ -3030,6 +3035,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.session_state[paste_toggle_key] = False
                         st.session_state[paste_clear_key] = True
                         st.session_state[scroll_target_key] = anchor_id
+                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
                         st.rerun()
                 with b2:
                     if st.button(
@@ -3040,6 +3046,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.session_state[paste_toggle_key] = False
                         st.session_state[paste_clear_key] = True
                         st.session_state[scroll_target_key] = anchor_id
+                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
                         st.rerun()
 
         final_code = str(code_value or "").strip().upper()
@@ -3086,15 +3093,20 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         st.session_state[scroll_target_key] = _metryczka_anchor_id(
             kind, study_key, str(new_q.get("_ui_key") or "")
         )
+        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
         st.rerun()
 
     scroll_target = str(st.session_state.pop(scroll_target_key, "") or "").strip()
+    scroll_nonce = int(st.session_state.pop(scroll_nonce_key, 0) or 0)
     if scroll_target:
+        if scroll_nonce <= 0:
+            scroll_nonce = int(time.time() * 1_000_000)
         html_component(
             f"""
             <script>
             (function(){{
               const id = {json.dumps(scroll_target)};
+              const runId = {json.dumps(str(scroll_nonce))};
 
               const findTarget = () => {{
                 let win = window;
@@ -3121,14 +3133,40 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 if (!found) return false;
                 const hostWin = found.win;
                 const el = found.el;
+                const doc = hostWin.document;
+                const scrollingTargets = [
+                  doc.scrollingElement,
+                  doc.documentElement,
+                  doc.body,
+                  doc.querySelector('section.main'),
+                  doc.querySelector('[data-testid="stAppViewContainer"]'),
+                  doc.querySelector('.block-container')?.parentElement
+                ].filter(Boolean);
                 try {{
                   const rect = el.getBoundingClientRect();
                   const top = Math.max(0, rect.top + hostWin.pageYOffset - Math.round(hostWin.innerHeight * 0.22));
                   hostWin.scrollTo({{ top, behavior: 'auto' }});
+                  for (const tgt of scrollingTargets) {{
+                    try {{
+                      if (tgt === doc.body || tgt === doc.documentElement || tgt === doc.scrollingElement) {{
+                        continue;
+                      }}
+                      const tRect = tgt.getBoundingClientRect();
+                      const relTop = (rect.top - tRect.top) + (tgt.scrollTop || 0) - 24;
+                      if (typeof tgt.scrollTo === 'function') tgt.scrollTo({{ top: Math.max(0, relTop), behavior: 'auto' }});
+                      else tgt.scrollTop = Math.max(0, relTop);
+                    }} catch (e) {{}}
+                  }}
                 }} catch (e) {{
                   try {{ el.scrollIntoView({{ behavior: 'auto', block: 'center' }}); }} catch (e2) {{}}
                 }}
-                try {{ hostWin.location.hash = id; }} catch (e) {{}}
+                try {{
+                  const hashTarget = `#${{id}}`;
+                  if (hostWin.location.hash === hashTarget) {{
+                    hostWin.location.hash = '';
+                  }}
+                  hostWin.location.hash = hashTarget;
+                }} catch (e) {{}}
                 return true;
               }};
 
@@ -3143,6 +3181,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             </script>
             """,
             height=1,
+            key=f"{widget_prefix}scroll_restore_{scroll_nonce}",
         )
 
     return deepcopy(st.session_state.get(state_key) or cfg_out)

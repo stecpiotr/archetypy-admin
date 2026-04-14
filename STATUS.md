@@ -1922,3 +1922,16 @@
   - większa czytelność sekcji końca edytora metryczki.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-085 (2026-04-14, metryczka: stabilizacja pozostawania na edytowanym pytaniu)
+- `archetypy-admin/app.py`:
+  - dodano nonce scrolla (`_metryczka_scroll_nonce_key`) i ustawianie go przy:
+    - `Wstaw`,
+    - `Anuluj`,
+    - `➕ Dodaj pytanie metryczkowe`,
+  - scroll-restore renderowany z unikalnym kluczem komponentu (`key=...scroll_restore_{nonce}`), co wymusza jego świeże wykonanie,
+  - logika scroll-restoru rozszerzona o przewijanie nie tylko `window`, ale też kontenerów przewijania Streamlit.
+- Efekt:
+  - znacząco mniejsze ryzyko skoku do `1. M_PLEC` po edycji pytania niżej na liście (np. `7. M_POGLADY`).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

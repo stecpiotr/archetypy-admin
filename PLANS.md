@@ -2466,3 +2466,22 @@ Wynik:
   - `jst_metryczka_view` i `personal_metryczka_view`: `💾 Zapisz metryczkę` osadzony w prawej kolumnie, z `use_container_width=True`.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-085 [DONE]
+Temat: Metryczka - twarda stabilizacja powrotu scrolla do edytowanego pytania po `Wstaw`/`Dodaj`.
+Kryteria ukończenia:
+1. Po `Wstaw` w `📋 Wklej pytanie i odpowiedzi` użytkownik zostaje na aktualnie edytowanym pytaniu (np. `7. M_POGLADY`), bez skoku do `1. M_PLEC`.
+2. Po `➕ Dodaj pytanie metryczkowe` widok wraca do nowo dodanego pytania, a nie na górę listy.
+3. Mechanizm scrolla uruchamia się niezawodnie także przy powtarzanych akcjach na tym samym pytaniu.
+Pierwszy krok wykonawczy:
+- dodać nonce dla akcji scroll-restoru i wymusić remount skryptu oraz rozszerzyć przewijanie o wewnętrzne kontenery Streamlit.
+Wynik:
+- `app.py` (`_render_metryczka_editor`):
+  - dodano `_metryczka_scroll_nonce_key(...)`,
+  - przy akcjach `Wstaw`, `Anuluj`, `Dodaj pytanie` zapisywany jest `scroll_target` + unikalny `scroll_nonce`,
+  - skrypt scroll-restoru:
+    - renderowany z unikalnym `key` (remount na każdą akcję),
+    - przewija `window` oraz typowe kontenery przewijania Streamlit,
+    - resetuje/ustawia hash kotwicy dla pewniejszego skoku także przy tym samym pytaniu.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

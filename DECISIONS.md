@@ -1763,3 +1763,12 @@ Decyzja:
 - Przycisk `💾 Zapisz metryczkę` renderujemy w prawej kolumnie (JST i personal), jako akcję wykonawczą kończącą edycję.
 Uzasadnienie:
 - Użytkownik oczekuje standardowego układu UX, gdzie finalna akcja potwierdzająca znajduje się po prawej stronie.
+
+### D-195: Scroll-restore metryczki musi być „wymuszony” nonce + remount
+Decyzja:
+- Dla akcji, które mają utrzymać użytkownika na aktualnym pytaniu (`Wstaw`, `Anuluj`, `Dodaj pytanie`), zapisujemy:
+  - `scroll_target`,
+  - unikalny `scroll_nonce`.
+- Komponent JS od przewijania renderujemy z kluczem zależnym od nonce, aby wymusić świeże wykonanie skryptu po każdej akcji.
+Uzasadnienie:
+- W praktyce UI Streamlit potrafi nie odpalić identycznego skryptu przewijania przy kolejnych interakcjach na tym samym pytaniu; nonce+remount usuwa ten problem klasy „zostaję zrzucony na górę”.
