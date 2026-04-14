@@ -2271,6 +2271,21 @@ Wynik:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
 
+### Hotfix H-078 [DONE]
+Temat: Poprawa klejenia krótkich słów — bez sklejania końcówek wyrazów (iPhone single-screen).
+Kryteria ukończenia:
+1. Reguła klejenia krótkich słów działa tylko dla pełnych, osobnych słów.
+2. Nie dochodzi do błędów typu sklejenie końcówki w `można`, które prowadzi do obcinania.
+Pierwszy krok wykonawczy:
+- poprawić regex `SHORT_WORD_GLUE_RE` i sposób podmiany w `withHardSpaces(...)`.
+Wynik:
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - `SHORT_WORD_GLUE_RE` zmieniono z granicy słowa (`\\b...`) na wariant wymagający początku/whitespace (`(^|\\s)...`),
+  - podmiana używa callbacka i zachowuje prefix (`prefix + shortWord + NBSP`).
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### Hotfix H-073 [DONE]
 Temat: Dopieszczenie panelu `Wklej pytanie i odpowiedzi` (format prefill + większe pole + ciaśniejszy podgląd).
 Kryteria ukończenia:
@@ -2340,5 +2355,24 @@ Wynik:
     - właściwy zapis wykonywany jest na kolejnym rerunie po pobraniu zatwierdzonych wartości z edytora,
   - `personal_metryczka_view`:
     - analogiczny mechanizm save-intent i zapis po rerunie.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-079 [DONE]
+Temat: Metryczka — `Wklej pytanie i odpowiedzi` psuło UX i kodowanie.
+Kryteria ukończenia:
+1. Po `Wstaw`/`Anuluj` użytkownik wraca do edytowanego pytania (bez skoku na górę strony).
+2. `Wklej pytanie i odpowiedzi` nie nadpisuje kodowania odpowiedzi (`1,2,3...`) dla pytań custom.
+3. Wklejka modyfikuje tylko treść pytania i listę odpowiedzi.
+Pierwszy krok wykonawczy:
+- dodać kotwice pytania + mechanizm scroll-restoru po rerun oraz zmienić logikę `Wstaw`, aby zachowywała istniejące kody odpowiedzi.
+Wynik:
+- `app.py` (`_render_metryczka_editor`):
+  - dodano kotwicę per pytanie (`_metryczka_anchor_id`) i klucz scroll-target (`_metryczka_scroll_target_key`),
+  - po `Wstaw` i `Anuluj` zapisywany jest target i po rerunie wykonywany auto-scroll do danego pytania,
+  - przy `Wstaw`:
+    - `core`: `code = label` (jak dotychczas),
+    - `custom`: kodowanie jest zachowane z istniejących opcji (najpierw po etykiecie, fallback po indeksie),
+    - usunięto wymuszanie nowych kodów `1..N`.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).

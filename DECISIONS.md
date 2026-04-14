@@ -1651,6 +1651,16 @@ Decyzja:
 Uzasadnienie:
 - User zgłosił, że właśnie to pytanie nadal obcina końcówkę; sklejenie tej pary słów wymusza bezpieczniejsze zawinięcie całej końcówki zdania.
 
+### D-187: Reguła „krótkich słów” klei wyłącznie pełne tokeny, nigdy fragmenty końcówek wyrazów
+Decyzja:
+- W `Questionnaire.tsx` zmieniamy `SHORT_WORD_GLUE_RE` z:
+  - `\\b(na|do|...|dla)\\s+`
+  na:
+  - `(^|\\s)(na|do|...|dla)\\s+`
+- Zamiana wykonywana callbackiem zachowuje prefix i dokleja NBSP tylko po pełnym krótkim słowie.
+Uzasadnienie:
+- `\\b` w JS jest ASCII-centryczne i przy polskich znakach mogło błędnie wykrywać granice wewnątrz wyrazów (np. końcówka `...na` w `można`), co tworzyło nienaturalnie nierozdzielne bloki i obcinanie tekstu na iPhone.
+
 ### D-182: Prefill panelu `Wklej pytanie i odpowiedzi` ma być formatem edycyjnym, nie surową listą
 Decyzja:
 - Seed pola `Wklej treść` renderujemy jako:
@@ -1689,3 +1699,14 @@ Decyzja:
 Uzasadnienie:
 - `st.data_editor` potrafi nie zatwierdzić aktywnie edytowanej komórki w tym samym przebiegu, w którym kliknięto przycisk zapisu.
 - `save intent` eliminuje konieczność podwójnego wpisywania kodowania i stabilizuje UX edytora.
+
+### D-188: `Wklej pytanie i odpowiedzi` nie zmienia kodowania custom i ma przywracać pozycję edycji
+Decyzja:
+- W edytorze metryczki operacja `Wklej pytanie i odpowiedzi`:
+  - aktualizuje treść pytania i listę etykiet odpowiedzi,
+  - dla pytań custom zachowuje istniejące kody odpowiedzi (match po etykiecie, fallback po indeksie),
+  - nie generuje nowych kodów `1..N`.
+- Po `Wstaw`/`Anuluj` stosujemy scroll-restore do kotwicy edytowanego pytania.
+Uzasadnienie:
+- User zgłosił krytyczny błąd UX (skok na górę) i błąd merytoryczny (nadpisywanie kodowania), które utrudniały bezpieczną edycję metryczki.
+- Funkcja wklejki ma wspierać treść pytań/odpowiedzi, a nie zmieniać warstwę kodowania danych.

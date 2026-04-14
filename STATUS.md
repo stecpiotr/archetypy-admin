@@ -1784,6 +1784,18 @@
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
 
+### Zrobione w Hotfix H-078 (2026-04-14, poprawa regexu klejenia krótkich słów)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - poprawiono `SHORT_WORD_GLUE_RE`, aby działał wyłącznie na osobnych słowach (`(^|\\s)...`) zamiast łapać fragmenty końcówki wyrazu przez `\\b`.
+  - podmiana krótkich słów realizowana callbackiem:
+    - zachowuje prefix (`początek/whitespace`),
+    - dokleja NBSP tylko po prawidłowo wykrytym, pełnym krótkim słowie.
+- Efekt:
+  - usunięty mechanizm, który mógł tworzyć zbyt długie, nierozdzielne bloki i powodować obcinanie końcówki pytania na iPhone.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### Zrobione w Hotfix H-073 (2026-04-14, metryczka paste: format edycyjny + wyższe pole)
 - `archetypy-admin/app.py`:
   - panel `📋 Wklej pytanie i odpowiedzi` dostał prefill w formacie:
@@ -1829,5 +1841,21 @@
 - Efekt:
   - zniknął objaw „muszę wpisać kodowanie drugi raz”,
   - jedno zapisanie powinno utrwalać bieżące kodowanie.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-079 (2026-04-14, metryczka: scroll po wklejce + brak nadpisywania kodowania)
+- `archetypy-admin/app.py`:
+  - dodano mechanizm „powrotu do edytowanego pytania” po `Wstaw`/`Anuluj` w panelu `Wklej pytanie i odpowiedzi`:
+    - kotwica HTML per pytanie,
+    - zapamiętanie targetu w `session_state`,
+    - auto-scroll po rerunie.
+  - poprawiono `Wstaw`, aby nie zmieniało kodowania odpowiedzi dla pytań custom:
+    - zachowanie kodów po etykiecie,
+    - fallback po indeksie,
+    - brak wymuszenia `1,2,3...`.
+- Efekt:
+  - użytkownik nie jest zrzucany na górę strony po operacji wklejki,
+  - kodowanie odpowiedzi nie jest nadpisywane przez samą operację `Wklej pytanie i odpowiedzi`.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).

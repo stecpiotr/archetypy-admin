@@ -2571,6 +2571,16 @@ def _metryczka_save_intent_key(kind: str, study_key: str) -> str:
     return f"{kind}_metryczka_editor_save_intent_{study_key}"
 
 
+def _metryczka_scroll_target_key(kind: str, study_key: str) -> str:
+    return f"{kind}_metryczka_editor_scroll_target_{study_key}"
+
+
+def _metryczka_anchor_id(kind: str, study_key: str, ui_key: str) -> str:
+    raw = f"metryczka-{kind}-{study_key}-{ui_key}"
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "-", raw).strip("-")
+    return safe or f"metryczka-{kind}"
+
+
 def _metryczka_options_to_df(options: Any) -> pd.DataFrame:
     rows: List[Dict[str, str]] = []
     if isinstance(options, list):
@@ -2775,6 +2785,7 @@ def _validate_metryczka_before_save(raw_cfg: Dict[str, Any]) -> Tuple[bool, str]
 
 def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, Any]) -> Dict[str, Any]:
     state_key = _metryczka_editor_state_key(kind, study_key)
+    scroll_target_key = _metryczka_scroll_target_key(kind, study_key)
     widget_prefix = _metryczka_editor_widget_prefix(kind, study_key)
     normalized_cfg = _metryczka_normalize_config(kind, current_cfg)
 
@@ -2803,6 +2814,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         scope = str(q_dict.get("scope") or "custom").strip().lower()
         is_core = scope == "core"
         ui_key = str(q_dict.get("_ui_key") or f"q_{idx}_{str(q_dict.get('id') or '')}".strip())
+        anchor_id = _metryczka_anchor_id(kind, study_key, ui_key)
         db_column = str(q_dict.get("db_column") or q_dict.get("id") or "").strip().upper()
         if is_core and db_column in _METRY_CORE_IDS:
             qid = db_column
@@ -2811,6 +2823,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         prompt_default = str(q_dict.get("prompt") or "").strip()
         options_default = q_dict.get("options") or []
 
+        st.markdown(f"<div id='{anchor_id}'></div>", unsafe_allow_html=True)
         st.markdown("---")
         h1, h2 = st.columns([0.72, 0.28], gap="small")
         with h1:
@@ -2962,15 +2975,43 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             if parsed_question:
                                 q_item["prompt"] = parsed_question
                             q_scope = str(q_item.get("scope") or "").strip().lower()
-                            q_item["options"] = [
-                                {"label": ans, "code": (ans if q_scope == "core" else str(i + 1))}
-                                for i, ans in enumerate(parsed_answers)
-                            ]
+                            existing_opts_raw = q_item.get("options")
+                            existing_opts: List[Dict[str, str]] = []
+                            if isinstance(existing_opts_raw, list):
+                                for it in existing_opts_raw:
+                                    if not isinstance(it, dict):
+                                        continue
+                                    existing_opts.append(
+                                        {
+                                            "label": str(it.get("label") or "").strip(),
+                                            "code": str(it.get("code") or "").strip(),
+                                        }
+                                    )
+
+                            old_codes_by_label: Dict[str, str] = {}
+                            for opt in existing_opts:
+                                old_label = str(opt.get("label") or "").strip().lower()
+                                old_code = str(opt.get("code") or "").strip()
+                                if old_label and old_code and old_label not in old_codes_by_label:
+                                    old_codes_by_label[old_label] = old_code
+
+                            new_options: List[Dict[str, str]] = []
+                            for i, ans in enumerate(parsed_answers):
+                                if q_scope == "core":
+                                    new_options.append({"label": ans, "code": ans})
+                                    continue
+                                code_existing = old_codes_by_label.get(str(ans).strip().lower(), "")
+                                if (not code_existing) and i < len(existing_opts):
+                                    code_existing = str(existing_opts[i].get("code") or "").strip()
+                                # Wklejka ma aktualizować treść pytania/odpowiedzi, nie narzucać nowych kodowań.
+                                new_options.append({"label": ans, "code": code_existing})
+                            q_item["options"] = new_options
                             break
                         working["questions"] = q_list
                         st.session_state[state_key] = working
                         st.session_state[paste_toggle_key] = False
                         st.session_state[paste_clear_key] = True
+                        st.session_state[scroll_target_key] = anchor_id
                         _bump_metryczka_editor_nonce(kind, study_key)
                         st.rerun()
                 with b2:
@@ -2981,6 +3022,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     ):
                         st.session_state[paste_toggle_key] = False
                         st.session_state[paste_clear_key] = True
+                        st.session_state[scroll_target_key] = anchor_id
                         _bump_metryczka_editor_nonce(kind, study_key)
                         st.rerun()
 
@@ -3024,6 +3066,24 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         working["questions"] = q_list
         st.session_state[state_key] = working
         st.rerun()
+
+    scroll_target = str(st.session_state.pop(scroll_target_key, "") or "").strip()
+    if scroll_target:
+        st.markdown(
+            f"""
+            <script>
+            (function(){{
+              const id = {json.dumps(scroll_target)};
+              const root = (window.parent && window.parent.document) ? window.parent.document : document;
+              const el = root.getElementById(id);
+              if (el) {{
+                setTimeout(() => el.scrollIntoView({{behavior:'auto', block:'center'}}), 0);
+              }}
+            }})();
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
 
     return deepcopy(st.session_state.get(state_key) or cfg_out)
 
