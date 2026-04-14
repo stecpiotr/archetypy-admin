@@ -2856,3 +2856,33 @@ Wynik:
   - `Nie` czyści stan oczekujący i nic nie wstawia.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-103 [DONE]
+Temat: Randomizacja metryczki — blokady per odpowiedź zamiast opcji „Nie losuj ostatniej odpowiedzi”.
+Kryteria ukończenia:
+1. W tabeli odpowiedzi metryczki jest nowa kolumna `Blokuj losowanie` (za kolumną `Otwarta`).
+2. Checkbox `Nie losuj ostatniej odpowiedzi` jest usunięty z edytora (JST i personal).
+3. Przy `Losowa kolejność odpowiedzi`:
+   - odpowiedzi z `Blokuj losowanie = true` pozostają na swoich pozycjach,
+   - pozostałe odpowiedzi są losowane między sobą.
+4. Mechanizm działa w runtime obu ankiet (`archetypy.badania.pro` i `jst.badania.pro`).
+Pierwszy krok wykonawczy:
+- rozszerzyć model opcji metryczki o `lock_randomization`, przebudować edytor i randomizację frontendu.
+Wynik:
+- `archetypy-admin/app.py`:
+  - dodano kolumnę `Blokuj losowanie` do edytora odpowiedzi (pytania + predefiniowane),
+  - usunięto checkbox `Nie losuj ostatniej odpowiedzi`,
+  - zapisywanie opcji przenosi flagę `lock_randomization`,
+  - utrzymana kompatybilność: stare `randomize_exclude_last=true` mapuje się na blokadę ostatniej odpowiedzi, jeśli brak innych blokad.
+- `archetypy-admin/metryczka_config.py`:
+  - normalizacja opcji obsługuje `lock_randomization`,
+  - dodano migrację legacy (`randomize_exclude_last`) do blokady ostatniej odpowiedzi,
+  - w znormalizowanym output `randomize_exclude_last` jest wygaszane (`False`).
+- `archetypy-admin/db_jst_utils.py`:
+  - normalizacja pytań predefiniowanych obsługuje `lock_randomization` i legacy-mapowanie.
+- `archetypy-ankieta`:
+  - `src/lib/metryczka.ts`: normalizacja opcji i migracja legacy do `lock_randomization`,
+  - `src/Questionnaire.tsx` + `src/JstSurvey.tsx`: randomizacja z zachowaniem stałych pozycji opcji zablokowanych.
+- Smoke-check:
+  - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).

@@ -2584,21 +2584,33 @@ def _metryczka_anchor_id(kind: str, study_key: str, ui_key: str) -> str:
     return safe or f"metryczka-{kind}"
 
 
-def _metryczka_options_to_df(options: Any) -> pd.DataFrame:
+def _metryczka_options_to_df(
+    options: Any,
+    *,
+    randomize_options: bool = False,
+    legacy_exclude_last: bool = False,
+) -> pd.DataFrame:
     rows: List[Dict[str, Any]] = []
+    has_locked = False
     if isinstance(options, list):
         for opt in options:
             if not isinstance(opt, dict):
                 continue
+            lock_randomization = bool(opt.get("lock_randomization") is True)
+            if lock_randomization:
+                has_locked = True
             rows.append(
                 {
                     "Odpowiedź": str(opt.get("label") or "").strip(),
                     "Kodowanie": str(opt.get("code") or "").strip(),
                     "Otwarta": bool(opt.get("is_open") is True),
+                    "Blokuj losowanie": lock_randomization,
                 }
             )
+    if randomize_options and legacy_exclude_last and rows and not has_locked:
+        rows[-1]["Blokuj losowanie"] = True
     if not rows:
-        rows = [{"Odpowiedź": "", "Kodowanie": "", "Otwarta": False}]
+        rows = [{"Odpowiedź": "", "Kodowanie": "", "Otwarta": False, "Blokuj losowanie": False}]
     return pd.DataFrame(rows)
 
 
@@ -2611,6 +2623,7 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
         label = str(row.get("Odpowiedź") or "").strip()
         code = str(row.get("Kodowanie") or "").strip()
         is_open = bool(row.get("Otwarta") is True)
+        lock_randomization = bool(row.get("Blokuj losowanie") is True)
         if not label:
             continue
         # Zachowujemy wiersze nawet z pustym kodowaniem, aby nie gubić odpowiedzi w UI.
@@ -2620,7 +2633,36 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
             if code_norm in seen_codes:
                 continue
             seen_codes.add(code_norm)
-        out.append({"label": label, "code": code, "is_open": is_open})
+        out.append(
+            {
+                "label": label,
+                "code": code,
+                "is_open": is_open,
+                "lock_randomization": lock_randomization,
+            }
+        )
+    return out
+
+
+def _metryczka_apply_legacy_exclude_last_lock(
+    options: List[Dict[str, Any]],
+    *,
+    randomize_options: bool,
+    legacy_exclude_last: bool,
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    has_locked = False
+    for opt in options:
+        if not isinstance(opt, dict):
+            continue
+        cloned = dict(opt)
+        locked = bool(cloned.get("lock_randomization") is True)
+        if locked:
+            has_locked = True
+        cloned["lock_randomization"] = locked
+        out.append(cloned)
+    if randomize_options and legacy_exclude_last and out and not has_locked:
+        out[-1]["lock_randomization"] = True
     return out
 
 
@@ -2738,8 +2780,8 @@ def _new_custom_metryczka_question(questions: List[Dict[str, Any]]) -> Dict[str,
         "randomize_exclude_last": False,
         "aliases": [],
         "options": [
-            {"label": "", "code": "1", "is_open": False},
-            {"label": "", "code": "2", "is_open": False},
+            {"label": "", "code": "1", "is_open": False, "lock_randomization": False},
+            {"label": "", "code": "2", "is_open": False, "lock_randomization": False},
         ],
     }
 
@@ -2768,6 +2810,8 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
     desired_code = str(q_src.get("db_column") or q_src.get("id") or "").strip().upper()
     code = _unique_custom_metryczka_code(desired_code, questions)
     prompt = str(q_src.get("prompt") or "").strip()
+    randomize_options = bool(q_src.get("randomize_options") is True)
+    legacy_exclude_last = bool(q_src.get("randomize_exclude_last") is True)
     options_out: List[Dict[str, Any]] = []
     seen_codes: set[str] = set()
     for opt in list(q_src.get("options") or []):
@@ -2786,13 +2830,19 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
                 "label": label,
                 "code": code_opt,
                 "is_open": bool(opt.get("is_open") is True),
+                "lock_randomization": bool(opt.get("lock_randomization") is True),
             }
         )
     if len(options_out) < 2:
         options_out = [
-            {"label": "", "code": "", "is_open": False},
-            {"label": "", "code": "", "is_open": False},
+            {"label": "", "code": "", "is_open": False, "lock_randomization": False},
+            {"label": "", "code": "", "is_open": False, "lock_randomization": False},
         ]
+    options_out = _metryczka_apply_legacy_exclude_last_lock(
+        options_out,
+        randomize_options=randomize_options,
+        legacy_exclude_last=legacy_exclude_last,
+    )
     return {
         "id": code,
         "scope": "custom",
@@ -2801,10 +2851,8 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
         "prompt": prompt,
         "required": True,
         "multiple": False,
-        "randomize_options": bool(q_src.get("randomize_options") is True),
-        "randomize_exclude_last": bool(
-            q_src.get("randomize_options") is True and q_src.get("randomize_exclude_last") is True
-        ),
+        "randomize_options": randomize_options,
+        "randomize_exclude_last": False,
         "aliases": [],
         "options": options_out,
     }
@@ -2921,7 +2969,6 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 edit_prompt_key = f"{widget_prefix}tpl_edit_prompt_top"
                 edit_code_key = f"{widget_prefix}tpl_edit_code_top"
                 edit_rand_key = f"{widget_prefix}tpl_edit_rand_top"
-                edit_rand_last_key = f"{widget_prefix}tpl_edit_rand_last_top"
                 edit_loaded_key = f"{widget_prefix}tpl_edit_loaded_top"
                 edit_opts_key = f"{widget_prefix}tpl_edit_opts_top"
                 tpl_insert_pending_key = f"{widget_prefix}tpl_insert_pending_top"
@@ -2933,8 +2980,11 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     st.session_state[edit_prompt_key] = str(picked_q.get("prompt") or "").strip()
                     st.session_state[edit_code_key] = str(picked_q.get("db_column") or picked_q.get("id") or "").strip().upper()
                     st.session_state[edit_rand_key] = bool(picked_q.get("randomize_options") is True)
-                    st.session_state[edit_rand_last_key] = bool(picked_q.get("randomize_exclude_last") is True)
-                    st.session_state[edit_opts_key] = _metryczka_options_to_df(picked_q.get("options"))
+                    st.session_state[edit_opts_key] = _metryczka_options_to_df(
+                        picked_q.get("options"),
+                        randomize_options=bool(picked_q.get("randomize_options") is True),
+                        legacy_exclude_last=bool(picked_q.get("randomize_exclude_last") is True),
+                    )
                     st.session_state.pop(tpl_insert_pending_key, None)
                     st.session_state.pop(tpl_insert_conflict_code_key, None)
 
@@ -2949,14 +2999,9 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     )
                 with e2:
                     st.text_input("Kodowanie", key=edit_code_key, placeholder="np. M_POWIAT")
-                    rand_val = st.checkbox(
+                    st.checkbox(
                         "Losowa kolejność odpowiedzi",
                         key=edit_rand_key,
-                    )
-                    st.checkbox(
-                        "Nie losuj ostatniej odpowiedzi",
-                        key=edit_rand_last_key,
-                        disabled=not rand_val,
                     )
 
                 tpl_opts_df = st.session_state.get(edit_opts_key)
@@ -2985,6 +3030,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             default=False,
                             width="small",
                         ),
+                        "Blokuj losowanie": st.column_config.CheckboxColumn(
+                            "Blokuj losowanie",
+                            help="Po zaznaczeniu odpowiedź zachowuje stałą pozycję przy randomizacji.",
+                            default=False,
+                            width="small",
+                        ),
                     },
                 )
                 st.session_state[edit_opts_key] = tpl_opts_df
@@ -2995,9 +3046,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     "db_column": str(st.session_state.get(edit_code_key) or "").strip().upper(),
                     "prompt": str(st.session_state.get(edit_prompt_key) or "").strip(),
                     "randomize_options": bool(st.session_state.get(edit_rand_key)),
-                    "randomize_exclude_last": bool(
-                        st.session_state.get(edit_rand_key) and st.session_state.get(edit_rand_last_key)
-                    ),
+                    "randomize_exclude_last": False,
                     "options": _metryczka_options_from_df(tpl_opts_df),
                 }
                 st.caption(
@@ -3134,17 +3183,15 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 value=bool(q_dict.get("randomize_options") is True),
                 key=f"{widget_prefix}randomize_{ui_key}",
             )
-            randomize_exclude_last_val = st.checkbox(
-                "Nie losuj ostatniej odpowiedzi",
-                value=bool(q_dict.get("randomize_exclude_last") is True),
-                key=f"{widget_prefix}randomize_last_{ui_key}",
-                disabled=not randomize_options_val,
-            )
             if is_core:
                 st.caption("Kodowanie rdzenia jest zgodne z historyczną bazą (tekst odpowiedzi).")
 
         st.markdown("**Odpowiedzi**")
-        options_df = _metryczka_options_to_df(options_default)
+        options_df = _metryczka_options_to_df(
+            options_default,
+            randomize_options=bool(q_dict.get("randomize_options") is True),
+            legacy_exclude_last=bool(q_dict.get("randomize_exclude_last") is True),
+        )
         edited_options_df = st.data_editor(
             options_df,
             use_container_width=True,
@@ -3165,6 +3212,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 "Otwarta": st.column_config.CheckboxColumn(
                     "Otwarta",
                     help="Po wyborze tej odpowiedzi respondent musi wpisać własną treść.",
+                    default=False,
+                    width="small",
+                ),
+                "Blokuj losowanie": st.column_config.CheckboxColumn(
+                    "Blokuj losowanie",
+                    help="Po zaznaczeniu odpowiedź zachowuje stałą pozycję przy randomizacji.",
                     default=False,
                     width="small",
                 ),
@@ -3280,6 +3333,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                         "label": str(it.get("label") or "").strip(),
                                         "code": str(it.get("code") or "").strip(),
                                         "is_open": bool(it.get("is_open") is True),
+                                        "lock_randomization": bool(it.get("lock_randomization") is True),
                                     }
                                 )
                             if not existing_opts:
@@ -3293,11 +3347,13 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                                 "label": str(it.get("label") or "").strip(),
                                                 "code": str(it.get("code") or "").strip(),
                                                 "is_open": bool(it.get("is_open") is True),
+                                                "lock_randomization": bool(it.get("lock_randomization") is True),
                                             }
                                         )
 
                             old_codes_by_label: Dict[str, str] = {}
                             old_open_by_label: Dict[str, bool] = {}
+                            old_lock_by_label: Dict[str, bool] = {}
                             for opt in existing_opts:
                                 old_label = str(opt.get("label") or "").strip().lower()
                                 old_code = str(opt.get("code") or "").strip()
@@ -3305,25 +3361,44 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                     old_codes_by_label[old_label] = old_code
                                 if old_label and old_label not in old_open_by_label:
                                     old_open_by_label[old_label] = bool(opt.get("is_open") is True)
+                                if old_label and old_label not in old_lock_by_label:
+                                    old_lock_by_label[old_label] = bool(opt.get("lock_randomization") is True)
 
                             new_options: List[Dict[str, Any]] = []
                             for i, ans in enumerate(parsed_answers):
                                 if q_scope == "core":
-                                    new_options.append({"label": ans, "code": ans, "is_open": bool(old_open_by_label.get(str(ans).strip().lower(), False))})
+                                    ans_key = str(ans).strip().lower()
+                                    new_options.append(
+                                        {
+                                            "label": ans,
+                                            "code": ans,
+                                            "is_open": bool(old_open_by_label.get(ans_key, False)),
+                                            "lock_randomization": bool(old_lock_by_label.get(ans_key, False)),
+                                        }
+                                    )
                                     continue
                                 code_existing = old_codes_by_label.get(str(ans).strip().lower(), "")
                                 open_existing = bool(old_open_by_label.get(str(ans).strip().lower(), False))
+                                lock_existing = bool(old_lock_by_label.get(str(ans).strip().lower(), False))
                                 if (not code_existing) and i < len(existing_opts):
                                     idx_code = str(existing_opts[i].get("code") or "").strip()
                                     idx_label = str(existing_opts[i].get("label") or "").strip().lower()
                                     if idx_code and idx_label and idx_label == str(ans).strip().lower():
                                         code_existing = idx_code
                                         open_existing = bool(existing_opts[i].get("is_open") is True)
+                                        lock_existing = bool(existing_opts[i].get("lock_randomization") is True)
                                 # Wklejka ma aktualizować treść pytania/odpowiedzi, nie narzucać nowych kodowań.
                                 if not code_existing:
                                     # Propozycja domyślna: kodowanie = treść odpowiedzi (edytowalne przez użytkownika).
                                     code_existing = ans
-                                new_options.append({"label": ans, "code": code_existing, "is_open": open_existing})
+                                new_options.append(
+                                    {
+                                        "label": ans,
+                                        "code": code_existing,
+                                        "is_open": open_existing,
+                                        "lock_randomization": lock_existing,
+                                    }
+                                )
                             q_item["options"] = new_options
                             break
                         working["questions"] = q_list
@@ -3367,12 +3442,13 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             "db_column": code_for_template,
                             "prompt": str(prompt or "").strip(),
                             "randomize_options": bool(randomize_options_val),
-                            "randomize_exclude_last": bool(randomize_options_val and randomize_exclude_last_val),
+                            "randomize_exclude_last": False,
                             "options": [
                                 {
                                     "label": str(opt.get("label") or "").strip(),
                                     "code": str(opt.get("code") or "").strip(),
                                     "is_open": bool(opt.get("is_open") is True),
+                                    "lock_randomization": bool(opt.get("lock_randomization") is True),
                                 }
                                 for opt in options
                                 if isinstance(opt, dict)
@@ -3403,7 +3479,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 "required": True,
                 "multiple": False,
                 "randomize_options": bool(randomize_options_val),
-                "randomize_exclude_last": bool(randomize_options_val and randomize_exclude_last_val),
+                "randomize_exclude_last": False,
                 "aliases": list(q_dict.get("aliases") or []),
                 "options": options,
             }

@@ -1131,8 +1131,11 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
     db_column = str(src.get("db_column") or src.get("id") or "").strip().upper()
     scope = str(src.get("scope") or "custom").strip().lower() or "custom"
     qid = str(src.get("id") or db_column).strip().upper()
+    randomize_options = _bool_from_any(src.get("randomize_options"), False)
+    legacy_exclude_last = _bool_from_any(src.get("randomize_exclude_last"), False)
     options_out: List[Dict[str, Any]] = []
     seen_codes: set[str] = set()
+    has_locked = False
     for opt in list(src.get("options") or []):
         if not isinstance(opt, dict):
             continue
@@ -1145,7 +1148,19 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
             continue
         seen_codes.add(code_u)
         is_open = _bool_from_any(opt.get("is_open"), False) or ("inna (jaka?)" in label.lower())
-        options_out.append({"label": label, "code": code, "is_open": bool(is_open)})
+        lock_randomization = _bool_from_any(opt.get("lock_randomization"), False)
+        if lock_randomization:
+            has_locked = True
+        options_out.append(
+            {
+                "label": label,
+                "code": code,
+                "is_open": bool(is_open),
+                "lock_randomization": bool(lock_randomization),
+            }
+        )
+    if randomize_options and legacy_exclude_last and options_out and not has_locked:
+        options_out[-1]["lock_randomization"] = True
     return {
         "id": qid or db_column,
         "scope": scope,
@@ -1153,8 +1168,8 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
         "prompt": prompt,
         "required": True,
         "multiple": False,
-        "randomize_options": _bool_from_any(src.get("randomize_options"), False),
-        "randomize_exclude_last": _bool_from_any(src.get("randomize_exclude_last"), False),
+        "randomize_options": randomize_options,
+        "randomize_exclude_last": False,
         "aliases": [],
         "options": options_out,
     }

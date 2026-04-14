@@ -2081,3 +2081,21 @@ Decyzja:
 - `Tak` kontynuuje wstawienie przez mechanizm unikalnego kodowania (`M_*_2`, `M_*_3`, ...), `Nie` kończy operację bez zmian.
 Uzasadnienie:
 - Użytkownik oczekuje świadomej decyzji przy duplikacie, zamiast cichego tworzenia kolejnej wersji pytania.
+
+### D-229: Randomizacja odpowiedzi metryczki opiera się na blokadach per odpowiedź (`lock_randomization`)
+Decyzja:
+- Rezygnujemy z mechaniki pytaniowej `randomize_exclude_last` w UI.
+- Każda odpowiedź może mieć flagę `lock_randomization` (`Blokuj losowanie`).
+- Przy `Losowa kolejność odpowiedzi`:
+  - odpowiedzi z blokadą zostają na swoich stałych indeksach,
+  - tylko odpowiedzi bez blokady są losowane pomiędzy wolnymi pozycjami.
+Uzasadnienie:
+- Użytkownik potrzebuje blokowania dowolnej odpowiedzi (pierwszej, środkowej lub ostatniej), a nie tylko „ostatniej”.
+
+### D-230: Kompatybilność legacy `randomize_exclude_last` zachowana przez migrację do blokady ostatniej odpowiedzi
+Decyzja:
+- W normalizacji backend/frontend, gdy `randomize_options=true` i `randomize_exclude_last=true`, a brak jawnych blokad:
+  - ostatnia odpowiedź dostaje `lock_randomization=true`.
+- Jednocześnie znormalizowana konfiguracja wygasza `randomize_exclude_last` (`False`).
+Uzasadnienie:
+- Zapewnia to brak regresji dla istniejących ankiet przy przejściu na nowy model blokad.

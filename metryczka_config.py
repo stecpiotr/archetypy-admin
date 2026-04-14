@@ -166,7 +166,15 @@ def _normalize_options(raw_options: Any, *, fallback: List[Dict[str, Any]]) -> L
         if not label or not code or code in seen_codes:
             continue
         is_open = _safe_bool(item.get("is_open"), _looks_like_open_label(label))
-        out.append({"label": label, "code": code, "is_open": bool(is_open)})
+        lock_randomization = _safe_bool(item.get("lock_randomization"), False)
+        out.append(
+            {
+                "label": label,
+                "code": code,
+                "is_open": bool(is_open),
+                "lock_randomization": bool(lock_randomization),
+            }
+        )
         seen_codes.add(code)
     if out:
         return out
@@ -181,9 +189,34 @@ def _normalize_options(raw_options: Any, *, fallback: List[Dict[str, Any]]) -> L
                 "label": label,
                 "code": code,
                 "is_open": _safe_bool(o.get("is_open"), _looks_like_open_label(label)),
+                "lock_randomization": _safe_bool(o.get("lock_randomization"), False),
             }
         )
     return fallback_out
+
+
+def _apply_legacy_exclude_last_lock(
+    options: List[Dict[str, Any]],
+    *,
+    randomize_options: bool,
+    randomize_exclude_last: bool,
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    has_locked = False
+    for opt in options:
+        if not isinstance(opt, dict):
+            continue
+        cloned = dict(opt)
+        locked = _safe_bool(cloned.get("lock_randomization"), False)
+        if locked:
+            has_locked = True
+        cloned["lock_randomization"] = bool(locked)
+        out.append(cloned)
+    if not out:
+        return out
+    if randomize_options and randomize_exclude_last and not has_locked:
+        out[-1]["lock_randomization"] = True
+    return out
 
 
 def _normalize_aliases(raw_aliases: Any) -> List[str]:
@@ -220,7 +253,14 @@ def _normalize_custom_question(raw: Dict[str, Any], used_columns: set[str]) -> D
         return {}
 
     fallback_options: List[Dict[str, Any]] = []
+    randomize_options = _safe_bool(raw.get("randomize_options"), False)
+    randomize_exclude_last = _safe_bool(raw.get("randomize_exclude_last"), False)
     options = _normalize_options(raw.get("options"), fallback=fallback_options)
+    options = _apply_legacy_exclude_last_lock(
+        options,
+        randomize_options=randomize_options,
+        randomize_exclude_last=randomize_exclude_last,
+    )
     if not options:
         return {}
 
@@ -232,8 +272,8 @@ def _normalize_custom_question(raw: Dict[str, Any], used_columns: set[str]) -> D
         "prompt": prompt,
         "required": _safe_bool(raw.get("required"), True),
         "multiple": _safe_bool(raw.get("multiple"), False),
-        "randomize_options": _safe_bool(raw.get("randomize_options"), False),
-        "randomize_exclude_last": _safe_bool(raw.get("randomize_exclude_last"), False),
+        "randomize_options": randomize_options,
+        "randomize_exclude_last": False,
         "aliases": _normalize_aliases(raw.get("aliases")),
         "options": options,
     }
@@ -265,13 +305,20 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
     for qid in CORE_QUESTION_ORDER:
         base = deepcopy(defaults[qid])
         src = by_id.get(qid) or {}
+        randomize_options = _safe_bool(src.get("randomize_options"), False)
+        randomize_exclude_last = _safe_bool(src.get("randomize_exclude_last"), False)
         base["prompt"] = _safe_text(src.get("prompt"), base["prompt"])
         base["required"] = True
         base["multiple"] = False
-        base["randomize_options"] = _safe_bool(src.get("randomize_options"), False)
-        base["randomize_exclude_last"] = _safe_bool(src.get("randomize_exclude_last"), False)
+        base["randomize_options"] = randomize_options
+        base["randomize_exclude_last"] = False
         base["aliases"] = _normalize_aliases(src.get("aliases")) or base["aliases"]
         core_opts = _normalize_options(src.get("options"), fallback=base["options"])
+        core_opts = _apply_legacy_exclude_last_lock(
+            core_opts,
+            randomize_options=randomize_options,
+            randomize_exclude_last=randomize_exclude_last,
+        )
         normalized_core_opts: List[Dict[str, Any]] = []
         seen_labels: set[str] = set()
         for opt in core_opts:
@@ -286,6 +333,7 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
                     "label": label,
                     "code": label,
                     "is_open": _safe_bool(opt.get("is_open"), _looks_like_open_label(label)),
+                    "lock_randomization": _safe_bool(opt.get("lock_randomization"), False),
                 }
             )
         if not normalized_core_opts:
@@ -294,6 +342,7 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
                     "label": _safe_text(o.get("label")),
                     "code": _safe_text(o.get("label")),
                     "is_open": _safe_bool(o.get("is_open"), _looks_like_open_label(_safe_text(o.get("label")))),
+                    "lock_randomization": _safe_bool(o.get("lock_randomization"), False),
                 }
                 for o in base["options"]
             ]

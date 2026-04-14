@@ -2265,3 +2265,21 @@
   - `Nie` anuluje operację (bez zmian w metryczce).
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-103 (2026-04-14, randomizacja z blokadami per odpowiedź)
+- `archetypy-admin/app.py`:
+  - w edytorze odpowiedzi (pytania metryczki + predefiniowane) dodano kolumnę `Blokuj losowanie` za kolumną `Otwarta`,
+  - usunięto checkbox `Nie losuj ostatniej odpowiedzi`,
+  - zapis opcji utrzymuje flagę `lock_randomization`,
+  - legacy `randomize_exclude_last` jest mapowane do blokady ostatniej odpowiedzi (tylko gdy brak jawnych blokad).
+- `archetypy-admin/metryczka_config.py`:
+  - normalizacja opcji i pytań obsługuje `lock_randomization`,
+  - dodano helper migracyjny legacy->lock dla ostatniej odpowiedzi.
+- `archetypy-admin/db_jst_utils.py`:
+  - normalizacja pytań predefiniowanych obsługuje `lock_randomization` + legacy-mapowanie.
+- `archetypy-ankieta`:
+  - `src/lib/metryczka.ts`: w normalizacji opcji dodano `lock_randomization` oraz migrację z `randomize_exclude_last`,
+  - `src/Questionnaire.tsx` i `src/JstSurvey.tsx`: randomizacja działa teraz na zasadzie „zablokowane pozycje stałe, reszta losowana”.
+- Testy techniczne:
+  - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).
