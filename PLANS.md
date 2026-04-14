@@ -2941,3 +2941,17 @@ Wynik:
   - dodano sekcję `Profile archetypowe 0-100` z dwoma kołami profilowymi i legendą osi kolorów.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).
+
+### Hotfix H-106 [DONE]
+Temat: Radar demografii personalnej — poprawka TOP2/TOP3 zgodnie z progiem archetypu pobocznego.
+Kryteria ukończenia:
+1. `Podgląd radarowy podgrupy` nie jest na stałe TOP2.
+2. TOP3 pojawia się tylko gdy 3. archetyp osiąga próg widoczności pobocznego (>=70% na skali 0-100), w przeciwnym razie TOP2.
+3. Legenda pod radarem i markery na radarze respektują tę samą logikę.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - dodano logikę `_priority_top_for_ui_demo(...)` opartą o próg 70% dla 3. archetypu,
+  - markery i opisy pod radarem są dynamiczne (`TOP2` lub `TOP3`) dla obu profili,
+  - legenda ról (`główny/wspierający/poboczny`) renderuje się zależnie od liczby aktywnych priorytetów.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).

@@ -2154,3 +2154,12 @@ Decyzja:
 - Pod radarem dodajemy sekcję `Profile archetypowe 0-100` (dwa koła profilowe + legenda osi).
 Uzasadnienie:
 - Ujednolicenie z wyglądem Matchingu zmniejsza próg interpretacji i spełnia wskazany przez użytkownika wzorzec UX.
+
+### D-237: `Podgląd radarowy podgrupy` w demografii personalnej używa tej samej logiki TOP2/TOP3 co Matching
+Decyzja:
+- W radarze podstrony demografii personalnej priorytety są wyznaczane jako:
+  - TOP3, jeśli 3. archetyp ma >=70% (w skali 0-100),
+  - w przeciwnym razie TOP2.
+- Ta sama liczba priorytetów steruje markerami i legendą pod wykresem.
+Uzasadnienie:
+- Użytkownik oczekuje pełnej spójności reguł interpretacyjnych między personalnym raportem demograficznym a Matchingiem.

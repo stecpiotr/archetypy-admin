@@ -2326,3 +2326,11 @@
     - pod radarem dodano sekcję `Profile archetypowe 0-100` (2 koła profilowe + legenda osi kolorów).
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).
+
+### Zrobione w Hotfix H-106 (2026-04-15, radar demografii personalnej: TOP2/TOP3)
+- `archetypy-admin/admin_dashboard.py`:
+  - `Podgląd radarowy podgrupy` ma już logikę TOP2/TOP3 zależną od progu archetypu pobocznego (3. pozycja >= 70% na skali 0-100 => TOP3, inaczej TOP2),
+  - markery na radarze i podpisy pod wykresem są dynamiczne i zgodne z tą logiką,
+  - legenda ról (`główny`, `wspierający`, `poboczny`) renderuje się warunkowo.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).

@@ -72,6 +72,11 @@ TEMPLATE_PATH = str(_BASE_DIR / "ap48_raport_template.docx")
 TEMPLATE_PATH_NOSUPP = str(_BASE_DIR / "ap48_raport_template_nosupp.docx")  # szablon bez sekcji archetypu pobocznego
 TEMPLATE_PATH_SHORT = str(_BASE_DIR / "ap48_raport_template_short.docx")
 TEMPLATE_PATH_SHORT_NOSUPP = str(_BASE_DIR / "ap48_raport_template_short_nosupp.docx")
+
+TEMPLATE_PATH_FEMALE = str(_BASE_DIR / "ap48_raport_template_female.docx")
+TEMPLATE_PATH_NOSUPP_FEMALE = str(_BASE_DIR / "ap48_raport_template_nosupp_female.docx")
+TEMPLATE_PATH_SHORT_FEMALE = str(_BASE_DIR / "ap48_raport_template_short_female.docx")
+TEMPLATE_PATH_SHORT_NOSUPP_FEMALE = str(_BASE_DIR / "ap48_raport_template_short_nosupp_female.docx")
 logos_dir = str(Path(__file__).with_name("logos_local"))
 
 import plotly.io as pio
@@ -2359,6 +2364,71 @@ def base_masc_from_any(name: str) -> str:
     return raw
 
 
+def _template_candidates_for_export(
+    show_supplement: bool,
+    short_report: bool,
+    gender_code: str = "M",
+) -> list[str]:
+    """Zwraca kandydatów szablonów w kolejności preferencji (najpierw płeć badanej osoby)."""
+
+    def _ordered_set(is_female: bool) -> list[str]:
+        full = TEMPLATE_PATH_FEMALE if is_female else TEMPLATE_PATH
+        full_nosupp = TEMPLATE_PATH_NOSUPP_FEMALE if is_female else TEMPLATE_PATH_NOSUPP
+        short = TEMPLATE_PATH_SHORT_FEMALE if is_female else TEMPLATE_PATH_SHORT
+        short_nosupp = TEMPLATE_PATH_SHORT_NOSUPP_FEMALE if is_female else TEMPLATE_PATH_SHORT_NOSUPP
+
+        if short_report:
+            return [
+                short if show_supplement else short_nosupp,
+                short_nosupp if show_supplement else short,
+                full if show_supplement else full_nosupp,
+                full_nosupp if show_supplement else full,
+            ]
+        return [
+            full if show_supplement else full_nosupp,
+            full_nosupp if show_supplement else full,
+        ]
+
+    is_female = normalize_gender(gender_code) == "K"
+    merged = _ordered_set(is_female) + _ordered_set(not is_female)
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in merged:
+        if item and item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+def _default_template_for_export(show_supplement: bool, gender_code: str = "M") -> str:
+    candidates = _template_candidates_for_export(
+        show_supplement=show_supplement,
+        short_report=False,
+        gender_code=gender_code,
+    )
+    return candidates[0] if candidates else (TEMPLATE_PATH if show_supplement else TEMPLATE_PATH_NOSUPP)
+
+
+def get_archetype_payload_for_gender(archetype_name: str, gender_code: str = "M") -> dict:
+    """
+    Pobiera dane archetypu preferując wersję zgodną z płcią:
+    - dla 'K' najpierw nazwa żeńska, potem fallback do męskiej.
+    - dla 'M' odwrotnie.
+    """
+    base_name = base_masc_from_any(archetype_name)
+    gender = normalize_gender(gender_code)
+    display_name = display_name_for_gender(base_name, gender)
+
+    if gender == "K":
+        payload = archetype_extended.get(display_name) or archetype_extended.get(base_name) or {}
+    else:
+        payload = archetype_extended.get(base_name) or archetype_extended.get(display_name) or {}
+
+    out = dict(payload)
+    out["name"] = display_name if gender == "K" else (base_name or out.get("name", ""))
+    return out
+
+
 def _dedupe_hex_palette(values) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
@@ -3737,18 +3807,27 @@ def _render_personal_demography_subpage(
         )
         st.markdown(table_html, unsafe_allow_html=True)
 
-    all_top = [x for x in pick_top_3_archetypes(means_20_all, archetype_names) if x][:2]
-    sub_top = [x for x in pick_top_3_archetypes(filtered_means_20, archetype_names) if x][:2]
+    def _priority_top_for_ui_demo(profile_20: dict[str, float], order: list[str]) -> list[str]:
+        ordered = sorted(order, key=lambda a: (-float(profile_20.get(a, 0.0)), order.index(a)))
+        top3 = [x for x in ordered[:3] if x]
+        if len(top3) >= 3 and float(profile_20.get(top3[2], 0.0)) * 5.0 < 70.0:
+            return top3[:2]
+        return top3
+
+    all_top = _priority_top_for_ui_demo(means_20_all, archetype_names)
+    sub_top = _priority_top_for_ui_demo(filtered_means_20, archetype_names)
     theta = [disp_name_fn(n) for n in archetype_names]
     all_vals = [float(means_20_all.get(n, 0.0)) for n in archetype_names]
     filt_vals = [float(filtered_means_20.get(n, 0.0)) for n in archetype_names]
 
-    def _marker_series(profile: dict[str, float], top2: list[str], palette: dict[str, str]) -> tuple[list[float | None], list[str]]:
+    def _marker_series(profile: dict[str, float], topn: list[str], palette: dict[str, str]) -> tuple[list[float | None], list[str]]:
         mapping: dict[str, str] = {}
-        if len(top2) > 0:
-            mapping[top2[0]] = palette["main"]
-        if len(top2) > 1:
-            mapping[top2[1]] = palette["aux"]
+        if len(topn) > 0:
+            mapping[topn[0]] = palette["main"]
+        if len(topn) > 1:
+            mapping[topn[1]] = palette["aux"]
+        if len(topn) > 2:
+            mapping[topn[2]] = palette["supp"]
         r_vals: list[float | None] = []
         c_vals: list[str] = []
         for arch in archetype_names:
@@ -3760,8 +3839,10 @@ def _render_personal_demography_subpage(
                 c_vals.append("rgba(0,0,0,0)")
         return r_vals, c_vals
 
-    all_marker_r, all_marker_c = _marker_series(means_20_all, all_top, {"main": "#ef4444", "aux": "#f59e0b"})
-    sub_marker_r, sub_marker_c = _marker_series(filtered_means_20, sub_top, {"main": "#2563eb", "aux": "#8b5cf6"})
+    all_top_colors = {"main": "#ef4444", "aux": "#f59e0b", "supp": "#22c55e"}
+    sub_top_colors = {"main": "#2563eb", "aux": "#8b5cf6", "supp": "#f97316"}
+    all_marker_r, all_marker_c = _marker_series(means_20_all, all_top, all_top_colors)
+    sub_marker_r, sub_marker_c = _marker_series(filtered_means_20, sub_top, sub_top_colors)
 
     demo_fig = go.Figure(
         data=[
@@ -3791,7 +3872,7 @@ def _render_personal_demography_subpage(
                 mode="markers",
                 marker=dict(size=16, symbol="circle", color=all_marker_c, opacity=0.92, line=dict(color="black", width=2.4)),
                 showlegend=False,
-                hovertemplate="<b>%{theta}</b><br>TOP2 całej próby: %{r:.2f}<extra></extra>",
+                hovertemplate=f"<b>%{{theta}}</b><br>TOP{max(1, len(all_top))} całej próby: %{{r:.2f}}<extra></extra>",
             ),
             go.Scatterpolar(
                 r=sub_marker_r,
@@ -3799,7 +3880,7 @@ def _render_personal_demography_subpage(
                 mode="markers",
                 marker=dict(size=14, symbol="square", color=sub_marker_c, opacity=0.94, line=dict(color="#0f172a", width=1.9)),
                 showlegend=False,
-                hovertemplate="<b>%{theta}</b><br>TOP2 podgrupy: %{r:.2f}<extra></extra>",
+                hovertemplate=f"<b>%{{theta}}</b><br>TOP{max(1, len(sub_top))} podgrupy: %{{r:.2f}}<extra></extra>",
             ),
         ]
     )
@@ -3839,16 +3920,28 @@ def _render_personal_demography_subpage(
         config={"displaylogo": False, "displayModeBar": False, "responsive": True},
         key=f"personal_demo_profile_radar_subpage_{study_id}",
     )
+
+    def _role_legend_html(palette: dict[str, str], marker: str, count: int) -> str:
+        role_defs = [("główny", "main"), ("wspierający", "aux"), ("poboczny", "supp")]
+        items: list[str] = []
+        for idx, (label, role_key) in enumerate(role_defs):
+            if idx >= max(0, int(count)):
+                break
+            items.append(
+                f"<span><span style=\"color:{palette[role_key]};\">{marker}</span> {label}</span>"
+            )
+        return "".join(items)
+
     st.markdown(
-        """
+        f"""
         <div class="pdemo-top2-grid">
           <div class="pdemo-top2-card">
-            <div class="pdemo-top2-title">TOP2 całej próby</div>
-            <div class="pdemo-top2-line"><span style="color:#ef4444;">●</span> główny &nbsp;&nbsp; <span style="color:#f59e0b;">●</span> wspierający</div>
+            <div class="pdemo-top2-title">TOP{max(1, len(all_top))} całej próby</div>
+            <div class="pdemo-top2-line">{_role_legend_html(all_top_colors, "●", len(all_top))}</div>
           </div>
           <div class="pdemo-top2-card">
-            <div class="pdemo-top2-title">TOP2 podgrupy</div>
-            <div class="pdemo-top2-line"><span style="color:#2563eb;">■</span> główny &nbsp;&nbsp; <span style="color:#8b5cf6;">■</span> wspierający</div>
+            <div class="pdemo-top2-title">TOP{max(1, len(sub_top))} podgrupy</div>
+            <div class="pdemo-top2-line">{_role_legend_html(sub_top_colors, "■", len(sub_top))}</div>
           </div>
         </div>
         """,
@@ -4031,7 +4124,8 @@ import os
 def build_word_context(
     main_type, second_type, supplement_type, features, main, second, supplement,
     mean_scores=None, radar_image=None, archetype_table=None, num_ankiet=None,
-    person: dict | None = None
+    person: dict | None = None,
+    gender_code: str = "M",
 ):
     """
     person = {
@@ -4063,6 +4157,12 @@ def build_word_context(
             out.append(f"{name} ({code})")
         return ', '.join(out)
 
+    g = normalize_gender(gender_code)
+    leader_term = "liderki" if g == "K" else "lidera"
+    candidate_term = "kandydatkę" if g == "K" else "kandydata"
+    politician_term = "polityczki" if g == "K" else "polityka"
+    possessive_term = "jej" if g == "K" else "jego"
+
     context = {
         # ——— Meta
         "TYTUL": "Raport Archetypów",
@@ -4082,12 +4182,12 @@ def build_word_context(
         "WSTEP": (
             "Archetypy to uniwersalne wzorce osobowości, które od wieków pomagają ludziom rozumieć świat i budować autentyczną tożsamość. "
             "Współczesna psychologia i marketing potwierdzają, że trafnie zdefiniowany archetyp jest potężnym narzędziem komunikacji, pozwalającym budować rozpoznawalność, zaufanie i emocjonalny kontakt. Czas wykorzystać to także w polityce! "
-            "\n\nW polityce archetyp pomaga wyeksponować najważniejsze cechy lidera, porządkuje przekaz, wzmacnia spójność strategii oraz wyraźnie różnicuje kandydata na tle konkurencji. "
-            "Analiza archetypów pozwala lepiej zrozumieć sposób odbioru polityka przez otoczenie, a co się z tym wiąże także motywacje i aspiracje. "
+            f"\n\nW polityce archetyp pomaga wyeksponować najważniejsze cechy {leader_term}, porządkuje przekaz, wzmacnia spójność strategii oraz wyraźnie różnicuje {candidate_term} na tle konkurencji. "
+            f"Analiza archetypów pozwala lepiej zrozumieć sposób odbioru {politician_term} przez otoczenie, a co się z tym wiąże także motywacje i aspiracje. "
             "Wyniki badań archetypowych stanowią istotny fundament do tworzenia skutecznej narracji wyborczej, strategii wizerunkowej i komunikacji z wyborcami.\n\n"
             "W modelu przez nas opracowanym wykorzystano klasyfikację Mark and Pearson, obejmującą 12 uniwersalnych typów osobowościowych. "
             f"Raport przedstawia wyniki i profil archetypowy dla {p('GEN') or '—'} w oparciu o dane z przeprowadzonego badania. "
-            "Badanie to pozwoliło zidentyfikować archetyp główny i wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić jego pozycjonowanie. "
+            f"Badanie to pozwoliło zidentyfikować archetyp główny i wspierający, a więc dwa najważniejsze wzorce, które mogą wzmocnić {possessive_term} pozycjonowanie. "
             "Zaprezentowano także trzeci w kolejności ważności — archetyp poboczny.\n\n"
             "Dzięki analizie archetypów można precyzyjnie dopasować komunikację do oczekiwań wyborców, podkreślić atuty, a także przewidzieć skuteczność strategii politycznej w dynamicznym środowisku publicznym. "),
 
@@ -4710,12 +4810,12 @@ def export_word_metrics_only(
             preferred_templates.append(resolved)
 
     # Zawsze dołóż fallbacki (również gdy template_path wskazuje brakujący plik).
-    fallback_templates = [
-        TEMPLATE_PATH_SHORT if show_supplement else TEMPLATE_PATH_SHORT_NOSUPP,
-        TEMPLATE_PATH_SHORT_NOSUPP if show_supplement else TEMPLATE_PATH_SHORT,
-        TEMPLATE_PATH if show_supplement else TEMPLATE_PATH_NOSUPP,
-        TEMPLATE_PATH_NOSUPP if show_supplement else TEMPLATE_PATH,
-    ]
+    # Najpierw template zgodny z płcią badanej osoby, potem fallback na drugi wariant.
+    fallback_templates = _template_candidates_for_export(
+        show_supplement=show_supplement,
+        short_report=True,
+        gender_code=gender_code,
+    )
     for cand in fallback_templates:
         resolved = _resolve_template(cand)
         if resolved and resolved not in preferred_templates:
@@ -4783,8 +4883,11 @@ def export_word_docxtpl(
     show_supplement: bool = True,                       # ⬅️ NOWY ARGUMENT
     template_path: str | None = None,                   # ⬅️ (opcjonalny override)
 ):
-    # Wybór szablonu zależnie od widoczności pobocznego
-    _template = template_path or (TEMPLATE_PATH if show_supplement else TEMPLATE_PATH_NOSUPP)
+    # Wybór szablonu zależnie od widoczności pobocznego i płci badanej osoby
+    _template = template_path or _default_template_for_export(
+        show_supplement=show_supplement,
+        gender_code=gender_code,
+    )
     doc = DocxTemplate(_template)
 
     # [AUTO-FIT] policz pole składu i zaplanuj szerokości obrazków
@@ -4833,7 +4936,8 @@ def export_word_docxtpl(
     context = build_word_context(
         main_type, second_type, supplement_type, features, main, second, supplement,
         mean_scores, radar_image, archetype_table, num_ankiet,
-        person=person
+        person=person,
+        gender_code=gender_code,
     )
 
     # Wstrzyknięcie ikon i palet do szablonu DOCX
@@ -6947,6 +7051,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     # --- NOWE: płeć + mapowanie nazw do żeńskich ---
     gender_raw = (study.get("gender") or study.get("sex") or study.get("plec") or "").strip().lower()
     IS_FEMALE = gender_raw in {"k", "kobieta", "female", "f"}
+    report_gender_code = "K" if IS_FEMALE else "M"
 
     FEM_NAME_MAP = {
         "Władca": "Władczyni",
@@ -7047,9 +7152,17 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             # <<< UNIKALNE NAZWY TYLKO DLA TEGO RESPONDENTA >>>
             main_i, aux_i, supp_i = pick_top_3_archetypes(arcsums, ARCHE_NAMES_ORDER)
 
-            main = archetype_extended.get(main_i, {})
-            second = archetype_extended.get(aux_i, {}) if aux_i != main_i else {}
-            supplement = archetype_extended.get(supp_i, {}) if supp_i not in [main_i, aux_i] else {}
+            main = get_archetype_payload_for_gender(main_i, report_gender_code)
+            second = (
+                get_archetype_payload_for_gender(aux_i, report_gender_code)
+                if aux_i != main_i
+                else {}
+            )
+            supplement = (
+                get_archetype_payload_for_gender(supp_i, report_gender_code)
+                if supp_i not in [main_i, aux_i]
+                else {}
+            )
 
             # wersje do wyświetlania – żeńskie/męskie
             main_disp = dict(main);
@@ -7226,11 +7339,17 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 supp_avg = None
 
             # >>> KARTY I OPISY: przygotuj dane archetypów na podstawie ŚREDNICH <<<
-            main_data = archetype_extended.get(main_avg, {})
-            second_data = archetype_extended.get(aux_avg,
-                                                 {}) if aux_avg and aux_avg != main_avg else {}
-            supp_data = archetype_extended.get(supp_avg, {}) if supp_avg and supp_avg not in [
-                main_avg, aux_avg] else {}
+            main_data = get_archetype_payload_for_gender(main_avg, report_gender_code)
+            second_data = (
+                get_archetype_payload_for_gender(aux_avg, report_gender_code)
+                if aux_avg and aux_avg != main_avg
+                else {}
+            )
+            supp_data = (
+                get_archetype_payload_for_gender(supp_avg, report_gender_code)
+                if supp_avg and supp_avg not in [main_avg, aux_avg]
+                else {}
+            )
 
             def _with_core_triplet(payload: dict, arche_name: str | None) -> dict:
                 out = dict(payload or {})
@@ -7914,19 +8033,19 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             """, unsafe_allow_html=True)
             st.markdown("<div id='opisy'></div>", unsafe_allow_html=True)
             st.markdown(f'<div style="font-size:2.1em;font-weight:700;margin-bottom:16px;">Archetyp główny {personGen}</div>', unsafe_allow_html=True)
-            render_archetype_card(main_disp, main=True, gender_code=("K" if IS_FEMALE else "M"))
+            render_archetype_card(main_disp, main=True, gender_code=report_gender_code)
 
             if aux_avg and aux_avg != main_avg:
                 st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp wspierający {personGen}</div>", unsafe_allow_html=True)
-                render_archetype_card(second_disp, main=False, gender_code=("K" if IS_FEMALE else "M"))
+                render_archetype_card(second_disp, main=False, gender_code=report_gender_code)
 
             if supp_avg and supp_avg not in [main_avg, aux_avg]:
                 st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
                 st.markdown("""<hr style="height:1.1px; border:none; background:#ddd; margin-top:6px; margin-bottom:18px;" />""", unsafe_allow_html=True)
                 st.markdown(f"<div style='font-size:1.63em;font-weight:700;margin-bottom:15px;'>Archetyp poboczny {personGen}</div>", unsafe_allow_html=True)
-                render_archetype_card(supp_disp, main=False, supplement=True, gender_code=("K" if IS_FEMALE else "M"))
+                render_archetype_card(supp_disp, main=False, supplement=True, gender_code=report_gender_code)
 
             if public_view:
                 return
@@ -8024,7 +8143,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     num_ankiet=num_ankiet,
                     panel_img_path=panel_img_path,
                     person=person,
-                    gender_code=("K" if IS_FEMALE else "M"),
+                    gender_code=report_gender_code,
                     axes_wheel_img_path="axes_wheel.png",
                     dom_color=dom_color,
                     color_progress_img_path=progress_png_path,
@@ -8051,7 +8170,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     archetype_table=archetype_table,
                     num_ankiet=num_ankiet,
                     panel_img_path=panel_img_path,
-                    gender_code=("K" if IS_FEMALE else "M"),
+                    gender_code=report_gender_code,
                     axes_wheel_img_path="axes_wheel.png",
                     dom_color=dom_color,
                     color_progress_img_path=progress_png_path,
