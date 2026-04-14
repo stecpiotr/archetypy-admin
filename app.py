@@ -2975,18 +2975,30 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             if parsed_question:
                                 q_item["prompt"] = parsed_question
                             q_scope = str(q_item.get("scope") or "").strip().lower()
-                            existing_opts_raw = q_item.get("options")
+                            # Bazujemy na aktualnym stanie tabeli odpowiedzi z bieżącego przebiegu
+                            # (a nie na historycznym q_item), aby nie gubić świeżo edytowanego kodowania.
                             existing_opts: List[Dict[str, str]] = []
-                            if isinstance(existing_opts_raw, list):
-                                for it in existing_opts_raw:
-                                    if not isinstance(it, dict):
-                                        continue
-                                    existing_opts.append(
-                                        {
-                                            "label": str(it.get("label") or "").strip(),
-                                            "code": str(it.get("code") or "").strip(),
-                                        }
-                                    )
+                            for it in options:
+                                if not isinstance(it, dict):
+                                    continue
+                                existing_opts.append(
+                                    {
+                                        "label": str(it.get("label") or "").strip(),
+                                        "code": str(it.get("code") or "").strip(),
+                                    }
+                                )
+                            if not existing_opts:
+                                existing_opts_raw = q_item.get("options")
+                                if isinstance(existing_opts_raw, list):
+                                    for it in existing_opts_raw:
+                                        if not isinstance(it, dict):
+                                            continue
+                                        existing_opts.append(
+                                            {
+                                                "label": str(it.get("label") or "").strip(),
+                                                "code": str(it.get("code") or "").strip(),
+                                            }
+                                        )
 
                             old_codes_by_label: Dict[str, str] = {}
                             for opt in existing_opts:
@@ -3012,7 +3024,6 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.session_state[paste_toggle_key] = False
                         st.session_state[paste_clear_key] = True
                         st.session_state[scroll_target_key] = anchor_id
-                        _bump_metryczka_editor_nonce(kind, study_key)
                         st.rerun()
                 with b2:
                     if st.button(
@@ -3023,7 +3034,6 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.session_state[paste_toggle_key] = False
                         st.session_state[paste_clear_key] = True
                         st.session_state[scroll_target_key] = anchor_id
-                        _bump_metryczka_editor_nonce(kind, study_key)
                         st.rerun()
 
         final_code = str(code_value or "").strip().upper()
@@ -3069,7 +3079,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
 
     scroll_target = str(st.session_state.pop(scroll_target_key, "") or "").strip()
     if scroll_target:
-        st.markdown(
+        html_component(
             f"""
             <script>
             (function(){{
@@ -3077,12 +3087,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
               const root = (window.parent && window.parent.document) ? window.parent.document : document;
               const el = root.getElementById(id);
               if (el) {{
-                setTimeout(() => el.scrollIntoView({{behavior:'auto', block:'center'}}), 0);
+                setTimeout(() => el.scrollIntoView({{behavior:'auto', block:'center'}}), 10);
               }}
             }})();
             </script>
             """,
-            unsafe_allow_html=True,
+            height=0,
         )
 
     return deepcopy(st.session_state.get(state_key) or cfg_out)
@@ -3149,12 +3159,19 @@ def jst_metryczka_view() -> None:
     )
 
     save_intent_key = _metryczka_save_intent_key("jst", sid)
+    save_intent = str(st.session_state.get(save_intent_key) or "").strip().lower()
     if st.button("💾 Zapisz metryczkę", type="primary", key=f"jst_metryczka_save_{sid}"):
-        # 1. klik kończy edycję aktywnej komórki data_editor, zapis robimy na kolejnym rerun.
-        st.session_state[save_intent_key] = True
+        # 1. klik uzbraja zapis; dalsze fazy robią bezpieczny commit edytora.
+        st.session_state[save_intent_key] = "arm"
         st.rerun()
 
-    if bool(st.session_state.pop(save_intent_key, False)):
+    if save_intent == "arm":
+        # Faza 2: dodatkowy rerun, żeby data_editor na pewno zacommitował aktywną komórkę.
+        st.session_state[save_intent_key] = "commit"
+        st.rerun()
+
+    if save_intent == "commit":
+        st.session_state.pop(save_intent_key, None)
         valid, msg = _validate_metryczka_before_save(edited_cfg)
         if not valid:
             st.error(msg)
@@ -6844,12 +6861,19 @@ def personal_metryczka_view() -> None:
     )
 
     save_intent_key = _metryczka_save_intent_key("personal", study_id or slug)
+    save_intent = str(st.session_state.get(save_intent_key) or "").strip().lower()
     if st.button("💾 Zapisz metryczkę", type="primary", key=f"personal_metryczka_save_{study_id or slug}"):
-        # 1. klik kończy edycję aktywnej komórki data_editor, zapis robimy na kolejnym rerun.
-        st.session_state[save_intent_key] = True
+        # 1. klik uzbraja zapis; dalsze fazy robią bezpieczny commit edytora.
+        st.session_state[save_intent_key] = "arm"
         st.rerun()
 
-    if bool(st.session_state.pop(save_intent_key, False)):
+    if save_intent == "arm":
+        # Faza 2: dodatkowy rerun, żeby data_editor na pewno zacommitował aktywną komórkę.
+        st.session_state[save_intent_key] = "commit"
+        st.rerun()
+
+    if save_intent == "commit":
+        st.session_state.pop(save_intent_key, None)
         if not study_id:
             st.error("Brak identyfikatora badania.")
         else:

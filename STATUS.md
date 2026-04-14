@@ -1859,3 +1859,25 @@
   - kodowanie odpowiedzi nie jest nadpisywane przez samą operację `Wklej pytanie i odpowiedzi`.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-080 (2026-04-14, metryczka: stabilizacja `Wstaw`)
+- `archetypy-admin/app.py`:
+  - przy `Wstaw` kodowanie odpowiedzi jest brane z bieżącego `options` (aktualnie edytowana tabela),
+  - usunięto resetujący `_bump_metryczka_editor_nonce(...)` z `Wstaw` i `Anuluj`,
+  - auto-scroll po operacji `Wstaw`/`Anuluj` przełączono na `html_component` (pewniejsze wykonanie JS po rerunie).
+- Efekt:
+  - mniejsze ryzyko utraty świeżo wpisanego kodowania,
+  - brak pełnego resetu widgetów metryczki po operacji wklejki,
+  - powinien zniknąć skok na górę strony.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-081 (2026-04-14, metryczka: fazowy commit zapisu)
+- `archetypy-admin/app.py`:
+  - zapis metryczki przeszedł z trybu jednoetapowego intent na tryb fazowy `arm -> commit -> save`,
+  - wdrożone równolegle dla JST i personalnych.
+- Efekt:
+  - większa odporność na przypadek, gdy aktywna komórka `data_editor` nie była jeszcze zatwierdzona w momencie kliku zapisu,
+  - redukcja objawu „muszę wpisać kodowanie drugi raz”.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

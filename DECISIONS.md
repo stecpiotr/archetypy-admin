@@ -1710,3 +1710,21 @@ Decyzja:
 Uzasadnienie:
 - User zgłosił krytyczny błąd UX (skok na górę) i błąd merytoryczny (nadpisywanie kodowania), które utrudniały bezpieczną edycję metryczki.
 - Funkcja wklejki ma wspierać treść pytań/odpowiedzi, a nie zmieniać warstwę kodowania danych.
+
+### D-189: `Wstaw` w metryczce nie może resetować widgetów ani opierać mapowania kodowania na starym snapshotcie
+Decyzja:
+- W operacji `Wstaw`:
+  - mapowanie `label -> code` opieramy najpierw o aktualne `options` z bieżącego renderu,
+  - usuwamy `_bump_metryczka_editor_nonce(...)` z `Wstaw` i `Anuluj`,
+  - scroll-restore wykonujemy przez `html_component`.
+Uzasadnienie:
+- `nonce bump` po `Wstaw`/`Anuluj` resetował klucze widgetów i mógł dawać efekt utraty świeżej edycji oraz skoku pozycji.
+- Mapa kodowania ze starego `q_item` mogła pomijać najnowsze zmiany użytkownika w tabeli odpowiedzi.
+
+### D-190: Zapis metryczki używa faz `arm -> commit -> save` dla pewnego commitu `data_editor`
+Decyzja:
+- `save_intent` dla metryczki przechowuje stan tekstowy fazy (`arm`, `commit`), a nie sam bool.
+- Właściwy zapis do DB wykonujemy dopiero w fazie `commit`.
+Uzasadnienie:
+- Na części interakcji `data_editor` potrzebuje dodatkowego przebiegu, by pewnie zatwierdzić aktywną komórkę.
+- Fazy zapisu minimalizują ryzyko utraty ostatniej zmiany kodowania przy pojedynczym kliknięciu `💾 Zapisz metryczkę`.

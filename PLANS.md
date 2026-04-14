@@ -2376,3 +2376,35 @@ Wynik:
     - usunięto wymuszanie nowych kodów `1..N`.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-080 [DONE]
+Temat: Metryczka — po `Wstaw` nadal skok na górę + nadal gubienie świeżo edytowanego kodowania.
+Kryteria ukończenia:
+1. Po `Wstaw`/`Anuluj` panel zostaje przy edytowanym pytaniu.
+2. Operacja `Wstaw` korzysta z bieżącego stanu kodowania (z tabeli odpowiedzi) i nie resetuje świeżych zmian.
+3. Brak wymuszonego resetu widgetów metryczki przy `Wstaw`/`Anuluj`.
+Pierwszy krok wykonawczy:
+- usunąć `nonce bump` z akcji panelu wklejki, przełączyć scroll-restore na `html_component`, a mapowanie kodów oprzeć o aktualne `options` z bieżącego przebiegu.
+Wynik:
+- `app.py` (`_render_metryczka_editor`):
+  - `Wstaw` mapuje kodowanie na podstawie aktualnych `options` (fallback: stare `q_item["options"]`),
+  - usunięto `_bump_metryczka_editor_nonce(...)` z `Wstaw` i `Anuluj` (koniec resetu całego zestawu widgetów),
+  - scroll-restore po `Wstaw`/`Anuluj` wykonuje się przez `html_component(..., height=0)`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-081 [DONE]
+Temat: Dodatkowe uszczelnienie zapisu kodowania (`data_editor`) — commit fazowy.
+Kryteria ukończenia:
+1. Jedno kliknięcie `💾 Zapisz metryczkę` nie wymaga ponownego wpisywania kodowania.
+2. Commit aktywnej komórki edytora jest domknięty przed właściwym zapisem do DB.
+Pierwszy krok wykonawczy:
+- zmienić `save intent` z bool na fazy `arm -> commit -> save` (2 reruny techniczne po jednym kliknięciu).
+Wynik:
+- `app.py`:
+  - w `jst_metryczka_view` i `personal_metryczka_view` zapis metryczki działa fazowo:
+    - klik przycisku ustawia `arm`,
+    - kolejny przebieg przechodzi do `commit`,
+    - następny przebieg wykonuje właściwy zapis i czyści flagę.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
