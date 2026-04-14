@@ -1893,3 +1893,20 @@
   - mniejsze ryzyko utraty świeżego wpisu kodowania przez nadmiarowy rerun flow zapisu.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+
+### Zrobione w Hotfix H-083 (2026-04-14, metryczka: scroll + zapis kodowania + domyślne kodowanie z odpowiedzi)
+- `archetypy-admin/app.py`:
+  - przebudowano scroll-restore po rerunach w edytorze metryczki:
+    - skrypt szuka kotwicy pytania przez kolejne poziomy `window.parent`,
+    - przewija widok przez `scrollTo` (fallback `scrollIntoView`) i powtarza próbę w pętli retry,
+  - uproszczono zapis metryczki (JST + personal) do bezpośredniego trybu po kliknięciu `💾 Zapisz metryczkę` (bez dodatkowych faz zapisu),
+  - w `Wklej pytanie i odpowiedzi` dla pytań custom:
+    - brakujące kodowanie otrzymuje propozycję `kodowanie = treść odpowiedzi`,
+    - istniejące kodowania są zachowywane przy możliwym dopasowaniu.
+- Efekt:
+  - mniej przypadków skoku do góry po `Dodaj pytanie metryczkowe` i `Wstaw`,
+  - mniejsze ryzyko "znikania" pierwszego wpisu kodowania przy zapisie,
+  - szybsze uzupełnianie kodowania po wklejeniu odpowiedzi.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

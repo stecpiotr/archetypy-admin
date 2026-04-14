@@ -1738,3 +1738,22 @@ Decyzja:
 Uzasadnienie:
 - Usuwanie wierszy z pustym kodem dawało mylący błąd „co najmniej 2 odpowiedzi” zamiast informacji o brakującym kodowaniu.
 - Nadmiarowe reruny w ścieżce zapisu pogarszały stabilność commitu pól edycyjnych.
+
+
+### D-192: Scroll-restore w metryczce musi działać także przy zagnieżdżonych iframe
+Decyzja:
+- Mechanizm powrotu do aktualnie edytowanego pytania po rerunie działa przez skrypt, który:
+  - przechodzi po łańcuchu `window -> parent -> ...`,
+  - szuka kotwicy pytania (`id`) na każdym poziomie dokumentu,
+  - przewija przez `scrollTo` z fallbackiem `scrollIntoView`,
+  - wykonuje retry przez kilkadziesiąt prób po rerunie.
+Uzasadnienie:
+- W części środowisk produkcyjnych panel jest renderowany w dodatkowych warstwach osadzenia; prosty dostęp tylko do jednego `parent.document` bywa niewystarczający i powoduje powrót na górę strony.
+
+### D-193: `Wklej pytanie i odpowiedzi` dla custom ma proponować kodowanie z treści odpowiedzi
+Decyzja:
+- W operacji `Wstaw` dla pytań custom:
+  - najpierw zachowujemy istniejące kodowania, jeśli można je dopasować (po etykiecie / ostrożny fallback),
+  - dla braków domyślnie proponujemy `kodowanie = treść odpowiedzi` (wartość edytowalna przez użytkownika).
+Uzasadnienie:
+- Użytkownik oczekuje szybkiej propozycji kodowania bez ręcznego przepisywania każdej pozycji, ale jednocześnie bez utraty już poprawionych kodów.

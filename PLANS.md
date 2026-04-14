@@ -2429,3 +2429,25 @@ Wynik:
     bez faz `arm/commit` i dodatkowych rerunów technicznych.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+
+### Hotfix H-083 [DONE]
+Temat: Metryczka - stabilizacja scroll po akcjach edytora + stabilizacja pierwszego zapisu kodowania.
+Kryteria ukończenia:
+1. Po `➕ Dodaj pytanie metryczkowe` i `Wstaw` edytor wraca do właściwego pytania zamiast zostawać na górze.
+2. Zapis metryczki nie wymaga dodatkowych faz rerun, które mogły gubić pierwszy wpis kodowania.
+3. Przy `Wklej pytanie i odpowiedzi` brakujące kodowanie dla odpowiedzi ma domyślną propozycję `kodowanie = treść odpowiedzi` (edytowalne).
+Pierwszy krok wykonawczy:
+- poprawić skrypt scroll-restoru (obsługa zagnieżdżonych iframe), uprościć flow zapisu i domknąć mapowanie kodów w `Wstaw`.
+Wynik:
+- `app.py`:
+  - scroll-restore w `_render_metryczka_editor` przebudowany:
+    - wyszukiwanie kotwicy przez łańcuch `window -> parent -> ...` (do kilku poziomów),
+    - przewijanie przez `scrollTo` z fallbackiem `scrollIntoView`,
+    - retry-loop (40 prób) po rerunie,
+  - zapis metryczki (`jst_metryczka_view`, `personal_metryczka_view`) uproszczony do bezpośredniego zapisu po kliknięciu `💾 Zapisz metryczkę`,
+  - `Wstaw` dla pytań custom:
+    - zachowuje istniejące kodowanie gdy da się je dopasować,
+    - gdy brak dopasowania, proponuje `code = label` (treść odpowiedzi), bez narzucania numeracji.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

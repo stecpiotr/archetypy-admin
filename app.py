@@ -2571,6 +2571,7 @@ def _metryczka_scroll_target_key(kind: str, study_key: str) -> str:
     return f"{kind}_metryczka_editor_scroll_target_{study_key}"
 
 
+
 def _metryczka_anchor_id(kind: str, study_key: str, ui_key: str) -> str:
     raw = f"metryczka-{kind}-{study_key}-{ui_key}"
     safe = re.sub(r"[^A-Za-z0-9_-]+", "-", raw).strip("-")
@@ -3013,8 +3014,14 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                     continue
                                 code_existing = old_codes_by_label.get(str(ans).strip().lower(), "")
                                 if (not code_existing) and i < len(existing_opts):
-                                    code_existing = str(existing_opts[i].get("code") or "").strip()
+                                    idx_code = str(existing_opts[i].get("code") or "").strip()
+                                    idx_label = str(existing_opts[i].get("label") or "").strip().lower()
+                                    if idx_code and idx_label and idx_label == str(ans).strip().lower():
+                                        code_existing = idx_code
                                 # Wklejka ma aktualizować treść pytania/odpowiedzi, nie narzucać nowych kodowań.
+                                if not code_existing:
+                                    # Propozycja domyślna: kodowanie = treść odpowiedzi (edytowalne przez użytkownika).
+                                    code_existing = ans
                                 new_options.append({"label": ans, "code": code_existing})
                             q_item["options"] = new_options
                             break
@@ -3071,49 +3078,70 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
     if st.button("➕ Dodaj pytanie metryczkowe", key=f"{widget_prefix}add_q", type="secondary"):
         working = deepcopy(st.session_state.get(state_key) or cfg_out)
         q_list = list(working.get("questions") or [])
-        q_list.append(_new_custom_metryczka_question(q_list))
+        new_q = _new_custom_metryczka_question(q_list)
+        q_list.append(new_q)
         working["questions"] = q_list
         st.session_state[state_key] = working
+        st.session_state[scroll_target_key] = _metryczka_anchor_id(
+            kind, study_key, str(new_q.get("_ui_key") or "")
+        )
         st.rerun()
 
     scroll_target = str(st.session_state.pop(scroll_target_key, "") or "").strip()
     if scroll_target:
-        st.markdown(
+        html_component(
             f"""
             <script>
             (function(){{
               const id = {json.dumps(scroll_target)};
-              const roots = [];
-              try {{ if (window && window.document) roots.push(window.document); }} catch(e) {{}}
-              try {{
-                if (window.parent && window.parent.document && window.parent.document !== window.document) {{
-                  roots.push(window.parent.document);
-                }}
-              }} catch(e) {{}}
 
-              const run = () => {{
-                for (const root of roots) {{
-                  const el = root.getElementById(id);
-                  if (el) {{
-                    try {{ root.defaultView.location.hash = id; }} catch(e) {{}}
-                    try {{ el.scrollIntoView({{behavior:'auto', block:'center'}}); }} catch(e) {{}}
-                    return true;
+              const findTarget = () => {{
+                let win = window;
+                let hops = 0;
+                while (win && hops < 6) {{
+                  try {{
+                    const doc = win.document;
+                    const el = doc ? doc.getElementById(id) : null;
+                    if (el) return {{ win, el }};
+                  }} catch (e) {{}}
+                  try {{
+                    if (!win.parent || win.parent === win) break;
+                    win = win.parent;
+                    hops += 1;
+                  }} catch (e) {{
+                    break;
                   }}
                 }}
-                return false;
+                return null;
+              }};
+
+              const scrollToTarget = () => {{
+                const found = findTarget();
+                if (!found) return false;
+                const hostWin = found.win;
+                const el = found.el;
+                try {{
+                  const rect = el.getBoundingClientRect();
+                  const top = Math.max(0, rect.top + hostWin.pageYOffset - Math.round(hostWin.innerHeight * 0.22));
+                  hostWin.scrollTo({{ top, behavior: 'auto' }});
+                }} catch (e) {{
+                  try {{ el.scrollIntoView({{ behavior: 'auto', block: 'center' }}); }} catch (e2) {{}}
+                }}
+                try {{ hostWin.location.hash = id; }} catch (e) {{}}
+                return true;
               }};
 
               let tries = 0;
               const timer = setInterval(() => {{
                 tries += 1;
-                if (run() || tries > 30) {{
+                if (scrollToTarget() || tries > 40) {{
                   clearInterval(timer);
                 }}
-              }}, 80);
+              }}, 75);
             }})();
             </script>
             """,
-            unsafe_allow_html=True,
+            height=1,
         )
 
     return deepcopy(st.session_state.get(state_key) or cfg_out)
