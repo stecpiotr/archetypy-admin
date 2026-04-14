@@ -1985,3 +1985,43 @@
   - `python -m py_compile app.py db_jst_utils.py metryczka_config.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-089 (2026-04-14, UI metryczki personalnej zbliżone do JST)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - sekcja metryczki personalnej została przebudowana z układu „siatkowych kafelków” na układ blokowy:
+    - pytanie jako osobna sekcja,
+    - odpowiedzi jako pionowa lista opcji (jak w JST),
+    - zachowane radio-marki i walidacja,
+    - zachowana obsługa pola doprecyzowania `M_ZAWOD_OTHER`.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - dodano dedykowane style `pm-metry-*` dla personalnej metryczki,
+  - zaznaczenia opcji i przycisk `Przejdź dalej` mają niebieski akcent (zgodnie z wymaganiem),
+  - dodano responsywne dopracowanie dla mobile.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Zrobione w Hotfix H-090 (2026-04-14, Punkt 3+4: profile demograficzne + segmenty matching)
+- `archetypy-admin/admin_dashboard.py`:
+  - `load(...)` pobiera teraz również `scores` z tabeli `responses` i parsuje je do dict,
+  - dodano helpery do obsługi metryczki personalnej z `scores.metryczka`:
+    - `_extract_personal_metry_payload(...)`,
+    - `_build_personal_metry_questions(...)`,
+    - `_metry_value_label(...)`,
+  - w `show_report(...)` dodano sekcję:
+    `👥 Profile demograficzne (filtr wielocechowy + radar)`
+    - filtr wielocechowy (AND) oparty o `metryczka_config` badania,
+    - liczebność podgrupy i próg minimalnego N,
+    - ostrzeżenie o niepewności dla małych podgrup,
+    - radar porównawczy: cała próba vs podgrupa filtrowana (skala 0-20).
+- `archetypy-admin/app.py` (`🧭 Matching`):
+  - dodano nową zakładkę `Segmenty` obok `Podsumowanie / Demografia / Strategia komunikacji`,
+  - dodano helper `_load_matching_segment_profiles(...)` (odczyt `SEGMENTY_ULTRA_PREMIUM_profile.csv` z katalogu runa JST),
+  - tabela segmentów w Matching liczy porównanie na tej samej skali 12 archetypów:
+    - `Śr. luka |Δ| (pp)` oraz `Zgodność (%) = 100 - MAE`,
+  - dodano kontrolę wiarygodności:
+    - `Minimalna liczebność segmentu (N)`,
+    - oznaczenie `Niepewne` i komunikaty ostrzegawcze dla segmentów poniżej progu,
+  - dodano radar polityk vs wybrany segment.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

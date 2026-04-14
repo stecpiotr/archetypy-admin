@@ -2540,3 +2540,48 @@ Wynik:
   - `python -m py_compile app.py db_jst_utils.py metryczka_config.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-089 [DONE]
+Temat: Uspójnienie wyglądu metryczki w ankiecie personalnej do stylu JST (z niebieskim akcentem).
+Kryteria ukończenia:
+1. Metryczka personalna ma układ „sekcje pytań + pionowe listy odpowiedzi” jak w JST (bez ciasnych kafelków siatkowych).
+2. Zaznaczenie opcji i CTA są w tonacji niebieskiej (zgodnie z prośbą), nie zielonej.
+3. Dalszy flow ankiety personalnej pozostaje bez regresji funkcjonalnej.
+Pierwszy krok wykonawczy:
+- przebudować markup sekcji metryczki w `Questionnaire.tsx` na dedykowane klasy i przenieść styling do CSS.
+Wynik:
+- `Questionnaire.tsx`:
+  - metryczka personalna renderuje teraz blokami pytań i pionowymi opcjami (układ jak JST),
+  - zachowana logika walidacji i `M_ZAWOD_OTHER`.
+- `SingleQuestionnaire.css`:
+  - dodano kompletny zestaw styli `pm-metry-*` dla metryczki personalnej,
+  - styl opcji/radiomarków i przycisku `Przejdź dalej` ustawiony na niebieski akcent.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
+### Hotfix H-090 [DONE]
+Temat: Punkt 3+4 — profile demograficzne (personal) + zakładka `Segmenty` w Matching.
+Kryteria ukończenia:
+1. W wynikach personalnych działa filtr wielocechowy metryczki (AND) i radar `Profile demograficzne`.
+2. W `🧭 Matching` istnieje zakładka `Segmenty` porównująca polityka do segmentów JST wyłącznie na tej samej skali 12 archetypów.
+3. Zakładka `Segmenty` ma kontrolę wiarygodności: minimalna liczebność `N` i komunikat niepewności dla segmentów poniżej progu.
+Pierwszy krok wykonawczy:
+- rozszerzyć loader personalnych odpowiedzi o `scores.metryczka` i dodać sekcję filtrowania+radaru w `admin_dashboard.py`; następnie dodać helper odczytu profili segmentów oraz nową zakładkę `Segmenty` w `app.py`.
+Wynik:
+- `admin_dashboard.py`:
+  - `load(...)` pobiera teraz `scores` obok `answers` i parsuje JSON,
+  - dodano helpery metryczki (`_extract_personal_metry_payload`, `_build_personal_metry_questions`, `_metry_value_label`),
+  - w `show_report(...)` wdrożono sekcję `👥 Profile demograficzne (filtr wielocechowy + radar)`:
+    - filtry wielocechowe (łączenie AND) po pytaniach z `metryczka_config`,
+    - liczebność podgrupy, próg minimalnego N i komunikat o niepewności,
+    - radar porównawczy: cała próba vs podgrupa filtrowana (skala 0-20).
+- `app.py` (`matching_view`):
+  - dodano nową zakładkę `Segmenty`,
+  - dodano helper `_load_matching_segment_profiles(...)` czytający profile segmentów z raportu JST (`SEGMENTY_ULTRA_PREMIUM_profile.csv`),
+  - porównanie segmentów do profilu polityka liczone na wspólnej skali 12 archetypów:
+    - `Śr. luka |Δ| (pp)` oraz `Zgodność (%) = 100 - MAE`,
+  - dodano kontrolę wiarygodności (`min N`) i ostrzeżenia dla segmentów niepewnych,
+  - dodano radar porównawczy polityk vs wybrany segment.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

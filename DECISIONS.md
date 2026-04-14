@@ -1810,3 +1810,36 @@ Decyzja:
 - Generowanie raportu JST dostaje pełny dataframe z kolumnami custom (bez obcinania do samego kanonu).
 Uzasadnienie:
 - Bez tego custom metryczka byłaby tracona przy imporcie/eksporcie i niewidoczna w `data.csv`, co blokowałoby dalszą analitykę demograficzną.
+
+### D-201: Personalna metryczka przyjmuje układ wizualny JST (pionowe opcje), ale z niebieskim akcentem
+Decyzja:
+- W ankiecie personalnej (`Questionnaire`) metryczkę renderujemy w układzie:
+  - blok pytania,
+  - pionowa lista opcji,
+  - czytelny znacznik radiowy,
+  podobnie do JST.
+- Kolor akcentu wyboru i CTA jest niebieski (nie zielony), aby zachować spójność z dotychczasową linią personalną.
+Uzasadnienie:
+- User oczekuje większej spójności UX między metryczką personalną i JST, przy jednoczesnym zachowaniu własnej kolorystyki personalnej.
+
+### D-202: Profilowanie demograficzne w wynikach personalnych działa jako filtr AND po metryczce + radar porównawczy
+Decyzja:
+- W module wyników personalnych dodajemy sekcję `Profile demograficzne` opartą o `metryczka_config` badania.
+- Każda wybrana cecha demograficzna działa koniunkcyjnie (AND), a wynik pokazujemy jako:
+  - liczebność podgrupy,
+  - radar `cała próba vs podgrupa` (skala 0-20).
+- Wprowadzamy próg minimalnej liczebności podgrupy i ostrzeżenie o niepewności poniżej progu.
+Uzasadnienie:
+- User oczekuje analizy wielocechowej (np. kobieta + wyższe + 60+) oraz szybkiego podglądu profilu archetypowego dla takiej kombinacji.
+- AND jest najbardziej jednoznaczną i operacyjnie czytelną semantyką filtra dla badań kampanijnych.
+
+### D-203: Zakładka `Segmenty` w Matching porównuje profile wyłącznie na wspólnej skali 12 archetypów (0-100)
+Decyzja:
+- W `🧭 Matching` dodajemy zakładkę `Segmenty`, która czyta profile segmentów JST z `SEGMENTY_ULTRA_PREMIUM_profile.csv`.
+- Metryka dopasowania segmentu do polityka:
+  - `Śr. luka |Δ| (pp)` = MAE po 12 archetypach,
+  - `Zgodność (%) = 100 - MAE`.
+- Segmenty poniżej zadanego progu `N` dostają status `Niepewne` i komunikat ostrzegawczy.
+Uzasadnienie:
+- User wymaga porównania tylko „na tej samej skali 12 archetypów”, bez mieszania innych osi czy heurystyk.
+- Kontrola wiarygodności (min N + ostrzeżenie) ogranicza ryzyko nadinterpretacji mikrosegmentów.

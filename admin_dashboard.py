@@ -58,6 +58,7 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
 from archetype_docx_loader import load_archetype_extended
+from metryczka_config import normalize_personal_metryczka_config
 
 import sys
 if sys.platform.startswith("linux"):
@@ -2906,7 +2907,7 @@ def load(study_id=None):
     import json
     try:
         engine = _sa_engine()
-        base_sql = "SELECT created_at, answers FROM public.responses"
+        base_sql = "SELECT created_at, answers, scores FROM public.responses"
         if study_id:
             query = sa.text(base_sql + " WHERE study_id = :sid ORDER BY created_at")
             with engine.begin() as conn:
@@ -2930,12 +2931,105 @@ def load(study_id=None):
                 return None
             return None
 
+        def parse_scores(x):
+            if isinstance(x, dict):
+                return x
+            if isinstance(x, str):
+                for loader in (json.loads, ast.literal_eval):
+                    try:
+                        val = loader(x)
+                        return val if isinstance(val, dict) else {}
+                    except Exception:
+                        pass
+                return {}
+            return {}
+
         if "answers" in df.columns:
             df["answers"] = df["answers"].apply(parse_answers)
+        if "scores" in df.columns:
+            df["scores"] = df["scores"].apply(parse_scores)
         return df
 
     except Exception as e:
         st.warning(f"Błąd podczas ładowania danych: {e}")
+
+
+def _norm_text_token(value: object) -> str:
+    txt = str(value or "").strip().lower()
+    repl = (
+        ("ą", "a"),
+        ("ć", "c"),
+        ("ę", "e"),
+        ("ł", "l"),
+        ("ń", "n"),
+        ("ó", "o"),
+        ("ś", "s"),
+        ("ż", "z"),
+        ("ź", "z"),
+    )
+    for src, dst in repl:
+        txt = txt.replace(src, dst)
+    return re.sub(r"\s+", " ", txt).strip()
+
+
+def _extract_personal_metry_payload(raw_scores: object) -> dict[str, str]:
+    if not isinstance(raw_scores, dict):
+        return {}
+    metry = raw_scores.get("metryczka")
+    candidate = metry if isinstance(metry, dict) else raw_scores
+    out: dict[str, str] = {}
+    for key, val in candidate.items():
+        k = str(key or "").strip()
+        if not k.startswith("M_"):
+            continue
+        v = str(val or "").strip()
+        if v:
+            out[k] = v
+    return out
+
+
+def _build_personal_metry_questions(study: dict) -> list[dict[str, object]]:
+    cfg = normalize_personal_metryczka_config((study or {}).get("metryczka_config"))
+    out: list[dict[str, object]] = []
+    for q in list(cfg.get("questions") or []):
+        if not isinstance(q, dict):
+            continue
+        qid = str(q.get("id") or "").strip()
+        db_col = str(q.get("db_column") or qid).strip()
+        if not db_col.startswith("M_"):
+            continue
+        options: list[dict[str, str]] = []
+        for opt in list(q.get("options") or []):
+            if not isinstance(opt, dict):
+                continue
+            label = str(opt.get("label") or "").strip()
+            code = str(opt.get("code") or label).strip()
+            if label and code:
+                options.append({"label": label, "code": code})
+        if not options:
+            continue
+        out.append(
+            {
+                "id": qid or db_col,
+                "db_column": db_col,
+                "prompt": str(q.get("prompt") or db_col).strip(),
+                "options": options,
+            }
+        )
+    return out
+
+
+def _metry_value_label(question: dict[str, object], code: str) -> str:
+    raw = str(code or "").strip()
+    if not raw:
+        return "brak danych"
+    for opt in list(question.get("options") or []):
+        if not isinstance(opt, dict):
+            continue
+        if str(opt.get("code") or "").strip() == raw:
+            label = str(opt.get("label") or "").strip()
+            return label or raw
+    return raw
 
 
 
@@ -6062,6 +6156,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     # --- Analiza respondentów i agregacja ---
 
     if "answers" in data.columns and not data.empty:
+        metry_questions = _build_personal_metry_questions(study)
 
         results = []
 
@@ -6102,8 +6197,17 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 except Exception:
                     czas_ankiety = row["created_at"].strftime('%Y-%m-%d %H:%M:%S')
 
+            metry_payload = _extract_personal_metry_payload(row.get("scores"))
+            metry_row: dict[str, str] = {}
+            for mq in metry_questions:
+                db_col = str(mq.get("db_column") or "").strip()
+                qid = str(mq.get("id") or db_col).strip()
+                raw_code = str(metry_payload.get(db_col) or metry_payload.get(qid) or "").strip()
+                metry_row[f"METRY_{db_col}"] = raw_code
+
             results.append({
                 "Czas ankiety": czas_ankiety,
+                **metry_row,
                 **arcsums,
                 **{f"{k}_%": v for k, v in arcper.items()},
                 "Główny archetyp": main_i,
@@ -6262,6 +6366,178 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             col1, col2, col3 = st.columns([0.28, 0.36, 0.36], gap="small")
             means_pct = mean_pct_by_archetype_from_df(data)
+            means_20_all = {k: float(mean_archetype_scores.get(k, 0.0) or 0.0) for k in archetype_names}
+
+            metry_available: list[dict[str, object]] = []
+            for mq in metry_questions:
+                db_col = str(mq.get("db_column") or "").strip()
+                col_name = f"METRY_{db_col}"
+                if col_name not in results_df.columns:
+                    continue
+                col_series = results_df[col_name].fillna("").astype(str).str.strip()
+                if not bool(col_series.ne("").any()):
+                    continue
+                ordered_codes = [str((opt or {}).get("code") or "").strip() for opt in list(mq.get("options") or [])]
+                ordered_codes = [c for c in ordered_codes if c]
+                present = [c for c in ordered_codes if bool((col_series == c).any())]
+                extra = sorted(set(col_series[col_series != ""]) - set(present))
+                codes = present + list(extra)
+                if not codes:
+                    continue
+                metry_available.append(
+                    {
+                        "question": mq,
+                        "col_name": col_name,
+                        "codes": codes,
+                    }
+                )
+
+            if metry_available:
+                with st.expander("👥 Profile demograficzne (filtr wielocechowy + radar)", expanded=False):
+                    st.caption(
+                        "Filtry działają łącznie (AND): wybór np. płeć + wiek + wykształcenie zawęża profil do wspólnego segmentu respondentów."
+                    )
+                    min_demo_n = int(
+                        st.number_input(
+                            "Minimalna liczebność podgrupy (N) dla stabilnego wniosku",
+                            min_value=5,
+                            max_value=5000,
+                            value=30,
+                            step=1,
+                            key=f"personal_demo_min_n_{study_id}",
+                        )
+                    )
+
+                    filt_df = results_df.copy()
+                    active_filters: list[str] = []
+                    for item in metry_available:
+                        mq = item["question"]
+                        col_name = str(item["col_name"])
+                        db_col = str((mq or {}).get("db_column") or "").strip()
+                        prompt = str((mq or {}).get("prompt") or db_col).strip()
+                        options = list(item["codes"])
+                        selected = st.multiselect(
+                            prompt,
+                            options=options,
+                            default=[],
+                            format_func=(lambda code, q=mq: _metry_value_label(q, code)),
+                            key=f"personal_demo_filter_{study_id}_{db_col}",
+                        )
+                        if selected:
+                            filt_df = filt_df[filt_df[col_name].astype(str).isin([str(x) for x in selected])]
+                            labels = [_metry_value_label(mq, str(x)) for x in selected]
+                            active_filters.append(f"{prompt}: {', '.join(labels)}")
+
+                    n_all = int(len(results_df))
+                    n_filtered = int(len(filt_df))
+                    if active_filters:
+                        st.markdown("**Aktywne filtry:** " + " | ".join(active_filters))
+                    else:
+                        st.caption("Brak aktywnych filtrów: profil odpowiada całej próbie.")
+                    st.markdown(f"**Liczebność:** {n_filtered} / {n_all}")
+
+                    if n_filtered <= 0:
+                        st.warning("Brak odpowiedzi spełniających aktualny zestaw filtrów.")
+                    else:
+                        if n_filtered < min_demo_n:
+                            st.warning(
+                                f"Wynik ma podwyższoną niepewność (N={n_filtered}, próg stabilności: {min_demo_n})."
+                            )
+                        filtered_means_20 = {
+                            k: (
+                                float(pd.to_numeric(filt_df[k], errors="coerce").mean())
+                                if k in filt_df.columns and pd.to_numeric(filt_df[k], errors="coerce").notna().any()
+                                else 0.0
+                            )
+                            for k in archetype_names
+                        }
+                        filtered_top = pick_top_3_archetypes(filtered_means_20, archetype_names)
+                        filtered_main = filtered_top[0] if len(filtered_top) > 0 else None
+                        filtered_aux = filtered_top[1] if len(filtered_top) > 1 else None
+                        filtered_supp = filtered_top[2] if len(filtered_top) > 2 else None
+
+                        theta = [disp_name(n) for n in archetype_names]
+                        all_vals = [float(means_20_all.get(n, 0.0)) for n in archetype_names]
+                        filt_vals = [float(filtered_means_20.get(n, 0.0)) for n in archetype_names]
+                        marker_r = []
+                        marker_c = []
+                        for n in archetype_names:
+                            if n == filtered_main:
+                                marker_r.append(float(filtered_means_20.get(n, 0.0)))
+                                marker_c.append("#ef4444")
+                            elif n == filtered_aux:
+                                marker_r.append(float(filtered_means_20.get(n, 0.0)))
+                                marker_c.append("#f59e0b")
+                            elif n == filtered_supp:
+                                marker_r.append(float(filtered_means_20.get(n, 0.0)))
+                                marker_c.append("#22c55e")
+                            else:
+                                marker_r.append(None)
+                                marker_c.append("rgba(0,0,0,0)")
+
+                        demo_fig = go.Figure(
+                            data=[
+                                go.Scatterpolar(
+                                    r=all_vals + [all_vals[0]],
+                                    theta=theta + [theta[0]],
+                                    fill="toself",
+                                    fillcolor="rgba(37,99,235,0.14)",
+                                    line=dict(color="#2563eb", width=2.3),
+                                    name=f"Cała próba (N={n_all})",
+                                    hovertemplate="<b>%{theta}</b><br>Cała próba: %{r:.2f}<extra></extra>",
+                                ),
+                                go.Scatterpolar(
+                                    r=filt_vals + [filt_vals[0]],
+                                    theta=theta + [theta[0]],
+                                    fill="toself",
+                                    fillcolor="rgba(14,165,233,0.12)",
+                                    line=dict(color="#0284c7", width=3.0, dash="dot"),
+                                    name=f"Podgrupa filtrowana (N={n_filtered})",
+                                    hovertemplate="<b>%{theta}</b><br>Podgrupa: %{r:.2f}<extra></extra>",
+                                ),
+                                go.Scatterpolar(
+                                    r=marker_r,
+                                    theta=theta,
+                                    mode="markers",
+                                    marker=dict(size=14, color=marker_c, line=dict(color="#0f172a", width=1.7)),
+                                    showlegend=False,
+                                    hovertemplate="<b>%{theta}</b><br>TOP podgrupy: %{r:.2f}<extra></extra>",
+                                ),
+                            ]
+                        )
+                        demo_fig.update_layout(
+                            height=560 if not is_mobile else 430,
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            polar=dict(
+                                bgcolor="rgba(0,0,0,0)",
+                                radialaxis=dict(visible=True, range=[0, 20]),
+                                angularaxis=dict(
+                                    rotation=90,
+                                    direction="clockwise",
+                                    tickfont=dict(size=14 if not is_mobile else 10.5),
+                                ),
+                            ),
+                            margin=dict(l=20, r=20, t=40, b=40),
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.06,
+                                xanchor="center",
+                                x=0.5,
+                                bgcolor="rgba(255,255,255,0.92)",
+                                bordercolor="#dbe4ef",
+                                borderwidth=1,
+                            ),
+                        )
+                        st.plotly_chart(
+                            demo_fig,
+                            use_container_width=True,
+                            config={"displaylogo": False, "displayModeBar": False, "responsive": True},
+                            key=f"personal_demo_profile_radar_{study_id}",
+                        )
+                        st.caption(
+                            "Radar pokazuje średnią siłę archetypu w skali 0-20 dla całej próby oraz dla podgrupy złożonej z aktywnych filtrów."
+                        )
 
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (

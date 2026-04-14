@@ -5089,6 +5089,85 @@ def _norm(a: Dict[str, float]) -> float:
     return float(sum(float(a.get(k, 0.0)) ** 2 for k in JST_ARCHETYPES)) ** 0.5
 
 
+def _norm_arch_key(value: Any) -> str:
+    txt = str(value or "").strip().lower()
+    repl = (
+        ("ą", "a"),
+        ("ć", "c"),
+        ("ę", "e"),
+        ("ł", "l"),
+        ("ń", "n"),
+        ("ó", "o"),
+        ("ś", "s"),
+        ("ż", "z"),
+        ("ź", "z"),
+    )
+    for a, b in repl:
+        txt = txt.replace(a, b)
+    txt = re.sub(r"\s+", "", txt)
+    return txt
+
+
+def _safe_float_num(raw: Any, default: float = 0.0) -> float:
+    try:
+        v = float(raw)
+    except Exception:
+        return float(default)
+    return v if math.isfinite(v) else float(default)
+
+
+def _load_matching_segment_profiles(jst_study_id: str) -> Tuple[List[Dict[str, Any]], str, str]:
+    sid = str(jst_study_id or "").strip()
+    if not sid:
+        return [], "", "Brak ID badania JST."
+
+    template_root = Path(__file__).resolve().parent / "JST_Archetypy_Analiza"
+    csv_path = template_root / "_runs" / sid / "WYNIKI" / "SEGMENTY_ULTRA_PREMIUM_profile.csv"
+    if not csv_path.exists():
+        return [], str(csv_path), "Brak profili segmentów dla tego badania. Najpierw wygeneruj raport JST."
+
+    try:
+        df = pd.read_csv(csv_path, encoding="utf-8-sig")
+    except Exception as e:
+        return [], str(csv_path), f"Nie udało się odczytać pliku segmentów: {e}"
+    if df is None or df.empty:
+        return [], str(csv_path), "Plik segmentów jest pusty."
+
+    pm_col_by_arch: Dict[str, str] = {}
+    for col in [str(c) for c in df.columns]:
+        if not col.startswith("pm_share_"):
+            continue
+        arch_key = _norm_arch_key(col.replace("pm_share_", "", 1))
+        if arch_key and arch_key not in pm_col_by_arch:
+            pm_col_by_arch[arch_key] = col
+
+    out: List[Dict[str, Any]] = []
+    for idx, row in df.iterrows():
+        segment_profile: Dict[str, float] = {}
+        for arch in JST_ARCHETYPES:
+            col_name = f"pm_share_{arch}"
+            if col_name not in df.columns:
+                col_name = pm_col_by_arch.get(_norm_arch_key(arch), "")
+            val = _safe_float_num(row.get(col_name), 0.0)
+            segment_profile[arch] = float(max(0.0, min(100.0, val)))
+
+        seg_label = str(row.get("segment") or f"Seg_{idx + 1}").strip() or f"Seg_{idx + 1}"
+        out.append(
+            {
+                "segment": seg_label,
+                "segment_id": int(round(_safe_float_num(row.get("segment_id"), idx))),
+                "name_arche": str(row.get("name_marketing_arche") or "").strip(),
+                "name_values": str(row.get("name_marketing_values") or "").strip(),
+                "n": int(round(_safe_float_num(row.get("n"), 0.0))),
+                "share_pct": _safe_float_num(row.get("share_pct"), 0.0),
+                "profile": segment_profile,
+            }
+        )
+
+    out.sort(key=lambda x: (int(x.get("segment_id", 9999)), -float(x.get("share_pct", 0.0))))
+    return out, str(csv_path), ""
+
+
 def matching_view() -> None:
     require_auth()
     if not _require_jst_ready():
@@ -5183,7 +5262,9 @@ def matching_view() -> None:
     }
     j_options = {_jst_option_label(s): s for s in jst_studies}
 
-    tab_pick, tab_summary, tab_demo, tab_strategy = st.tabs(["Wybierz badania", "Podsumowanie", "Demografia", "Strategia komunikacji"])
+    tab_pick, tab_summary, tab_demo, tab_segments, tab_strategy = st.tabs(
+        ["Wybierz badania", "Podsumowanie", "Demografia", "Segmenty", "Strategia komunikacji"]
+    )
 
     with tab_pick:
         def _invalidate_matching_result() -> None:
@@ -5624,6 +5705,8 @@ def matching_view() -> None:
         with tab_summary:
             st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
         with tab_demo:
+            st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
+        with tab_segments:
             st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
         with tab_strategy:
             st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
@@ -6793,6 +6876,232 @@ def matching_view() -> None:
                 """,
                 unsafe_allow_html=True,
             )
+
+    with tab_segments:
+        person_profile_match = {
+            a: float((result.get("personal_profile") or {}).get(a, 0.0) or 0.0)
+            for a in JST_ARCHETYPES
+        }
+        jst_sid = str(result.get("jst_study_id") or "").strip()
+        person_sid = str(result.get("person_study_id") or "").strip()
+        segment_profiles, segment_source, segment_err = _load_matching_segment_profiles(jst_sid)
+
+        st.markdown(
+            "Porównanie działa wyłącznie na wspólnej skali 12 archetypów (0-100): "
+            "dla każdego segmentu liczona jest średnia luka |Δ| względem profilu polityka."
+        )
+        if segment_err:
+            st.warning(segment_err)
+            if segment_source:
+                st.caption(f"Oczekiwany plik segmentów: `{segment_source}`")
+        if not segment_profiles:
+            st.info("Brak danych segmentów do porównania w tym badaniu JST.")
+        else:
+            jst_n = int(result.get("jst_n") or 0)
+            default_min_seg_n = max(30, int(round(jst_n * 0.06))) if jst_n > 0 else 60
+            ctrl_a, ctrl_b = st.columns([0.55, 0.45], gap="large")
+            with ctrl_a:
+                min_seg_n = int(
+                    st.number_input(
+                        "Minimalna liczebność segmentu (N) dla wiarygodnego porównania",
+                        min_value=10,
+                        max_value=5000,
+                        value=int(default_min_seg_n),
+                        step=5,
+                        key=f"matching_segments_min_n_{person_sid}_{jst_sid}",
+                    )
+                )
+            with ctrl_b:
+                show_uncertain = bool(
+                    st.toggle(
+                        "Pokaż segmenty poniżej progu (niepewne)",
+                        value=True,
+                        key=f"matching_segments_show_uncertain_{person_sid}_{jst_sid}",
+                    )
+                )
+
+            seg_rows: List[Dict[str, Any]] = []
+            for seg in segment_profiles:
+                seg_profile = {
+                    a: float((seg.get("profile") or {}).get(a, 0.0) or 0.0)
+                    for a in JST_ARCHETYPES
+                }
+                diff_vals = [abs(float(person_profile_match.get(a, 0.0)) - float(seg_profile.get(a, 0.0))) for a in JST_ARCHETYPES]
+                mae = float(sum(diff_vals) / max(1, len(diff_vals)))
+                match_pct = float(max(0.0, min(100.0, 100.0 - mae)))
+                seg_n = int(seg.get("n") or 0)
+                reliable = bool(seg_n >= min_seg_n)
+                seg_name = (
+                    str(seg.get("name_values") or "").strip()
+                    if str(current_axis_label) == "Wartość"
+                    else str(seg.get("name_arche") or "").strip()
+                )
+                if not seg_name:
+                    seg_name = str(seg.get("name_arche") or seg.get("name_values") or seg.get("segment") or "").strip()
+                seg_rows.append(
+                    {
+                        "segment": str(seg.get("segment") or "").strip(),
+                        "segment_name": seg_name,
+                        "n": seg_n,
+                        "share_pct": float(seg.get("share_pct") or 0.0),
+                        "mae": mae,
+                        "match_pct": match_pct,
+                        "reliable": reliable,
+                        "profile": seg_profile,
+                    }
+                )
+
+            seg_rows.sort(
+                key=lambda r: (
+                    0 if bool(r.get("reliable")) else 1,
+                    -float(r.get("match_pct") or 0.0),
+                    float(r.get("mae") or 0.0),
+                )
+            )
+            visible_rows = list(seg_rows) if show_uncertain else [r for r in seg_rows if bool(r.get("reliable"))]
+            if not visible_rows:
+                st.warning("Po zastosowaniu progu wiarygodności nie ma segmentów do pokazania.")
+            else:
+                table_df = pd.DataFrame(
+                    [
+                        {
+                            "Segment": str(r["segment"]),
+                            "Nazwa segmentu": str(r["segment_name"]),
+                            "N": int(r["n"]),
+                            "Udział (%)": round(float(r["share_pct"]), 1),
+                            "Śr. luka |Δ| (pp)": round(float(r["mae"]), 1),
+                            "Zgodność (%)": round(float(r["match_pct"]), 1),
+                            "Wiarygodność": ("OK" if bool(r["reliable"]) else f"Niepewne (N<{min_seg_n})"),
+                        }
+                        for r in visible_rows
+                    ]
+                )
+                seg_height = min(560, 56 + 38 * len(table_df))
+                st.dataframe(table_df, use_container_width=True, hide_index=True, height=seg_height)
+
+                uncertain_count = int(sum(1 for r in visible_rows if not bool(r.get("reliable"))))
+                if uncertain_count > 0:
+                    st.warning(
+                        f"{uncertain_count} segment(ów) jest poniżej progu N={min_seg_n}. "
+                        "Wyniki traktuj orientacyjnie (wysoka niepewność estymacji)."
+                    )
+
+                reliable_rows = [r for r in visible_rows if bool(r.get("reliable"))]
+                if reliable_rows:
+                    best = reliable_rows[0]
+                    st.success(
+                        f"Najwyższa zgodność (segment wiarygodny): {best['segment']} — {best['segment_name']} "
+                        f"(zgodność {best['match_pct']:.1f}%, N={best['n']})."
+                    )
+                else:
+                    st.info("Brak segmentów spełniających próg wiarygodności. Obniż próg N lub traktuj wynik jako eksploracyjny.")
+
+                opt_map: Dict[str, Dict[str, Any]] = {}
+                for r in visible_rows:
+                    status_suffix = " • niepewne" if not bool(r.get("reliable")) else ""
+                    label = (
+                        f"{r['segment']} — {r['segment_name']} "
+                        f"(N={int(r['n'])}, zgodność={float(r['match_pct']):.1f}%){status_suffix}"
+                    )
+                    opt_map[label] = r
+                selected_label = st.selectbox(
+                    "Podgląd radarowy segmentu",
+                    list(opt_map.keys()),
+                    key=f"matching_segments_pick_{person_sid}_{jst_sid}",
+                )
+                selected_seg = opt_map[selected_label]
+                if not bool(selected_seg.get("reliable")):
+                    st.warning(
+                        f"Wybrany segment ma N={int(selected_seg.get('n') or 0)} (<{min_seg_n}) — interpretuj radar ostrożnie."
+                    )
+
+                radar_order = list(JST_ARCHETYPES)
+                radar_tick_labels = [_matching_entity_name(a, current_axis_label) for a in radar_order]
+                person_vals_20 = [float(person_profile_match.get(a, 0.0)) / 5.0 for a in radar_order]
+                seg_profile = {a: float((selected_seg.get("profile") or {}).get(a, 0.0)) for a in radar_order}
+                seg_vals_20 = [float(seg_profile.get(a, 0.0)) / 5.0 for a in radar_order]
+                seg_top3 = sorted(radar_order, key=lambda a: float(seg_profile.get(a, 0.0)), reverse=True)[:3]
+                seg_marker_r: List[Optional[float]] = []
+                seg_marker_c: List[str] = []
+                for a in radar_order:
+                    if a == (seg_top3[0] if len(seg_top3) > 0 else None):
+                        seg_marker_r.append(float(seg_profile.get(a, 0.0)) / 5.0)
+                        seg_marker_c.append("#ef4444")
+                    elif a == (seg_top3[1] if len(seg_top3) > 1 else None):
+                        seg_marker_r.append(float(seg_profile.get(a, 0.0)) / 5.0)
+                        seg_marker_c.append("#f59e0b")
+                    elif a == (seg_top3[2] if len(seg_top3) > 2 else None):
+                        seg_marker_r.append(float(seg_profile.get(a, 0.0)) / 5.0)
+                        seg_marker_c.append("#22c55e")
+                    else:
+                        seg_marker_r.append(None)
+                        seg_marker_c.append("rgba(0,0,0,0)")
+
+                fig_seg = go.Figure(
+                    data=[
+                        go.Scatterpolar(
+                            r=person_vals_20 + [person_vals_20[0]],
+                            theta=radar_tick_labels + [radar_tick_labels[0]],
+                            fill="toself",
+                            fillcolor="rgba(37,99,235,0.17)",
+                            line=dict(color="#2563eb", width=3),
+                            name=f"Polityk ({result.get('person_name_nom') or ''})",
+                            hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
+                        ),
+                        go.Scatterpolar(
+                            r=seg_vals_20 + [seg_vals_20[0]],
+                            theta=radar_tick_labels + [radar_tick_labels[0]],
+                            fill="toself",
+                            fillcolor="rgba(15,118,110,0.13)",
+                            line=dict(color="#0f766e", width=3, dash="dot"),
+                            name=f"Segment {selected_seg.get('segment')}",
+                            hovertemplate="<b>%{theta}</b><br>Segment: %{r:.2f}<extra></extra>",
+                        ),
+                        go.Scatterpolar(
+                            r=seg_marker_r,
+                            theta=radar_tick_labels,
+                            mode="markers",
+                            marker=dict(size=14, color=seg_marker_c, line=dict(color="#0f172a", width=1.8)),
+                            showlegend=False,
+                            hovertemplate="<b>%{theta}</b><br>TOP segmentu: %{r:.2f}<extra></extra>",
+                        ),
+                    ]
+                )
+                fig_seg.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    height=620,
+                    polar=dict(
+                        bgcolor="rgba(0,0,0,0)",
+                        radialaxis=dict(visible=True, range=[0, 20]),
+                        angularaxis=dict(
+                            tickfont=dict(size=14.5),
+                            tickvals=radar_tick_labels,
+                            ticktext=radar_tick_labels,
+                            rotation=90,
+                            direction="clockwise",
+                        ),
+                    ),
+                    margin=dict(l=24, r=24, t=42, b=44),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.05,
+                        xanchor="center",
+                        x=0.5,
+                        bgcolor="rgba(255,255,255,0.94)",
+                        bordercolor="#cfd9e8",
+                        borderwidth=1,
+                    ),
+                )
+                st.plotly_chart(
+                    fig_seg,
+                    use_container_width=True,
+                    config={"displaylogo": False, "displayModeBar": False, "responsive": True},
+                    key=f"matching-segment-radar-{person_sid}-{jst_sid}",
+                )
+                st.caption(
+                    "Metoda porównania: zgodność = 100 - średnia luka |Δ| dla tych samych 12 archetypów (skala 0-100)."
+                )
 
     with tab_strategy:
         strengths = [str(_matching_entity_name(x, current_axis_label)) for x in (result.get("strengths") or [])[:3]]
