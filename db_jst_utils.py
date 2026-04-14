@@ -117,6 +117,10 @@ def ensure_jst_schema() -> None:
       survey_auto_end_enabled BOOLEAN NOT NULL DEFAULT FALSE,
       survey_auto_end_at TIMESTAMPTZ NULL,
       survey_auto_end_applied_at TIMESTAMPTZ NULL,
+      survey_notify_on_response BOOLEAN NOT NULL DEFAULT FALSE,
+      survey_notify_email TEXT NULL,
+      survey_notify_last_count INTEGER NOT NULL DEFAULT 0,
+      survey_notify_last_sent_at TIMESTAMPTZ NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at TIMESTAMPTZ NULL
@@ -152,6 +156,14 @@ def ensure_jst_schema() -> None:
       ADD COLUMN IF NOT EXISTS survey_auto_end_at TIMESTAMPTZ NULL;
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS survey_auto_end_applied_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_notify_on_response BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_notify_email TEXT NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_notify_last_count INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_notify_last_sent_at TIMESTAMPTZ NULL;
     DO $jst_status_chk$
     BEGIN
       IF NOT EXISTS (
@@ -225,6 +237,14 @@ def ensure_jst_schema() -> None:
           ADD COLUMN IF NOT EXISTS survey_auto_end_at TIMESTAMPTZ NULL;
         ALTER TABLE public.studies
           ADD COLUMN IF NOT EXISTS survey_auto_end_applied_at TIMESTAMPTZ NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_notify_on_response BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_notify_email TEXT NULL;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_notify_last_count INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_notify_last_sent_at TIMESTAMPTZ NULL;
 
         IF NOT EXISTS (
           SELECT 1
@@ -347,7 +367,9 @@ def ensure_jst_schema() -> None:
           survey_auto_start_applied_at,
           survey_auto_end_enabled,
           survey_auto_end_at,
-          survey_auto_end_applied_at
+          survey_auto_end_applied_at,
+          survey_notify_on_response,
+          survey_notify_email
         FROM public.jst_studies
         WHERE slug = trim(coalesce(p_slug, ''))
           AND COALESCE(is_active, true)
@@ -997,6 +1019,10 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data.setdefault("survey_randomize_questions", False)
     data.setdefault("survey_auto_start_enabled", False)
     data.setdefault("survey_auto_end_enabled", False)
+    data.setdefault("survey_notify_on_response", False)
+    data.setdefault("survey_notify_email", None)
+    data.setdefault("survey_notify_last_count", 0)
+    data.setdefault("survey_notify_last_sent_at", None)
     data.setdefault("created_at", now_iso)
     data.setdefault("updated_at", now_iso)
     try:

@@ -913,6 +913,12 @@ def _normalize_survey_display_mode(raw: Any, *, allow_single: bool) -> str:
 
 
 def _extract_survey_settings(study: Dict[str, Any], *, allow_single: bool) -> Dict[str, Any]:
+    notify_raw = study.get("survey_notify_last_count")
+    notify_last_count = 0
+    try:
+        notify_last_count = max(0, int(notify_raw or 0))
+    except Exception:
+        notify_last_count = 0
     return {
         "display_mode": _normalize_survey_display_mode(study.get("survey_display_mode"), allow_single=allow_single),
         "show_progress": _bool_from_any(study.get("survey_show_progress"), True),
@@ -924,7 +930,205 @@ def _extract_survey_settings(study: Dict[str, Any], *, allow_single: bool) -> Di
         "auto_end_enabled": _bool_from_any(study.get("survey_auto_end_enabled"), False),
         "auto_end_at": study.get("survey_auto_end_at"),
         "auto_end_applied_at": study.get("survey_auto_end_applied_at"),
+        "notify_on_response": _bool_from_any(study.get("survey_notify_on_response"), False),
+        "notify_email": str(study.get("survey_notify_email") or "").strip(),
+        "notify_last_count": notify_last_count,
+        "notify_last_sent_at": study.get("survey_notify_last_sent_at"),
     }
+
+
+def _normalize_notify_email(raw: Any) -> str:
+    email = str(raw or "").strip().lower()
+    if not email:
+        return ""
+    if not EMAIL_RE.match(email):
+        return ""
+    return email
+
+
+def _survey_notify_title(study: Dict[str, Any], *, kind: str) -> str:
+    if kind == "jst":
+        full_nom = str(study.get("jst_full_nom") or "").strip()
+        if full_nom:
+            return full_nom
+        fallback = f"{str(study.get('jst_type') or '').title()} {str(study.get('jst_name') or '').strip()}".strip()
+        return fallback or "badaniu mieszkańców"
+
+    first = str(study.get("first_name_nom") or study.get("first_name") or "").strip()
+    last = str(study.get("last_name_nom") or study.get("last_name") or "").strip()
+    city = str(study.get("city") or "").strip()
+    base = f"{first} {last}".strip()
+    if base and city:
+        return f"{base} ({city})"
+    if base:
+        return base
+    slug = str(study.get("slug") or "").strip()
+    return f"/{slug}" if slug else "badaniu personalnym"
+
+
+def _survey_public_url(slug: str, *, kind: str) -> str:
+    clean_slug = str(slug or "").strip().lstrip("/")
+    if kind == "jst":
+        base = str(st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
+    else:
+        base = str(st.secrets.get("SURVEY_BASE_URL", "https://archetypy.badania.pro") or "").rstrip("/")
+    return f"{base}/{clean_slug}" if clean_slug else base
+
+
+def _survey_notify_body(study_title: str, survey_url: str, total_count: int) -> str:
+    safe_count = max(0, int(total_count or 0))
+    return (
+        f"Została udzielona odpowiedź w badaniu {study_title}, dostępnym pod adresem {survey_url}.\n\n"
+        f"Łączna liczba wypełnionych ankiet dla tego badania to: {safe_count}."
+    )
+
+
+def _send_response_notify_email(*, to_email: str, study_title: str, survey_url: str, total_count: int) -> Tuple[bool, str]:
+    try:
+        host, port, user, pwd, secure, from_email, from_name = _email_env()
+    except Exception as exc:
+        return False, str(exc)
+    ok, _provider_id, err = send_email(
+        host=host,
+        port=port,
+        username=user,
+        password=pwd,
+        secure=secure,
+        from_email=from_email,
+        from_name=from_name,
+        to_email=to_email,
+        subject=f"Nowa odpowiedź w badaniu {study_title}",
+        text=_survey_notify_body(study_title, survey_url, total_count),
+    )
+    return bool(ok), str(err or "")
+
+
+def _fetch_personal_counts_by_slug() -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    try:
+        res = sb.from_("study_response_count_v").select("slug,responses").execute()
+    except Exception:
+        return out
+    for row in (res.data or []):
+        slug = str(row.get("slug") or "").strip()
+        if not slug:
+            continue
+        try:
+            out[slug] = max(0, int(row.get("responses") or 0))
+        except Exception:
+            out[slug] = 0
+    return out
+
+
+def _dispatch_personal_response_notifications() -> None:
+    studies = fetch_studies(sb)
+    if not studies:
+        return
+    counts_by_slug = _fetch_personal_counts_by_slug()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for study in studies:
+        sid = str(study.get("id") or "").strip()
+        slug = str(study.get("slug") or "").strip()
+        if not sid or not slug:
+            continue
+        cfg = _extract_survey_settings(study, allow_single=True)
+        if not bool(cfg.get("notify_on_response")):
+            continue
+        notify_email = _normalize_notify_email(cfg.get("notify_email"))
+        if not notify_email:
+            continue
+        current_count = max(0, int(counts_by_slug.get(slug, 0)))
+        last_count = max(0, int(cfg.get("notify_last_count") or 0))
+        if current_count <= last_count:
+            if current_count < last_count:
+                try:
+                    sb.table("studies").update({"survey_notify_last_count": current_count}).eq("id", sid).execute()
+                except Exception:
+                    pass
+            continue
+        study_title = _survey_notify_title(study, kind="personal")
+        survey_url = _survey_public_url(slug, kind="personal")
+        ok, _err = _send_response_notify_email(
+            to_email=notify_email,
+            study_title=study_title,
+            survey_url=survey_url,
+            total_count=current_count,
+        )
+        if ok:
+            try:
+                sb.table("studies").update(
+                    {
+                        "survey_notify_last_count": current_count,
+                        "survey_notify_last_sent_at": now_iso,
+                    }
+                ).eq("id", sid).execute()
+            except Exception:
+                pass
+
+
+def _dispatch_jst_response_notifications() -> None:
+    studies = fetch_jst_studies(sb)
+    if not studies:
+        return
+    counts_by_id = fetch_jst_response_counts(sb)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for study in studies:
+        sid = str(study.get("id") or "").strip()
+        slug = str(study.get("slug") or "").strip()
+        if not sid or not slug:
+            continue
+        cfg = _extract_survey_settings(study, allow_single=False)
+        if not bool(cfg.get("notify_on_response")):
+            continue
+        notify_email = _normalize_notify_email(cfg.get("notify_email"))
+        if not notify_email:
+            continue
+        current_count = max(0, int(counts_by_id.get(sid, 0)))
+        last_count = max(0, int(cfg.get("notify_last_count") or 0))
+        if current_count <= last_count:
+            if current_count < last_count:
+                try:
+                    sb.table("jst_studies").update({"survey_notify_last_count": current_count}).eq("id", sid).execute()
+                except Exception:
+                    pass
+            continue
+        study_title = _survey_notify_title(study, kind="jst")
+        survey_url = _survey_public_url(slug, kind="jst")
+        ok, _err = _send_response_notify_email(
+            to_email=notify_email,
+            study_title=study_title,
+            survey_url=survey_url,
+            total_count=current_count,
+        )
+        if ok:
+            try:
+                sb.table("jst_studies").update(
+                    {
+                        "survey_notify_last_count": current_count,
+                        "survey_notify_last_sent_at": now_iso,
+                    }
+                ).eq("id", sid).execute()
+            except Exception:
+                pass
+
+
+def _run_response_notifications_dispatcher() -> None:
+    if not logged_in():
+        return
+    now_utc = datetime.now(timezone.utc)
+    last_run = st.session_state.get("_notify_dispatch_last_run_utc")
+    if isinstance(last_run, datetime):
+        if (now_utc - last_run).total_seconds() < 30:
+            return
+    st.session_state["_notify_dispatch_last_run_utc"] = now_utc
+    if not _ensure_jst_schema_initialized():
+        return
+    try:
+        _dispatch_personal_response_notifications()
+        _dispatch_jst_response_notifications()
+    except Exception:
+        # Dispatcher nie może blokować panelu.
+        pass
 
 
 def _scheduled_survey_transition_updates(study: Dict[str, Any], *, kind: str, now_utc: Optional[datetime] = None) -> Dict[str, Any]:
@@ -2329,6 +2533,20 @@ def jst_settings_view() -> None:
         key=f"jst_settings_back_{sid}",
     )
 
+    st.markdown("#### Powiadomienia")
+    notify_on_response = st.checkbox(
+        "Wysyłaj powiadomienie po uzyskaniu odpowiedzi",
+        value=bool(cfg.get("notify_on_response")),
+        key=f"jst_settings_notify_enabled_{sid}",
+    )
+    notify_email = st.text_input(
+        "Adres e-mail do powiadomień",
+        value=str(cfg.get("notify_email") or ""),
+        key=f"jst_settings_notify_email_{sid}",
+        disabled=not notify_on_response,
+        placeholder="np. imie.nazwisko@domena.pl",
+    )
+
     st.markdown("#### Automatyczny start i zakończenie badania")
     start_def_date, start_def_time = _utc_to_warsaw_input_defaults(
         cfg.get("auto_start_at"), fallback_hour=0, fallback_minute=0
@@ -2384,6 +2602,12 @@ def jst_settings_view() -> None:
         )
 
     if st.button("💾 Zapisz parametry ankiety", type="primary", key=f"jst_settings_save_params_{sid}"):
+        notify_email_clean = str(notify_email or "").strip().lower()
+        notify_email_valid = _normalize_notify_email(notify_email_clean)
+        if notify_on_response and not notify_email_valid:
+            st.error("Podaj poprawny adres e-mail do powiadomień.")
+            return
+
         start_iso = _local_date_time_to_utc_iso(start_date, start_time) if start_enabled else None
         end_iso = _local_date_time_to_utc_iso(end_date, end_time) if end_enabled else None
         if start_enabled and not start_iso:
@@ -2405,7 +2629,18 @@ def jst_settings_view() -> None:
             "survey_auto_start_at": start_iso if start_enabled else None,
             "survey_auto_end_enabled": bool(end_enabled),
             "survey_auto_end_at": end_iso if end_enabled else None,
+            "survey_notify_on_response": bool(notify_on_response),
+            "survey_notify_email": notify_email_clean or None,
         }
+        previous_notify_enabled = bool(cfg.get("notify_on_response"))
+        previous_notify_email = _normalize_notify_email(cfg.get("notify_email"))
+        current_count = int(counts_by_id.get(sid, 0))
+        if not notify_on_response:
+            updates["survey_notify_last_count"] = current_count
+        elif (not previous_notify_enabled) or (notify_email_valid != previous_notify_email):
+            updates["survey_notify_last_count"] = current_count
+            updates["survey_notify_last_sent_at"] = None
+
         if (bool(start_enabled) != bool(cfg.get("auto_start_enabled"))) or (
             bool(start_enabled) and str(start_iso or "") != str(cfg.get("auto_start_at") or "")
         ):
@@ -5915,6 +6150,20 @@ def personal_settings_view() -> None:
         key=f"personal_settings_back_{study_id or slug}",
     )
 
+    st.markdown("#### Powiadomienia")
+    notify_on_response = st.checkbox(
+        "Wysyłaj powiadomienie po uzyskaniu odpowiedzi",
+        value=bool(cfg.get("notify_on_response")),
+        key=f"personal_settings_notify_enabled_{study_id or slug}",
+    )
+    notify_email = st.text_input(
+        "Adres e-mail do powiadomień",
+        value=str(cfg.get("notify_email") or ""),
+        key=f"personal_settings_notify_email_{study_id or slug}",
+        disabled=not notify_on_response,
+        placeholder="np. imie.nazwisko@domena.pl",
+    )
+
     st.markdown("#### Automatyczny start i zakończenie badania")
     start_def_date, start_def_time = _utc_to_warsaw_input_defaults(
         cfg.get("auto_start_at"), fallback_hour=0, fallback_minute=0
@@ -5974,6 +6223,12 @@ def personal_settings_view() -> None:
         type="primary",
         key=f"personal_settings_save_params_{study_id or slug}",
     ):
+        notify_email_clean = str(notify_email or "").strip().lower()
+        notify_email_valid = _normalize_notify_email(notify_email_clean)
+        if notify_on_response and not notify_email_valid:
+            st.error("Podaj poprawny adres e-mail do powiadomień.")
+            return
+
         start_iso = _local_date_time_to_utc_iso(start_date, start_time) if start_enabled else None
         end_iso = _local_date_time_to_utc_iso(end_date, end_time) if end_enabled else None
         if start_enabled and not start_iso:
@@ -5998,7 +6253,18 @@ def personal_settings_view() -> None:
             "survey_auto_start_at": start_iso if start_enabled else None,
             "survey_auto_end_enabled": bool(end_enabled),
             "survey_auto_end_at": end_iso if end_enabled else None,
+            "survey_notify_on_response": bool(notify_on_response),
+            "survey_notify_email": notify_email_clean or None,
         }
+        previous_notify_enabled = bool(cfg.get("notify_on_response"))
+        previous_notify_email = _normalize_notify_email(cfg.get("notify_email"))
+        current_count = int(counts_by_slug.get(slug, 0))
+        if not notify_on_response:
+            updates["survey_notify_last_count"] = current_count
+        elif (not previous_notify_enabled) or (notify_email_valid != previous_notify_email):
+            updates["survey_notify_last_count"] = current_count
+            updates["survey_notify_last_sent_at"] = None
+
         if (bool(start_enabled) != bool(cfg.get("auto_start_enabled"))) or (
             bool(start_enabled) and str(start_iso or "") != str(cfg.get("auto_start_at") or "")
         ):
@@ -6971,6 +7237,7 @@ def send_link_view() -> None:
 # ───────────────────────── routing ─────────────────────────
 if "view" not in st.session_state:
     st.session_state["view"] = "login"
+_run_response_notifications_dispatcher()
 render_build_badge()
 with st.sidebar:
     if logged_in():

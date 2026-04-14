@@ -1529,3 +1529,31 @@
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK),
   - `python -m py_compile send_link_jst.py` (OK).
+
+### Zrobione w Hotfix H-059 (2026-04-14, powiadomienia e-mail po nowych odpowiedziach)
+- `db_jst_utils.py`:
+  - `ensure_jst_schema()` rozszerza `jst_studies` i `studies` o pola powiadomień:
+    - `survey_notify_on_response`,
+    - `survey_notify_email`,
+    - `survey_notify_last_count`,
+    - `survey_notify_last_sent_at`,
+  - `insert_jst_study(...)` ustawia domyślne wartości nowych pól.
+- `db_utils.py`:
+  - `insert_study(...)` ustawia domyślne wartości pól powiadomień dla badań personalnych.
+- `app.py`:
+  - `_extract_survey_settings(...)` odczytuje konfigurację powiadomień,
+  - `personal_settings_view` i `jst_settings_view`:
+    - nowa sekcja `Powiadomienia`,
+    - checkbox `Wysyłaj powiadomienie po uzyskaniu odpowiedzi`,
+    - aktywowane pole adresu e-mail,
+    - walidacja e-mail przy zapisie,
+    - baseline `survey_notify_last_count` ustawiany na bieżący licznik odpowiedzi przy aktywacji/zmianie adresu,
+  - dodano dispatcher `_run_response_notifications_dispatcher()` uruchamiany przy pracy panelu:
+    - monitoruje wzrost liczby odpowiedzi,
+    - wysyła e-mail notyfikacyjny dla personalnych i JST,
+    - po sukcesie aktualizuje `survey_notify_last_count` i `survey_notify_last_sent_at`.
+- Treść wysyłanego e-maila:
+  - `Została udzielona odpowiedź w badaniu {tytuł badania}, dostępnym pod adresem {link}.`
+  - `Łączna liczba wypełnionych ankiet dla tego badania to: {N}.`
+- Test techniczny:
+  - `python -m py_compile app.py db_jst_utils.py db_utils.py` (OK).

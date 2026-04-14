@@ -1434,3 +1434,20 @@ Decyzja:
 Uzasadnienie:
 - Sam podgląd transliterowany bez transliteracji payloadu prowadził do „krzaków” u odbiorcy.
 - Spójność `podgląd = zapis = realna wysyłka` usuwa klasę tych błędów.
+
+### D-162: Powiadomienia e-mail po nowych odpowiedziach opieramy na liczniku odpowiedzi + baseline per badanie
+Decyzja:
+- Dodajemy konfigurację powiadomień do `studies` i `jst_studies`:
+  - `survey_notify_on_response`,
+  - `survey_notify_email`,
+  - `survey_notify_last_count`,
+  - `survey_notify_last_sent_at`.
+- W `⚙️ Ustawienia ankiety` (personalne i JST) aktywacja checkboxa odblokowuje pole e-mail.
+- Po włączeniu powiadomień (lub zmianie adresu) zapisujemy baseline `survey_notify_last_count` równy bieżącej liczbie odpowiedzi, żeby nie wysyłać alertów historycznych.
+- Dispatcher w `app.py` monitoruje wzrost licznika odpowiedzi i po wzroście wysyła e-mail z:
+  - tytułem badania,
+  - linkiem do ankiety,
+  - łączną liczbą wypełnionych ankiet.
+Uzasadnienie:
+- Ankiety publiczne zapisują odpowiedzi bezpośrednio przez RPC do bazy, więc najbezpieczniej było dołożyć mechanizm monitorowania po stronie panelu administracyjnego bez ingerencji w frontendowe flow zapisu.
+- Baseline eliminuje ryzyko masowej wysyłki „wstecznej” przy pierwszym uruchomieniu opcji.
