@@ -1477,3 +1477,22 @@ Decyzja:
 Uzasadnienie:
 - User oczekuje spójnej ergonomii klawiatury między `archetypy.badania.pro` i `jst.badania.pro`.
 - Blokada skrótów w polach edycyjnych zapobiega przypadkowym przejściom podczas wpisywania tekstu.
+
+### D-166: Metryczka JST przechowuje konfigurację per badanie jako wersjonowany JSON
+Decyzja:
+- W `jst_studies` dodajemy:
+  - `metryczka_config (JSONB)`,
+  - `metryczka_config_version (INTEGER)`.
+- Model jest normalizowany przy zapisie i odczycie.
+Uzasadnienie:
+- Pozwala utrzymać niezależną konfigurację metryczki dla każdego badania JST bez łamania historycznych danych.
+- Wersjonowanie otwiera ścieżkę do przyszłych migracji parserów/importu.
+
+### D-167: Rdzeń metryczki (5 zmiennych) jest niezmienny identyfikatorowo, edytowalne są treści i opcje
+Decyzja:
+- Pola rdzeniowe pozostają stałe:
+  - `M_PLEC`, `M_WIEK`, `M_WYKSZT`, `M_ZAWOD`, `M_MATERIAL`.
+- Dodatkowe pytania działają jako `scope=custom` i muszą mieć unikalny `db_column`.
+Uzasadnienie:
+- Raporty i ważenie poststratyfikacyjne opierają się na stabilnych identyfikatorach rdzenia; ich zmienność rozwaliłaby kompatybilność analityczną.
+- Jednocześnie model musi pozwalać rozszerzać metryczkę o nowe zmienne demograficzne.

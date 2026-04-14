@@ -1975,3 +1975,33 @@ Wynik:
   - `python -m py_compile app.py db_jst_utils.py db_utils.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-061 [DONE]
+Temat: Fundament modelu `metryczka konfigurowalna` dla JST (rdzeń 5 pytań + pytania dodatkowe).
+Kryteria ukończenia:
+1. Jest jawny model danych metryczki z wersjonowaniem i walidacją.
+2. Definicja metryczki jest przechowywana per badanie JST.
+3. Nowe badania JST dostają domyślną konfigurację 5 pytań.
+4. Aktualizacja badania normalizuje konfigurację i pilnuje spójności rdzenia.
+Pierwszy krok wykonawczy:
+- dodać moduł modelu metryczki + kolumny w `jst_studies` + podpiąć default/normalizację w warstwie DB.
+Wynik:
+- dodano nowy moduł `metryczka_config.py`:
+  - domyślny model metryczki (`default_jst_metryczka_config`),
+  - normalizator/walidator (`normalize_jst_metryczka_config`),
+  - utrzymanie niezmiennego rdzenia 5 pytań (`M_PLEC`, `M_WIEK`, `M_WYKSZT`, `M_ZAWOD`, `M_MATERIAL`),
+  - obsługa pytań dodatkowych (`scope=custom`) z kontrolą kolizji `db_column`.
+- `db_jst_utils.py`:
+  - `ensure_jst_schema()` rozszerza `jst_studies` o:
+    - `metryczka_config JSONB`,
+    - `metryczka_config_version INTEGER`,
+  - `get_jst_study_public(...)` zwraca także pola konfiguracji metryczki,
+  - `insert_jst_study(...)` ustawia domyślną konfigurację metryczki dla nowych badań JST,
+  - `update_jst_study(...)` normalizuje `metryczka_config` przy zapisie,
+  - `fetch_jst_studies(...)` i `fetch_jst_study_by_id(...)` mają fallback normalizacji dla starszych rekordów bez konfiguracji.
+- dodano dokument projektowy `JST_METRYCZKA_MODEL.md`:
+  - model JSON,
+  - zasady mapowania do importu i raportów,
+  - strategia spójności i kolejność wdrożenia kolejnych etapów.
+- Smoke-check:
+  - `python -m py_compile db_jst_utils.py metryczka_config.py app.py` (OK).

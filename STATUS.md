@@ -1581,3 +1581,23 @@
   - `python -m py_compile app.py db_jst_utils.py db_utils.py` (OK),
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-061 (2026-04-14, fundament modelu metryczki konfigurowalnej JST)
+- Dodano moduł `metryczka_config.py`:
+  - definicja rdzenia 5 pytań metryczkowych,
+  - domyślny config metryczki per badanie JST,
+  - normalizacja i walidacja konfiguracji (rdzeń + pytania custom),
+  - zabezpieczenia: format ID, unikalność `db_column`, fallback do bezpiecznych defaultów.
+- `db_jst_utils.py`:
+  - `ensure_jst_schema()` rozszerza tabelę `jst_studies` o:
+    - `metryczka_config`,
+    - `metryczka_config_version`,
+  - `get_jst_study_public(...)` zwraca konfigurację metryczki,
+  - `insert_jst_study(...)` i `update_jst_study(...)` pracują na znormalizowanej konfiguracji,
+  - `fetch_jst_studies(...)` oraz `fetch_jst_study_by_id(...)` normalizują config przy odczycie (kompatybilność ze starszymi rekordami).
+- Dodano dokument `JST_METRYCZKA_MODEL.md`:
+  - model JSON metryczki,
+  - zasady mapowania do importu i raportów,
+  - plan dalszego wdrożenia (UI admin + render ankiety + parser raportów dla custom zmiennych).
+- Test techniczny:
+  - `python -m py_compile db_jst_utils.py metryczka_config.py app.py` (OK).

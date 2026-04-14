@@ -11,6 +11,7 @@ import pandas as pd
 import psycopg2
 import streamlit as st
 from supabase import Client
+from metryczka_config import default_jst_metryczka_config, normalize_jst_metryczka_config
 
 
 ARCHETYPES: List[str] = [
@@ -121,6 +122,8 @@ def ensure_jst_schema() -> None:
       survey_notify_email TEXT NULL,
       survey_notify_last_count INTEGER NOT NULL DEFAULT 0,
       survey_notify_last_sent_at TIMESTAMPTZ NULL,
+      metryczka_config JSONB NULL,
+      metryczka_config_version INTEGER NOT NULL DEFAULT 1,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at TIMESTAMPTZ NULL
@@ -164,6 +167,10 @@ def ensure_jst_schema() -> None:
       ADD COLUMN IF NOT EXISTS survey_notify_last_count INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS survey_notify_last_sent_at TIMESTAMPTZ NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS metryczka_config JSONB NULL;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS metryczka_config_version INTEGER NOT NULL DEFAULT 1;
     DO $jst_status_chk$
     BEGIN
       IF NOT EXISTS (
@@ -369,7 +376,9 @@ def ensure_jst_schema() -> None:
           survey_auto_end_at,
           survey_auto_end_applied_at,
           survey_notify_on_response,
-          survey_notify_email
+          survey_notify_email,
+          metryczka_config,
+          metryczka_config_version
         FROM public.jst_studies
         WHERE slug = trim(coalesce(p_slug, ''))
           AND COALESCE(is_active, true)
@@ -996,17 +1005,32 @@ def fetch_jst_studies(sb: Client, include_inactive: bool = False) -> List[Dict[s
     if not include_inactive:
         q = q.or_("is_active.is.true,is_active.is.null").is_("deleted_at", "null")
     res = q.execute()
-    return res.data or []
+    out: List[Dict[str, Any]] = []
+    for row in (res.data or []):
+        rec = dict(row)
+        cfg = normalize_jst_metryczka_config(rec.get("metryczka_config"))
+        rec["metryczka_config"] = cfg
+        rec["metryczka_config_version"] = int(cfg.get("version") or 1)
+        out.append(rec)
+    return out
 
 
 def fetch_jst_study_by_id(sb: Client, study_id: str) -> Optional[Dict[str, Any]]:
     res = sb.table("jst_studies").select("*").eq("id", str(study_id)).limit(1).execute()
     data = res.data or []
-    return data[0] if data else None
+    if not data:
+        return None
+    rec = dict(data[0])
+    cfg = normalize_jst_metryczka_config(rec.get("metryczka_config"))
+    rec["metryczka_config"] = cfg
+    rec["metryczka_config_version"] = int(cfg.get("version") or 1)
+    return rec
 
 
 def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data = dict(payload)
+    raw_metryczka = data.get("metryczka_config")
+    cfg_metryczka = normalize_jst_metryczka_config(raw_metryczka)
     now_iso = _utc_now_iso()
     data.setdefault("id", str(uuid.uuid4()))
     data.setdefault("is_active", True)
@@ -1023,6 +1047,8 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data.setdefault("survey_notify_email", None)
     data.setdefault("survey_notify_last_count", 0)
     data.setdefault("survey_notify_last_sent_at", None)
+    data["metryczka_config"] = cfg_metryczka if raw_metryczka is not None else default_jst_metryczka_config()
+    data.setdefault("metryczka_config_version", int(cfg_metryczka.get("version") or 1))
     data.setdefault("created_at", now_iso)
     data.setdefault("updated_at", now_iso)
     try:
@@ -1040,6 +1066,10 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def update_jst_study(sb: Client, study_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     data = dict(payload)
+    if "metryczka_config" in data:
+        cfg = normalize_jst_metryczka_config(data.get("metryczka_config"))
+        data["metryczka_config"] = cfg
+        data["metryczka_config_version"] = int(cfg.get("version") or 1)
     data["updated_at"] = _utc_now_iso()
     try:
         sb.table("jst_studies").update(data).eq("id", str(study_id)).execute()
