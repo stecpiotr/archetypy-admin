@@ -1656,3 +1656,19 @@ Uzasadnienie:
 - Użytkownik oczekuje workflow zgodnego z nagraniem referencyjnym: po otwarciu od razu edytowalny „blok” pytanie+odpowiedzi.
 - Większe pole wejściowe jest potrzebne przy realnych pytaniach z dłuższą listą odpowiedzi.
 - Domyślny markdown list dawał zbyt duże odstępy, co pogarszało czytelność podglądu.
+
+### D-183: Build badge ma degradację łagodną — `local + mtime` zamiast `unknown|unknown`
+Decyzja:
+- W `_app_build_signature()` rozszerzamy fallback SHA/czasu o dodatkowe env-y deployowe.
+- Gdy nadal brak czasu commita, używamy `mtime` pliku `app.py` jako ostatniego fallbacku czasu buildu.
+- Gdy nadal brak SHA, fallback skrótu commita to `local` (nie `unknown`).
+Uzasadnienie:
+- `unknown-time | commit: unknown` jest mylące operacyjnie i wygląda jak awaria aplikacji.
+- `local + mtime` daje czytelny sygnał, że aplikacja działa i ma konkretny build runtime, nawet bez pełnych metadanych Git.
+
+### D-184: Prefill w `Wklej pytanie i odpowiedzi` ma być bez numeracji opcji
+Decyzja:
+- W seedzie pola `Wklej treść` odpowiedzi zapisujemy jako czyste linie, bez prefiksów `1.`, `2.`, `3.`.
+- Placeholder również nie sugeruje numeracji.
+Uzasadnienie:
+- User wskazał, że numeracja w prefill jest zbędna i zaśmieca edycję; numerowanie odpowiedzi ma być elementem UI listy odpowiedzi, nie treści roboczej do wklejania.

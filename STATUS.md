@@ -1789,3 +1789,23 @@
   - podgląd nie „rozciąga” listy.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-074 (2026-04-14, stopka build: brak `unknown|unknown`)
+- `archetypy-admin/app.py` (`_app_build_signature`):
+  - rozszerzono fallbacki SHA i czasu o dodatkowe zmienne środowiskowe używane przez różne platformy deploy,
+  - dodano awaryjny fallback czasu po `mtime` pliku `app.py`,
+  - fallback skrótu commita zmieniono z `unknown` na `local`.
+- Efekt:
+  - stopka nie powinna już wpadać w stan `build: unknown-time | commit: unknown` przy chwilowej niedostępności GitHub API lub braku `.git`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-075 (2026-04-14, metryczka paste: bez numeracji w prefill)
+- `archetypy-admin/app.py`:
+  - usunięto automatyczne dodawanie numerów (`1.`, `2.`, `3.` ...) w prefill pola `Wklej treść`,
+  - placeholder pola `Wklej treść` także bez numeracji.
+- Efekt:
+  - panel `Wklej pytanie i odpowiedzi` pokazuje czysty, prosty tekst odpowiedzi,
+  - numeracja pozostaje tam, gdzie powinna (w samym edytorze listy odpowiedzi), a nie w treści do wklejania/edycji.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

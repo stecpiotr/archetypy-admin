@@ -245,6 +245,12 @@ def _app_build_signature() -> str:
             os.getenv("GITHUB_SHA"),
             os.getenv("COMMIT_SHA"),
             os.getenv("VERCEL_GIT_COMMIT_SHA"),
+            os.getenv("SOURCE_VERSION"),
+            os.getenv("RENDER_GIT_COMMIT"),
+            os.getenv("RAILWAY_GIT_COMMIT_SHA"),
+            os.getenv("CI_COMMIT_SHA"),
+            os.getenv("HEROKU_SLUG_COMMIT"),
+            os.getenv("CF_PAGES_COMMIT_SHA"),
             _secret_get("STREAMLIT_GIT_COMMIT_SHA"),
             _secret_get("GITHUB_SHA"),
             _secret_get("COMMIT_SHA"),
@@ -257,6 +263,9 @@ def _app_build_signature() -> str:
             os.getenv("COMMIT_TIME"),
             os.getenv("VERCEL_GIT_COMMIT_TIMESTAMP"),
             os.getenv("SOURCE_COMMIT_TIMESTAMP"),
+            os.getenv("RAILWAY_GIT_COMMIT_TIME"),
+            os.getenv("CI_COMMIT_TIMESTAMP"),
+            os.getenv("BUILD_TIMESTAMP"),
             _secret_get("STREAMLIT_GIT_COMMIT_TIME"),
             _secret_get("GITHUB_COMMIT_TIME"),
             _secret_get("COMMIT_TIME"),
@@ -275,9 +284,16 @@ def _app_build_signature() -> str:
         if sha_committed_at:
             raw_commit_time = sha_committed_at
 
+    # Ostatni fallback czasu: mtime pliku app.py (lepsze niż unknown-time).
+    if not raw_commit_time:
+        try:
+            raw_commit_time = str(Path(__file__).resolve().stat().st_mtime)
+        except Exception:
+            raw_commit_time = ""
+
     build_time = _to_warsaw_time(raw_commit_time)
 
-    commit_short = commit[:8] if commit else "unknown"
+    commit_short = commit[:8] if commit else "local"
 
     if build_time:
         return f"build: {build_time} | commit: {commit_short}"
@@ -2872,7 +2888,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     seed_lines.append(f"Pytanie: {existing_prompt}")
                 if existing_answers:
                     seed_lines.append("Odpowiedzi:")
-                    seed_lines.extend([f"{i}. {ans}" for i, ans in enumerate(existing_answers, start=1)])
+                    seed_lines.extend(existing_answers)
                 st.session_state[paste_text_key] = "\n".join(seed_lines).strip()
 
         if bool(st.session_state.get(paste_toggle_key, False)):
@@ -2891,9 +2907,9 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         placeholder=(
                             "Pytanie: Treść pytania...\n"
                             "Odpowiedzi:\n"
-                            "1. Odpowiedź 1\n"
-                            "2. Odpowiedź 2\n"
-                            "3. Odpowiedź 3"
+                            "Odpowiedź 1\n"
+                            "Odpowiedź 2\n"
+                            "Odpowiedź 3"
                         ),
                         label_visibility="collapsed",
                     )

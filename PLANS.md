@@ -2277,3 +2277,36 @@ Wynik:
   - podgląd odpowiedzi renderowany bardziej kompaktowo (mniejsze marginesy i line-height `ul/li`).
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-074 [DONE]
+Temat: Stopka build fallbackowała do `unknown-time | commit: unknown` na części deployów.
+Kryteria ukończenia:
+1. Stopka ma stabilny fallback nawet bez `.git` i bez odpowiedzi GitHub API.
+2. `commit` nie pokazuje już `unknown` w scenariuszu awaryjnym.
+3. `build_time` ma awaryjny fallback zamiast `unknown-time`, gdy to możliwe.
+Pierwszy krok wykonawczy:
+- rozszerzyć źródła env/secrets w `_app_build_signature()` i dodać fallback czasu po `mtime` pliku `app.py`.
+Wynik:
+- `app.py` (`_app_build_signature`):
+  - dodano dodatkowe źródła SHA z env:
+    - `SOURCE_VERSION`, `RENDER_GIT_COMMIT`, `RAILWAY_GIT_COMMIT_SHA`, `CI_COMMIT_SHA`, `HEROKU_SLUG_COMMIT`, `CF_PAGES_COMMIT_SHA`,
+  - dodano dodatkowe źródła czasu commita:
+    - `RAILWAY_GIT_COMMIT_TIME`, `CI_COMMIT_TIMESTAMP`, `BUILD_TIMESTAMP`,
+  - dodano ostatni fallback czasu: `mtime` pliku `app.py`,
+  - fallback `commit_short` zmieniono z `unknown` na `local`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-075 [DONE]
+Temat: Usunięcie numeracji odpowiedzi z prefill panelu `Wklej pytanie i odpowiedzi`.
+Kryteria ukończenia:
+1. W prefill nie ma `1.`, `2.`, `3.` przed odpowiedziami.
+2. Numeracja nie jest sugerowana także w placeholderze pola wklejania.
+Pierwszy krok wykonawczy:
+- zmienić seed `paste_text_*` oraz placeholder textarea w `_render_metryczka_editor`.
+Wynik:
+- `app.py`:
+  - prefill panelu zapisuje odpowiedzi jako czyste linie (bez numerów),
+  - placeholder pokazuje wzorzec bez numeracji (`Odpowiedź 1`, `Odpowiedź 2`, `Odpowiedź 3`).
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
