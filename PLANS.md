@@ -2585,3 +2585,23 @@ Wynik:
   - dodano radar porównawczy polityk vs wybrany segment.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-091 [DONE]
+Temat: Segmenty w Matching — doprecyzowanie metodologii zgodności + dodanie bloku `📌 Statystyczny profil demograficzny segmentu`.
+Kryteria ukończenia:
+1. W `Segmentach` jest jasna informacja, że `Zgodność (%)` dla segmentu to `100 - MAE` (bez kar strategicznych z `Poziomu dopasowania`).
+2. Dla wybranego segmentu, pod radarami, renderuje się profil demograficzny (karty + tabela) w stylistyce zgodnej z widokiem referencyjnym.
+3. Profil segmentu liczony jest na podstawie przypisań respondentów do segmentów i metryczki JST, z zachowaniem wag poststratyfikacyjnych jeśli są aktywne.
+Pierwszy krok wykonawczy:
+- dodać loader przypisań `respondenci_segmenty_ultra_premium.csv`, podpiąć mapowanie `respondent_id -> segment` do danych JST w Matching i wyrenderować sekcję demograficzną segmentu.
+Wynik:
+- `app.py`:
+  - dodano `_load_matching_segment_membership(...)` (odczyt przypisań respondentów do segmentów),
+  - rozszerzono `matching_result` o `jst_demo_vectors` (`respondent_id`, `payload`, `weight`) i `_calc_jst_target_profile(...)` o przenoszenie `respondent_id`,
+  - w `tab_segments`:
+    - dopisano objaśnienie metodologii segmentowej (`Zgodność (%) = 100 - MAE`, bez kar strategicznych),
+    - dołożono sekcję `📌 STATYSTYCZNY PROFIL DEMOGRAFICZNY SEGMENTU` (karty top kategorii + nadreprezentacja),
+    - dołożono sekcję `👥 PROFIL DEMOGRAFICZNY SEGMENTU` (tabela % segment vs % ogół mieszkańców + różnica w pp),
+    - dodano notę o pokryciu mapowania segmentów i notę o wagowaniu.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

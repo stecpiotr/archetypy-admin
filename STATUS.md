@@ -2025,3 +2025,24 @@
   - dodano radar polityk vs wybrany segment.
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-091 (2026-04-14, segmenty: metodologia + profil demograficzny segmentu)
+- `archetypy-admin/app.py`:
+  - rozszerzono normalizację metryczki (`_canon_demo_value`) o pola:
+    - `M_WYKSZT`,
+    - `M_ZAWOD`,
+    - `M_MATERIAL`,
+  - dodano loader przypisań respondentów do segmentów:
+    - `_load_matching_segment_membership(...)` -> plik `respondenci_segmenty_ultra_premium.csv`,
+  - w `matching_result` zapisujemy teraz `jst_demo_vectors` (`respondent_id`, `payload`, `weight`), a `_calc_jst_target_profile(...)` przenosi `respondent_id` do `respondent_vectors`,
+  - w `🧭 Matching > Segmenty`:
+    - dodano jawne objaśnienie metody:
+      `Zgodność (%) = 100 - średnia luka |Δ|` dla pojedynczego segmentu,
+      bez dodatkowych kar strategicznych z `Poziomu dopasowania`,
+    - pod radarami dodano sekcje:
+      - `📌 STATYSTYCZNY PROFIL DEMOGRAFICZNY SEGMENTU` (karty top kategorii + najsilniejsza nadreprezentacja),
+      - `👥 PROFIL DEMOGRAFICZNY SEGMENTU` (tabela `% segment` vs `% ogół mieszkańców (ważony)` + różnica w pp),
+    - profil segmentu liczony jest z mapowania `respondent_id -> segment` i metryczki respondentów JST, z wagowaniem poststratyfikacyjnym (jeśli aktywne),
+    - dodano notę o pokryciu mapowania segmentów względem bieżącej próby JST.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

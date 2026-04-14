@@ -4889,7 +4889,14 @@ def _calc_jst_target_profile(
             d13_hit = 100.0 if d13 == a else 0.0
             vec[a] = float((a_strength + b1_hit + b2_hit + d13_hit) / 4.0)
 
-        respondent_vectors.append({"payload": payload, "vec": vec, "weight": w})
+        respondent_vectors.append(
+            {
+                "respondent_id": str(rec.get("respondent_id") or "").strip(),
+                "payload": payload,
+                "vec": vec,
+                "weight": w,
+            }
+        )
 
     comp_A = {
         a: (100.0 * float(a_num[a]) / float(a_den[a])) if float(a_den[a]) > 0 else float("nan")
@@ -5019,6 +5026,41 @@ def _canon_demo_value(field: str, value: Any) -> str:
             return "40-59"
         if "60" in n:
             return "60+"
+    elif field == "M_WYKSZT":
+        if "wyzsze" in n:
+            return "wyższe"
+        if "srednie" in n:
+            return "średnie"
+        if any(k in n for k in ("podstaw", "gimnaz", "zawod")):
+            return "podst./gim./zaw."
+    elif field == "M_ZAWOD":
+        if "umysl" in n:
+            return "prac. umysłowy"
+        if "fizycz" in n:
+            return "prac. fizyczny"
+        if "wlasn" in n and "firm" in n:
+            return "własna firma"
+        if "student" in n or "uczen" in n:
+            return "student/uczeń"
+        if "bezrobot" in n:
+            return "bezrobotny"
+        if "renc" in n or "emery" in n:
+            return "rencista/emeryt"
+        if "inna" in n or "jaka" in n:
+            return "inna"
+    elif field == "M_MATERIAL":
+        if "odmaw" in n:
+            return "odmowa"
+        if "bardzo dobrze" in n or "bardzo dobra" in n:
+            return "bardzo dobra"
+        if "raczej dobrze" in n or "raczej dobra" in n:
+            return "raczej dobra"
+        if "przeciet" in n or "srednio" in n:
+            return "przeciętna"
+        if "raczej zle" in n or "raczej zla" in n:
+            return "raczej zła"
+        if "bardzo zle" in n or "bardzo zla" in n or "ciezk" in n:
+            return "bardzo zła"
     return raw or "brak danych"
 
 
@@ -5166,6 +5208,28 @@ def _load_matching_segment_profiles(jst_study_id: str) -> Tuple[List[Dict[str, A
 
     out.sort(key=lambda x: (int(x.get("segment_id", 9999)), -float(x.get("share_pct", 0.0))))
     return out, str(csv_path), ""
+
+
+def _load_matching_segment_membership(jst_study_id: str) -> Tuple[pd.DataFrame, str, str]:
+    sid = str(jst_study_id or "").strip()
+    if not sid:
+        return pd.DataFrame(), "", "Brak ID badania JST."
+
+    template_root = Path(__file__).resolve().parent / "JST_Archetypy_Analiza"
+    csv_path = template_root / "_runs" / sid / "WYNIKI" / "respondenci_segmenty_ultra_premium.csv"
+    if not csv_path.exists():
+        return pd.DataFrame(), str(csv_path), "Brak przypisań respondentów do segmentów (CSV)."
+
+    try:
+        df = pd.read_csv(csv_path, encoding="utf-8-sig")
+    except Exception as e:
+        return pd.DataFrame(), str(csv_path), f"Nie udało się odczytać pliku przypisań segmentów: {e}"
+    if df is None or df.empty:
+        return pd.DataFrame(), str(csv_path), "Plik przypisań segmentów jest pusty."
+    for col in ("respondent_id", "segment"):
+        if col not in df.columns:
+            return pd.DataFrame(), str(csv_path), f"Brak wymaganej kolumny `{col}` w pliku przypisań segmentów."
+    return df, str(csv_path), ""
 
 
 def matching_view() -> None:
@@ -5681,6 +5745,14 @@ def matching_view() -> None:
                 "demo_jst_weighted_header": f"{jst_name_nom} / (po wagowaniu)",
                 "demo_weights_used": bool(weights_used),
                 "target_audit": target_audit,
+                "jst_demo_vectors": [
+                    {
+                        "respondent_id": str(rec.get("respondent_id") or "").strip(),
+                        "payload": (rec.get("payload") if isinstance(rec.get("payload"), dict) else {}),
+                        "weight": float(rec.get("weight") or 1.0),
+                    }
+                    for rec in respondent_vectors
+                ],
                 "match_formula": (
                     "base = 0.40*(100 - MAE) + 0.20*(100 - RMSE) + 0.20*(100 - TOP3_MAE) + 0.20*(100 - KEY_MAE); "
                     "kara_kluczowa = 0.56*KEY_MAE + 0.26*max(0, KEY_MAX - 10) + kara_wspolnych_priorytetow + kara_roznicy_priorytetu_glownego; "
@@ -6885,10 +6957,13 @@ def matching_view() -> None:
         jst_sid = str(result.get("jst_study_id") or "").strip()
         person_sid = str(result.get("person_study_id") or "").strip()
         segment_profiles, segment_source, segment_err = _load_matching_segment_profiles(jst_sid)
+        segment_membership_df, segment_membership_source, segment_membership_err = _load_matching_segment_membership(jst_sid)
 
         st.markdown(
             "Porównanie działa wyłącznie na wspólnej skali 12 archetypów (0-100): "
             "dla każdego segmentu liczona jest średnia luka |Δ| względem profilu polityka."
+            " W `Segmentach` wskaźnik `Zgodność (%) = 100 - średnia luka |Δ|` dla jednego segmentu i nie obejmuje "
+            "dodatkowych kar strategicznych z `Poziomu dopasowania` w zakładce `Podsumowanie`."
         )
         if segment_err:
             st.warning(segment_err)
@@ -6941,6 +7016,7 @@ def matching_view() -> None:
                 seg_rows.append(
                     {
                         "segment": str(seg.get("segment") or "").strip(),
+                        "segment_id": int(seg.get("segment_id") or 0),
                         "segment_name": seg_name,
                         "n": seg_n,
                         "share_pct": float(seg.get("share_pct") or 0.0),
@@ -7305,6 +7381,356 @@ def matching_view() -> None:
                     )
                 except Exception as e:
                     st.info(f"Nie udało się wygenerować porównania kół 0-100 dla segmentu: {e}")
+
+                st.markdown(
+                    """
+                    <style>
+                      .match-seg-demo-box{border:1px solid #dbe4ef;border-radius:12px;background:#fff;padding:10px 12px;margin:10px 0 10px 0;}
+                      .match-seg-demo-box-label{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;color:#334155;display:flex;align-items:center;gap:6px;}
+                      .match-seg-demo-box-note{color:#5f6b7a;font-size:12px;margin:2px 0 6px 0;}
+                      .match-seg-demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin:10px 0 8px 0;}
+                      .match-seg-demo-stat{border:1px solid #dbe4ef;border-radius:10px;background:#fff;padding:8px 10px;}
+                      .match-seg-demo-stat-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5f6b7a;}
+                      .match-seg-demo-stat-main{margin-top:2px;font-size:14px;font-weight:900;color:#111827;line-height:1.2;}
+                      .match-seg-demo-stat-sub{margin-top:2px;font-size:12.5px;color:#3f4954;}
+                      .match-seg-demo-table-wrap{overflow-x:auto;max-width:940px;}
+                      .match-seg-demo-table{margin-top:0;width:100%;min-width:720px;max-width:940px;border-collapse:collapse;border:3px solid #b8c2cc;background:#fff;font-size:13.5px;color:#334155;}
+                      .match-seg-demo-table th,.match-seg-demo-table td{padding:8px 10px;border:1px solid #dfe4ea;text-align:left;vertical-align:middle;}
+                      .match-seg-demo-table th{background:#f2f6fb;color:#1f2f44;font-weight:800;font-size:13.5px;}
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                if segment_membership_err:
+                    st.warning(segment_membership_err)
+                    if segment_membership_source:
+                        st.caption(f"Oczekiwany plik przypisań segmentów: `{segment_membership_source}`")
+                else:
+                    jst_demo_vectors_raw = result.get("jst_demo_vectors") or []
+                    jst_demo_vectors: List[Dict[str, Any]] = []
+                    for rec in jst_demo_vectors_raw if isinstance(jst_demo_vectors_raw, list) else []:
+                        if not isinstance(rec, dict):
+                            continue
+                        payload = rec.get("payload") if isinstance(rec.get("payload"), dict) else {}
+                        rid = str(rec.get("respondent_id") or "").strip()
+                        w = float(rec.get("weight") or 1.0) if math.isfinite(float(rec.get("weight") or 1.0)) else 1.0
+                        if not payload:
+                            continue
+                        jst_demo_vectors.append({"respondent_id": rid, "payload": payload, "weight": w})
+
+                    seg_demo_weights_used = bool(result.get("demo_weights_used"))
+                    if not jst_demo_vectors:
+                        try:
+                            jst_study_live = fetch_jst_study_by_id(sb, jst_sid) or {}
+                            j_rows_live = list_jst_responses(sb, jst_sid)
+                            payloads_live = [
+                                (r.get("payload") if isinstance(r.get("payload"), dict) else {})
+                                for r in j_rows_live
+                            ]
+                            weights_live, weights_used_live = _calc_poststrat_weights_for_payloads(payloads_live, jst_study_live)
+                            seg_demo_weights_used = bool(weights_used_live)
+                            for idx, row_live in enumerate(j_rows_live):
+                                payload_live = row_live.get("payload") if isinstance(row_live.get("payload"), dict) else {}
+                                if not payload_live:
+                                    continue
+                                rid_live = str(row_live.get("respondent_id") or "").strip()
+                                w_live = float(weights_live[idx]) if idx < len(weights_live) else 1.0
+                                if not math.isfinite(w_live) or w_live <= 0:
+                                    w_live = 1.0
+                                jst_demo_vectors.append({"respondent_id": rid_live, "payload": payload_live, "weight": w_live})
+                        except Exception as e:
+                            st.info(f"Nie udało się pobrać danych demograficznych segmentu: {e}")
+
+                    if not jst_demo_vectors:
+                        st.caption("Brak danych do wyliczenia statystycznego profilu demograficznego segmentu.")
+                    else:
+                        seg_assign_by_rid: Dict[str, Dict[str, Any]] = {}
+                        for _, seg_row in segment_membership_df.iterrows():
+                            rid = str(seg_row.get("respondent_id") or "").strip()
+                            if not rid:
+                                continue
+                            seg_label_row = str(seg_row.get("segment") or "").strip()
+                            seg_id_row = int(round(_safe_float_num(seg_row.get("segment_id"), -1)))
+                            seg_assign_by_rid[rid] = {
+                                "segment": seg_label_row,
+                                "segment_id": seg_id_row,
+                            }
+
+                        def _seg_norm(v: Any) -> str:
+                            return re.sub(r"\s+", "", str(v or "").strip().lower())
+
+                        selected_segment_norm = _seg_norm(selected_seg.get("segment"))
+                        selected_segment_id = int(selected_seg.get("segment_id") or -1)
+                        all_records: List[Dict[str, Any]] = []
+                        subset_records: List[Dict[str, Any]] = []
+                        for rec in jst_demo_vectors:
+                            rid = str(rec.get("respondent_id") or "").strip()
+                            if not rid:
+                                continue
+                            seg_meta = seg_assign_by_rid.get(rid)
+                            if not isinstance(seg_meta, dict):
+                                continue
+                            payload = rec.get("payload") if isinstance(rec.get("payload"), dict) else {}
+                            if not payload:
+                                continue
+                            w = float(rec.get("weight") or 1.0)
+                            if not math.isfinite(w) or w <= 0:
+                                w = 1.0
+                            entry = {
+                                "payload": payload,
+                                "weight": w,
+                                "segment": str(seg_meta.get("segment") or "").strip(),
+                                "segment_id": int(seg_meta.get("segment_id") or -1),
+                            }
+                            all_records.append(entry)
+                            same_by_id = selected_segment_id >= 0 and int(entry["segment_id"]) == selected_segment_id
+                            same_by_label = _seg_norm(entry["segment"]) == selected_segment_norm
+                            if same_by_id or same_by_label:
+                                subset_records.append(entry)
+
+                        if not all_records:
+                            st.caption("Brak wspólnych rekordów respondentów między odpowiedziami JST a plikiem przypisań segmentów.")
+                        elif not subset_records:
+                            st.caption("Brak danych respondentów dla wybranego segmentu.")
+                        else:
+                            variable_emoji = {
+                                "Płeć": "👫",
+                                "Wiek": "🧭",
+                                "Wykształcenie": "🎓",
+                                "Status zawodowy": "💼",
+                                "Sytuacja materialna": "💰",
+                            }
+                            dim_specs_seg = [
+                                {"label": "Płeć", "field": "M_PLEC", "order": ["kobieta", "mężczyzna"]},
+                                {"label": "Wiek", "field": "M_WIEK", "order": ["15-39", "40-59", "60+"]},
+                                {"label": "Wykształcenie", "field": "M_WYKSZT", "order": ["podst./gim./zaw.", "średnie", "wyższe"]},
+                                {"label": "Status zawodowy", "field": "M_ZAWOD", "order": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"]},
+                                {"label": "Sytuacja materialna", "field": "M_MATERIAL", "order": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"]},
+                            ]
+                            category_emoji = {
+                                "kobieta": "👩",
+                                "mężczyzna": "👨",
+                                "15-39": "🧑",
+                                "40-59": "🧑‍💼",
+                                "60+": "🧓",
+                                "podst./gim./zaw.": "🛠️",
+                                "średnie": "📘",
+                                "wyższe": "🎓",
+                                "prac. umysłowy": "🧠",
+                                "prac. fizyczny": "🛠️",
+                                "własna firma": "🏢",
+                                "student/uczeń": "🧑‍🎓",
+                                "bezrobotny": "🔎",
+                                "rencista/emeryt": "🌿",
+                                "inna": "🧩",
+                                "bardzo dobra": "😄",
+                                "raczej dobra": "🙂",
+                                "przeciętna": "😐",
+                                "raczej zła": "🙁",
+                                "bardzo zła": "😟",
+                                "odmowa": "🤐",
+                                "brak danych": "❔",
+                            }
+
+                            def _weighted_count_records(records: List[Dict[str, Any]], field: str) -> Dict[str, float]:
+                                out: Dict[str, float] = {}
+                                for rec in records:
+                                    payload = rec.get("payload") if isinstance(rec.get("payload"), dict) else {}
+                                    w = float(rec.get("weight") or 1.0)
+                                    if not math.isfinite(w) or w <= 0:
+                                        continue
+                                    val = _canon_demo_value(field, payload.get(field))
+                                    out[val] = float(out.get(val, 0.0)) + w
+                                return out
+
+                            seg_demo_rows: List[Dict[str, Any]] = []
+                            seg_demo_cards: List[Dict[str, Any]] = []
+                            for spec in dim_specs_seg:
+                                dim_label = str(spec["label"])
+                                field = str(spec["field"])
+                                dist_sub = _weighted_count_records(subset_records, field)
+                                dist_all = _weighted_count_records(all_records, field)
+                                sum_sub = float(sum(float(v) for v in dist_sub.values()))
+                                sum_all = float(sum(float(v) for v in dist_all.values()))
+                                known_order = list(spec.get("order") or [])
+                                unknown = sorted((set(dist_sub.keys()) | set(dist_all.keys())) - set(known_order))
+                                cats = known_order + unknown
+
+                                top_cat: Optional[str] = None
+                                top_pct = -1.0
+                                top_all_pct = 0.0
+                                for cat in cats:
+                                    c_sub = float(dist_sub.get(cat, 0.0))
+                                    c_all = float(dist_all.get(cat, 0.0))
+                                    pct_sub = (100.0 * c_sub / sum_sub) if sum_sub > 0 else 0.0
+                                    pct_all = (100.0 * c_all / sum_all) if sum_all > 0 else 0.0
+                                    if pct_sub > top_pct:
+                                        top_pct = pct_sub
+                                        top_cat = str(cat)
+                                        top_all_pct = pct_all
+                                    seg_demo_rows.append(
+                                        {
+                                            "Zmienna": dim_label,
+                                            "Kategoria": str(cat),
+                                            "% segment": round(pct_sub, 1),
+                                            "% ogół mieszkańców (ważony)": round(pct_all, 1),
+                                            "Róznica (w pp.)": round(pct_sub - pct_all, 1),
+                                        }
+                                    )
+                                if top_cat is not None:
+                                    seg_demo_cards.append(
+                                        {
+                                            "label": dim_label,
+                                            "top": str(top_cat),
+                                            "pct": round(max(top_pct, 0.0), 1),
+                                            "diff_pp": round(top_pct - top_all_pct, 1),
+                                            "emoji": str(category_emoji.get(str(top_cat), "•")),
+                                        }
+                                    )
+
+                            cards_html = "".join(
+                                f"""
+                                <div class="match-seg-demo-stat">
+                                  <div class="match-seg-demo-stat-label">{html.escape(str(variable_emoji.get(str(c.get("label") or ""), "📌")))} {html.escape(str(c.get("label") or "").upper())}</div>
+                                  <div class="match-seg-demo-stat-main">{html.escape(str(c.get("emoji") or ""))} {html.escape(str(c.get("top") or ""))}</div>
+                                  <div class="match-seg-demo-stat-sub">{float(c.get("pct") or 0.0):.1f}% • {float(c.get("diff_pp") or 0.0):+,.1f} pp</div>
+                                </div>
+                                """
+                                for c in seg_demo_cards
+                            )
+                            strongest = None
+                            if seg_demo_cards:
+                                strongest = max(seg_demo_cards, key=lambda x: float(x.get("diff_pp") or 0.0))
+                            strongest_note = ""
+                            if strongest is not None:
+                                strongest_note = (
+                                    f"Najmocniejsza nadreprezentacja: {str(strongest.get('label') or '')} – "
+                                    f"{str(strongest.get('top') or '')} ({float(strongest.get('diff_pp') or 0.0):+,.1f} pp)."
+                                )
+                            st.markdown(
+                                f"""
+                                <div class="match-seg-demo-box">
+                                  <div class="match-seg-demo-box-label">📌 STATYSTYCZNY PROFIL DEMOGRAFICZNY SEGMENTU</div>
+                                  <div class="match-seg-demo-cards">{cards_html}</div>
+                                  {"<div class='match-seg-demo-box-note'>" + html.escape(strongest_note) + "</div>" if strongest_note else ""}
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+
+                            ddf = pd.DataFrame(seg_demo_rows)
+                            if ddf.empty:
+                                st.caption("Brak danych demograficznych dla wybranego segmentu.")
+                            else:
+                                variable_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
+                                category_order = {
+                                    "Płeć": ["kobieta", "mężczyzna"],
+                                    "Wiek": ["15-39", "40-59", "60+"],
+                                    "Wykształcenie": ["podst./gim./zaw.", "średnie", "wyższe"],
+                                    "Status zawodowy": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
+                                    "Sytuacja materialna": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
+                                }
+                                ddf["% segment"] = pd.to_numeric(ddf["% segment"], errors="coerce").fillna(0.0).round(1)
+                                ddf["% ogół mieszkańców (ważony)"] = pd.to_numeric(ddf["% ogół mieszkańców (ważony)"], errors="coerce").fillna(0.0).round(1)
+                                ddf["Róznica (w pp.)"] = pd.to_numeric(ddf["Róznica (w pp.)"], errors="coerce").fillna(0.0).round(1)
+                                ddf["__var_order"] = ddf["Zmienna"].map(lambda v: variable_order.index(v) if v in variable_order else 999)
+                                ddf["__cat_order"] = ddf.apply(
+                                    lambda row: (
+                                        category_order.get(str(row["Zmienna"]), []).index(str(row["Kategoria"]))
+                                        if str(row["Kategoria"]) in category_order.get(str(row["Zmienna"]), [])
+                                        else 999
+                                    ),
+                                    axis=1,
+                                )
+                                ddf = ddf.sort_values(["__var_order", "__cat_order", "Kategoria"], ascending=[True, True, True])
+
+                                table_rows: List[str] = []
+                                for var_name in variable_order:
+                                    part = ddf[ddf["Zmienna"] == var_name].copy()
+                                    if part.empty:
+                                        continue
+                                    top_idx = part["% segment"].idxmax()
+                                    rowspan = len(part.index)
+                                    for idx, (_, row) in enumerate(part.iterrows()):
+                                        cat = str(row["Kategoria"])
+                                        pct_sub = float(row["% segment"])
+                                        pct_all = float(row["% ogół mieszkańców (ważony)"])
+                                        diff = float(row["Róznica (w pp.)"])
+                                        is_top = bool(row.name == top_idx)
+                                        bar_w = max(0.0, min(100.0, pct_sub))
+                                        var_icon = variable_emoji.get(var_name, "📌")
+                                        fill_color = "#8ecae6" if is_top else "#d8e5f1"
+                                        top_border = "border-top:3px solid #b8c2cc;"
+                                        diff_color = "#0f766e" if diff >= 0 else "#9a3412"
+                                        diff_text = f"{diff:+.1f} pp"
+                                        cat_weight = "800" if is_top else "500"
+                                        pct_weight = "900" if is_top else "600"
+                                        first_col = (
+                                            "<td "
+                                            f"rowspan='{rowspan}' "
+                                            f"style=\"font-weight:800; text-transform:uppercase; vertical-align:middle; background:#fafafa; border-left:3px solid #b8c2cc; {top_border}\">"
+                                            "<span style='display:inline-flex; align-items:center; gap:6px;'>"
+                                            f"<span>{html.escape(var_icon)}</span>"
+                                            f"<span>{html.escape(var_name)}</span>"
+                                            "</span>"
+                                            "</td>"
+                                            if idx == 0
+                                            else ""
+                                        )
+                                        table_rows.append(
+                                            "<tr>"
+                                            f"{first_col}"
+                                            f"<td style=\"font-size:13.5px; font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
+                                            "<span style='display:inline-flex; align-items:center; gap:6px;'>"
+                                            f"<span>{html.escape(category_emoji.get(cat, '📌'))}</span>"
+                                            f"<span>{html.escape(cat)}</span>"
+                                            "</span>"
+                                            "</td>"
+                                            f"<td style=\"padding:0; min-width:176px; border:1px solid #dfe4ea; {top_border if idx == 0 else ''}\">"
+                                            "<div style=\"position:relative; height:34px; background:#fff;\">"
+                                            f"<div style=\"position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:{fill_color}; opacity:0.96;\"></div>"
+                                            f"<span style=\"position:absolute; right:6px; top:6px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:13.5px; font-weight:{pct_weight}; color:#111;\">{pct_sub:.1f}%</span>"
+                                            "</div>"
+                                            "</td>"
+                                            f"<td style=\"font-size:13.5px; text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
+                                            f"<td style=\"font-size:13.5px; text-align:right; color:{diff_color}; font-weight:400; border-right:3px solid #b8c2cc; {top_border if idx == 0 else ''}\">{diff_text}</td>"
+                                            "</tr>"
+                                        )
+
+                                jst_weighted_header = str(result.get("demo_jst_weighted_header") or "JST / (po wagowaniu)")
+                                jst_weighted_header_html = html.escape(jst_weighted_header).replace(" / ", " /<br>")
+                                table_html = (
+                                    "<div class='match-seg-demo-table-wrap'>"
+                                    "<table class='match-seg-demo-table'>"
+                                    "<thead><tr>"
+                                    "<th style='min-width:150px; font-size:13.5px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
+                                    "<th style='min-width:220px; font-size:13.5px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
+                                    "<th style='min-width:176px; text-align:center; font-size:13.5px; border-top:3px solid #b8c2cc;'>% segment</th>"
+                                    f"<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>{jst_weighted_header_html}</th>"
+                                    "<th style='min-width:120px; text-align:center; border-top:3px solid #b8c2cc; border-right:3px solid #b8c2cc;'>Róznica (w pp.)</th>"
+                                    "</tr></thead><tbody>"
+                                    + "".join(table_rows)
+                                    + "</tbody></table></div>"
+                                )
+                                weights_note = (
+                                    "Wartości w kolumnie referencyjnej i segmencie liczone po wagowaniu (płeć × wiek)."
+                                    if seg_demo_weights_used
+                                    else "Brak zdefiniowanych wag poststratyfikacyjnych dla tego badania — pokazujemy rozkład surowy."
+                                )
+                                coverage_pct = 100.0 * float(len(all_records)) / max(1.0, float(len(jst_demo_vectors)))
+                                st.markdown(
+                                    f"""
+                                    <div class="match-seg-demo-box">
+                                      <div class="match-seg-demo-box-label">👥 PROFIL DEMOGRAFICZNY SEGMENTU</div>
+                                      <div class="match-seg-demo-box-note">W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.</div>
+                                      <div class="match-seg-demo-box-note">{html.escape(weights_note)}</div>
+                                      <div class="match-seg-demo-box-note">Pokrycie mapowania segmentów: {coverage_pct:.1f}% respondentów z bieżącej próby JST.</div>
+                                      {table_html}
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
 
     with tab_strategy:
         strengths = [str(_matching_entity_name(x, current_axis_label)) for x in (result.get("strengths") or [])[:3]]

@@ -1843,3 +1843,26 @@ Decyzja:
 Uzasadnienie:
 - User wymaga porównania tylko „na tej samej skali 12 archetypów”, bez mieszania innych osi czy heurystyk.
 - Kontrola wiarygodności (min N + ostrzeżenie) ogranicza ryzyko nadinterpretacji mikrosegmentów.
+
+### D-204: `Zgodność (%)` w `Segmentach` to metryka lokalna i nie jest równoważna `Poziomowi dopasowania` z `Podsumowania`
+Decyzja:
+- W `Segmentach` utrzymujemy prostą metrykę:
+  - `Zgodność (%) = 100 - MAE` (MAE po 12 archetypach) dla pojedynczego segmentu.
+- Nie dokładamy tam kar strategicznych (TOP/KEY), które są używane wyłącznie w globalnym wskaźniku `Poziom dopasowania` w `Podsumowaniu`.
+Uzasadnienie:
+- To dwa różne poziomy analizy:
+  - `Podsumowanie` ocenia dopasowanie do całego profilu mieszkańców (globalnie, z karami),
+  - `Segmenty` ocenia lokalną zbieżność do konkretnej podgrupy.
+- Dzięki temu można mieć niski globalny matching i jednocześnie wysoki matching dla części segmentów.
+
+### D-205: Profil demograficzny segmentu w Matching liczymy z mapowania `respondent_id -> segment` + metryczki JST
+Decyzja:
+- Źródłem segmentu jest plik runa:
+  - `WYNIKI/respondenci_segmenty_ultra_premium.csv`.
+- Źródłem demografii są payloady odpowiedzi JST (z wagami poststratyfikacyjnymi, jeśli aktywne dla badania).
+- Łączenie wykonujemy po `respondent_id`, a wynik pokazujemy jako:
+  - karty top kategorii (`📌 ...`),
+  - tabela `% segment` vs `% ogół mieszkańców (ważony)` + różnica w pp.
+Uzasadnienie:
+- Tylko połączenie po identyfikatorze respondenta daje poprawny, statystyczny profil segmentu zgodny z bieżącą próbą.
+- Pokazanie pokrycia mapowania ogranicza ryzyko nadinterpretacji, gdy część respondentów nie ma przypisanego segmentu.
