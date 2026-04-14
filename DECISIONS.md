@@ -1866,3 +1866,16 @@ Decyzja:
 Uzasadnienie:
 - Tylko połączenie po identyfikatorze respondenta daje poprawny, statystyczny profil segmentu zgodny z bieżącą próbą.
 - Pokazanie pokrycia mapowania ogranicza ryzyko nadinterpretacji, gdy część respondentów nie ma przypisanego segmentu.
+
+### D-206: `Segmenty` w Matching używają metryki strategicznej (tej samej rodziny co `Podsumowanie`)
+Decyzja:
+- Wskaźnik `Zgodność (%)` w zakładce `Segmenty` liczymy metryką strategiczną:
+  - `base = 0.40*(100-MAE) + 0.20*(100-RMSE) + 0.20*(100-TOP3_MAE) + 0.20*(100-KEY_MAE)`,
+  - `zgodność = clamp(0,100, base - kara_kluczowa)`.
+- Oznacza to odejście od uproszczonego `100 - MAE` jako finalnej zgodności segmentu.
+Uzasadnienie:
+- Proste `100 - MAE` zawyżało wynik przy profilach z dużymi rozjazdami strategicznymi (zwłaszcza na priorytetach TOP/KEY).
+- User zgłosił „absurdalnie wysokie” zgodności; metryka strategiczna usuwa ten efekt i ujednolica interpretację z `Podsumowaniem`.
+
+Status:
+- Decyzja D-204 zostaje zastąpiona przez D-206.

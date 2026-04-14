@@ -2605,3 +2605,22 @@ Wynik:
     - dodano notę o pokryciu mapowania segmentów i notę o wagowaniu.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-092 [DONE]
+Temat: Segmenty w Matching — przejście na metrykę strategiczną (jak w Podsumowaniu) i usunięcie zawyżonej zgodności `100-MAE`.
+Kryteria ukończenia:
+1. `Zgodność (%)` w tabeli Segmentów jest liczona tą samą logiką strategiczną co `Poziom dopasowania` (MAE/RMSE/TOP3/KEY + kary).
+2. Opisy metodologii w zakładce Segmenty i pod radarem nie wprowadzają w błąd (brak opisu `100-MAE` jako finalnej zgodności).
+3. W tabeli Segmentów liczby `Udział (%)`, `Śr. luka |Δ| (pp)` i `Zgodność (%)` są zawsze z 1 miejscem po przecinku.
+Pierwszy krok wykonawczy:
+- podmienić wyliczanie `match_pct` w pętli segmentów z `100 - MAE` na metrykę strategiczną i skorygować podpisy.
+Wynik:
+- `app.py`:
+  - dodano lokalny kalkulator strategiczny segmentu (`_segment_strategic_score`) oparty o:
+    - `base = 0.40*(100-MAE) + 0.20*(100-RMSE) + 0.20*(100-TOP3_MAE) + 0.20*(100-KEY_MAE)`,
+    - `match = clamp(0,100, base - kara_kluczowa)`,
+  - ranking i `Zgodność (%)` w tabeli Segmentów używają teraz `match` z tej metody,
+  - zaktualizowano opisy metody na górze Segmentów i pod radarem,
+  - utrzymano i dopięto formatowanie tabeli do stałego 1 miejsca po przecinku.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

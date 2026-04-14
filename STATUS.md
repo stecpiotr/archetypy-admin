@@ -2046,3 +2046,25 @@
     - dodano notę o pokryciu mapowania segmentów względem bieżącej próby JST.
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-092 (2026-04-14, segmenty: metryka strategiczna zamiast `100-MAE`)
+- `archetypy-admin/app.py` (`🧭 Matching > Segmenty`):
+  - zmieniono wyliczanie `Zgodność (%)` dla segmentów:
+    - było: `100 - MAE`,
+    - jest: metryka strategiczna jak w `Podsumowaniu` (`MAE + RMSE + TOP3_MAE + KEY_MAE` oraz kary kluczowe),
+  - dodano lokalne helpery:
+    - `_segment_priority_pool(...)` (TOP2/TOP3 z progiem 70),
+    - `_segment_strategic_score(...)` (finalny `match_pct` + metryki pomocnicze),
+  - zaktualizowano opisy metodologii:
+    - górny opis zakładki Segmenty,
+    - podpis pod radarem (metoda strategiczna, nie `100-MAE`),
+  - utrzymano stałe formatowanie 1 miejsca po przecinku dla:
+    - `Udział (%)`,
+    - `Śr. luka |Δ| (pp)`,
+    - `Zgodność (%)`,
+    oraz komunikatów/etykiet segmentu.
+- Efekt:
+  - znikają zawyżone wyniki zgodności wynikające z prostego `100-MAE`,
+  - porównanie Segmentów jest spójne metodycznie z `Podsumowaniem`.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

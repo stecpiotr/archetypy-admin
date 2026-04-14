@@ -6962,8 +6962,9 @@ def matching_view() -> None:
         st.markdown(
             "Porównanie działa wyłącznie na wspólnej skali 12 archetypów (0-100): "
             "dla każdego segmentu liczona jest średnia luka |Δ| względem profilu polityka."
-            " W `Segmentach` wskaźnik `Zgodność (%) = 100 - średnia luka |Δ|` dla jednego segmentu i nie obejmuje "
-            "dodatkowych kar strategicznych z `Poziomu dopasowania` w zakładce `Podsumowanie`."
+            " W `Segmentach` wskaźnik zgodności liczony jest teraz metryką strategiczną (jak w `Podsumowaniu`): "
+            "`base = 0.40*(100-MAE) + 0.20*(100-RMSE) + 0.20*(100-TOP3_MAE) + 0.20*(100-KEY_MAE)`, "
+            "`zgodność = clamp(0,100, base - kara_kluczowa)`."
         )
         if segment_err:
             st.warning(segment_err)
@@ -6995,15 +6996,74 @@ def matching_view() -> None:
                     )
                 )
 
+            arch_order = list(JST_ARCHETYPES)
+
+            def _segment_priority_pool(profile_100: Dict[str, float]) -> List[str]:
+                ordered = sorted(
+                    arch_order,
+                    key=lambda a: (-float(profile_100.get(a, 0.0)), arch_order.index(a)),
+                )
+                top3 = ordered[:3]
+                if len(top3) >= 3 and float(profile_100.get(top3[2], 0.0)) < 70.0:
+                    return top3[:2]
+                return top3
+
+            def _segment_strategic_score(person_profile_100: Dict[str, float], seg_profile_100: Dict[str, float]) -> Dict[str, float]:
+                diffs = {
+                    a: abs(float(person_profile_100.get(a, 0.0)) - float(seg_profile_100.get(a, 0.0)))
+                    for a in arch_order
+                }
+                diff_vals = [float(v) for v in diffs.values()]
+                mae = float(sum(diff_vals) / max(1, len(diff_vals)))
+                rmse = math.sqrt(float(sum(v * v for v in diff_vals) / max(1, len(diff_vals))))
+                sorted_gaps_desc = sorted(diff_vals, reverse=True)
+                top3_gap_mae = float(sum(sorted_gaps_desc[:3]) / max(1, min(3, len(sorted_gaps_desc))))
+
+                person_top = _segment_priority_pool(person_profile_100)
+                seg_top = _segment_priority_pool(seg_profile_100)
+                key_archetypes: List[str] = []
+                for arche in person_top + seg_top:
+                    if arche not in key_archetypes:
+                        key_archetypes.append(arche)
+                key_gap_vals = [float(diffs.get(a, 0.0)) for a in key_archetypes]
+                key_gap_mae = float(sum(key_gap_vals) / max(1, len(key_gap_vals)))
+                key_gap_max = float(max(key_gap_vals)) if key_gap_vals else 0.0
+                shared_priority_count = len(set(person_top).intersection(set(seg_top)))
+                main_priority_mismatch_penalty = (
+                    2.5 if (person_top and seg_top and person_top[0] != seg_top[0]) else 0.0
+                )
+                shared_priority_penalty = (
+                    5.5 if shared_priority_count == 0 else (2.0 if shared_priority_count == 1 else 0.0)
+                )
+
+                score_mae = max(0.0, min(100.0, 100.0 - mae))
+                score_rmse = max(0.0, min(100.0, 100.0 - rmse))
+                score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
+                score_key = max(0.0, min(100.0, 100.0 - key_gap_mae))
+                base_score = 0.40 * score_mae + 0.20 * score_rmse + 0.20 * score_top3 + 0.20 * score_key
+                key_penalty = (
+                    0.56 * key_gap_mae
+                    + 0.26 * max(0.0, key_gap_max - 10.0)
+                    + shared_priority_penalty
+                    + main_priority_mismatch_penalty
+                )
+                match_score = max(0.0, min(100.0, base_score - key_penalty))
+                return {
+                    "mae": float(mae),
+                    "match_pct": float(match_score),
+                    "key_gap_mae": float(key_gap_mae),
+                    "key_penalty": float(key_penalty),
+                }
+
             seg_rows: List[Dict[str, Any]] = []
             for seg in segment_profiles:
                 seg_profile = {
                     a: float((seg.get("profile") or {}).get(a, 0.0) or 0.0)
                     for a in JST_ARCHETYPES
                 }
-                diff_vals = [abs(float(person_profile_match.get(a, 0.0)) - float(seg_profile.get(a, 0.0))) for a in JST_ARCHETYPES]
-                mae = float(sum(diff_vals) / max(1, len(diff_vals)))
-                match_pct = float(max(0.0, min(100.0, 100.0 - mae)))
+                seg_metrics = _segment_strategic_score(person_profile_match, seg_profile)
+                mae = float(seg_metrics.get("mae", 0.0))
+                match_pct = float(seg_metrics.get("match_pct", 0.0))
                 seg_n = int(seg.get("n") or 0)
                 reliable = bool(seg_n >= min_seg_n)
                 seg_name = (
@@ -7022,6 +7082,8 @@ def matching_view() -> None:
                         "share_pct": float(seg.get("share_pct") or 0.0),
                         "mae": mae,
                         "match_pct": match_pct,
+                        "key_gap_mae": float(seg_metrics.get("key_gap_mae", 0.0)),
+                        "key_penalty": float(seg_metrics.get("key_penalty", 0.0)),
                         "reliable": reliable,
                         "profile": seg_profile,
                     }
@@ -7038,15 +7100,21 @@ def matching_view() -> None:
             if not visible_rows:
                 st.warning("Po zastosowaniu progu wiarygodności nie ma segmentów do pokazania.")
             else:
+                def _fmt1_pl(v: Any) -> str:
+                    try:
+                        return f"{float(v):.1f}".replace(".", ",")
+                    except Exception:
+                        return "0,0"
+
                 table_df = pd.DataFrame(
                     [
                         {
                             "Segment": str(r["segment"]),
                             "Nazwa segmentu": str(r["segment_name"]),
                             "N": int(r["n"]),
-                            "Udział (%)": round(float(r["share_pct"]), 1),
-                            "Śr. luka |Δ| (pp)": round(float(r["mae"]), 1),
-                            "Zgodność (%)": round(float(r["match_pct"]), 1),
+                            "Udział (%)": _fmt1_pl(r["share_pct"]),
+                            "Śr. luka |Δ| (pp)": _fmt1_pl(r["mae"]),
+                            "Zgodność (%)": _fmt1_pl(r["match_pct"]),
                             "Wiarygodność": ("OK" if bool(r["reliable"]) else f"Niepewne (N<{min_seg_n})"),
                         }
                         for r in visible_rows
@@ -7066,8 +7134,8 @@ def matching_view() -> None:
                 if reliable_rows:
                     best = reliable_rows[0]
                     st.success(
-                        f"Najwyższa zgodność (segment wiarygodny): {best['segment']} — {best['segment_name']} "
-                        f"(zgodność {best['match_pct']:.1f}%, N={best['n']})."
+                        f"Najwyższa zgodność strategiczna (segment wiarygodny): {best['segment']} — {best['segment_name']} "
+                        f"(zgodność {_fmt1_pl(best['match_pct'])}%, N={best['n']})."
                     )
                 else:
                     st.info("Brak segmentów spełniających próg wiarygodności. Obniż próg N lub traktuj wynik jako eksploracyjny.")
@@ -7077,7 +7145,7 @@ def matching_view() -> None:
                     status_suffix = " • niepewne" if not bool(r.get("reliable")) else ""
                     label = (
                         f"{r['segment']} — {r['segment_name']} "
-                        f"(N={int(r['n'])}, zgodność={float(r['match_pct']):.1f}%){status_suffix}"
+                        f"(N={int(r['n'])}, zgodność={_fmt1_pl(r['match_pct'])}%){status_suffix}"
                     )
                     opt_map[label] = r
                 st.markdown(
@@ -7315,7 +7383,8 @@ def matching_view() -> None:
                     unsafe_allow_html=True,
                 )
                 st.caption(
-                    "Metoda porównania: zgodność = 100 - średnia luka |Δ| dla tych samych 12 archetypów (skala 0-100)."
+                    "Metoda porównania strategicznego: ta sama formuła co w Podsumowaniu "
+                    "(MAE + RMSE + TOP3_MAE + KEY_MAE oraz kary kluczowe), liczona dla polityk vs wybrany segment."
                 )
 
                 profile_title = (
