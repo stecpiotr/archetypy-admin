@@ -1543,3 +1543,23 @@ Decyzja:
 Uzasadnienie:
 - User zgłosił, że pole jest zbyt wysokie i utrudnia szybkie przeglądanie wielu pytań.
 - Selektor po `id` nie był wystarczająco niezawodny dla renderu Streamlit, więc potrzebny był bardziej stabilny target.
+
+### D-173: Widget `paste_text_*` w metryczce czyścimy tylko przed renderem, nigdy po instancji
+Decyzja:
+- W `_render_metryczka_editor` pole tekstowe panelu `📋 Wklej pytanie i odpowiedzi` czyścimy przez flagę `paste_clear_*`.
+- Faktyczne czyszczenie wykonujemy przed renderem widgetu (`st.session_state.pop(paste_text_key, None)`), a nie przez bezpośredni zapis do `st.session_state[paste_text_key]` po utworzeniu textarea.
+- Dodatkowo usuwamy wymuszony `st.rerun()` przy samym otwieraniu panelu i utrzymujemy fallback podglądu do aktualnego pytania/odpowiedzi.
+Uzasadnienie:
+- Eliminuje `StreamlitAPIException` (`... cannot be modified after the widget ... is instantiated`) zgłoszony przy kliknięciu `Anuluj`.
+- Ogranicza skoki widoku (mniej zbędnych rerunów) i poprawia czytelność podglądu, gdy użytkownik dopiero otwiera panel bez wklejonej treści.
+
+### D-174: Metryczka — domyślna wysokość pola `Pytanie` ustawiona na wygodny wariant ~2 linii
+Decyzja:
+- W `app.py` dla `textarea[aria-label="Pytanie"]` przyjmujemy:
+  - `min-height: 50px`,
+  - `height: 50px`,
+  - `line-height: 1.3`,
+  - `resize: vertical`.
+Uzasadnienie:
+- Wariant `38px` po H-065 był zbyt niski w praktyce i utrudniał edycję dłuższych pytań.
+- `50px` daje czytelny start (ok. 2 linie) bez utraty kompaktowości widoku.

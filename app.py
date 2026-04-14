@@ -527,11 +527,11 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 .form-label-note{ font-weight:400; color:#748096; margin-left:6px; }
 .section-gap{ margin-top:18px; } .section-gap-big{ margin-top:26px; }
 
-/* Metryczka: pole "Pytanie" startuje od 1-2 linii, z możliwością rozszerzenia w dół */
+/* Metryczka: pole "Pytanie" startuje od ok. 2 linii, z możliwością rozszerzenia w dół */
 textarea[aria-label="Pytanie"]{
-  min-height: 38px !important;
-  height: 38px !important;
-  line-height: 1.25 !important;
+  min-height: 50px !important;
+  height: 50px !important;
+  line-height: 1.3 !important;
   resize: vertical !important;
 }
 .card{ border:1px solid var(--line); background:#fff; border-radius:14px; padding:18px 16px; }
@@ -2845,15 +2845,19 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
 
         paste_toggle_key = f"{widget_prefix}paste_open_{ui_key}"
         paste_text_key = f"{widget_prefix}paste_text_{ui_key}"
+        paste_clear_key = f"{widget_prefix}paste_clear_{ui_key}"
+        if bool(st.session_state.get(paste_clear_key, False)):
+            st.session_state.pop(paste_text_key, None)
+            st.session_state[paste_clear_key] = False
         if st.button(
             "📋 Wklej pytanie i odpowiedzi",
             key=f"{widget_prefix}paste_btn_{ui_key}",
             type="secondary",
         ):
-            st.session_state[paste_toggle_key] = not bool(st.session_state.get(paste_toggle_key, False))
-            if not st.session_state[paste_toggle_key]:
-                st.session_state[paste_text_key] = ""
-            st.rerun()
+            is_open = bool(st.session_state.get(paste_toggle_key, False))
+            st.session_state[paste_toggle_key] = not is_open
+            if is_open:
+                st.session_state[paste_clear_key] = True
 
         if bool(st.session_state.get(paste_toggle_key, False)):
             with st.container(border=True):
@@ -2877,18 +2881,25 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         label_visibility="collapsed",
                     )
                 parsed_question, parsed_answers = _parse_pasted_question_and_answers(
-                    st.session_state.get(paste_text_key, ""),
+                    pasted_text,
                     fallback_prompt=str(prompt or "").strip(),
                 )
+                fallback_answers = [
+                    str(opt.get("label") or "").strip()
+                    for opt in options
+                    if str(opt.get("label") or "").strip()
+                ]
+                preview_question = parsed_question or str(prompt or "").strip()
+                preview_answers = parsed_answers if parsed_answers else fallback_answers
                 with col_preview:
                     st.markdown("**Podgląd**")
-                    if parsed_question:
-                        st.markdown(f"**Treść pytania:** {parsed_question}")
+                    if preview_question:
+                        st.markdown(f"**Treść pytania:** {preview_question}")
                     else:
                         st.markdown("**Treść pytania:** _(brak)_")
-                    if parsed_answers:
+                    if preview_answers:
                         st.markdown("**Odpowiedzi:**")
-                        for ans in parsed_answers:
+                        for ans in preview_answers:
                             st.markdown(f"- {ans}")
                     else:
                         st.markdown("**Odpowiedzi:** _(brak)_")
@@ -2917,7 +2928,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         working["questions"] = q_list
                         st.session_state[state_key] = working
                         st.session_state[paste_toggle_key] = False
-                        st.session_state[paste_text_key] = ""
+                        st.session_state[paste_clear_key] = True
                         _bump_metryczka_editor_nonce(kind, study_key)
                         st.rerun()
                 with b2:
@@ -2927,7 +2938,8 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         type="secondary",
                     ):
                         st.session_state[paste_toggle_key] = False
-                        st.session_state[paste_text_key] = ""
+                        st.session_state[paste_clear_key] = True
+                        _bump_metryczka_editor_nonce(kind, study_key)
                         st.rerun()
 
         final_code = str(code_value or "").strip().upper()

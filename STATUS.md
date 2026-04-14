@@ -1672,3 +1672,28 @@
   - pozostawiono możliwość ręcznego rozszerzania pola w dół (`resize: vertical`).
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-066 (2026-04-14, metryczka paste panel: crash + preview + UX scroll)
+- `archetypy-admin/app.py` (`_render_metryczka_editor`):
+  - naprawiono crash po `Anuluj` w panelu `📋 Wklej pytanie i odpowiedzi`:
+    - usunięto niedozwolone modyfikowanie `st.session_state[paste_text_key]` po utworzeniu widgetu,
+    - dodano bezpieczne czyszczenie przez flagę `paste_clear_*` i `st.session_state.pop(...)` przed renderem pola.
+  - usunięto wymuszony `st.rerun()` po kliknięciu przycisku otwierającego panel wklejania,
+    co ogranicza „wystrzał” widoku na górę.
+  - podgląd parsera dostał fallback do aktualnych wartości pytania:
+    - gdy pole wklejania jest puste, `Treść pytania` pokazuje obecną treść pytania,
+    - `Odpowiedzi` pokazują bieżącą listę odpowiedzi zamiast `(brak)`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-067 (2026-04-14, metryczka: pole `Pytanie` było za niskie)
+- `archetypy-admin/app.py`:
+  - zwiększono wysokość startową pola `Pytanie` w edytorze metryczki:
+    - `min-height: 50px`,
+    - `height: 50px`,
+    - `line-height: 1.3`,
+  - pozostawiono `resize: vertical` (możliwość rozszerzania w dół).
+- Efekt:
+  - pole nie jest już zbyt „ściśnięte” i lepiej mieści pytanie już na starcie.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

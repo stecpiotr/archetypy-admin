@@ -2113,3 +2113,38 @@ Wynik:
     - `resize: vertical`.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-066 [DONE]
+Temat: Stabilizacja panelu `Wklej pytanie i odpowiedzi` w edytorze metryczki (cancel + preview + scroll).
+Kryteria ukończenia:
+1. Kliknięcie `Anuluj` nie powoduje błędu `StreamlitAPIException` dla `paste_text_*`.
+2. Otwarcie panelu wklejania nie robi dodatkowego, wymuszonego `rerun`, który pogarszał UX przewijania.
+3. `Podgląd` przy pustym polu wklejania pokazuje aktualne pytanie i aktualne odpowiedzi edytowanego wiersza.
+Pierwszy krok wykonawczy:
+- poprawić zarządzanie `session_state` dla widgetu `paste_text_*` i fallback podglądu w `_render_metryczka_editor`.
+Wynik:
+- `app.py` (`_render_metryczka_editor`):
+  - usunięto bezpośrednie czyszczenie `st.session_state[paste_text_key]` po instancjacji widgetu,
+  - dodano bezpieczny mechanizm czyszczenia przez flagę `paste_clear_*` + `pop(...)` przed renderem textarea,
+  - usunięto zbędny `st.rerun()` po kliknięciu `📋 Wklej pytanie i odpowiedzi` (mniej skoków widoku),
+  - `Podgląd` ma fallback:
+    - `Treść pytania` -> aktualna treść pytania, gdy parser nie wykryje nowej,
+    - `Odpowiedzi` -> aktualna lista odpowiedzi, gdy pole wklejania jest puste.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-067 [DONE]
+Temat: Korekta wysokości pola `Pytanie` w edytorze metryczki (za niska po H-065).
+Kryteria ukończenia:
+1. Pole `Pytanie` nie jest „ściśnięte” i startuje wizualnie bliżej 2 linii.
+2. Nadal działa ręczne rozszerzanie pola w dół.
+Pierwszy krok wykonawczy:
+- podnieść wartości `height/min-height` dla `textarea[aria-label="Pytanie"]` w `app.py`.
+Wynik:
+- `app.py`:
+  - `min-height`: `38px` -> `50px`,
+  - `height`: `38px` -> `50px`,
+  - `line-height`: `1.25` -> `1.3`,
+  - zachowano `resize: vertical`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
