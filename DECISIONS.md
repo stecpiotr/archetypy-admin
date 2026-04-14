@@ -1998,3 +1998,26 @@ Decyzja:
 Uzasadnienie:
 - User oczekuje zapamiętywania ustawienia „per badanie”, a nie wyłącznie w pamięci bieżącej sesji.
 - Parametr należy domenowo do segmentacji mieszkańców, więc naturalnym miejscem trwałego zapisu jest rekord badania JST.
+
+### D-218: Demografia metryczki w raporcie personalnym dziala jako osobna podstrona, nie inline
+Decyzja:
+- Sekcja demografii metryczki (`filtr wielocechowy + radar`) zostaje wyłączona z głównej osi raportu archetypowego.
+- Dostęp do niej jest realizowany przez osobny przycisk `👥 Raport demograficzny`, a analiza otwiera się jako dedykowana podstrona w tym samym oknie z przyciskiem `← Cofnij`.
+Uzasadnienie:
+- Inline-expander pod tabelą archetypów zaburzał układ raportu i obniżał czytelność głównego przekazu.
+- Oddzielenie widoku porządkuje UX i odpowiada oczekiwaniu użytkownika: najpierw raport archetypowy, potem analizy demograficzne.
+
+### D-219: Styl podstrony demograficznej personalnej wzorowany na JST `Symulacja`
+Decyzja:
+- Podstrona demografii personalnej używa układu:
+  - karty statystyczne `📌`,
+  - tabela profilu `👥` z `% podgrupa / % cała próba / różnica`,
+  - radar 0-20 `cała próba` vs `podgrupa`.
+Uzasadnienie:
+- Spójność wizualna między modułami (JST i personal) skraca czas interpretacji i ogranicza ryzyko błędnej analizy.
+
+### D-220: Tabela podsumowania archetypów bez desktopowego poziomego scrolla
+Decyzja:
+- Wrapper tabeli `.ap-table-wrap` na desktopie ma `overflow-x: hidden`; poziomy scroll pozostaje tylko dla mobile przez dedykowane reguły responsywne.
+Uzasadnienie:
+- Dolny pasek przewijania był odbierany jako błąd UI i pogarszał odbiór raportu w widoku desktop.

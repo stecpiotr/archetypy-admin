@@ -258,6 +258,24 @@
 ### Zrobione w Hotfix H-004 (Matching + wymuszenie przeliczenia po zmianie silnika)
 - `app.py` (`matching_view`, zakladka `Podsumowanie`):
   - naprawiono regresje renderu porownania profili 0-100:
+
+### Zrobione w Hotfix H-098 (2026-04-14, wieczór)
+- `admin_dashboard.py`:
+  - wydzielono osobny widok `Profile demograficzne archetypu` (podstrona w tym samym oknie) z:
+    - filtrem wielocechowym AND,
+    - liczebnością podgrupy i progiem stabilności,
+    - kartami `📌 STATYSTYCZNY PROFIL DEMOGRAFICZNY`,
+    - tabelą `👥 PROFIL DEMOGRAFICZNY` (`% podgrupa`, `% cała próba`, `Różnica (w pp.)`),
+    - radarem 0-20 (`cała próba` vs `podgrupa filtrowana`).
+  - dodano obsługę nawigacji podstrony przez `st.session_state[f"personal_demo_page_{study_id}"]`
+    oraz przycisk `← Cofnij`.
+  - usunięto z głównego raportu inline-expander `👥 Profile demograficzne (filtr wielocechowy + radar)`.
+  - usunięto poziomy scrollbar pod tabelą podsumowania archetypów na desktopie
+    (`.ap-table-wrap { overflow-x: hidden; }`).
+- `app.py` (`results_view`):
+  - dodano przycisk `👥 Raport demograficzny` dla wybranej osoby, który otwiera dedykowaną podstronę demografii.
+- Testy techniczne:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).
     - dodano kompatybilny fallback dla `st.image` (`use_container_width` -> `use_column_width` -> bez parametru),
     - sekcja dwoch profili (polityk vs mieszkancy JST) nie wywala juz wyjatku.
   - uporzadkowano radar porownawczy 0-20:

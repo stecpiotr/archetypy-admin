@@ -9303,6 +9303,15 @@ def results_view() -> None:
         unsafe_allow_html=True,
     )
     study = options[choice]
+    _demo_btn_left, _demo_btn_right = st.columns([0.80, 0.20], gap="small")
+    with _demo_btn_right:
+        if st.button(
+            "👥 Raport demograficzny",
+            key=f"open_personal_demography_from_results_{study['id']}",
+            use_container_width=True,
+        ):
+            st.session_state[f"personal_demo_page_{study['id']}"] = True
+            st.rerun()
     render_titlebar([
         "Panel", "Wyniki",
         f"{(study.get('last_name_nom') or study['last_name'])} "

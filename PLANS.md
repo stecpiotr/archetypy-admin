@@ -2744,3 +2744,23 @@ Wynik:
   - klucz widgetu przeniesiony na poziom badania JST (`matching_segments_penalty_strength_{jst_sid}`).
 - Smoke-check:
   - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-098 [DONE]
+Temat: Raport archetypowy personalny — usunięcie poziomego paska przewijania tabeli + przeniesienie demografii metryczki do osobnej podstrony.
+Kryteria ukończenia:
+1. W tabeli podsumowania archetypów nie pojawia się dolny poziomy scrollbar na desktopie.
+2. Blok `Profile demograficzne` nie jest już osadzony inline pod tabelą głównego raportu.
+3. W raporcie dostępny jest przycisk otwierający osobną podstronę demograficzną (w tym samym oknie) z przyciskiem `Cofnij`.
+4. Podstrona demograficzna używa układu zbliżonego do stylu JST `Symulacja` (karty + tabela + radar + filtr wielocechowy).
+Pierwszy krok wykonawczy:
+- wydzielić renderer demografii personalnej do osobnej funkcji i podpiąć przełączanie widoku po stanie sesji.
+Wynik:
+- `admin_dashboard.py`:
+  - dodano osobny renderer ` _render_personal_demography_subpage(...)` (filtry AND, liczebność, ostrzeżenie niepewności, karty statystyczne, tabela różnic vs cała próba, radar 0-20),
+  - podłączono przełączanie widoku przez `st.session_state[f"personal_demo_page_{study_id}"]` i przycisk `← Cofnij`,
+  - usunięto stary inline-expander `👥 Profile demograficzne (filtr wielocechowy + radar)` z głównego raportu,
+  - zmieniono wrapper tabeli archetypów (`.ap-table-wrap`) na desktopie na `overflow-x: hidden`, co usuwa dolny scrollbar.
+- `app.py`:
+  - dodano w widoku wyników (`results_view`) przycisk `👥 Raport demograficzny`, który otwiera dedykowaną podstronę demografii dla wybranej osoby.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

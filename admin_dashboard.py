@@ -3032,6 +3032,521 @@ def _metry_value_label(question: dict[str, object], code: str) -> str:
     return raw
 
 
+PERSONAL_METRY_VARIABLE_ICONS = {
+    "M_PLEC": "👤",
+    "M_WIEK": "🎯",
+    "M_WYKSZT": "🎓",
+    "M_ZAWOD": "💼",
+    "M_MATERIAL": "💰",
+    "M_OBSZAR": "🏘️",
+}
+
+
+def _personal_metry_var_icon(db_column: str) -> str:
+    key = str(db_column or "").strip().upper()
+    if key in PERSONAL_METRY_VARIABLE_ICONS:
+        return PERSONAL_METRY_VARIABLE_ICONS[key]
+    if "WIEK" in key:
+        return "🎯"
+    if "PLEC" in key:
+        return "👤"
+    if "WYKSZ" in key:
+        return "🎓"
+    if "ZAWOD" in key:
+        return "💼"
+    if "MATERIAL" in key:
+        return "💰"
+    if "OBSZAR" in key or "MIESZKA" in key:
+        return "🏘️"
+    return "📌"
+
+
+def _collect_personal_metry_available(
+    results_df: pd.DataFrame,
+    metry_questions: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    out: list[dict[str, object]] = []
+    for mq in metry_questions:
+        db_col = str(mq.get("db_column") or "").strip()
+        if not db_col:
+            continue
+        col_name = f"METRY_{db_col}"
+        if col_name not in results_df.columns:
+            continue
+        col_series = results_df[col_name].fillna("").astype(str).str.strip()
+        if not bool(col_series.ne("").any()):
+            continue
+        ordered_codes = [
+            str((opt or {}).get("code") or "").strip()
+            for opt in list(mq.get("options") or [])
+        ]
+        ordered_codes = [c for c in ordered_codes if c]
+        present = [c for c in ordered_codes if bool((col_series == c).any())]
+        extra = sorted(set(col_series[col_series != ""]) - set(present))
+        codes = present + list(extra)
+        if not codes:
+            continue
+        out.append({"question": mq, "col_name": col_name, "codes": codes})
+    return out
+
+
+def _render_personal_demography_subpage(
+    *,
+    study_id: str,
+    person_gen: str,
+    results_df: pd.DataFrame,
+    metry_questions: list[dict[str, object]],
+    archetype_names: list[str],
+    disp_name_fn,
+    is_mobile: bool,
+) -> None:
+    page_state_key = f"personal_demo_page_{study_id}"
+    available = _collect_personal_metry_available(results_df, metry_questions)
+
+    st.markdown(
+        """
+        <style>
+          .pdemo-head{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-end;
+            gap:14px;
+            margin:8px 0 10px 0;
+            flex-wrap:wrap;
+          }
+          .pdemo-title{
+            font-size:1.75rem;
+            font-weight:800;
+            color:#0f2748;
+            line-height:1.1;
+          }
+          .pdemo-sub{
+            color:#475569;
+            font-size:0.93rem;
+          }
+          .pdemo-context{
+            border:1px solid #dbe4ef;
+            border-radius:12px;
+            background:#f8fbff;
+            padding:10px 12px;
+            margin:8px 0 16px 0;
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px 10px;
+            align-items:center;
+          }
+          .pdemo-chip{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            border:1px solid #d7e0eb;
+            background:#ffffff;
+            border-radius:999px;
+            padding:4px 10px;
+            font-size:12.5px;
+            font-weight:700;
+            color:#334155;
+          }
+          .pdemo-box{
+            border:1px solid #dbe4ef;
+            border-radius:12px;
+            background:#fff;
+            padding:10px 12px;
+            margin:0 0 12px 0;
+          }
+          .pdemo-box-label{
+            font-size:15px;
+            font-weight:900;
+            text-transform:uppercase;
+            letter-spacing:.02em;
+            color:#334155;
+            display:flex;
+            align-items:center;
+            gap:6px;
+          }
+          .pdemo-box-note{
+            color:#5f6b7a;
+            font-size:12px;
+            margin:2px 0 6px 0;
+          }
+          .pdemo-cards{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(175px,1fr));
+            gap:8px;
+            margin:10px 0 2px 0;
+          }
+          .pdemo-stat{
+            border:1px solid #dbe4ef;
+            border-radius:10px;
+            background:#fff;
+            padding:8px 10px;
+          }
+          .pdemo-stat-label{
+            font-size:12px;
+            font-weight:800;
+            text-transform:uppercase;
+            letter-spacing:.03em;
+            color:#5f6b7a;
+          }
+          .pdemo-stat-main{
+            margin-top:2px;
+            font-size:14px;
+            font-weight:900;
+            color:#111827;
+            line-height:1.2;
+          }
+          .pdemo-stat-sub{
+            margin-top:2px;
+            font-size:12.5px;
+            color:#3f4954;
+          }
+          .pdemo-table-wrap{
+            overflow-x:auto;
+            max-width:940px;
+          }
+          .pdemo-table{
+            margin-top:0;
+            width:100%;
+            min-width:720px;
+            max-width:940px;
+            border-collapse:collapse;
+            border:3px solid #b8c2cc;
+            background:#fff;
+            font-size:13.5px;
+            color:#334155;
+          }
+          .pdemo-table th,.pdemo-table td{
+            padding:8px 10px;
+            border:1px solid #dfe4ea;
+            text-align:left;
+            vertical-align:middle;
+          }
+          .pdemo-table th{
+            background:#f2f6fb;
+            color:#1f2f44;
+            font-weight:800;
+            font-size:13.5px;
+          }
+          @media (max-width:900px){
+            .pdemo-title{font-size:1.42rem;}
+            .pdemo-table-wrap{max-width:100%;}
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    back_col, title_col = st.columns([0.16, 0.84], gap="small")
+    with back_col:
+        if st.button("← Cofnij", key=f"personal_demo_back_btn_{study_id}", use_container_width=True):
+            st.session_state[page_state_key] = False
+            st.rerun()
+    with title_col:
+        st.markdown(
+            f"""
+            <div class="pdemo-head">
+              <div>
+                <div class="pdemo-title">Profile demograficzne archetypu</div>
+                <div class="pdemo-sub">Raport wielocechowy dla badania archetypu {html.escape(person_gen)}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if not available:
+        st.info("Dla tego badania brak skonfigurowanych danych metryczkowych do analizy demograficznej.")
+        return
+
+    n_all = int(len(results_df))
+    st.markdown(
+        f"""
+        <div class="pdemo-context">
+          <span class="pdemo-chip">👤 Badanie personalne</span>
+          <span class="pdemo-chip">🧾 Respondenci: {n_all}</span>
+          <span class="pdemo-chip">⚙️ Zmienne metryczkowe: {len(available)}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="pdemo-box">
+          <div class="pdemo-box-label">🎛️ Filtr wielocechowy</div>
+          <div class="pdemo-box-note">Filtry działają łącznie (AND): np. płeć + wiek + wykształcenie.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    min_demo_n = int(
+        st.number_input(
+            "Minimalna liczebność podgrupy (N) dla stabilnego wniosku",
+            min_value=5,
+            max_value=5000,
+            value=30,
+            step=1,
+            key=f"personal_demo_min_n_subpage_{study_id}",
+        )
+    )
+
+    filt_df = results_df.copy()
+    active_filters: list[str] = []
+    for item in available:
+        mq = item["question"]
+        col_name = str(item["col_name"])
+        db_col = str((mq or {}).get("db_column") or "").strip()
+        prompt = str((mq or {}).get("prompt") or db_col).strip()
+        options = list(item["codes"])
+        selected = st.multiselect(
+            prompt,
+            options=options,
+            default=[],
+            format_func=(lambda code, q=mq: _metry_value_label(q, code)),
+            key=f"personal_demo_sub_filter_{study_id}_{db_col}",
+        )
+        if selected:
+            filt_df = filt_df[filt_df[col_name].astype(str).isin([str(x) for x in selected])]
+            labels = [_metry_value_label(mq, str(x)) for x in selected]
+            active_filters.append(f"{prompt}: {', '.join(labels)}")
+
+    n_filtered = int(len(filt_df))
+    if active_filters:
+        st.markdown("**Aktywne filtry:** " + " | ".join(active_filters))
+    else:
+        st.caption("Brak aktywnych filtrów: profil odpowiada całej próbie.")
+    st.markdown(f"**Liczebność podgrupy:** {n_filtered} / {n_all}")
+
+    if n_filtered <= 0:
+        st.warning("Brak odpowiedzi spełniających aktualny zestaw filtrów.")
+        return
+    if n_filtered < min_demo_n:
+        st.warning(f"Wynik ma podwyższoną niepewność (N={n_filtered}, próg stabilności: {min_demo_n}).")
+
+    means_20_all = {
+        k: (
+            float(pd.to_numeric(results_df[k], errors="coerce").mean())
+            if k in results_df.columns and pd.to_numeric(results_df[k], errors="coerce").notna().any()
+            else 0.0
+        )
+        for k in archetype_names
+    }
+    filtered_means_20 = {
+        k: (
+            float(pd.to_numeric(filt_df[k], errors="coerce").mean())
+            if k in filt_df.columns and pd.to_numeric(filt_df[k], errors="coerce").notna().any()
+            else 0.0
+        )
+        for k in archetype_names
+    }
+
+    cards_html_parts: list[str] = []
+    table_rows_html: list[str] = []
+    for item in available:
+        mq = item["question"]
+        col_name = str(item["col_name"])
+        db_col = str((mq or {}).get("db_column") or "").strip()
+        prompt = str((mq or {}).get("prompt") or db_col).strip()
+        icon = _personal_metry_var_icon(db_col)
+
+        q_all = results_df[col_name].fillna("").astype(str).str.strip()
+        q_sub = filt_df[col_name].fillna("").astype(str).str.strip()
+        if not bool(q_all.ne("").any()):
+            continue
+
+        categories: list[dict[str, object]] = []
+        for code in list(item["codes"]):
+            code_txt = str(code or "").strip()
+            if not code_txt:
+                continue
+            pct_all = 100.0 * float((q_all == code_txt).sum()) / max(1, int(q_all.ne("").sum()))
+            pct_sub = 100.0 * float((q_sub == code_txt).sum()) / max(1, int(q_sub.ne("").sum()))
+            if pct_all <= 0.0 and pct_sub <= 0.0:
+                continue
+            categories.append(
+                {
+                    "code": code_txt,
+                    "label": _metry_value_label(mq, code_txt),
+                    "pct_all": float(pct_all),
+                    "pct_sub": float(pct_sub),
+                    "diff": float(pct_sub - pct_all),
+                }
+            )
+        if not categories:
+            continue
+
+        categories = sorted(categories, key=lambda c: (-float(c["pct_sub"]), str(c["label"])))
+        strongest = categories[0]
+        cards_html_parts.append(
+            f"""
+            <div class="pdemo-stat">
+              <div class="pdemo-stat-label">{html.escape(icon)} {html.escape(prompt.upper())}</div>
+              <div class="pdemo-stat-main">{html.escape(str(strongest.get("label") or ""))}</div>
+              <div class="pdemo-stat-sub">{float(strongest.get("pct_sub") or 0.0):.1f}% • {float(strongest.get("diff") or 0.0):+,.1f} pp</div>
+            </div>
+            """
+        )
+
+        rowspan = len(categories)
+        for idx, cat in enumerate(categories):
+            pct_sub = float(cat["pct_sub"])
+            pct_all = float(cat["pct_all"])
+            diff = float(cat["diff"])
+            is_top = idx == 0
+            bar_w = max(0.0, min(100.0, pct_sub))
+            fill_color = "#8ecae6" if is_top else "#d8e5f1"
+            top_border = "border-top:3px solid #b8c2cc;"
+            diff_color = "#0f766e" if diff >= 0 else "#9a3412"
+            first_col = (
+                "<td "
+                f"rowspan='{rowspan}' "
+                f"style=\"font-weight:800; text-transform:uppercase; vertical-align:middle; background:#fafafa; border-left:3px solid #b8c2cc; {top_border}\">"
+                "<span style='display:inline-flex; align-items:center; gap:6px;'>"
+                f"<span>{html.escape(icon)}</span>"
+                f"<span>{html.escape(prompt)}</span>"
+                "</span>"
+                "</td>"
+                if idx == 0
+                else ""
+            )
+            table_rows_html.append(
+                "<tr>"
+                f"{first_col}"
+                f"<td style=\"font-size:13.5px; font-weight:{'800' if is_top else '500'}; {top_border if idx == 0 else ''}\">{html.escape(str(cat['label']))}</td>"
+                f"<td style=\"padding:0; min-width:176px; border:1px solid #dfe4ea; {top_border if idx == 0 else ''}\">"
+                "<div style=\"position:relative; height:34px; background:#fff;\">"
+                f"<div style=\"position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:{fill_color}; opacity:0.96;\"></div>"
+                f"<span style=\"position:absolute; right:6px; top:6px; z-index:2; background:rgba(255,255,255,0.88); padding:1px 5px; border-radius:4px; font-size:13.5px; font-weight:{'900' if is_top else '600'}; color:#111;\">{pct_sub:.1f}%</span>"
+                "</div>"
+                "</td>"
+                f"<td style=\"font-size:13.5px; text-align:right; {top_border if idx == 0 else ''}\">{pct_all:.1f}%</td>"
+                f"<td style=\"font-size:13.5px; text-align:right; color:{diff_color}; font-weight:400; border-right:3px solid #b8c2cc; {top_border if idx == 0 else ''}\">{diff:+.1f} pp</td>"
+                "</tr>"
+            )
+
+    if cards_html_parts:
+        st.markdown(
+            f"""
+            <div class="pdemo-box">
+              <div class="pdemo-box-label">📌 STATYSTYCZNY PROFIL DEMOGRAFICZNY</div>
+              <div class="pdemo-cards">{''.join(cards_html_parts)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if table_rows_html:
+        table_html = (
+            "<div class='pdemo-box'>"
+            "<div class='pdemo-box-label'>👥 PROFIL DEMOGRAFICZNY</div>"
+            "<div class='pdemo-box-note'>W tabeli pogrubiona najwyższa kategoria w każdej zmiennej.</div>"
+            "<div class='pdemo-table-wrap'><table class='pdemo-table'>"
+            "<thead><tr>"
+            "<th style='min-width:150px; font-size:13.5px; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>Zmienna</th>"
+            "<th style='min-width:220px; font-size:13.5px; border-top:3px solid #b8c2cc;'>Kategoria</th>"
+            "<th style='min-width:176px; text-align:center; font-size:13.5px; border-top:3px solid #b8c2cc;'>% podgrupa</th>"
+            "<th style='min-width:130px; text-align:center; border-top:3px solid #b8c2cc;'>% cała próba</th>"
+            "<th style='min-width:120px; text-align:center; border-top:3px solid #b8c2cc; border-right:3px solid #b8c2cc;'>Różnica (w pp.)</th>"
+            "</tr></thead><tbody>"
+            + "".join(table_rows_html)
+            + "</tbody></table></div></div>"
+        )
+        st.markdown(table_html, unsafe_allow_html=True)
+
+    filtered_top = pick_top_3_archetypes(filtered_means_20, archetype_names)
+    filtered_main = filtered_top[0] if len(filtered_top) > 0 else None
+    filtered_aux = filtered_top[1] if len(filtered_top) > 1 else None
+    filtered_supp = filtered_top[2] if len(filtered_top) > 2 else None
+    theta = [disp_name_fn(n) for n in archetype_names]
+    all_vals = [float(means_20_all.get(n, 0.0)) for n in archetype_names]
+    filt_vals = [float(filtered_means_20.get(n, 0.0)) for n in archetype_names]
+    marker_r = []
+    marker_c = []
+    for n in archetype_names:
+        if n == filtered_main:
+            marker_r.append(float(filtered_means_20.get(n, 0.0)))
+            marker_c.append("#ef4444")
+        elif n == filtered_aux:
+            marker_r.append(float(filtered_means_20.get(n, 0.0)))
+            marker_c.append("#f59e0b")
+        elif n == filtered_supp:
+            marker_r.append(float(filtered_means_20.get(n, 0.0)))
+            marker_c.append("#22c55e")
+        else:
+            marker_r.append(None)
+            marker_c.append("rgba(0,0,0,0)")
+
+    demo_fig = go.Figure(
+        data=[
+            go.Scatterpolar(
+                r=all_vals + [all_vals[0]],
+                theta=theta + [theta[0]],
+                fill="toself",
+                fillcolor="rgba(37,99,235,0.14)",
+                line=dict(color="#2563eb", width=2.3),
+                name=f"Cała próba (N={n_all})",
+                hovertemplate="<b>%{theta}</b><br>Cała próba: %{r:.2f}<extra></extra>",
+            ),
+            go.Scatterpolar(
+                r=filt_vals + [filt_vals[0]],
+                theta=theta + [theta[0]],
+                fill="toself",
+                fillcolor="rgba(14,165,233,0.12)",
+                line=dict(color="#0284c7", width=3.0, dash="dot"),
+                name=f"Podgrupa filtrowana (N={n_filtered})",
+                hovertemplate="<b>%{theta}</b><br>Podgrupa: %{r:.2f}<extra></extra>",
+            ),
+            go.Scatterpolar(
+                r=marker_r,
+                theta=theta,
+                mode="markers",
+                marker=dict(size=14, color=marker_c, line=dict(color="#0f172a", width=1.7)),
+                showlegend=False,
+                hovertemplate="<b>%{theta}</b><br>TOP podgrupy: %{r:.2f}<extra></extra>",
+            ),
+        ]
+    )
+    demo_fig.update_layout(
+        height=560 if not is_mobile else 430,
+        paper_bgcolor="rgba(0,0,0,0)",
+        polar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(visible=True, range=[0, 20]),
+            angularaxis=dict(
+                rotation=90,
+                direction="clockwise",
+                tickfont=dict(size=14 if not is_mobile else 10.5),
+            ),
+        ),
+        margin=dict(l=20, r=20, t=40, b=40),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.06,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255,255,255,0.92)",
+            bordercolor="#dbe4ef",
+            borderwidth=1,
+        ),
+    )
+    st.markdown(
+        """
+        <div class="pdemo-box">
+          <div class="pdemo-box-label">🕸️ PODGLĄD RADAROWY PODGRUPY</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(
+        demo_fig,
+        use_container_width=True,
+        config={"displaylogo": False, "displayModeBar": False, "responsive": True},
+        key=f"personal_demo_profile_radar_subpage_{study_id}",
+    )
+    st.caption("Radar pokazuje średnią siłę archetypu w skali 0-20 dla całej próby oraz filtrowanej podgrupy.")
+
 
 
 @st.cache_data(ttl=30)
@@ -6112,6 +6627,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     personVoc  = _join(study.get("first_name_voc"),  study.get("last_name_voc"))
 
     study_id = study["id"]
+    demo_page_key = f"personal_demo_page_{study_id}"
+    st.session_state.setdefault(demo_page_key, False)
     data = load(study_id)
 
     # ❗️ZBIERAMY WSZYSTKIE PRZYPADKI DO SŁOWNIKA DLA WORDA
@@ -6234,6 +6751,19 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         if not results_df.empty and "Czas ankiety" in results_df.columns:
 
             results_df = results_df.sort_values("Czas ankiety", ascending=True)
+            archetype_names = KOLO_NAMES_ORDER
+
+            if (not public_view) and bool(st.session_state.get(demo_page_key)):
+                _render_personal_demography_subpage(
+                    study_id=str(study_id),
+                    person_gen=personGen,
+                    results_df=results_df,
+                    metry_questions=metry_questions,
+                    archetype_names=list(archetype_names),
+                    disp_name_fn=disp_name,
+                    is_mobile=is_mobile,
+                )
+                return
 
             if public_view:
                 participants_label = "uczestnik badania" if int(num_ankiet or 0) == 1 else "uczestników badania"
@@ -6314,7 +6844,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             # --- ⬇️ RANKING I WYKRES NA BAZIE ŚREDNIEJ (0–20), NIE LICZEBNOŚCI! ---
             # Kolejność zgodna z "Rozkład archetypów na osiach potrzeb"
             # (od godz. 12, zgodnie z ruchem wskazówek zegara).
-            archetype_names = KOLO_NAMES_ORDER
 
             # 1) średnia suma punktów dla każdego archetypu (0–20)
             mean_archetype_scores = {
@@ -6366,178 +6895,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             col1, col2, col3 = st.columns([0.28, 0.36, 0.36], gap="small")
             means_pct = mean_pct_by_archetype_from_df(data)
-            means_20_all = {k: float(mean_archetype_scores.get(k, 0.0) or 0.0) for k in archetype_names}
-
-            metry_available: list[dict[str, object]] = []
-            for mq in metry_questions:
-                db_col = str(mq.get("db_column") or "").strip()
-                col_name = f"METRY_{db_col}"
-                if col_name not in results_df.columns:
-                    continue
-                col_series = results_df[col_name].fillna("").astype(str).str.strip()
-                if not bool(col_series.ne("").any()):
-                    continue
-                ordered_codes = [str((opt or {}).get("code") or "").strip() for opt in list(mq.get("options") or [])]
-                ordered_codes = [c for c in ordered_codes if c]
-                present = [c for c in ordered_codes if bool((col_series == c).any())]
-                extra = sorted(set(col_series[col_series != ""]) - set(present))
-                codes = present + list(extra)
-                if not codes:
-                    continue
-                metry_available.append(
-                    {
-                        "question": mq,
-                        "col_name": col_name,
-                        "codes": codes,
-                    }
-                )
-
-            if metry_available:
-                with st.expander("👥 Profile demograficzne (filtr wielocechowy + radar)", expanded=False):
-                    st.caption(
-                        "Filtry działają łącznie (AND): wybór np. płeć + wiek + wykształcenie zawęża profil do wspólnego segmentu respondentów."
-                    )
-                    min_demo_n = int(
-                        st.number_input(
-                            "Minimalna liczebność podgrupy (N) dla stabilnego wniosku",
-                            min_value=5,
-                            max_value=5000,
-                            value=30,
-                            step=1,
-                            key=f"personal_demo_min_n_{study_id}",
-                        )
-                    )
-
-                    filt_df = results_df.copy()
-                    active_filters: list[str] = []
-                    for item in metry_available:
-                        mq = item["question"]
-                        col_name = str(item["col_name"])
-                        db_col = str((mq or {}).get("db_column") or "").strip()
-                        prompt = str((mq or {}).get("prompt") or db_col).strip()
-                        options = list(item["codes"])
-                        selected = st.multiselect(
-                            prompt,
-                            options=options,
-                            default=[],
-                            format_func=(lambda code, q=mq: _metry_value_label(q, code)),
-                            key=f"personal_demo_filter_{study_id}_{db_col}",
-                        )
-                        if selected:
-                            filt_df = filt_df[filt_df[col_name].astype(str).isin([str(x) for x in selected])]
-                            labels = [_metry_value_label(mq, str(x)) for x in selected]
-                            active_filters.append(f"{prompt}: {', '.join(labels)}")
-
-                    n_all = int(len(results_df))
-                    n_filtered = int(len(filt_df))
-                    if active_filters:
-                        st.markdown("**Aktywne filtry:** " + " | ".join(active_filters))
-                    else:
-                        st.caption("Brak aktywnych filtrów: profil odpowiada całej próbie.")
-                    st.markdown(f"**Liczebność:** {n_filtered} / {n_all}")
-
-                    if n_filtered <= 0:
-                        st.warning("Brak odpowiedzi spełniających aktualny zestaw filtrów.")
-                    else:
-                        if n_filtered < min_demo_n:
-                            st.warning(
-                                f"Wynik ma podwyższoną niepewność (N={n_filtered}, próg stabilności: {min_demo_n})."
-                            )
-                        filtered_means_20 = {
-                            k: (
-                                float(pd.to_numeric(filt_df[k], errors="coerce").mean())
-                                if k in filt_df.columns and pd.to_numeric(filt_df[k], errors="coerce").notna().any()
-                                else 0.0
-                            )
-                            for k in archetype_names
-                        }
-                        filtered_top = pick_top_3_archetypes(filtered_means_20, archetype_names)
-                        filtered_main = filtered_top[0] if len(filtered_top) > 0 else None
-                        filtered_aux = filtered_top[1] if len(filtered_top) > 1 else None
-                        filtered_supp = filtered_top[2] if len(filtered_top) > 2 else None
-
-                        theta = [disp_name(n) for n in archetype_names]
-                        all_vals = [float(means_20_all.get(n, 0.0)) for n in archetype_names]
-                        filt_vals = [float(filtered_means_20.get(n, 0.0)) for n in archetype_names]
-                        marker_r = []
-                        marker_c = []
-                        for n in archetype_names:
-                            if n == filtered_main:
-                                marker_r.append(float(filtered_means_20.get(n, 0.0)))
-                                marker_c.append("#ef4444")
-                            elif n == filtered_aux:
-                                marker_r.append(float(filtered_means_20.get(n, 0.0)))
-                                marker_c.append("#f59e0b")
-                            elif n == filtered_supp:
-                                marker_r.append(float(filtered_means_20.get(n, 0.0)))
-                                marker_c.append("#22c55e")
-                            else:
-                                marker_r.append(None)
-                                marker_c.append("rgba(0,0,0,0)")
-
-                        demo_fig = go.Figure(
-                            data=[
-                                go.Scatterpolar(
-                                    r=all_vals + [all_vals[0]],
-                                    theta=theta + [theta[0]],
-                                    fill="toself",
-                                    fillcolor="rgba(37,99,235,0.14)",
-                                    line=dict(color="#2563eb", width=2.3),
-                                    name=f"Cała próba (N={n_all})",
-                                    hovertemplate="<b>%{theta}</b><br>Cała próba: %{r:.2f}<extra></extra>",
-                                ),
-                                go.Scatterpolar(
-                                    r=filt_vals + [filt_vals[0]],
-                                    theta=theta + [theta[0]],
-                                    fill="toself",
-                                    fillcolor="rgba(14,165,233,0.12)",
-                                    line=dict(color="#0284c7", width=3.0, dash="dot"),
-                                    name=f"Podgrupa filtrowana (N={n_filtered})",
-                                    hovertemplate="<b>%{theta}</b><br>Podgrupa: %{r:.2f}<extra></extra>",
-                                ),
-                                go.Scatterpolar(
-                                    r=marker_r,
-                                    theta=theta,
-                                    mode="markers",
-                                    marker=dict(size=14, color=marker_c, line=dict(color="#0f172a", width=1.7)),
-                                    showlegend=False,
-                                    hovertemplate="<b>%{theta}</b><br>TOP podgrupy: %{r:.2f}<extra></extra>",
-                                ),
-                            ]
-                        )
-                        demo_fig.update_layout(
-                            height=560 if not is_mobile else 430,
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            polar=dict(
-                                bgcolor="rgba(0,0,0,0)",
-                                radialaxis=dict(visible=True, range=[0, 20]),
-                                angularaxis=dict(
-                                    rotation=90,
-                                    direction="clockwise",
-                                    tickfont=dict(size=14 if not is_mobile else 10.5),
-                                ),
-                            ),
-                            margin=dict(l=20, r=20, t=40, b=40),
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=1.06,
-                                xanchor="center",
-                                x=0.5,
-                                bgcolor="rgba(255,255,255,0.92)",
-                                bordercolor="#dbe4ef",
-                                borderwidth=1,
-                            ),
-                        )
-                        st.plotly_chart(
-                            demo_fig,
-                            use_container_width=True,
-                            config={"displaylogo": False, "displayModeBar": False, "responsive": True},
-                            key=f"personal_demo_profile_radar_{study_id}",
-                        )
-                        st.caption(
-                            "Radar pokazuje średnią siłę archetypu w skali 0-20 dla całej próby oraz dla podgrupy złożonej z aktywnych filtrów."
-                        )
 
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (
@@ -6707,8 +7064,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 <style>
                   .ap-table-wrap {{
                     width: 100%;
-                    overflow-x: auto;
-                    -webkit-overflow-scrolling: touch;
+                    overflow-x: hidden;
                   }}
                   .ap-table {{
                     table-layout: fixed; width: 100%; border-collapse: collapse;
