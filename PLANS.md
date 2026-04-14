@@ -1883,3 +1883,31 @@ Wynik:
   - usunięto dodatkowe sortowanie DataFrame po `_sort`.
 - Smoke-check:
   - `python -m py_compile admin_dashboard.py` (OK).
+
+### Hotfix H-058 [DONE]
+Temat: iPhone 15 Pro — czytelność ekranu powitalnego i brak nakładania paska odpowiedzi + realna transliteracja SMS JST.
+Kryteria ukończenia:
+1. Ekran powitalny ankiety personalnej ma czytelny, ciemny tekst również przy dark mode iOS.
+2. W `Pojedynczych ekranach` (mobile portrait) pasek odpowiedzi nie nachodzi na treść pytania.
+3. Wysyłka SMS JST transliteruje polskie znaki w realnym payloadzie wysyłanym do bramki (nie tylko w podglądzie).
+Pierwszy krok wykonawczy:
+- poprawić punktowo `archetypy-ankieta/src/App.tsx`, `archetypy-ankieta/src/SingleQuestionnaire.css` i `archetypy-admin/send_link_jst.py`.
+Wynik:
+- `archetypy-ankieta/src/App.tsx`:
+  - wymuszono ciemny kolor tekstu (`wrapperStyle.color`) na białym tle welcome screen,
+  - doprecyzowano kolor bloku powitalnego treści.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait:
+    - zmniejszono górny offset sekcji pytania,
+    - wycofano `position: fixed` dla strefy odpowiedzi i akcji (`Dalej`),
+    - odpowiedzi i przycisk są teraz w naturalnym flow pod pytaniem (z większym odstępem),
+    - dzięki temu pasek odpowiedzi nie nakłada się na tekst pytania na iPhone.
+- `archetypy-admin/send_link_jst.py`:
+  - transliteracja `_strip_pl_diacritics(...)` jest stosowana przy:
+    - wysyłce nowego SMS JST (`send_btn`),
+    - zapisie treści SMS JST do rekordu wysyłki,
+    - ponownej wysyłce (`_resend_sms_row`).
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK),
+  - `python -m py_compile send_link_jst.py` (OK).

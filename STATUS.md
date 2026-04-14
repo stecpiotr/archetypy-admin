@@ -1511,3 +1511,21 @@
   - przy remisie `%` kolejność jest stabilna i zgodna z regułą biznesową.
 - Test techniczny:
   - `python -m py_compile admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-058 (2026-04-14, iPhone mobile + realna transliteracja SMS JST)
+- `archetypy-ankieta/src/App.tsx`:
+  - ekran powitalny ankiety personalnej ma wymuszony ciemny kolor tekstu na białym tle,
+  - dodatkowo blok treści powitalnej dostał jawny kolor tekstu, aby iOS dark mode nie rozjaśniał liter.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - mobile portrait:
+    - sekcja pytań startuje wyżej (mniejszy górny offset),
+    - pasek odpowiedzi i strefa `Dalej` przeszły z `position: fixed` do normalnego flow pod pytaniem,
+    - dodano większy odstęp nad odpowiedziami, żeby eliminować nakładanie się odpowiedzi na treść pytania na iPhone.
+- `archetypy-admin/send_link_jst.py`:
+  - transliteracja SMS (`_strip_pl_diacritics`) jest stosowana do realnie wysyłanego payloadu SMS,
+  - transliterowana treść jest też zapisywana przy tworzeniu rekordu SMS,
+  - ponowna wysyłka (`_resend_sms_row`) również wysyła transliterowaną treść.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK),
+  - `python -m py_compile send_link_jst.py` (OK).

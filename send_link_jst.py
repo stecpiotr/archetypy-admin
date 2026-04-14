@@ -368,7 +368,8 @@ def _resend_sms_row(sb, row: Dict[str, Any], selected_study: Dict[str, Any]) -> 
     else:
         body = _inject_link_into_message(body, expected_link=expected_link, token=token)
 
-    ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=body, sender=sender)
+    sms_body = _strip_pl_diacritics(body)
+    ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=sms_body, sender=sender)
     if ok:
         _mark_jst_sms_sent(sb, sms_id=sms_id, provider_message_id=provider_id or "")
         return True, ""
@@ -979,7 +980,8 @@ def render(back_btn: Callable[[], None]) -> None:
                     msg = _inject_link_into_message(msg, expected_link=final_link, token=token)
                 for _ in range(5):
                     try:
-                        rec = _create_jst_sms_record(sb, study_id=study["id"], phone=phone, text=msg, token=token)
+                        sms_msg = _strip_pl_diacritics(msg)
+                        rec = _create_jst_sms_record(sb, study_id=study["id"], phone=phone, text=sms_msg, token=token)
                         break
                     except DuplicateJstTokenError:
                         token = make_token(8)
@@ -992,7 +994,8 @@ def render(back_btn: Callable[[], None]) -> None:
                 else:
                     st.error(f"Nie udało się wygenerować unikalnego tokena dla {phone}.")
                     continue
-                ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=msg, sender=sender)
+                sms_msg = _strip_pl_diacritics(msg)
+                ok, provider_id, err = send_sms(api_token=api_token, to_phone=phone, text=sms_msg, sender=sender)
                 if ok:
                     _mark_jst_sms_sent(sb, sms_id=rec["id"], provider_message_id=provider_id or "")
                     sent_ok += 1

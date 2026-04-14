@@ -1409,3 +1409,28 @@ Decyzja:
 Uzasadnienie:
 - User wymaga jawnej reguły rozstrzygania remisów.
 - Wtórne sortowanie po samym `%` mogło zaburzać kolejność przy remisach, więc ranking musi być nadawany jednokrotnie pełnym kluczem.
+
+### D-159: Welcome screen ankiety personalnej ma jawnie zdefiniowany ciemny kolor tekstu
+Decyzja:
+- W `archetypy-ankieta/src/App.tsx` ustawiamy jawny kolor tekstu na kontenerze ekranu powitalnego (`#1f2937`) oraz na bloku treści (`#213547`).
+Uzasadnienie:
+- Na iPhone (dark mode) tekst powitalny dziedziczył jasny kolor z globalnego motywu i stawał się słabo czytelny na białym tle.
+- Jawne kolory w tym widoku eliminują zależność od automatyki kolorystycznej przeglądarki.
+
+### D-160: Mobile portrait `Pojedyncze ekrany` — strefa odpowiedzi działa w normalnym flow, nie jako fixed overlay
+Decyzja:
+- W mobile portrait dla `SingleQuestionnaire` wycofujemy `position: fixed` dla:
+  - paska odpowiedzi (`.single-scale-zone`),
+  - akcji `Dalej` (`.single-footer-actions`).
+- Odpowiedzi i CTA renderują się pod pytaniem z kontrolowanym odstępem.
+Uzasadnienie:
+- Na iPhone 15 Pro fixed overlay nachodził na długie treści pytań.
+- W tym wariancie ergonomia i brak kolizji treści mają priorytet nad stałym „przyklejeniem” paska odpowiedzi.
+
+### D-161: Transliteracja SMS JST dotyczy realnie wysyłanego payloadu, nie tylko podglądu
+Decyzja:
+- W `send_link_jst.py` każda wysyłka SMS (nowa i ponowna) przekazuje do `send_sms(...)` treść po `_strip_pl_diacritics(...)`.
+- Przy tworzeniu rekordu SMS zapisujemy tę samą transliterowaną wersję.
+Uzasadnienie:
+- Sam podgląd transliterowany bez transliteracji payloadu prowadził do „krzaków” u odbiorcy.
+- Spójność `podgląd = zapis = realna wysyłka` usuwa klasę tych błędów.
