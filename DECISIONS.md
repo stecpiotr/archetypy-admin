@@ -2073,3 +2073,11 @@ Decyzja:
 Uzasadnienie:
 - Funkcja była wywoływana, ale nie istniała w module, co powodowało `NameError` przy otwieraniu panelu `Predefiniowane metryczki`.
 - Lokalny helper domyka zależność i stabilizuje parsowanie flag `is_open`/`randomize_*` niezależnie od formatu danych wejściowych.
+
+### D-228: Wstawianie predefiniowanego pytania wymaga potwierdzenia przy konflikcie kodowania
+Decyzja:
+- Jeśli kodowanie pytania z biblioteki (`db_column`) już istnieje w aktualnej metryczce, panel nie wstawia pytania od razu.
+- Najpierw pokazujemy potwierdzenie `Tak/Nie` z komunikatem o duplikacie.
+- `Tak` kontynuuje wstawienie przez mechanizm unikalnego kodowania (`M_*_2`, `M_*_3`, ...), `Nie` kończy operację bez zmian.
+Uzasadnienie:
+- Użytkownik oczekuje świadomej decyzji przy duplikacie, zamiast cichego tworzenia kolejnej wersji pytania.

@@ -2254,3 +2254,14 @@
   - kliknięcie `Predefiniowane metryczki` nie kończy się błędem `NameError`.
 - Test techniczny:
   - `python -m py_compile db_jst_utils.py app.py` (OK).
+
+### Zrobione w Hotfix H-102 (2026-04-14, potwierdzenie duplikatu przy wstawianiu predefiniowanego pytania)
+- `archetypy-admin/app.py` (`_render_metryczka_editor`):
+  - dodano wykrywanie konfliktu kodowania `M_*` przed wstawieniem pytania z biblioteki,
+  - przy konflikcie pokazuje się potwierdzenie:
+    - komunikat `Masz już to pytanie w metryczce. Czy chcesz na pewno je wstawić?`,
+    - przyciski `Tak` / `Nie`,
+  - `Tak` wstawia pytanie z nowym unikalnym kodowaniem (`_2`, `_3`, ...),
+  - `Nie` anuluje operację (bez zmian w metryczce).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

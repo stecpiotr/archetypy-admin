@@ -2839,3 +2839,20 @@ Wynik:
   - dodano helper `_bool_from_any(value, fallback)` wykorzystywany przez normalizację pytań predefiniowanych.
 - Smoke-check:
   - `python -m py_compile db_jst_utils.py app.py` (OK).
+
+### Hotfix H-102 [DONE]
+Temat: Predefiniowane metryczki — potwierdzenie przy duplikacie kodowania pytania.
+Kryteria ukończenia:
+1. Gdy w metryczce istnieje już pytanie o tym samym kodowaniu (`M_*`), kliknięcie `Wstaw pytanie` wymaga potwierdzenia.
+2. Komunikat ma treść: `Masz już to pytanie w metryczce. Czy chcesz na pewno je wstawić?`
+3. `Tak` wstawia pytanie z unikalnym kodowaniem (`M_OBSZAR_2`, `M_OBSZAR_3`, ...), `Nie` anuluje operację.
+Pierwszy krok wykonawczy:
+- dodać stan oczekującego insertu i przyciski `Tak`/`Nie` w panelu `Predefiniowane metryczki` w `_render_metryczka_editor`.
+Wynik:
+- `app.py`:
+  - przy `Wstaw pytanie` wykrywane są duplikaty kodowania względem pytań już obecnych w metryczce,
+  - dla duplikatu pojawia się blok potwierdzenia (`Tak`/`Nie`),
+  - `Tak` kontynuuje insert i używa istniejącej logiki nadawania unikalnego kodu (`_question_from_template_payload`),
+  - `Nie` czyści stan oczekujący i nic nie wstawia.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

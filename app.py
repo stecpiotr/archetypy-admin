@@ -2924,6 +2924,8 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 edit_rand_last_key = f"{widget_prefix}tpl_edit_rand_last_top"
                 edit_loaded_key = f"{widget_prefix}tpl_edit_loaded_top"
                 edit_opts_key = f"{widget_prefix}tpl_edit_opts_top"
+                tpl_insert_pending_key = f"{widget_prefix}tpl_insert_pending_top"
+                tpl_insert_conflict_code_key = f"{widget_prefix}tpl_insert_conflict_code_top"
                 picked_id = str(picked_tpl.get("id") or "").strip()
                 if st.session_state.get(edit_loaded_key) != picked_id:
                     st.session_state[edit_loaded_key] = picked_id
@@ -2933,6 +2935,8 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     st.session_state[edit_rand_key] = bool(picked_q.get("randomize_options") is True)
                     st.session_state[edit_rand_last_key] = bool(picked_q.get("randomize_exclude_last") is True)
                     st.session_state[edit_opts_key] = _metryczka_options_to_df(picked_q.get("options"))
+                    st.session_state.pop(tpl_insert_pending_key, None)
+                    st.session_state.pop(tpl_insert_conflict_code_key, None)
 
                 st.text_input("Nazwa zapisanego pytania", key=edit_name_key, placeholder="np. M_OBSZAR")
                 e1, e2 = st.columns([0.68, 0.32], gap="small")
@@ -3019,6 +3023,21 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     if st.button("Wstaw pytanie", key=f"{widget_prefix}tpl_insert_top", type="primary", use_container_width=True):
                         working = deepcopy(st.session_state.get(state_key) or cfg_state)
                         q_list = list(working.get("questions") or [])
+                        desired_code = str(
+                            live_tpl_question.get("db_column") or live_tpl_question.get("id") or ""
+                        ).strip().upper()
+                        existing_codes: set[str] = set()
+                        for q in q_list:
+                            if not isinstance(q, dict):
+                                continue
+                            existing_codes.add(str(q.get("db_column") or "").strip().upper())
+                            existing_codes.add(str(q.get("id") or "").strip().upper())
+                        if desired_code and desired_code in existing_codes:
+                            st.session_state[tpl_insert_pending_key] = deepcopy(live_tpl_question)
+                            st.session_state[tpl_insert_conflict_code_key] = desired_code
+                            st.rerun()
+                        st.session_state.pop(tpl_insert_pending_key, None)
+                        st.session_state.pop(tpl_insert_conflict_code_key, None)
                         new_q = _question_from_template_payload(live_tpl_question, q_list)
                         q_list.append(new_q)
                         working["questions"] = q_list
@@ -3031,7 +3050,37 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 with t3:
                     if st.button("Zamknij", key=f"{widget_prefix}tpl_close_top", type="secondary", use_container_width=True):
                         st.session_state[tpl_panel_key] = False
+                        st.session_state.pop(tpl_insert_pending_key, None)
+                        st.session_state.pop(tpl_insert_conflict_code_key, None)
                         st.rerun()
+
+                pending_tpl_insert = st.session_state.get(tpl_insert_pending_key)
+                if isinstance(pending_tpl_insert, dict):
+                    conflict_code = str(st.session_state.get(tpl_insert_conflict_code_key) or "").strip().upper()
+                    st.warning("Masz już to pytanie w metryczce. Czy chcesz na pewno je wstawić?")
+                    if conflict_code:
+                        st.caption(f"Wykryte kodowanie: {conflict_code}")
+                    c_yes, c_no = st.columns([0.14, 0.14], gap="small")
+                    with c_yes:
+                        if st.button("Tak", key=f"{widget_prefix}tpl_insert_confirm_yes_top", type="primary", use_container_width=True):
+                            working = deepcopy(st.session_state.get(state_key) or cfg_state)
+                            q_list = list(working.get("questions") or [])
+                            new_q = _question_from_template_payload(pending_tpl_insert, q_list)
+                            q_list.append(new_q)
+                            working["questions"] = q_list
+                            st.session_state[state_key] = working
+                            st.session_state.pop(tpl_insert_pending_key, None)
+                            st.session_state.pop(tpl_insert_conflict_code_key, None)
+                            st.session_state[scroll_target_key] = _metryczka_anchor_id(
+                                kind, study_key, str(new_q.get("_ui_key") or "")
+                            )
+                            st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                            st.rerun()
+                    with c_no:
+                        if st.button("Nie", key=f"{widget_prefix}tpl_insert_confirm_no_top", type="secondary", use_container_width=True):
+                            st.session_state.pop(tpl_insert_pending_key, None)
+                            st.session_state.pop(tpl_insert_conflict_code_key, None)
+                            st.rerun()
 
     questions = list((cfg_state.get("questions") or []))
     rebuilt_questions: List[Dict[str, Any]] = []
