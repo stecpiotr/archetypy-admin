@@ -2073,3 +2073,25 @@ Wynik:
     - odświeża edytor bez utraty spójności stanu.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-064 [DONE]
+Temat: Korekta kodowania odpowiedzi dla 5 stałych pól metryczki (zgodność z historycznymi bazami).
+Kryteria ukończenia:
+1. Dla rdzenia metryczki (`M_PLEC`, `M_WIEK`, `M_WYKSZT`, `M_ZAWOD`, `M_MATERIAL`) kodowanie odpowiedzi jest zgodne z dotychczasową bazą (tekst odpowiedzi), a nie wymuszone `1..N`.
+2. Wklejanie odpowiedzi (`Wklej pytanie i odpowiedzi`) dla pytań rdzeniowych zachowuje tę samą zasadę.
+3. Dla pytań custom pozostaje auto-kodowanie `1..N` przy masowym wklejeniu.
+Pierwszy krok wykonawczy:
+- poprawić normalizację rdzenia w `metryczka_config.py` i logikę wstawiania/edycji opcji w `app.py`.
+Wynik:
+- `metryczka_config.py`:
+  - domyślne opcje rdzeniowe mają `code` równe tekstowi odpowiedzi,
+  - normalizacja rdzenia wymusza kompatybilność historyczną:
+    `code = label` dla 5 stałych pytań.
+- `app.py`:
+  - parser opcji z tabeli (`_metryczka_options_from_df`) przestał wymuszać uppercase kodowania odpowiedzi,
+  - przy `Wstaw` po wklejeniu:
+    - rdzeń: `code = tekst odpowiedzi`,
+    - custom: `code = 1..N`,
+  - doprecyzowano opis przy kodowaniu rdzenia (zgodność z historyczną bazą).
+- Smoke-check:
+  - `python -m py_compile app.py metryczka_config.py db_utils.py db_jst_utils.py` (OK).

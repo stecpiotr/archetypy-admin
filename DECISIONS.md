@@ -1528,3 +1528,11 @@ Decyzja:
 Uzasadnienie:
 - User pokazał referencyjny workflow na nagraniu i oczekiwał analogicznego, szybkiego sposobu masowego wprowadzania odpowiedzi.
 - Podgląd przed zatwierdzeniem ogranicza ryzyko błędnego parsowania przy wklejkach z Word/Excel.
+
+### D-171: Dla 5 stałych pól metryczki kodowanie odpowiedzi musi być zgodne z historycznym zapisem bazowym (`code = tekst odpowiedzi`)
+Decyzja:
+- W rdzeniu metryczki (`M_PLEC`, `M_WIEK`, `M_WYKSZT`, `M_ZAWOD`, `M_MATERIAL`) kodowanie odpowiedzi utrzymujemy jako wartość tekstową odpowiedzi (np. `mężczyzna`, `60 i więcej`), a nie `1..N`.
+- Przy masowym wklejeniu (`Wklej pytanie i odpowiedzi`) ta sama zasada obowiązuje dla pytań rdzeniowych.
+- Dla pytań dodatkowych (`scope=custom`) przy wklejeniu pozostaje auto-kodowanie `1..N`.
+Uzasadnienie:
+- User wskazał, że dotychczasowe bazy zapisują rdzeń metryczki tekstowo; zmiana na kody liczbowe groziłaby rozjazdem importu/raportów i kompatybilności historycznej.

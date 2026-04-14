@@ -27,8 +27,8 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "multiple": False,
             "aliases": ["M_PLEC", "Płeć", "Plec"],
             "options": [
-                {"label": "kobieta", "code": "1"},
-                {"label": "mężczyzna", "code": "2"},
+                {"label": "kobieta", "code": "kobieta"},
+                {"label": "mężczyzna", "code": "mężczyzna"},
             ],
         },
         "M_WIEK": {
@@ -40,9 +40,9 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "multiple": False,
             "aliases": ["M_WIEK", "Wiek"],
             "options": [
-                {"label": "15-39", "code": "1"},
-                {"label": "40-59", "code": "2"},
-                {"label": "60 i więcej", "code": "3"},
+                {"label": "15-39", "code": "15-39"},
+                {"label": "40-59", "code": "40-59"},
+                {"label": "60 i więcej", "code": "60 i więcej"},
             ],
         },
         "M_WYKSZT": {
@@ -54,9 +54,12 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "multiple": False,
             "aliases": ["M_WYKSZT", "Wykształcenie", "Wyksztalcenie"],
             "options": [
-                {"label": "podstawowe, gimnazjalne, zasadnicze zawodowe", "code": "1"},
-                {"label": "średnie", "code": "2"},
-                {"label": "wyższe", "code": "3"},
+                {
+                    "label": "podstawowe, gimnazjalne, zasadnicze zawodowe",
+                    "code": "podstawowe, gimnazjalne, zasadnicze zawodowe",
+                },
+                {"label": "średnie", "code": "średnie"},
+                {"label": "wyższe", "code": "wyższe"},
             ],
         },
         "M_ZAWOD": {
@@ -68,13 +71,13 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "multiple": False,
             "aliases": ["M_ZAWOD", "Status zawodowy", "Sytuacja zawodowa"],
             "options": [
-                {"label": "pracownik umysłowy", "code": "1"},
-                {"label": "pracownik fizyczny", "code": "2"},
-                {"label": "prowadzę własną firmę", "code": "3"},
-                {"label": "student/uczeń", "code": "4"},
-                {"label": "bezrobotny", "code": "5"},
-                {"label": "rencista/emeryt", "code": "6"},
-                {"label": "inna (jaka?)", "code": "7"},
+                {"label": "pracownik umysłowy", "code": "pracownik umysłowy"},
+                {"label": "pracownik fizyczny", "code": "pracownik fizyczny"},
+                {"label": "prowadzę własną firmę", "code": "prowadzę własną firmę"},
+                {"label": "student/uczeń", "code": "student/uczeń"},
+                {"label": "bezrobotny", "code": "bezrobotny"},
+                {"label": "rencista/emeryt", "code": "rencista/emeryt"},
+                {"label": "inna (jaka?)", "code": "inna (jaka?)"},
             ],
         },
         "M_MATERIAL": {
@@ -86,12 +89,15 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "multiple": False,
             "aliases": ["M_MATERIAL", "Sytuacja materialna"],
             "options": [
-                {"label": "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej", "code": "1"},
-                {"label": "powodzi mi się raczej źle", "code": "2"},
-                {"label": "powodzi mi się przeciętnie, średnio", "code": "3"},
-                {"label": "powodzi mi się raczej dobrze", "code": "4"},
-                {"label": "powodzi mi się bardzo dobrze", "code": "5"},
-                {"label": "odmawiam udzielenia odpowiedzi", "code": "6"},
+                {
+                    "label": "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
+                    "code": "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
+                },
+                {"label": "powodzi mi się raczej źle", "code": "powodzi mi się raczej źle"},
+                {"label": "powodzi mi się przeciętnie, średnio", "code": "powodzi mi się przeciętnie, średnio"},
+                {"label": "powodzi mi się raczej dobrze", "code": "powodzi mi się raczej dobrze"},
+                {"label": "powodzi mi się bardzo dobrze", "code": "powodzi mi się bardzo dobrze"},
+                {"label": "odmawiam udzielenia odpowiedzi", "code": "odmawiam udzielenia odpowiedzi"},
             ],
         },
     }
@@ -226,7 +232,20 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
         base["required"] = True
         base["multiple"] = False
         base["aliases"] = _normalize_aliases(src.get("aliases")) or base["aliases"]
-        base["options"] = _normalize_options(src.get("options"), fallback=base["options"])
+        core_opts = _normalize_options(src.get("options"), fallback=base["options"])
+        normalized_core_opts: List[Dict[str, str]] = []
+        seen_labels: set[str] = set()
+        for opt in core_opts:
+            label = _safe_text(opt.get("label"))
+            key = label.lower()
+            if not label or key in seen_labels:
+                continue
+            seen_labels.add(key)
+            # Zgodność historyczna: dla 5 stałych pytań kodowanie odpowiedzi = tekst odpowiedzi.
+            normalized_core_opts.append({"label": label, "code": label})
+        if not normalized_core_opts:
+            normalized_core_opts = [{"label": _safe_text(o.get("label")), "code": _safe_text(o.get("label"))} for o in base["options"]]
+        base["options"] = normalized_core_opts
         normalized_questions.append(base)
         used_columns.add(base["db_column"])
 

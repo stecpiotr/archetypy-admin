@@ -1647,3 +1647,16 @@
     - nadaje kodowanie odpowiedzi sekwencyjnie `1..N`.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-064 (2026-04-14, kodowanie rdzenia metryczki zgodne z historyczną bazą)
+- `metryczka_config.py`:
+  - dla 5 pytań rdzeniowych (`M_PLEC`, `M_WIEK`, `M_WYKSZT`, `M_ZAWOD`, `M_MATERIAL`) domyślne `code` odpowiedzi ustawiono na tekst odpowiedzi,
+  - normalizator rdzenia utrzymuje tę zasadę również przy odczycie/zapisie konfiguracji (`code = label`).
+- `app.py`:
+  - `_metryczka_options_from_df(...)` przestało wymuszać uppercase kodowania odpowiedzi,
+  - w flow `Wklej pytanie i odpowiedzi`:
+    - dla rdzenia kodowanie odpowiedzi = tekst odpowiedzi (zgodność z dotychczasową bazą),
+    - dla pytań custom pozostaje auto-kodowanie `1..N`,
+  - komunikat przy polu kodowania rdzenia doprecyzowany (zgodność historyczna).
+- Test techniczny:
+  - `python -m py_compile app.py metryczka_config.py db_utils.py db_jst_utils.py` (OK).

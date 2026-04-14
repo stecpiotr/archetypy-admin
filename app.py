@@ -526,6 +526,14 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 .form-label-strong{ font-weight:700; font-size:15px; color:#1F2937; }
 .form-label-note{ font-weight:400; color:#748096; margin-left:6px; }
 .section-gap{ margin-top:18px; } .section-gap-big{ margin-top:26px; }
+
+/* Metryczka: pole pytania ma startować od 1 linii, ale dawać się rozciągać w dół */
+textarea[id^="personal_metryczka_editor_widget_"][id*="prompt_"],
+textarea[id^="jst_metryczka_editor_widget_"][id*="prompt_"]{
+  min-height: 40px !important;
+  height: 40px !important;
+  resize: vertical !important;
+}
 .card{ border:1px solid var(--line); background:#fff; border-radius:14px; padding:18px 16px; }
 .section-title{ font-weight:700; font-size:18px; margin-bottom:12px; }
 
@@ -2569,11 +2577,11 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, str]]:
         code = str(row.get("Kodowanie") or "").strip()
         if not label or not code:
             continue
-        code_norm = code.upper()
+        code_norm = code.lower()
         if code_norm in seen_codes:
             continue
         seen_codes.add(code_norm)
-        out.append({"label": label, "code": code_norm})
+        out.append({"label": label, "code": code})
     return out
 
 
@@ -2798,7 +2806,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 "Pytanie",
                 value=prompt_default,
                 key=f"{widget_prefix}prompt_{ui_key}",
-                height=96,
+                height=24,
                 placeholder="Treść pytania widoczna dla respondenta",
             )
         with c_col:
@@ -2810,7 +2818,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 placeholder="np. M_POWIAT",
             )
             if is_core:
-                st.caption("Kodowanie rdzenia jest stałe.")
+                st.caption("Kodowanie rdzenia jest zgodne z historyczną bazą (tekst odpowiedzi).")
 
         st.markdown("**Odpowiedzi**")
         options_df = _metryczka_options_to_df(options_default)
@@ -2900,8 +2908,9 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                 continue
                             if parsed_question:
                                 q_item["prompt"] = parsed_question
+                            q_scope = str(q_item.get("scope") or "").strip().lower()
                             q_item["options"] = [
-                                {"label": ans, "code": str(i + 1)}
+                                {"label": ans, "code": (ans if q_scope == "core" else str(i + 1))}
                                 for i, ans in enumerate(parsed_answers)
                             ]
                             break
