@@ -2066,3 +2066,10 @@ Decyzja:
 - Aktywne selekcje łączą się dalej logiką AND między cechami.
 Uzasadnienie:
 - Użytkownik zgłosił konieczność uproszczenia i upodobnienia wyboru cech do wzorca z Segmentacji (kontrolki jednokrotnego wyboru).
+
+### D-227: Normalizacja predefiniowanych pytań metryczkowych używa lokalnego parsera bool w `db_jst_utils.py`
+Decyzja:
+- W `db_jst_utils.py` utrzymujemy lokalny helper `_bool_from_any(...)` i używamy go w `_normalize_template_question_payload(...)`.
+Uzasadnienie:
+- Funkcja była wywoływana, ale nie istniała w module, co powodowało `NameError` przy otwieraniu panelu `Predefiniowane metryczki`.
+- Lokalny helper domyka zależność i stabilizuje parsowanie flag `is_open`/`randomize_*` niezależnie od formatu danych wejściowych.

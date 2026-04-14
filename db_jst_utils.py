@@ -1051,6 +1051,17 @@ def normalize_matching_segments_penalty_strength(raw: Any) -> str:
     return "standard"
 
 
+def _bool_from_any(value: Any, fallback: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    txt = str(value or "").strip().lower()
+    if txt in {"1", "true", "t", "yes", "y", "on", "tak", "x"}:
+        return True
+    if txt in {"0", "false", "f", "no", "n", "off", "nie"}:
+        return False
+    return bool(fallback)
+
+
 def _notify_postgrest_schema_reload() -> None:
     try:
         with _db_connect() as conn:

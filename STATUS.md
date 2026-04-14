@@ -2242,3 +2242,15 @@
   - zachowano logikę AND między aktywnymi cechami.
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-101 (2026-04-14, fix NameError w predefiniowanych metryczkach)
+- `archetypy-admin/db_jst_utils.py`:
+  - dodano brakujący helper `_bool_from_any(...)` (parsowanie bool z różnych formatów),
+  - normalizacja pytań predefiniowanych (`_normalize_template_question_payload`) ma już komplet zależności dla pól:
+    - `is_open`,
+    - `randomize_options`,
+    - `randomize_exclude_last`.
+- Efekt:
+  - kliknięcie `Predefiniowane metryczki` nie kończy się błędem `NameError`.
+- Test techniczny:
+  - `python -m py_compile db_jst_utils.py app.py` (OK).

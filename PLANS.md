@@ -2826,3 +2826,16 @@ Wynik:
   - filtry wielocechowe działają jako single-select z opcją `— brak filtra —`, w układzie 2-kolumnowym.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-101 [DONE]
+Temat: Błąd `NameError: _bool_from_any` przy wejściu w `Predefiniowane metryczki`.
+Kryteria ukończenia:
+1. Kliknięcie `Predefiniowane metryczki` nie wywala wyjątku.
+2. Normalizacja zapisanego pytania metryczkowego poprawnie parsuje pola bool (`is_open`, `randomize_options`, `randomize_exclude_last`).
+Pierwszy krok wykonawczy:
+- dodać brakujący helper `_bool_from_any` do `db_jst_utils.py` i uruchomić smoke-check.
+Wynik:
+- `db_jst_utils.py`:
+  - dodano helper `_bool_from_any(value, fallback)` wykorzystywany przez normalizację pytań predefiniowanych.
+- Smoke-check:
+  - `python -m py_compile db_jst_utils.py app.py` (OK).
