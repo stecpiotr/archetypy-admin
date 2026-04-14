@@ -7004,9 +7004,58 @@ def matching_view() -> None:
                         f"(N={int(r['n'])}, zgodność={float(r['match_pct']):.1f}%){status_suffix}"
                     )
                     opt_map[label] = r
+                st.markdown(
+                    """
+                    <style>
+                      .match-seg-radar-label{
+                        margin:22px 0 10px 0;
+                        font-size:24px;
+                        font-weight:900;
+                        color:#1f2f44;
+                        line-height:1.2;
+                      }
+                      .match-seg-top3-style-grid{
+                        display:grid;
+                        grid-template-columns:1fr 1fr;
+                        gap:12px;
+                        margin:-18px 0 4px 0;
+                      }
+                      .match-seg-top3-style-card{
+                        border:1px solid #dbe4ef;
+                        border-radius:12px;
+                        background:#fff;
+                        padding:10px 12px;
+                        text-align:center;
+                      }
+                      .match-seg-top3-style-card .title{
+                        font-size:13px;
+                        font-weight:500;
+                        color:#1f2f44;
+                        margin-bottom:4px;
+                      }
+                      .match-seg-top3-style-card .line2{
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        gap:18px;
+                        flex-wrap:wrap;
+                        font-size:14px;
+                        font-weight:700;
+                        line-height:1.35;
+                      }
+                      .match-seg-top3-style-card .line2 span{white-space:nowrap;}
+                      @media (max-width: 900px){
+                        .match-seg-top3-style-grid{grid-template-columns:1fr;}
+                      }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown("<div class='match-seg-radar-label'>Podgląd radarowy segmentu</div>", unsafe_allow_html=True)
                 selected_label = st.selectbox(
                     "Podgląd radarowy segmentu",
                     list(opt_map.keys()),
+                    label_visibility="collapsed",
                     key=f"matching_segments_pick_{person_sid}_{jst_sid}",
                 )
                 selected_seg = opt_map[selected_label]
@@ -7015,27 +7064,76 @@ def matching_view() -> None:
                         f"Wybrany segment ma N={int(selected_seg.get('n') or 0)} (<{min_seg_n}) — interpretuj radar ostrożnie."
                     )
 
-                radar_order = list(JST_ARCHETYPES)
+                radar_order: List[str] = [
+                    "Buntownik", "Błazen", "Kochanek", "Opiekun", "Towarzysz", "Niewinny",
+                    "Władca", "Mędrzec", "Czarodziej", "Bohater", "Twórca", "Odkrywca",
+                ]
                 radar_tick_labels = [_matching_entity_name(a, current_axis_label) for a in radar_order]
-                person_vals_20 = [float(person_profile_match.get(a, 0.0)) / 5.0 for a in radar_order]
                 seg_profile = {a: float((selected_seg.get("profile") or {}).get(a, 0.0)) for a in radar_order}
-                seg_vals_20 = [float(seg_profile.get(a, 0.0)) / 5.0 for a in radar_order]
-                seg_top3 = sorted(radar_order, key=lambda a: float(seg_profile.get(a, 0.0)), reverse=True)[:3]
-                seg_marker_r: List[Optional[float]] = []
-                seg_marker_c: List[str] = []
-                for a in radar_order:
-                    if a == (seg_top3[0] if len(seg_top3) > 0 else None):
-                        seg_marker_r.append(float(seg_profile.get(a, 0.0)) / 5.0)
-                        seg_marker_c.append("#ef4444")
-                    elif a == (seg_top3[1] if len(seg_top3) > 1 else None):
-                        seg_marker_r.append(float(seg_profile.get(a, 0.0)) / 5.0)
-                        seg_marker_c.append("#f59e0b")
-                    elif a == (seg_top3[2] if len(seg_top3) > 2 else None):
-                        seg_marker_r.append(float(seg_profile.get(a, 0.0)) / 5.0)
-                        seg_marker_c.append("#22c55e")
-                    else:
-                        seg_marker_r.append(None)
-                        seg_marker_c.append("rgba(0,0,0,0)")
+                person_profile_20 = {a: float(person_profile_match.get(a, 0.0)) / 5.0 for a in radar_order}
+                seg_profile_20 = {a: float(seg_profile.get(a, 0.0)) / 5.0 for a in radar_order}
+
+                def _priority_top_for_ui_seg(profile_100: Dict[str, float], order: List[str]) -> List[str]:
+                    ordered = sorted(order, key=lambda a: (-float(profile_100.get(a, 0.0)), order.index(a)))
+                    top3 = ordered[:3]
+                    if len(top3) >= 3 and float(profile_100.get(top3[2], 0.0)) < 70.0:
+                        return top3[:2]
+                    return top3
+
+                p_top = _priority_top_for_ui_seg(person_profile_match, radar_order)
+                seg_top = _priority_top_for_ui_seg(seg_profile, radar_order)
+                radar_top_union = set(p_top + seg_top)
+                radar_tick_text: List[str] = []
+                for arche, lbl in zip(radar_order, radar_tick_labels):
+                    safe_lbl = html.escape(str(lbl))
+                    radar_tick_text.append(f"<b>{safe_lbl}</b>" if arche in radar_top_union else safe_lbl)
+
+                person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
+                seg_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
+                p_top_label = f"TOP{max(1, len(p_top))} polityka"
+                seg_top_label = f"TOP{max(1, len(seg_top))} segmentu"
+
+                def _marker_series_seg(profile: Dict[str, float], top3: List[str], palette: Dict[str, str]) -> Tuple[List[Optional[float]], List[str]]:
+                    r_vals: List[Optional[float]] = []
+                    colors: List[str] = []
+                    mapping: Dict[str, str] = {}
+                    if len(top3) > 0:
+                        mapping[top3[0]] = palette["main"]
+                    if len(top3) > 1:
+                        mapping[top3[1]] = palette["aux"]
+                    if len(top3) > 2:
+                        mapping[top3[2]] = palette["supp"]
+                    for arche in radar_order:
+                        if arche in mapping:
+                            r_vals.append(float(profile.get(arche, 0.0)))
+                            colors.append(str(mapping[arche]))
+                        else:
+                            r_vals.append(None)
+                            colors.append("rgba(0,0,0,0)")
+                    return r_vals, colors
+
+                def _role_legend_html_seg(palette: Dict[str, str], marker: str, count: int) -> str:
+                    role_defs = [("główny", "main"), ("wspierający", "aux"), ("poboczny", "supp")]
+                    items: List[str] = []
+                    for idx, (label, role_key) in enumerate(role_defs):
+                        if idx >= max(0, int(count)):
+                            break
+                        items.append(
+                            f"<span><span style=\"color:{palette[role_key]};\">{marker}</span> {label}</span>"
+                        )
+                    return "".join(items)
+
+                p_role_legend = _role_legend_html_seg(person_top_colors, "●", len(p_top))
+                seg_role_legend = _role_legend_html_seg(seg_top_colors, "■", len(seg_top))
+
+                p_marker_r, p_marker_c = _marker_series_seg(person_profile_20, p_top, person_top_colors)
+                seg_marker_r, seg_marker_c = _marker_series_seg(seg_profile_20, seg_top, seg_top_colors)
+                person_vals_20 = [float(person_profile_20.get(a, 0.0)) for a in radar_order]
+                seg_vals_20 = [float(seg_profile_20.get(a, 0.0)) for a in radar_order]
+                person_name_seg = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
+                segment_name_seg = str(selected_seg.get("segment_name") or selected_seg.get("segment") or "segment")
+                legend_person_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil polityka ({person_name_seg})\u00a0\u00a0\u00a0"
+                legend_segment_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil segmentu ({segment_name_seg})\u00a0\u00a0\u00a0"
 
                 fig_seg = go.Figure(
                     data=[
@@ -7043,65 +7141,170 @@ def matching_view() -> None:
                             r=person_vals_20 + [person_vals_20[0]],
                             theta=radar_tick_labels + [radar_tick_labels[0]],
                             fill="toself",
-                            fillcolor="rgba(37,99,235,0.17)",
+                            fillcolor="rgba(37,99,235,0.18)",
                             line=dict(color="#2563eb", width=3),
-                            name=f"Polityk ({result.get('person_name_nom') or ''})",
+                            marker=dict(size=5, symbol="circle"),
+                            name=legend_person_label,
+                            showlegend=True,
                             hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
                         ),
                         go.Scatterpolar(
                             r=seg_vals_20 + [seg_vals_20[0]],
                             theta=radar_tick_labels + [radar_tick_labels[0]],
                             fill="toself",
-                            fillcolor="rgba(15,118,110,0.13)",
+                            fillcolor="rgba(15,118,110,0.16)",
                             line=dict(color="#0f766e", width=3, dash="dot"),
-                            name=f"Segment {selected_seg.get('segment')}",
+                            marker=dict(size=6, symbol="square"),
+                            name=legend_segment_label,
+                            showlegend=True,
                             hovertemplate="<b>%{theta}</b><br>Segment: %{r:.2f}<extra></extra>",
+                        ),
+                        go.Scatterpolar(
+                            r=p_marker_r,
+                            theta=radar_tick_labels,
+                            mode="markers",
+                            marker=dict(size=16, symbol="circle", color=p_marker_c, opacity=0.92, line=dict(color="black", width=2.6)),
+                            name=p_top_label,
+                            showlegend=False,
+                            hovertemplate=f"<b>%{{theta}}</b><br>{p_top_label}: %{{r:.2f}}<extra></extra>",
                         ),
                         go.Scatterpolar(
                             r=seg_marker_r,
                             theta=radar_tick_labels,
                             mode="markers",
-                            marker=dict(size=14, color=seg_marker_c, line=dict(color="#0f172a", width=1.8)),
+                            marker=dict(size=14, symbol="square", color=seg_marker_c, opacity=0.94, line=dict(color="#0f172a", width=2.0)),
+                            name=seg_top_label,
                             showlegend=False,
-                            hovertemplate="<b>%{theta}</b><br>TOP segmentu: %{r:.2f}<extra></extra>",
+                            hovertemplate=f"<b>%{{theta}}</b><br>{seg_top_label}: %{{r:.2f}}<extra></extra>",
                         ),
                     ]
                 )
                 fig_seg.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
-                    height=620,
+                    height=640,
                     polar=dict(
                         bgcolor="rgba(0,0,0,0)",
                         radialaxis=dict(visible=True, range=[0, 20]),
                         angularaxis=dict(
-                            tickfont=dict(size=14.5),
+                            tickfont=dict(size=16),
                             tickvals=radar_tick_labels,
-                            ticktext=radar_tick_labels,
+                            ticktext=radar_tick_text,
                             rotation=90,
                             direction="clockwise",
                         ),
                     ),
-                    margin=dict(l=24, r=24, t=42, b=44),
+                    margin=dict(l=24, r=24, t=66, b=90),
+                    showlegend=True,
                     legend=dict(
                         orientation="h",
                         yanchor="bottom",
-                        y=1.05,
+                        y=1.16,
                         xanchor="center",
                         x=0.5,
+                        font=dict(size=13.5),
                         bgcolor="rgba(255,255,255,0.94)",
                         bordercolor="#cfd9e8",
                         borderwidth=1,
+                        entrywidthmode="pixels",
+                        entrywidth=232,
+                        tracegroupgap=28,
+                        itemclick="toggle",
+                        itemdoubleclick="toggleothers",
                     ),
+                )
+                seg_key_safe = re.sub(
+                    r"[^a-zA-Z0-9_-]+",
+                    "_",
+                    str(selected_seg.get("segment") or selected_seg.get("segment_name") or "segment"),
                 )
                 st.plotly_chart(
                     fig_seg,
                     use_container_width=True,
                     config={"displaylogo": False, "displayModeBar": False, "responsive": True},
-                    key=f"matching-segment-radar-{person_sid}-{jst_sid}",
+                    key=f"matching-segment-radar-{person_sid}-{jst_sid}-{seg_key_safe}",
+                )
+                st.markdown(
+                    f"""
+                    <div class="match-seg-top3-style-grid">
+                      <div class="match-seg-top3-style-card">
+                        <div class="title">{html.escape(p_top_label)}</div>
+                        <div class="line2">{p_role_legend}</div>
+                      </div>
+                      <div class="match-seg-top3-style-card">
+                        <div class="title">{html.escape(seg_top_label)}</div>
+                        <div class="line2">{seg_role_legend}</div>
+                      </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
                 st.caption(
                     "Metoda porównania: zgodność = 100 - średnia luka |Δ| dla tych samych 12 archetypów (skala 0-100)."
                 )
+
+                profile_title = (
+                    "Profile archetypowe 0-100 (siła archetypu, skala: 0-100)"
+                    if current_axis_label == "Archetyp"
+                    else "Profile wartości 0-100 (siła wartości, skala: 0-100)"
+                )
+                st.markdown(
+                    f"<div class='match-section-header match-profile-header'><h3>{html.escape(profile_title)}</h3></div>",
+                    unsafe_allow_html=True,
+                )
+                seg_left_profile_col, seg_right_profile_col = st.columns(2, gap="large")
+                try:
+                    import admin_dashboard as AD
+
+                    p_key = re.sub(r"[^a-zA-Z0-9_-]+", "_", person_sid or "person")
+                    s_key = re.sub(r"[^a-zA-Z0-9_-]+", "_", seg_key_safe or "segment")
+                    person_profile_img = AD.make_segment_profile_wheel_png(
+                        mean_scores=person_profile_match,
+                        out_path=f"matching_segment_profile_person_{p_key}_{s_key}.png",
+                        label_mode=("values" if current_axis_label == "Wartość" else "arche"),
+                    )
+                    segment_profile_img = AD.make_segment_profile_wheel_png(
+                        mean_scores=seg_profile,
+                        out_path=f"matching_segment_profile_segment_{s_key}_{p_key}.png",
+                        label_mode=("values" if current_axis_label == "Wartość" else "arche"),
+                    )
+
+                    def _show_image_compat_segment(img_path: str, max_width_px: int = 560) -> None:
+                        try:
+                            st.image(img_path, width=max_width_px)
+                        except TypeError:
+                            st.image(img_path, use_column_width=True)
+
+                    with seg_left_profile_col:
+                        st.markdown(
+                            f"<div class='match-profile-title'>"
+                            f"{'Profil archetypowy' if current_axis_label == 'Archetyp' else 'Profil wartości'} {html.escape(str(person_name_seg or ''))}"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+                        _show_image_compat_segment(person_profile_img, max_width_px=520)
+                    with seg_right_profile_col:
+                        st.markdown(
+                            f"<div class='match-profile-title'>"
+                            f"{'Profil archetypowy segmentu' if current_axis_label == 'Archetyp' else 'Profil wartości segmentu'} {html.escape(str(segment_name_seg or ''))}"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+                        _show_image_compat_segment(segment_profile_img, max_width_px=520)
+                    st.markdown(
+                        """
+                        <div class="match-wheel-legend-wrap">
+                          <div class="match-wheel-legend">
+                            <span><i style="background:#e53935"></i>Zmiana</span>
+                            <span><i style="background:#1e88e5"></i>Ludzie</span>
+                            <span><i style="background:#2e7d32"></i>Porządek</span>
+                            <span><i style="background:#7e57c2"></i>Niezależność</span>
+                          </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                except Exception as e:
+                    st.info(f"Nie udało się wygenerować porównania kół 0-100 dla segmentu: {e}")
 
     with tab_strategy:
         strengths = [str(_matching_entity_name(x, current_axis_label)) for x in (result.get("strengths") or [])[:3]]
