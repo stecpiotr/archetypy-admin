@@ -2127,3 +2127,18 @@
   - payload demografii (`var_order/cat_order`) jest budowany dynamicznie.
 - Test techniczny:
   - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Zrobione w Hotfix H-096 (2026-04-14, segmenty: suwak siły kar + 100% bazy z puli kluczowej)
+- `archetypy-admin/app.py` (`🧭 Matching > Segmenty`):
+  - dodano kontrolkę `Siła kar segmentowych` (`łagodna` / `standard` / `ostra`) obok progu `N` i przełącznika wiarygodności,
+  - profil kar jest teraz parametryzowany (`penalty_profiles`) i wpływa na:
+    - karę od średniej luki kluczowej,
+    - karę od maksymalnej luki kluczowej,
+    - karę za brak wspólnych priorytetów,
+    - karę za rozjazd TOP1,
+  - baza wyniku segmentowego została przestawiona na `100% key-pool`:
+    - `base_score = base_key` (TOP6 polityka + TOP6 segmentu),
+    - bez domieszki `base_global` z pełnych 12 archetypów,
+  - zaktualizowano opisy metodologii (górny opis i podpis pod radarem), aby jasno komunikowały nową logikę.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

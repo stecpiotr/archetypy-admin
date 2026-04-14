@@ -1950,3 +1950,28 @@ Decyzja:
 Uzasadnienie:
 - To pierwszy bezpieczny etap migracji generatora do obsługi metryczki konfigurowalnej.
 - Pozwala utrzymać działający pipeline raportu i jednocześnie włączać customowe zmienne do tabel demograficznych.
+
+### D-214: Segmentowy wynik bazowy liczony w 100% z puli kluczowej (`TOP6 + TOP6`)
+Decyzja:
+- W zakładce `🧭 Matching > Segmenty` bazę wyniku zgodności liczymy wyłącznie z puli kluczowej:
+  - `base_score = base_key`,
+  - pula kluczowa = suma unii `TOP6 polityka + TOP6 segmentu`.
+- Pełny profil 12 archetypów pozostaje metryką pomocniczą diagnostycznie (`mae_all`), ale nie wpływa już na bazę `% zgodności`.
+Uzasadnienie:
+- User wskazał, że w segmentacji archetypy z ogona rozkładu mają śladowe znaczenie i zaburzały interpretację dopasowania.
+- Priorytet kampanijny ma zgodność na osiach kluczowych, więc baza wskaźnika ma być w pełni key-focused.
+
+### D-215: Kalibracja „siły kar segmentowych” przez 3 profile (`łagodna`, `standard`, `ostra`)
+Decyzja:
+- Do Segmentów dodano kontrolkę `Siła kar segmentowych` sterującą zestawem współczynników kar:
+  - kara od `key_gap_mae`,
+  - kara od `key_gap_max` (z progiem),
+  - kara za brak/wąską część wspólną priorytetów,
+  - kara za rozjazd TOP1.
+- Domyślny profil to `standard`.
+Uzasadnienie:
+- Użytkownik chce móc zmieniać czułość wskaźnika bez kolejnych zmian kodu.
+- Trzy predefiniowane profile dają szybki kompromis między stabilnością metodologiczną a elastycznością analityczną.
+
+Status:
+- D-209 zostaje doprecyzowana przez D-214 i D-215 (finalnie: baza 100% key-pool + kalibrowalne kary).

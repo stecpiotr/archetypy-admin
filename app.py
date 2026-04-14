@@ -7198,7 +7198,7 @@ def matching_view() -> None:
         st.markdown(
             "Porównanie działa wyłącznie na wspólnej skali 12 archetypów (0-100): "
             "dla każdego segmentu liczona jest zgodność strategiczna z naciskiem na kluczowe archetypy "
-            "(TOP6 polityka + TOP6 segmentu, analiza TOP3/TOP2, luki i kary za rozjazdy priorytetów)."
+            "(TOP6 polityka + TOP6 segmentu, 100% bazy wyniku z puli kluczowej; analiza TOP3/TOP2, luki i kary za rozjazdy priorytetów)."
         )
         if segment_err:
             st.warning(segment_err)
@@ -7209,7 +7209,7 @@ def matching_view() -> None:
         else:
             jst_n = int(result.get("jst_n") or 0)
             default_min_seg_n = max(30, int(round(jst_n * 0.06))) if jst_n > 0 else 60
-            ctrl_a, ctrl_b = st.columns([0.55, 0.45], gap="large")
+            ctrl_a, ctrl_b, ctrl_c = st.columns([0.42, 0.30, 0.28], gap="large")
             with ctrl_a:
                 min_seg_n = int(
                     st.number_input(
@@ -7229,8 +7229,44 @@ def matching_view() -> None:
                         key=f"matching_segments_show_uncertain_{person_sid}_{jst_sid}",
                     )
                 )
+            with ctrl_c:
+                penalty_strength = str(
+                    st.select_slider(
+                        "Siła kar segmentowych",
+                        options=["łagodna", "standard", "ostra"],
+                        value="standard",
+                        key=f"matching_segments_penalty_strength_{person_sid}_{jst_sid}",
+                    )
+                )
 
             arch_order = list(JST_ARCHETYPES)
+            penalty_profiles: Dict[str, Dict[str, float]] = {
+                "łagodna": {
+                    "kgap_mul": 0.40,
+                    "kmax_mul": 0.12,
+                    "kmax_floor": 12.0,
+                    "shared_zero": 2.8,
+                    "shared_one": 1.0,
+                    "top1_mismatch": 1.2,
+                },
+                "standard": {
+                    "kgap_mul": 0.50,
+                    "kmax_mul": 0.18,
+                    "kmax_floor": 12.0,
+                    "shared_zero": 4.0,
+                    "shared_one": 1.5,
+                    "top1_mismatch": 1.8,
+                },
+                "ostra": {
+                    "kgap_mul": 0.62,
+                    "kmax_mul": 0.24,
+                    "kmax_floor": 10.0,
+                    "shared_zero": 5.6,
+                    "shared_one": 2.3,
+                    "top1_mismatch": 2.6,
+                },
+            }
+            penalty_cfg = penalty_profiles.get(penalty_strength, penalty_profiles["standard"])
 
             def _segment_priority_pool(profile_100: Dict[str, float]) -> List[str]:
                 ordered = sorted(
@@ -7281,10 +7317,18 @@ def matching_view() -> None:
                 key_gap_max = float(max(key_gap_vals)) if key_gap_vals else 0.0
                 shared_priority_count = len(set(person_top).intersection(set(seg_top)))
                 main_priority_mismatch_penalty = (
-                    1.8 if (person_top and seg_top and person_top[0] != seg_top[0]) else 0.0
+                    float(penalty_cfg.get("top1_mismatch", 1.8))
+                    if (person_top and seg_top and person_top[0] != seg_top[0])
+                    else 0.0
                 )
                 shared_priority_penalty = (
-                    4.0 if shared_priority_count == 0 else (1.5 if shared_priority_count == 1 else 0.0)
+                    float(penalty_cfg.get("shared_zero", 4.0))
+                    if shared_priority_count == 0
+                    else (
+                        float(penalty_cfg.get("shared_one", 1.5))
+                        if shared_priority_count == 1
+                        else 0.0
+                    )
                 )
 
                 score_mae_all = max(0.0, min(100.0, 100.0 - mae_all))
@@ -7295,10 +7339,11 @@ def matching_view() -> None:
                 score_top3_key = max(0.0, min(100.0, 100.0 - top3_gap_mae_key))
                 base_global = 0.50 * score_mae_all + 0.20 * score_rmse_all + 0.30 * score_top3_all
                 base_key = 0.45 * score_mae_key + 0.25 * score_rmse_key + 0.30 * score_top3_key
-                base_score = 0.35 * base_global + 0.65 * base_key
+                base_score = base_key
                 key_penalty = (
-                    0.50 * key_gap_mae
-                    + 0.18 * max(0.0, key_gap_max - 12.0)
+                    float(penalty_cfg.get("kgap_mul", 0.50)) * key_gap_mae
+                    + float(penalty_cfg.get("kmax_mul", 0.18))
+                    * max(0.0, key_gap_max - float(penalty_cfg.get("kmax_floor", 12.0)))
                     + shared_priority_penalty
                     + main_priority_mismatch_penalty
                 )
@@ -7310,6 +7355,7 @@ def matching_view() -> None:
                     "key_gap_mae": float(key_gap_mae),
                     "key_penalty": float(key_penalty),
                     "key_pool_n": float(len(key_pool)),
+                    "penalty_strength": str(penalty_strength),
                 }
 
             seg_rows: List[Dict[str, Any]] = []
@@ -7758,9 +7804,9 @@ def matching_view() -> None:
                     unsafe_allow_html=True,
                 )
                 st.caption(
-                    "Metoda porównania strategicznego (key-focused): 75% wagi ma pula kluczowa "
-                    "(TOP6 polityka + TOP6 segmentu), 35% ma profil pełny 12 archetypów; "
-                    "dodatkowo działa kara za luki priorytetów TOP3/TOP2."
+                    f"Metoda porównania strategicznego (key-focused): 100% bazy wyniku liczone jest z puli kluczowej "
+                    f"(TOP6 polityka + TOP6 segmentu); dodatkowo działa kara za luki priorytetów TOP3/TOP2. "
+                    f"Aktualna siła kar: {penalty_strength}."
                 )
 
                 profile_title = (

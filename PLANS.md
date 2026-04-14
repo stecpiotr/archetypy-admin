@@ -2703,3 +2703,20 @@ Wynik:
   - `_build_b2_declared_demo_payload(...)` buduje `var_order/cat_order` dynamicznie.
 - Smoke-check:
   - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-096 [DONE]
+Temat: Segmenty w Matching — suwak kalibracyjny siły kar + 100% bazy wyniku z puli kluczowej.
+Kryteria ukończenia:
+1. W zakładce `Segmenty` jest kontrolka `Siła kar segmentowych` (`łagodna` / `standard` / `ostra`).
+2. Baza wyniku segmentowego liczona jest w 100% na puli kluczowej (`TOP6 polityka + TOP6 segmentu`), bez domieszki pełnego profilu 12 archetypów.
+3. Opisy metody w UI są zgodne z nową logiką.
+Pierwszy krok wykonawczy:
+- dodać kontrolkę siły kar obok progu N i podpiąć ją do wzoru kar w `_segment_strategic_score`.
+Wynik:
+- `app.py` (`🧭 Matching > Segmenty`):
+  - dodano selektor `Siła kar segmentowych` z 3 profilami (`łagodna`, `standard`, `ostra`),
+  - `base_score` przestawiono na `base_key` (100% key-pool),
+  - kary (`key_gap`, `key_max`, brak wspólnych priorytetów, mismatch TOP1) są skalowane profilem siły kar,
+  - zaktualizowano podpisy metody (górny opis i podpis pod radarem).
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
