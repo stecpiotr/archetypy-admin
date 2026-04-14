@@ -1536,3 +1536,10 @@ Decyzja:
 - Dla pytań dodatkowych (`scope=custom`) przy wklejeniu pozostaje auto-kodowanie `1..N`.
 Uzasadnienie:
 - User wskazał, że dotychczasowe bazy zapisują rdzeń metryczki tekstowo; zmiana na kody liczbowe groziłaby rozjazdem importu/raportów i kompatybilności historycznej.
+
+### D-172: Pole `Pytanie` w edytorze metryczki ma startować z wysokości 1–2 linii
+Decyzja:
+- W CSS panelu admina pole `Pytanie` w metryczce targetujemy selektorem `textarea[aria-label=\"Pytanie\"]` i ustawiamy niski start (`height/min-height` ~38px) przy zachowaniu `resize: vertical`.
+Uzasadnienie:
+- User zgłosił, że pole jest zbyt wysokie i utrudnia szybkie przeglądanie wielu pytań.
+- Selektor po `id` nie był wystarczająco niezawodny dla renderu Streamlit, więc potrzebny był bardziej stabilny target.

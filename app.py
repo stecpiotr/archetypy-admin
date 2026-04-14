@@ -527,11 +527,11 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 .form-label-note{ font-weight:400; color:#748096; margin-left:6px; }
 .section-gap{ margin-top:18px; } .section-gap-big{ margin-top:26px; }
 
-/* Metryczka: pole pytania ma startować od 1 linii, ale dawać się rozciągać w dół */
-textarea[id^="personal_metryczka_editor_widget_"][id*="prompt_"],
-textarea[id^="jst_metryczka_editor_widget_"][id*="prompt_"]{
-  min-height: 40px !important;
-  height: 40px !important;
+/* Metryczka: pole "Pytanie" startuje od 1-2 linii, z możliwością rozszerzenia w dół */
+textarea[aria-label="Pytanie"]{
+  min-height: 38px !important;
+  height: 38px !important;
+  line-height: 1.25 !important;
   resize: vertical !important;
 }
 .card{ border:1px solid var(--line); background:#fff; border-radius:14px; padding:18px 16px; }

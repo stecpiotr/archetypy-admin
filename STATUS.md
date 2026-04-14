@@ -1660,3 +1660,15 @@
   - komunikat przy polu kodowania rdzenia doprecyzowany (zgodność historyczna).
 - Test techniczny:
   - `python -m py_compile app.py metryczka_config.py db_utils.py db_jst_utils.py` (OK).
+
+### Zrobione w Hotfix H-065 (2026-04-14, niższe pola `Pytanie` w metryczce)
+- `app.py`:
+  - poprawiono selektor CSS dla pól `Pytanie` w edytorze metryczki:
+    - zamiast selektora po `id` użyto pewnego targetu `textarea[aria-label=\"Pytanie\"]`,
+  - ustawiono niższą wysokość startową:
+    - `min-height: 38px`,
+    - `height: 38px`,
+    - `line-height: 1.25`,
+  - pozostawiono możliwość ręcznego rozszerzania pola w dół (`resize: vertical`).
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

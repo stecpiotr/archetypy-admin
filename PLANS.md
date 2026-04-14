@@ -2095,3 +2095,21 @@ Wynik:
   - doprecyzowano opis przy kodowaniu rdzenia (zgodność z historyczną bazą).
 - Smoke-check:
   - `python -m py_compile app.py metryczka_config.py db_utils.py db_jst_utils.py` (OK).
+
+### Hotfix H-065 [DONE]
+Temat: Dalsze obniżenie wysokości pola `Pytanie` w edytorze metryczki.
+Kryteria ukończenia:
+1. Pole `Pytanie` w metryczce startuje z wysokości ok. 1–2 linii.
+2. Użytkownik może nadal ręcznie rozszerzać pole w dół.
+Pierwszy krok wykonawczy:
+- poprawić selektor CSS tak, by na pewno trafiał w pola `Pytanie` renderowane przez Streamlit.
+Wynik:
+- `app.py`:
+  - selektor CSS zmieniono na `textarea[aria-label=\"Pytanie\"]`,
+  - ustawiono startową geometrię:
+    - `min-height: 38px`,
+    - `height: 38px`,
+    - `line-height: 1.25`,
+    - `resize: vertical`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
