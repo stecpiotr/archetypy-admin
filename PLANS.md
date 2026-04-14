@@ -2955,3 +2955,32 @@ Wynik:
   - legenda ról (`główny/wspierający/poboczny`) renderuje się zależnie od liczby aktywnych priorytetów.
 - Smoke-check:
   - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### Hotfix H-107 [DONE]
+Temat: Picker ikon metryczki + globalna propagacja zmian predefiniowanych pytań po kodowaniu `M_*`.
+Kryteria ukończenia:
+1. W edytorze metryczki (JST + personal) można wybrać ikonę zmiennej z bazy oraz ustawić ikonę kategorii.
+2. Domyślne ikonki dla rdzenia metryczki są uzupełnione automatycznie (zmienna + odpowiedzi), bez ręcznego klikania.
+3. `Predefiniowane metryczki -> Zapisz zmiany` propaguje zmiany globalnie do wszystkich ankiet z tym samym kodowaniem pytania.
+4. Lokalne zapisy metryczki per ankieta nadal działają wyłącznie na bieżące badanie.
+Pierwszy krok wykonawczy:
+- rozszerzyć model metryczki o pola ikon i podpiąć je w edytorze, a następnie dodać mechanizm globalnego „apply by db_column” przy zapisie predefiniowanego pytania.
+Wynik:
+- `app.py`:
+  - dodano picker ikon (baza + własna ikona) dla zmiennej metryczkowej,
+  - dodano kolumnę `Ikona` dla odpowiedzi (w edytorze pytania i predefiniowanych),
+  - zapis/odczyt metryczki i szablonów obejmuje `variable_emoji` i `value_emoji`,
+  - `Zapisz zmiany` w panelu predefiniowanych pytań uruchamia globalną propagację zmian do ankiet JST/personal po tym samym `db_column`.
+- `metryczka_config.py`:
+  - rdzeń metryczki ma pełne domyślne ikonki (zmienne + kategorie),
+  - normalizacja obsługuje pola `variable_emoji` i `value_emoji`,
+  - dodano heurystyki domyślnych ikon dla pytań/kategorii custom.
+- `db_jst_utils.py`:
+  - normalizacja predefiniowanego pytania obsługuje pola ikon i fallback heurystyczny.
+- `admin_dashboard.py` + `app.py (Matching)`:
+  - render tabel demograficznych respektuje ikonki z konfiguracji metryczki (z fallbackiem heurystycznym).
+- `archetypy-ankieta/src/lib/metryczka.ts`:
+  - model i normalizacja TS rozszerzone o pola ikon (zgodność kontraktu frontend-backend).
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py db_utils.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).

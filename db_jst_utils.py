@@ -13,6 +13,8 @@ import streamlit as st
 from supabase import Client
 from metryczka_config import (
     default_jst_metryczka_config,
+    guess_metry_value_emoji,
+    guess_metry_variable_emoji,
     metryczka_custom_columns,
     metryczka_questions,
     normalize_jst_metryczka_config,
@@ -1132,6 +1134,9 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
     db_column = str(src.get("db_column") or src.get("id") or "").strip().upper()
     scope = str(src.get("scope") or "custom").strip().lower() or "custom"
     qid = str(src.get("id") or db_column).strip().upper()
+    variable_emoji = str(
+        src.get("variable_emoji") or guess_metry_variable_emoji(db_column, table_label, prompt)
+    ).strip()
     randomize_options = _bool_from_any(src.get("randomize_options"), False)
     legacy_exclude_last = _bool_from_any(src.get("randomize_exclude_last"), False)
     options_out: List[Dict[str, Any]] = []
@@ -1158,6 +1163,9 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
                 "code": code,
                 "is_open": bool(is_open),
                 "lock_randomization": bool(lock_randomization),
+                "value_emoji": str(
+                    opt.get("value_emoji") or guess_metry_value_emoji(table_label, code, db_column)
+                ).strip(),
             }
         )
     if randomize_options and legacy_exclude_last and options_out and not has_locked:
@@ -1168,6 +1176,7 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
         "db_column": db_column,
         "prompt": prompt,
         "table_label": table_label,
+        "variable_emoji": variable_emoji,
         "required": True,
         "multiple": False,
         "randomize_options": randomize_options,

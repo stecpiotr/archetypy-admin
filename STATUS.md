@@ -2334,3 +2334,32 @@
   - legenda ról (`główny`, `wspierający`, `poboczny`) renderuje się warunkowo.
 - Test techniczny:
   - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### Zrobione w Hotfix H-107 (2026-04-15, picker ikon + globalna propagacja predefiniowanych)
+- `archetypy-admin/app.py`:
+  - dodano bibliotekę ikonek i picker dla metryczki:
+    - ikona zmiennej (`z bazy` + opcja własnej ikonki),
+    - ikona kategorii (`Ikona` w tabeli odpowiedzi),
+  - `Wklej pytanie i odpowiedzi` zachowuje/przenosi ikonki kategorii i nie gubi ich przy aktualizacji listy odpowiedzi,
+  - zapis pytania/metryczki obejmuje nowe pola:
+    - `variable_emoji`,
+    - `value_emoji`,
+  - `Predefiniowane metryczki -> 💾 Zapisz zmiany`:
+    - zapisuje szablon,
+    - automatycznie propaguje zmiany globalnie do ankiet JST i personalnych, które mają pytanie o tym samym `db_column` (np. `M_OBSZAR`),
+    - pokazuje podsumowanie liczby zaktualizowanych badań.
+- `archetypy-admin/metryczka_config.py`:
+  - rdzeń metryczki ma pełny domyślny zestaw ikonek dla zmiennych i kategorii,
+  - normalizacja pytań/odpowiedzi obsługuje pola ikon,
+  - dodano heurystyki ikon dla custom zmiennych/kategorii.
+- `archetypy-admin/db_jst_utils.py`:
+  - normalizacja szablonów pytań metryczkowych wspiera `variable_emoji` i `value_emoji` z fallbackiem heurystycznym.
+- `archetypy-admin/admin_dashboard.py`:
+  - demografia personalna czyta ikonki bezpośrednio z `metryczka_config` (zmienna + kategorie), z fallbackiem do dotychczasowej heurystyki.
+- `archetypy-admin/app.py` (`🧭 Matching`):
+  - dynamiczne tabele demograficzne respektują ikonki z konfiguracji pytań metryczkowych.
+- `archetypy-ankieta/src/lib/metryczka.ts`:
+  - model i normalizacja frontendu rozszerzone o pola ikon, aby kontrakt danych był spójny.
+- Testy techniczne:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py db_utils.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).

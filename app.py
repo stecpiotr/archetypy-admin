@@ -91,6 +91,8 @@ from report_share import (
     mark_sent as mark_report_access_sent,
 )
 from metryczka_config import (
+    guess_metry_value_emoji,
+    guess_metry_variable_emoji,
     normalize_jst_metryczka_config,
     normalize_personal_metryczka_config,
 )
@@ -2537,6 +2539,86 @@ def jst_edit_view() -> None:
 _METRY_CORE_IDS: Tuple[str, ...] = ("M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_MATERIAL")
 _METRY_CUSTOM_CODE_RE = re.compile(r"^M_[A-Z0-9_]{2,40}$")
 _METRY_PASTE_OPTION_PREFIX_RE = re.compile(r"^\s*(?:[-–—*•]+|\(?\d{1,3}[\)\].:-]|[A-Za-z][\)\].:-])\s+")
+_METRY_ICON_LIBRARY: List[Tuple[str, str]] = [
+    ("", "(brak ikony)"),
+    ("📌", "uniwersalna"),
+    ("👫", "płeć"),
+    ("👩", "kobieta"),
+    ("👨", "mężczyzna"),
+    ("🧭", "wiek / orientacja"),
+    ("🧑", "wiek 15-39"),
+    ("🧑‍💼", "wiek 40-59"),
+    ("🧓", "wiek 60+"),
+    ("🎓", "wykształcenie"),
+    ("🛠️", "podst./gim./zaw."),
+    ("📘", "średnie"),
+    ("💼", "status zawodowy"),
+    ("🧠", "prac. umysłowy"),
+    ("🏢", "własna firma"),
+    ("🧑‍🎓", "student/uczeń"),
+    ("🔎", "bezrobotny"),
+    ("🌿", "rencista/emeryt"),
+    ("🧩", "inna"),
+    ("💰", "sytuacja materialna"),
+    ("😄", "bardzo dobra"),
+    ("🙂", "raczej dobra"),
+    ("😐", "przeciętna"),
+    ("🙁", "raczej zła"),
+    ("😟", "bardzo zła"),
+    ("🤐", "odmowa"),
+    ("📍", "miejsce / obszar"),
+    ("🏙️", "miasto"),
+    ("🌾", "wieś"),
+    ("🗳️", "preferencje polityczne"),
+    ("➡️", "prawicowe"),
+    ("↗️", "centro-prawicowe"),
+    ("⚖️", "centrowe"),
+    ("↖️", "centro-lewicowe"),
+    ("⬅️", "lewicowe"),
+    ("❓", "nie wiem"),
+    ("✅", "tak"),
+    ("❌", "nie"),
+]
+_METRY_ICON_CUSTOM_LABEL = "✍️ Własna ikona…"
+_METRY_ICON_LABEL_TO_VALUE: Dict[str, str] = {
+    (f"{icon} {name}".strip() if icon else name): icon for icon, name in _METRY_ICON_LIBRARY
+}
+_METRY_ICON_VALUE_TO_LABEL: Dict[str, str] = {
+    icon: (f"{icon} {name}".strip() if icon else name) for icon, name in _METRY_ICON_LIBRARY
+}
+_METRY_ICON_PICK_VALUES: List[str] = [icon for icon, _ in _METRY_ICON_LIBRARY]
+
+
+def _metry_icon_picker(
+    *,
+    label: str,
+    key_prefix: str,
+    value: Any,
+    help_text: str = "",
+) -> str:
+    current = str(value or "").strip()
+    pick_key = f"{key_prefix}_pick"
+    custom_key = f"{key_prefix}_custom"
+    select_options = list(_METRY_ICON_LABEL_TO_VALUE.keys()) + [_METRY_ICON_CUSTOM_LABEL]
+    if pick_key not in st.session_state:
+        st.session_state[pick_key] = _METRY_ICON_VALUE_TO_LABEL.get(current, _METRY_ICON_CUSTOM_LABEL)
+    if custom_key not in st.session_state:
+        st.session_state[custom_key] = current if current not in _METRY_ICON_VALUE_TO_LABEL else ""
+    picked = st.selectbox(
+        label,
+        select_options,
+        key=pick_key,
+        help=help_text or None,
+    )
+    if picked == _METRY_ICON_CUSTOM_LABEL:
+        custom_val = st.text_input(
+            "Wgraj/wklej własną ikonkę",
+            key=custom_key,
+            placeholder="np. 🛰️",
+        )
+        return str(custom_val or "").strip()
+    st.session_state[custom_key] = ""
+    return str(_METRY_ICON_LABEL_TO_VALUE.get(picked) or "").strip()
 
 
 def _metryczka_normalize_config(kind: str, raw: Any) -> Dict[str, Any]:
@@ -2589,6 +2671,8 @@ def _metryczka_options_to_df(
     *,
     randomize_options: bool = False,
     legacy_exclude_last: bool = False,
+    table_label: str = "",
+    db_column: str = "",
 ) -> pd.DataFrame:
     rows: List[Dict[str, Any]] = []
     has_locked = False
@@ -2605,12 +2689,16 @@ def _metryczka_options_to_df(
                     "Kodowanie": str(opt.get("code") or "").strip(),
                     "Otwarta": bool(opt.get("is_open") is True),
                     "Blokuj losowanie": lock_randomization,
+                    "Ikona": str(
+                        opt.get("value_emoji")
+                        or guess_metry_value_emoji(table_label, str(opt.get("code") or opt.get("label") or "").strip(), db_column)
+                    ).strip(),
                 }
             )
     if randomize_options and legacy_exclude_last and rows and not has_locked:
         rows[-1]["Blokuj losowanie"] = True
     if not rows:
-        rows = [{"Odpowiedź": "", "Kodowanie": "", "Otwarta": False, "Blokuj losowanie": False}]
+        rows = [{"Odpowiedź": "", "Kodowanie": "", "Otwarta": False, "Blokuj losowanie": False, "Ikona": ""}]
     return pd.DataFrame(rows)
 
 
@@ -2631,6 +2719,7 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
         code = str(row.get("Kodowanie") or "").strip()
         is_open = bool(row.get("Otwarta") is True)
         lock_randomization = bool(row.get("Blokuj losowanie") is True)
+        value_emoji = str(row.get("Ikona") or "").strip()
         if not label:
             continue
         # Zachowujemy wiersze nawet z pustym kodowaniem, aby nie gubić odpowiedzi w UI.
@@ -2646,8 +2735,20 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
                 "code": code,
                 "is_open": is_open,
                 "lock_randomization": lock_randomization,
+                "value_emoji": value_emoji,
             }
         )
+    return out
+
+
+def _metry_icon_options_for_df(df: Any) -> List[str]:
+    out = list(_METRY_ICON_PICK_VALUES)
+    if isinstance(df, pd.DataFrame) and "Ikona" in df.columns:
+        for raw in list(df["Ikona"].tolist()):
+            icon = str(raw or "").strip()
+            if not icon or icon in out:
+                continue
+            out.append(icon)
     return out
 
 
@@ -2782,14 +2883,15 @@ def _new_custom_metryczka_question(questions: List[Dict[str, Any]]) -> Dict[str,
         "_ui_key": f"q_{int(time.time() * 1_000_000)}",
         "prompt": "",
         "table_label": "",
+        "variable_emoji": "📌",
         "required": True,
         "multiple": False,
         "randomize_options": False,
         "randomize_exclude_last": False,
         "aliases": [],
         "options": [
-            {"label": "", "code": "1", "is_open": False, "lock_randomization": False},
-            {"label": "", "code": "2", "is_open": False, "lock_randomization": False},
+            {"label": "", "code": "1", "is_open": False, "lock_randomization": False, "value_emoji": ""},
+            {"label": "", "code": "2", "is_open": False, "lock_randomization": False, "value_emoji": ""},
         ],
     }
 
@@ -2819,6 +2921,7 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
     code = _unique_custom_metryczka_code(desired_code, questions)
     prompt = str(q_src.get("prompt") or "").strip()
     table_label = str(q_src.get("table_label") or prompt).strip()
+    variable_emoji = str(q_src.get("variable_emoji") or guess_metry_variable_emoji(code, table_label, prompt)).strip()
     randomize_options = bool(q_src.get("randomize_options") is True)
     legacy_exclude_last = bool(q_src.get("randomize_exclude_last") is True)
     options_out: List[Dict[str, Any]] = []
@@ -2840,12 +2943,13 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
                 "code": code_opt,
                 "is_open": bool(opt.get("is_open") is True),
                 "lock_randomization": bool(opt.get("lock_randomization") is True),
+                "value_emoji": str(opt.get("value_emoji") or guess_metry_value_emoji(table_label, code_opt, code)).strip(),
             }
         )
     if len(options_out) < 2:
         options_out = [
-            {"label": "", "code": "", "is_open": False, "lock_randomization": False},
-            {"label": "", "code": "", "is_open": False, "lock_randomization": False},
+            {"label": "", "code": "", "is_open": False, "lock_randomization": False, "value_emoji": ""},
+            {"label": "", "code": "", "is_open": False, "lock_randomization": False, "value_emoji": ""},
         ]
     options_out = _metryczka_apply_legacy_exclude_last_lock(
         options_out,
@@ -2859,6 +2963,7 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
         "_ui_key": f"q_{int(time.time() * 1_000_000)}",
         "prompt": prompt,
         "table_label": table_label,
+        "variable_emoji": variable_emoji,
         "required": True,
         "multiple": False,
         "randomize_options": randomize_options,
@@ -2917,6 +3022,177 @@ def _validate_metryczka_before_save(raw_cfg: Dict[str, Any]) -> Tuple[bool, str]
     return True, ""
 
 
+def _metryczka_merge_question_from_template(
+    *,
+    kind: str,
+    existing_question: Dict[str, Any],
+    template_question: Dict[str, Any],
+) -> Dict[str, Any]:
+    q_existing = dict(existing_question or {})
+    q_tpl = dict(template_question or {})
+    db_column = str(q_existing.get("db_column") or q_existing.get("id") or "").strip().upper()
+    prompt = str(q_tpl.get("prompt") or q_existing.get("prompt") or "").strip()
+    table_label = str(q_tpl.get("table_label") or prompt or q_existing.get("table_label") or db_column).strip()
+    variable_emoji = str(
+        q_tpl.get("variable_emoji")
+        or q_existing.get("variable_emoji")
+        or guess_metry_variable_emoji(db_column, table_label, prompt)
+    ).strip()
+    randomize_options = bool(q_tpl.get("randomize_options") is True)
+    options_new: List[Dict[str, Any]] = []
+    seen_codes: set[str] = set()
+    for opt in list(q_tpl.get("options") or []):
+        if not isinstance(opt, dict):
+            continue
+        label = str(opt.get("label") or "").strip()
+        code = str(opt.get("code") or label).strip()
+        if not label:
+            continue
+        if db_column in _METRY_CORE_IDS:
+            code = label
+        if not code:
+            continue
+        code_key = code.lower()
+        if code_key in seen_codes:
+            continue
+        seen_codes.add(code_key)
+        options_new.append(
+            {
+                "label": label,
+                "code": code,
+                "is_open": bool(opt.get("is_open") is True),
+                "lock_randomization": bool(opt.get("lock_randomization") is True),
+                "value_emoji": str(opt.get("value_emoji") or guess_metry_value_emoji(table_label, code, db_column)).strip(),
+            }
+        )
+    if len(options_new) < 2:
+        options_new = list(q_existing.get("options") or [])
+    merged = dict(q_existing)
+    merged["prompt"] = prompt
+    merged["table_label"] = table_label
+    merged["variable_emoji"] = variable_emoji
+    merged["randomize_options"] = randomize_options
+    merged["randomize_exclude_last"] = False
+    merged["options"] = options_new
+    return merged
+
+
+def _apply_template_question_to_config(
+    *,
+    kind: str,
+    config: Any,
+    template_question: Dict[str, Any],
+) -> Tuple[Dict[str, Any], int]:
+    cfg = _metryczka_normalize_config(kind, config)
+    target_code = str(template_question.get("db_column") or template_question.get("id") or "").strip().upper()
+    if not target_code:
+        return cfg, 0
+    changed = 0
+    new_questions: List[Dict[str, Any]] = []
+    for q in list(cfg.get("questions") or []):
+        if not isinstance(q, dict):
+            continue
+        q_code = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if q_code != target_code:
+            new_questions.append(q)
+            continue
+        merged = _metryczka_merge_question_from_template(
+            kind=kind,
+            existing_question=q,
+            template_question=template_question,
+        )
+        if merged != q:
+            changed += 1
+        new_questions.append(merged)
+    if changed <= 0:
+        return cfg, 0
+    out_cfg = {"version": int(cfg.get("version") or 1), "questions": new_questions}
+    return _metryczka_normalize_config(kind, out_cfg), changed
+
+
+def _propagate_template_question_globally(
+    *,
+    template_question: Dict[str, Any],
+    kind_scope: str,
+) -> Dict[str, int]:
+    scope = str(kind_scope or "both").strip().lower()
+    apply_jst = scope in {"jst", "both"}
+    apply_personal = scope in {"personal", "both"}
+    stats = {
+        "jst_updated": 0,
+        "jst_questions_updated": 0,
+        "personal_updated": 0,
+        "personal_questions_updated": 0,
+        "errors": 0,
+    }
+    if apply_jst:
+        try:
+            jst_rows = fetch_jst_studies(sb, include_inactive=True)
+        except Exception:
+            jst_rows = fetch_jst_studies(sb)
+        for row in jst_rows:
+            sid = str(row.get("id") or "").strip()
+            if not sid:
+                continue
+            try:
+                cfg_new, changed_q = _apply_template_question_to_config(
+                    kind="jst",
+                    config=row.get("metryczka_config"),
+                    template_question=template_question,
+                )
+                if changed_q <= 0:
+                    continue
+                update_jst_study(
+                    sb,
+                    sid,
+                    {
+                        "metryczka_config": cfg_new,
+                        "metryczka_config_version": int(cfg_new.get("version") or 1),
+                    },
+                )
+                stats["jst_updated"] += 1
+                stats["jst_questions_updated"] += int(changed_q)
+            except Exception:
+                stats["errors"] += 1
+    if apply_personal:
+        try:
+            personal_rows = (
+                sb.table("studies")
+                .select("*")
+                .or_("is_active.is.true,is_active.is.false,is_active.is.null")
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            personal_rows = fetch_studies(sb)
+        for row in personal_rows:
+            sid = str(row.get("id") or "").strip()
+            if not sid:
+                continue
+            try:
+                cfg_new, changed_q = _apply_template_question_to_config(
+                    kind="personal",
+                    config=row.get("metryczka_config"),
+                    template_question=template_question,
+                )
+                if changed_q <= 0:
+                    continue
+                update_study(
+                    sb,
+                    sid,
+                    {
+                        "metryczka_config": cfg_new,
+                        "metryczka_config_version": int(cfg_new.get("version") or 1),
+                    },
+                )
+                stats["personal_updated"] += 1
+                stats["personal_questions_updated"] += int(changed_q)
+            except Exception:
+                stats["errors"] += 1
+    return stats
+
+
 def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, Any]) -> Dict[str, Any]:
     state_key = _metryczka_editor_state_key(kind, study_key)
     scroll_target_key = _metryczka_scroll_target_key(kind, study_key)
@@ -2948,6 +3224,9 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         templates = list_metryczka_question_templates(sb, kind=kind)
         with st.container(border=True):
             st.markdown("**Predefiniowane metryczki (zapisane pytania)**")
+            st.caption(
+                "Zmiany zapisane tutaj są globalne: aktualizują wszystkie ankiety, które mają pytanie o tym samym kodowaniu."
+            )
             if not templates:
                 st.caption("Brak zapisanych pytań metryczkowych. Zapisz pierwsze pytanie przyciskiem „💾 Zapisz do zapisanych”.")
             else:
@@ -2979,6 +3258,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 edit_prompt_key = f"{widget_prefix}tpl_edit_prompt_top"
                 edit_table_label_key = f"{widget_prefix}tpl_edit_table_label_top"
                 edit_code_key = f"{widget_prefix}tpl_edit_code_top"
+                edit_var_icon_key = f"{widget_prefix}tpl_edit_var_icon_top"
                 edit_rand_key = f"{widget_prefix}tpl_edit_rand_top"
                 edit_loaded_key = f"{widget_prefix}tpl_edit_loaded_top"
                 edit_opts_key = f"{widget_prefix}tpl_edit_opts_top"
@@ -2993,11 +3273,21 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         picked_q.get("table_label") or picked_q.get("prompt") or ""
                     ).strip()
                     st.session_state[edit_code_key] = str(picked_q.get("db_column") or picked_q.get("id") or "").strip().upper()
+                    st.session_state[edit_var_icon_key] = str(
+                        picked_q.get("variable_emoji")
+                        or guess_metry_variable_emoji(
+                            st.session_state.get(edit_code_key),
+                            st.session_state.get(edit_table_label_key),
+                            st.session_state.get(edit_prompt_key),
+                        )
+                    ).strip()
                     st.session_state[edit_rand_key] = bool(picked_q.get("randomize_options") is True)
                     st.session_state[edit_opts_key] = _metryczka_options_to_df(
                         picked_q.get("options"),
                         randomize_options=bool(picked_q.get("randomize_options") is True),
                         legacy_exclude_last=bool(picked_q.get("randomize_exclude_last") is True),
+                        table_label=str(st.session_state.get(edit_table_label_key) or ""),
+                        db_column=str(st.session_state.get(edit_code_key) or ""),
                     )
                     st.session_state.pop(tpl_insert_pending_key, None)
                     st.session_state.pop(tpl_insert_conflict_code_key, None)
@@ -3018,6 +3308,13 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     )
                 with e2:
                     st.text_input("Kodowanie", key=edit_code_key, placeholder="np. M_POWIAT")
+                    picked_var_icon = _metry_icon_picker(
+                        label="Ikona zmiennej (z bazy)",
+                        key_prefix=f"{widget_prefix}tpl_var_icon_top_{picked_id}",
+                        value=st.session_state.get(edit_var_icon_key),
+                        help_text="Ikona pokazywana przy nazwie zmiennej w tabelach demograficznych.",
+                    )
+                    st.session_state[edit_var_icon_key] = picked_var_icon
                     st.checkbox(
                         "Losowa kolejność odpowiedzi",
                         key=edit_rand_key,
@@ -3025,7 +3322,11 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
 
                 tpl_opts_df = st.session_state.get(edit_opts_key)
                 if not isinstance(tpl_opts_df, pd.DataFrame):
-                    tpl_opts_df = _metryczka_options_to_df([])
+                    tpl_opts_df = _metryczka_options_to_df(
+                        [],
+                        table_label=str(st.session_state.get(edit_table_label_key) or ""),
+                        db_column=str(st.session_state.get(edit_code_key) or ""),
+                    )
                 tpl_opts_df = st.data_editor(
                     tpl_opts_df,
                     height=_metryczka_data_editor_height(tpl_opts_df),
@@ -3056,6 +3357,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             default=False,
                             width="small",
                         ),
+                        "Ikona": st.column_config.SelectboxColumn(
+                            "Ikona",
+                            help="Ikona kategorii do tabel demograficznych.",
+                            options=_metry_icon_options_for_df(tpl_opts_df),
+                            width="small",
+                        ),
                     },
                 )
                 st.session_state[edit_opts_key] = tpl_opts_df
@@ -3066,9 +3373,23 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     "db_column": str(st.session_state.get(edit_code_key) or "").strip().upper(),
                     "prompt": str(st.session_state.get(edit_prompt_key) or "").strip(),
                     "table_label": str(st.session_state.get(edit_table_label_key) or "").strip(),
+                    "variable_emoji": str(st.session_state.get(edit_var_icon_key) or "").strip(),
                     "randomize_options": bool(st.session_state.get(edit_rand_key)),
                     "randomize_exclude_last": False,
-                    "options": _metryczka_options_from_df(tpl_opts_df),
+                    "options": [
+                        {
+                            **opt,
+                            "value_emoji": str(
+                                opt.get("value_emoji")
+                                or guess_metry_value_emoji(
+                                    str(st.session_state.get(edit_table_label_key) or ""),
+                                    str(opt.get("code") or opt.get("label") or ""),
+                                    str(st.session_state.get(edit_code_key) or ""),
+                                )
+                            ).strip(),
+                        }
+                        for opt in _metryczka_options_from_df(tpl_opts_df)
+                    ],
                 }
                 st.caption(
                     f"Kodowanie pytania: {str(live_tpl_question.get('db_column') or '').strip().upper()} • "
@@ -3084,8 +3405,26 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                 question=live_tpl_question,
                                 kind=picked_kind if picked_kind in {"jst", "personal", "both"} else "both",
                             )
+                            saved_tpl_question = (
+                                saved_tpl.get("question")
+                                if isinstance(saved_tpl, dict) and isinstance(saved_tpl.get("question"), dict)
+                                else live_tpl_question
+                            )
+                            apply_kind = str(saved_tpl.get("kind") or picked_kind or "both").strip().lower()
+                            apply_stats = _propagate_template_question_globally(
+                                template_question=dict(saved_tpl_question or {}),
+                                kind_scope=apply_kind,
+                            )
                             st.session_state[edit_loaded_key] = str(saved_tpl.get("id") or "").strip()
-                            st.success("Zapisano zmiany predefiniowanego pytania.")
+                            st.success(
+                                "Zapisano zmiany predefiniowanego pytania i zastosowano globalnie "
+                                f"(JST: {int(apply_stats.get('jst_updated', 0))}, "
+                                f"personalne: {int(apply_stats.get('personal_updated', 0))})."
+                            )
+                            if int(apply_stats.get("errors", 0)) > 0:
+                                st.warning(
+                                    f"Nie udało się zaktualizować części badań: {int(apply_stats.get('errors', 0))}."
+                                )
                             st.rerun()
                         except Exception as e:
                             st.error(f"Nie udało się zapisać zmian: {e}")
@@ -3169,6 +3508,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             qid = str(q_dict.get("id") or db_column or f"M_CUSTOM_{idx}").strip().upper()
         prompt_default = str(q_dict.get("prompt") or "").strip()
         table_label_default = str(q_dict.get("table_label") or prompt_default).strip()
+        variable_emoji_default = str(
+            q_dict.get("variable_emoji")
+            or guess_metry_variable_emoji(db_column, table_label_default, prompt_default)
+        ).strip()
         options_default = q_dict.get("options") or []
 
         st.markdown(f"<div id='{anchor_id}'></div>", unsafe_allow_html=True)
@@ -3206,6 +3549,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 disabled=is_core,
                 placeholder="np. M_POWIAT",
             )
+            variable_emoji = _metry_icon_picker(
+                label="Ikona zmiennej (z bazy)",
+                key_prefix=f"{widget_prefix}var_icon_{ui_key}",
+                value=variable_emoji_default,
+                help_text="Ikona pokazywana przy tej zmiennej w tabelach demograficznych.",
+            )
             randomize_options_val = st.checkbox(
                 "Losowa kolejność odpowiedzi",
                 value=bool(q_dict.get("randomize_options") is True),
@@ -3219,6 +3568,8 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             options_default,
             randomize_options=bool(q_dict.get("randomize_options") is True),
             legacy_exclude_last=bool(q_dict.get("randomize_exclude_last") is True),
+            table_label=table_label_default,
+            db_column=db_column,
         )
         edited_options_df = st.data_editor(
             options_df,
@@ -3248,6 +3599,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     "Blokuj losowanie",
                     help="Po zaznaczeniu odpowiedź zachowuje stałą pozycję przy randomizacji.",
                     default=False,
+                    width="small",
+                ),
+                "Ikona": st.column_config.SelectboxColumn(
+                    "Ikona",
+                    help="Ikona kategorii do tabel demograficznych.",
+                    options=_metry_icon_options_for_df(options_df),
                     width="small",
                 ),
             },
@@ -3363,6 +3720,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                         "code": str(it.get("code") or "").strip(),
                                         "is_open": bool(it.get("is_open") is True),
                                         "lock_randomization": bool(it.get("lock_randomization") is True),
+                                        "value_emoji": str(it.get("value_emoji") or "").strip(),
                                     }
                                 )
                             if not existing_opts:
@@ -3377,12 +3735,14 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                                 "code": str(it.get("code") or "").strip(),
                                                 "is_open": bool(it.get("is_open") is True),
                                                 "lock_randomization": bool(it.get("lock_randomization") is True),
+                                                "value_emoji": str(it.get("value_emoji") or "").strip(),
                                             }
                                         )
 
                             old_codes_by_label: Dict[str, str] = {}
                             old_open_by_label: Dict[str, bool] = {}
                             old_lock_by_label: Dict[str, bool] = {}
+                            old_icon_by_label: Dict[str, str] = {}
                             for opt in existing_opts:
                                 old_label = str(opt.get("label") or "").strip().lower()
                                 old_code = str(opt.get("code") or "").strip()
@@ -3392,6 +3752,8 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                     old_open_by_label[old_label] = bool(opt.get("is_open") is True)
                                 if old_label and old_label not in old_lock_by_label:
                                     old_lock_by_label[old_label] = bool(opt.get("lock_randomization") is True)
+                                if old_label and old_label not in old_icon_by_label:
+                                    old_icon_by_label[old_label] = str(opt.get("value_emoji") or "").strip()
 
                             new_options: List[Dict[str, Any]] = []
                             for i, ans in enumerate(parsed_answers):
@@ -3403,12 +3765,21 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                             "code": ans,
                                             "is_open": bool(old_open_by_label.get(ans_key, False)),
                                             "lock_randomization": bool(old_lock_by_label.get(ans_key, False)),
+                                            "value_emoji": str(
+                                                old_icon_by_label.get(ans_key, "")
+                                                or guess_metry_value_emoji(
+                                                    str(q_item.get("table_label") or q_item.get("prompt") or ""),
+                                                    ans,
+                                                    str(q_item.get("db_column") or ""),
+                                                )
+                                            ).strip(),
                                         }
                                     )
                                     continue
                                 code_existing = old_codes_by_label.get(str(ans).strip().lower(), "")
                                 open_existing = bool(old_open_by_label.get(str(ans).strip().lower(), False))
                                 lock_existing = bool(old_lock_by_label.get(str(ans).strip().lower(), False))
+                                icon_existing = str(old_icon_by_label.get(str(ans).strip().lower(), "") or "").strip()
                                 if (not code_existing) and i < len(existing_opts):
                                     idx_code = str(existing_opts[i].get("code") or "").strip()
                                     idx_label = str(existing_opts[i].get("label") or "").strip().lower()
@@ -3416,16 +3787,24 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                         code_existing = idx_code
                                         open_existing = bool(existing_opts[i].get("is_open") is True)
                                         lock_existing = bool(existing_opts[i].get("lock_randomization") is True)
+                                        icon_existing = str(existing_opts[i].get("value_emoji") or "").strip()
                                 # Wklejka ma aktualizować treść pytania/odpowiedzi, nie narzucać nowych kodowań.
                                 if not code_existing:
                                     # Propozycja domyślna: kodowanie = treść odpowiedzi (edytowalne przez użytkownika).
                                     code_existing = ans
+                                if not icon_existing:
+                                    icon_existing = guess_metry_value_emoji(
+                                        str(q_item.get("table_label") or q_item.get("prompt") or ""),
+                                        code_existing,
+                                        str(q_item.get("db_column") or ""),
+                                    )
                                 new_options.append(
                                     {
                                         "label": ans,
                                         "code": code_existing,
                                         "is_open": open_existing,
                                         "lock_randomization": lock_existing,
+                                        "value_emoji": icon_existing,
                                     }
                                 )
                             q_item["options"] = new_options
@@ -3471,6 +3850,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             "db_column": code_for_template,
                             "prompt": str(prompt or "").strip(),
                             "table_label": str(table_label or prompt or "").strip(),
+                            "variable_emoji": str(variable_emoji or "").strip(),
                             "randomize_options": bool(randomize_options_val),
                             "randomize_exclude_last": False,
                             "options": [
@@ -3479,6 +3859,14 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                     "code": str(opt.get("code") or "").strip(),
                                     "is_open": bool(opt.get("is_open") is True),
                                     "lock_randomization": bool(opt.get("lock_randomization") is True),
+                                    "value_emoji": str(
+                                        opt.get("value_emoji")
+                                        or guess_metry_value_emoji(
+                                            str(table_label or prompt or ""),
+                                            str(opt.get("code") or opt.get("label") or ""),
+                                            code_for_template,
+                                        )
+                                    ).strip(),
                                 }
                                 for opt in options
                                 if isinstance(opt, dict)
@@ -3494,6 +3882,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.success(f"Zapisano pytanie w bibliotece: {saved_name}")
                     except Exception as e:
                         st.error(f"Nie udało się zapisać pytania w bibliotece: {e}")
+                st.caption("Zapis lokalnych zmian w metryczce następuje dopiero po kliknięciu „💾 Zapisz metryczkę”.")
 
         final_code = str(code_value or "").strip().upper()
         if is_core:
@@ -3507,12 +3896,29 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 "_ui_key": ui_key,
                 "prompt": str(prompt or "").strip(),
                 "table_label": str(table_label or prompt or "").strip(),
+                "variable_emoji": str(
+                    variable_emoji or guess_metry_variable_emoji(final_code, str(table_label or prompt or ""), str(prompt or ""))
+                ).strip(),
                 "required": True,
                 "multiple": False,
                 "randomize_options": bool(randomize_options_val),
                 "randomize_exclude_last": False,
                 "aliases": list(q_dict.get("aliases") or []),
-                "options": options,
+                "options": [
+                    {
+                        **dict(opt),
+                        "value_emoji": str(
+                            opt.get("value_emoji")
+                            or guess_metry_value_emoji(
+                                str(table_label or prompt or ""),
+                                str(opt.get("code") or opt.get("label") or ""),
+                                final_code,
+                            )
+                        ).strip(),
+                    }
+                    for opt in options
+                    if isinstance(opt, dict)
+                ],
             }
         )
 
@@ -5626,7 +6032,13 @@ def _matching_demo_options(question: Dict[str, Any]) -> List[Dict[str, str]]:
         if code_u in seen:
             continue
         seen.add(code_u)
-        out.append({"code": code, "label": label})
+        out.append(
+            {
+                "code": code,
+                "label": label,
+                "value_emoji": str(opt.get("value_emoji") or "").strip(),
+            }
+        )
     return out
 
 
@@ -5648,6 +6060,17 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
             core_label = str(q.get("table_label") or core_meta.get("label") or field).strip() or field
             for cat in list(core_meta.get("order") or []):
                 display_labels[str(cat)] = str(cat)
+            value_emoji_map = dict(core_meta.get("value_emoji") or {})
+            for opt in opts:
+                if not isinstance(opt, dict):
+                    continue
+                code = str(opt.get("code") or "").strip()
+                icon = str(opt.get("value_emoji") or "").strip()
+                if not code or not icon:
+                    continue
+                canon_code = _canon_demo_value(field, code)
+                if canon_code and canon_code != "brak danych":
+                    value_emoji_map[str(canon_code)] = icon
             specs.append(
                 {
                     "field": field,
@@ -5655,8 +6078,12 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
                     "order_codes": list(core_meta.get("order") or []),
                     "display_labels": display_labels,
                     "options": opts,
-                    "variable_emoji": str(core_meta.get("variable_emoji") or "📌"),
-                    "value_emoji": dict(core_meta.get("value_emoji") or {}),
+                    "variable_emoji": str(
+                        q.get("variable_emoji")
+                        or core_meta.get("variable_emoji")
+                        or guess_metry_variable_emoji(field, core_label, q.get("prompt"))
+                    ).strip() or "📌",
+                    "value_emoji": value_emoji_map,
                     "is_core": True,
                 }
             )
@@ -5671,10 +6098,15 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
             if str(opt.get("code") or "").strip()
         }
         label = str(q.get("table_label") or q.get("prompt") or field).strip() or field
-        var_emoji = _matching_guess_variable_emoji(field, label)
+        var_emoji = str(
+            q.get("variable_emoji")
+            or guess_metry_variable_emoji(field, label, q.get("prompt"))
+            or _matching_guess_variable_emoji(field, label)
+        ).strip() or "📌"
         value_emoji = {
-            code: _matching_guess_value_emoji(label, code)
+            code: str(opt.get("value_emoji") or guess_metry_value_emoji(label, code, field) or _matching_guess_value_emoji(label, code)).strip()
             for code in order_codes
+            for opt in [next((o for o in opts if str(o.get("code") or "").strip() == code), {})]
         }
         specs.append(
             {

@@ -2163,3 +2163,28 @@ Decyzja:
 - Ta sama liczba priorytetów steruje markerami i legendą pod wykresem.
 Uzasadnienie:
 - Użytkownik oczekuje pełnej spójności reguł interpretacyjnych między personalnym raportem demograficznym a Matchingiem.
+
+### D-238: Ikonki metryczki są częścią konfiguracji pytania/odpowiedzi (nie tylko heurystyką renderu)
+Decyzja:
+- Model metryczki rozszerzamy o pola:
+  - `question.variable_emoji`,
+  - `option.value_emoji`.
+- Edytor metryczki (JST i personal) umożliwia:
+  - wybór ikony zmiennej z biblioteki (plus własna ikonka),
+  - wybór ikony odpowiedzi w tabeli opcji.
+- Warstwa renderująca (`Matching`, demografia personalna) najpierw czyta ikonki z konfiguracji, a dopiero potem używa heurystyki fallback.
+Uzasadnienie:
+- Użytkownik potrzebuje trwałej, sterowalnej ikonografii bez ręcznych zmian kodu.
+- Heurystyka pozostaje jako bezpieczny fallback dla historycznych danych.
+
+### D-239: `Predefiniowane metryczki -> Zapisz zmiany` propaguje zmiany globalnie po `db_column`
+Decyzja:
+- Zapis zmian w panelu predefiniowanych pytań uruchamia automatyczne „apply global”:
+  - dla każdego badania JST/personal, które zawiera pytanie o tym samym `db_column`,
+  - aktualizujemy treść pytania, etykietę tabelaryczną, randomizację, odpowiedzi i ikonki.
+- Lokalne zapisy metryczki per ankieta (`💾 Zapisz metryczkę`) pozostają wyłącznie lokalne dla bieżącego badania.
+Uzasadnienie:
+- Użytkownik oczekuje dwóch trybów:
+  - lokalnego (edycja konkretnej ankiety),
+  - globalnego (zmiana wzorca/pytania predefiniowanego dla całego systemu).
+- Propagacja po kodowaniu `M_*` spełnia oczekiwanie „wszędzie tam, gdzie jest np. `M_OBSZAR`”.

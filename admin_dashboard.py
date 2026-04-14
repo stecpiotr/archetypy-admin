@@ -2409,6 +2409,77 @@ def _default_template_for_export(show_supplement: bool, gender_code: str = "M") 
     return candidates[0] if candidates else (TEMPLATE_PATH if show_supplement else TEMPLATE_PATH_NOSUPP)
 
 
+_FEMINIZE_PHRASES_RUNTIME: list[tuple[str, str]] = [
+    ("on/ona", "ona"),
+    ("On/ona", "Ona"),
+    ("Jego", "Jej"),
+    ("jego", "jej"),
+    ("Niego", "Niej"),
+    ("niego", "niej"),
+    ("Nim", "Nią"),
+    ("nim", "nią"),
+    (" on ", " ona "),
+    (" On ", " Ona "),
+]
+
+_FEMINIZE_WORD_MAP_RUNTIME: dict[str, str] = {
+    "Władca": "Władczyni",
+    "Władcy": "Władczyni",
+    "Bohater": "Bohaterka",
+    "Bohatera": "Bohaterki",
+    "Mędrzec": "Mędrczyni",
+    "Mędrca": "Mędrczyni",
+    "Opiekun": "Opiekunka",
+    "Opiekuna": "Opiekunki",
+    "Kochanek": "Kochanka",
+    "Błazen": "Komiczka",
+    "Błazna": "Komiczki",
+    "Twórca": "Twórczyni",
+    "Twórcy": "Twórczyni",
+    "Odkrywca": "Odkrywczyni",
+    "Odkrywcy": "Odkrywczyni",
+    "Czarodziej": "Czarodziejka",
+    "Czarodzieja": "Czarodziejki",
+    "Towarzysz": "Towarzyszka",
+    "Towarzysza": "Towarzyszki",
+    "Niewinny": "Niewinna",
+    "Niewinnego": "Niewinnej",
+    "Buntownik": "Buntowniczka",
+    "Buntownika": "Buntowniczki",
+}
+
+_FEMINIZE_WORD_PATTERNS_RUNTIME: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (
+        re.compile(rf"(?<!\w){re.escape(old)}(?!\w)"),
+        new,
+    )
+    for old, new in sorted(_FEMINIZE_WORD_MAP_RUNTIME.items(), key=lambda kv: (-len(kv[0]), kv[0]))
+)
+
+
+def _feminize_text_runtime(text: str) -> str:
+    out = str(text or "")
+    if not out:
+        return out
+    for old, new in _FEMINIZE_PHRASES_RUNTIME:
+        out = out.replace(old, new)
+    for pat, repl in _FEMINIZE_WORD_PATTERNS_RUNTIME:
+        out = pat.sub(repl, out)
+    return out
+
+
+def _feminize_payload_runtime(value):
+    if isinstance(value, str):
+        return _feminize_text_runtime(value)
+    if isinstance(value, list):
+        return [_feminize_payload_runtime(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_feminize_payload_runtime(v) for v in value)
+    if isinstance(value, dict):
+        return {k: _feminize_payload_runtime(v) for k, v in value.items()}
+    return value
+
+
 def get_archetype_payload_for_gender(archetype_name: str, gender_code: str = "M") -> dict:
     """
     Pobiera dane archetypu preferując wersję zgodną z płcią:
@@ -2425,7 +2496,11 @@ def get_archetype_payload_for_gender(archetype_name: str, gender_code: str = "M"
         payload = archetype_extended.get(base_name) or archetype_extended.get(display_name) or {}
 
     out = dict(payload)
-    out["name"] = display_name if gender == "K" else (base_name or out.get("name", ""))
+    if gender == "K":
+        out = _feminize_payload_runtime(out)
+        out["name"] = display_name
+    else:
+        out["name"] = base_name or out.get("name", "")
     return out
 
 
@@ -2763,6 +2838,7 @@ def _plot_segment_profile_wheel_from_scores(
     outpath: Path,
     mean_scores: dict[str, float],
     label_mode: str = "arche",
+    gender_code: str = "M",
 ) -> None:
     from matplotlib.patches import Wedge, Circle
     import math
@@ -2859,6 +2935,8 @@ def _plot_segment_profile_wheel_from_scores(
 
     mode_norm = str(label_mode or "arche").strip().lower()
 
+    label_gender = normalize_gender(gender_code)
+
     for i, (arch, value_label, _icon_file, color) in enumerate(SEGMENT_PROFILE_ITEMS):
         center = 75 - i * 30
         theta1 = center - 15
@@ -2918,7 +2996,11 @@ def _plot_segment_profile_wheel_from_scores(
             )
         )
 
-        ring_label = str(value_label) if mode_norm.startswith("val") else str(arch)
+        ring_label = (
+            str(value_label)
+            if mode_norm.startswith("val")
+            else display_name_for_gender(str(arch), label_gender)
+        )
         _draw_text_on_arc(ax=ax, text=ring_label, center_deg=center, radius=(r_label_inner + r_label_outer) / 2)
 
         ang = math.radians(center)
@@ -2967,8 +3049,14 @@ def make_segment_profile_wheel_png(
     mean_scores: dict[str, float],
     out_path: str = "segment_profile_wheel.png",
     label_mode: str = "arche",
+    gender_code: str = "M",
 ) -> str:
-    _plot_segment_profile_wheel_from_scores(Path(out_path), mean_scores or {}, label_mode=label_mode)
+    _plot_segment_profile_wheel_from_scores(
+        Path(out_path),
+        mean_scores or {},
+        label_mode=label_mode,
+        gender_code=gender_code,
+    )
     return out_path
 
 
@@ -3075,7 +3163,13 @@ def _build_personal_metry_questions(study: dict) -> list[dict[str, object]]:
             label = str(opt.get("label") or "").strip()
             code = str(opt.get("code") or label).strip()
             if label and code:
-                options.append({"label": label, "code": code})
+                options.append(
+                    {
+                        "label": label,
+                        "code": code,
+                        "value_emoji": str(opt.get("value_emoji") or "").strip(),
+                    }
+                )
         if not options:
             continue
         out.append(
@@ -3084,6 +3178,7 @@ def _build_personal_metry_questions(study: dict) -> list[dict[str, object]]:
                 "db_column": db_col,
                 "prompt": str(q.get("prompt") or db_col).strip(),
                 "table_label": str(q.get("table_label") or q.get("prompt") or db_col).strip(),
+                "variable_emoji": str(q.get("variable_emoji") or "").strip(),
                 "options": options,
             }
         )
@@ -3218,7 +3313,10 @@ def _personal_demo_code(db_column: str, value: object, table_label: str = "") ->
     return raw
 
 
-def _personal_metry_var_icon(db_column: str, table_label: str = "") -> str:
+def _personal_metry_var_icon(db_column: str, table_label: str = "", preferred_icon: str = "") -> str:
+    pref = str(preferred_icon or "").strip()
+    if pref:
+        return pref
     key = str(db_column or "").strip().upper()
     if key in PERSONAL_METRY_VARIABLE_ICONS:
         return PERSONAL_METRY_VARIABLE_ICONS[key]
@@ -3242,7 +3340,20 @@ def _personal_metry_var_icon(db_column: str, table_label: str = "") -> str:
     return "📌"
 
 
-def _personal_metry_cat_icon(db_column: str, table_label: str, code: str) -> str:
+def _personal_metry_cat_icon(
+    db_column: str,
+    table_label: str,
+    code: str,
+    preferred_icon: str = "",
+    option_icon_map: dict[str, str] | None = None,
+) -> str:
+    pref = str(preferred_icon or "").strip()
+    if pref:
+        return pref
+    if isinstance(option_icon_map, dict):
+        icon_from_map = str(option_icon_map.get(str(code or "").strip()) or "").strip()
+        if icon_from_map:
+            return icon_from_map
     field = str(db_column or "").strip().upper()
     canon = _personal_demo_code(field, code, table_label)
     core_meta = PERSONAL_CORE_DEMO_META.get(field) or {}
@@ -3309,6 +3420,16 @@ def _collect_personal_metry_available(
             _personal_demo_code(db_col, str((opt or {}).get("code") or "").strip(), table_label)
             for opt in list(mq.get("options") or [])
         ]
+        option_icons: dict[str, str] = {}
+        for opt in list(mq.get("options") or []):
+            if not isinstance(opt, dict):
+                continue
+            icon = str(opt.get("value_emoji") or "").strip()
+            if not icon:
+                continue
+            canon_code = _personal_demo_code(db_col, str(opt.get("code") or "").strip(), table_label)
+            if canon_code and canon_code not in option_icons:
+                option_icons[canon_code] = icon
         ordered_codes = [c for c in ordered_codes if c]
         seen_codes: set[str] = set()
         ordered_codes = [c for c in ordered_codes if not (c in seen_codes or seen_codes.add(c))]
@@ -3317,7 +3438,15 @@ def _collect_personal_metry_available(
         codes = present + list(extra)
         if not codes:
             continue
-        out.append({"question": mq, "col_name": col_name, "codes": codes})
+        out.append(
+            {
+                "question": mq,
+                "col_name": col_name,
+                "codes": codes,
+                "variable_emoji": str((mq or {}).get("variable_emoji") or "").strip(),
+                "option_icons": option_icons,
+            }
+        )
     return out
 
 
@@ -3330,6 +3459,7 @@ def _render_personal_demography_subpage(
     archetype_names: list[str],
     disp_name_fn,
     is_mobile: bool,
+    gender_code: str = "M",
 ) -> None:
     page_state_key = f"personal_demo_page_{study_id}"
     available = _collect_personal_metry_available(results_df, metry_questions)
@@ -3612,6 +3742,8 @@ def _render_personal_demography_subpage(
         db_col = str((mq or {}).get("db_column") or "").strip()
         prompt = str((mq or {}).get("prompt") or db_col).strip()
         table_label = str((mq or {}).get("table_label") or prompt or db_col).strip()
+        var_icon_pref = str(item.get("variable_emoji") or "").strip()
+        option_icon_map = item.get("option_icons") if isinstance(item.get("option_icons"), dict) else {}
         demo_col = f"{col_name}__DEMO"
         if demo_col not in filt_df.columns:
             filt_df[demo_col] = (
@@ -3628,10 +3760,10 @@ def _render_personal_demography_subpage(
                 table_label,
                 options=select_options,
                 format_func=(
-                    lambda code, dbc=db_col, tbl=table_label: (
+                    lambda code, dbc=db_col, tbl=table_label, om=option_icon_map: (
                         "— brak filtra —"
                         if code == all_token
-                        else f"{_personal_metry_cat_icon(dbc, tbl, str(code))} {str(code)}"
+                        else f"{_personal_metry_cat_icon(dbc, tbl, str(code), option_icon_map=om)} {str(code)}"
                     )
                 ),
                 key=f"personal_demo_sub_filter_single_{study_id}_{db_col}",
@@ -3639,8 +3771,8 @@ def _render_personal_demography_subpage(
         if selected_code != all_token:
             filt_df = filt_df[filt_df[demo_col].astype(str) == str(selected_code)]
             active_filters.append(
-                f"{_personal_metry_var_icon(db_col, table_label)} {table_label}: "
-                f"{_personal_metry_cat_icon(db_col, table_label, str(selected_code))} {str(selected_code)}"
+                f"{_personal_metry_var_icon(db_col, table_label, var_icon_pref)} {table_label}: "
+                f"{_personal_metry_cat_icon(db_col, table_label, str(selected_code), option_icon_map=option_icon_map)} {str(selected_code)}"
             )
 
     n_filtered = int(len(filt_df))
@@ -3681,7 +3813,9 @@ def _render_personal_demography_subpage(
         db_col = str((mq or {}).get("db_column") or "").strip()
         prompt = str((mq or {}).get("prompt") or db_col).strip()
         table_label = str((mq or {}).get("table_label") or prompt or db_col).strip()
-        icon = _personal_metry_var_icon(db_col, table_label)
+        var_icon_pref = str(item.get("variable_emoji") or "").strip()
+        option_icon_map = item.get("option_icons") if isinstance(item.get("option_icons"), dict) else {}
+        icon = _personal_metry_var_icon(db_col, table_label, var_icon_pref)
         demo_col = f"{col_name}__DEMO"
         q_all = (
             results_df[col_name]
@@ -3730,7 +3864,7 @@ def _render_personal_demography_subpage(
             f"""
             <div class="pdemo-stat">
               <div class="pdemo-stat-label">{html.escape(icon)} {html.escape(table_label.upper())}</div>
-              <div class="pdemo-stat-main">{html.escape(_personal_metry_cat_icon(db_col, table_label, str(strongest.get("label") or "")))} {html.escape(str(strongest.get("label") or ""))}</div>
+              <div class="pdemo-stat-main">{html.escape(_personal_metry_cat_icon(db_col, table_label, str(strongest.get("label") or ""), option_icon_map=option_icon_map))} {html.escape(str(strongest.get("label") or ""))}</div>
               <div class="pdemo-stat-sub">{float(strongest.get("pct_sub") or 0.0):.1f}% • {float(strongest.get("diff") or 0.0):+,.1f} pp</div>
             </div>
             """
@@ -3763,7 +3897,7 @@ def _render_personal_demography_subpage(
                 f"{first_col}"
                 f"<td style=\"font-size:13.5px; font-weight:{'800' if is_top else '500'}; {top_border if idx == 0 else ''}\">"
                 "<span style='display:inline-flex; align-items:center; gap:6px;'>"
-                f"<span>{html.escape(_personal_metry_cat_icon(db_col, table_label, str(cat['label'])))}</span>"
+                f"<span>{html.escape(_personal_metry_cat_icon(db_col, table_label, str(cat['label']), option_icon_map=option_icon_map))}</span>"
                 f"<span>{html.escape(str(cat['label']))}</span>"
                 "</span>"
                 "</td>"
@@ -3959,11 +4093,13 @@ def _render_personal_demography_subpage(
             mean_scores=profile_all_100,
             out_path=f"personal_demo_all_{safe_study}.png",
             label_mode="arche",
+            gender_code=gender_code,
         )
         wheel_sub = make_segment_profile_wheel_png(
             mean_scores=profile_sub_100,
             out_path=f"personal_demo_sub_{safe_study}.png",
             label_mode="arche",
+            gender_code=gender_code,
         )
 
         def _show_image_compat(img_path: str, max_width_px: int = 560) -> None:
@@ -7230,6 +7366,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     archetype_names=list(archetype_names),
                     disp_name_fn=disp_name,
                     is_mobile=is_mobile,
+                    gender_code=report_gender_code,
                 )
                 return
 
@@ -7731,12 +7868,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 # ŚREDNIE (0–20) w KOLEJNOŚCI archetype_names
                 mean_vals_ordered = [mean_archetype_scores.get(n, 0.0) for n in archetype_names]
+                theta_display = [disp_name(n) for n in archetype_names]
 
                 fig = go.Figure(
                     data=[
                         go.Scatterpolar(
                             r=mean_vals_ordered + [mean_vals_ordered[0]],
-                            theta=archetype_names + [archetype_names[0]],
+                            theta=theta_display + [theta_display[0]],
                             fill='toself',
                             name='średnia wszystkich',
                             line=dict(color="royalblue", width=3),
@@ -7746,7 +7884,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         ),
                         go.Scatterpolar(
                             r=highlight_r,
-                            theta=archetype_names,
+                            theta=theta_display,
                             mode='markers',
                             marker=dict(size=18, color=highlight_marker_color, opacity=0.90,
                                         line=dict(color="black", width=3)),
@@ -7761,7 +7899,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             radialaxis=dict(visible=True, range=[0, 20]),
                             angularaxis=dict(
                                 tickfont=dict(size=19),
-                                tickvals=archetype_names,
+                                tickvals=theta_display,
                                 ticktext=theta_labels,
                                 rotation=90,
                                 direction="clockwise",
@@ -7782,7 +7920,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         radialaxis=dict(visible=True, range=[0, 20]),
                         angularaxis=dict(
                             tickfont=dict(size=radar_tick_size),
-                            tickvals=archetype_names,
+                            tickvals=theta_display,
                             ticktext=theta_labels,
                             rotation=90,
                             direction="clockwise",
@@ -8001,6 +8139,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             segment_profile_png_path = make_segment_profile_wheel_png(
                 mean_scores=means_pct,
                 out_path=f"segment_profile_{study_id}.png",
+                gender_code=report_gender_code,
             )
             st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
             st.markdown(
