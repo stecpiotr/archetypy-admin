@@ -1772,3 +1772,17 @@ Decyzja:
 - Komponent JS od przewijania renderujemy z kluczem zależnym od nonce, aby wymusić świeże wykonanie skryptu po każdej akcji.
 Uzasadnienie:
 - W praktyce UI Streamlit potrafi nie odpalić identycznego skryptu przewijania przy kolejnych interakcjach na tym samym pytaniu; nonce+remount usuwa ten problem klasy „zostaję zrzucony na górę”.
+
+### D-196: Scroll-restore przez `html_component` musi być kompatybilny z produkcyjnym API Streamlit (bez `key`)
+Decyzja:
+- W wywołaniu `html_component(...)` nie używamy argumentu `key`, bo nie jest wspierany w używanej wersji API (`IframeMixin._html`).
+- Unikalność kolejnych uruchomień skryptu przewijania zapewniamy przez zmienny payload JS (`scroll_nonce` / `runId`).
+Uzasadnienie:
+- Użytkownik trafił na runtime crash na produkcji, który blokował edycję metryczki; zgodność z API ma wyższy priorytet niż syntetyczny remount po `key`.
+
+### D-197: Scroll-restore metryczki działa dwutorowo (`html_component` + lokalny fallback `st.markdown`)
+Decyzja:
+- Utrzymujemy główny scroll-restore w `html_component`, ale dokładamy równoległy fallback JS renderowany przez `st.markdown(..., unsafe_allow_html=True)`.
+- Oba tory korzystają z tego samego `scroll_target`/`scroll_nonce`.
+Uzasadnienie:
+- W części osadzeń Streamlit przewijanie z poziomu iframe bywa niestabilne względem głównego kontenera strony; lokalny fallback zwiększa skuteczność utrzymania pozycji na edytowanym pytaniu.

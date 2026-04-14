@@ -1935,3 +1935,25 @@
   - znacząco mniejsze ryzyko skoku do `1. M_PLEC` po edycji pytania niżej na liście (np. `7. M_POGLADY`).
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-086 (2026-04-14, metryczka: usunięcie błędu `html_component(..., key=...)`)
+- `archetypy-admin/app.py`:
+  - usunięto parametr `key` z wywołania `html_component(...)` w scroll-restore metryczki (nieobsługiwany w środowisku produkcyjnym Streamlit),
+  - zostawiono nonce (`runId`) w treści skryptu, by zachować unikalność uruchomienia scroll-restoru.
+- Efekt:
+  - znika błąd `TypeError: IframeMixin._html() got an unexpected keyword argument 'key'`,
+  - flow `Wstaw`/`Dodaj` nie przerywa się wyjątkiem.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-087 (2026-04-14, metryczka: fallback scrolla po `Wstaw`)
+- `archetypy-admin/app.py`:
+  - do istniejącego scroll-restoru przez `html_component` dołożono drugi fallback przez `st.markdown(<script>, unsafe_allow_html=True)`,
+  - fallback szuka kotwicy pytania w bieżącym dokumencie i przewija:
+    - `window`,
+    - oraz typowe przewijalne kontenery Streamlit,
+  - ustawia hash kotwicy, by utrzymać pozycję także przy kolejnych akcjach na tym samym pytaniu.
+- Efekt:
+  - wyraźnie większa odporność na przypadek „po `Wstaw` wraca do `1. M_PLEC`”.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

@@ -2485,3 +2485,31 @@ Wynik:
     - resetuje/ustawia hash kotwicy dla pewniejszego skoku także przy tym samym pytaniu.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-086 [DONE]
+Temat: Metryczka - naprawa crasha `IframeMixin._html() got an unexpected keyword argument 'key'`.
+Kryteria ukończenia:
+1. Edytor metryczki nie rzuca błędu po `Wstaw`/`Dodaj` w scenariuszach scroll-restoru.
+2. Scroll-restore nadal ma unikalny trigger per akcja.
+Pierwszy krok wykonawczy:
+- usunąć nieobsługiwany argument `key` z `html_component(...)` i pozostawić wymuszanie przez `scroll_nonce` w treści skryptu.
+Wynik:
+- `app.py`:
+  - w wywołaniu `html_component` dla scroll-restoru usunięto parametr `key=...`,
+  - `scroll_nonce` pozostał w JS (`runId`) jako część unikalnego payloadu skryptu.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-087 [DONE]
+Temat: Metryczka - dodatkowy fallback scroll-restoru, żeby nie wracało do `1. M_PLEC`.
+Kryteria ukończenia:
+1. Po `Wstaw` w panelu `Wklej pytanie i odpowiedzi` widok utrzymuje pozycję na aktualnym pytaniu także wtedy, gdy iframe-scroll nie zadziała.
+2. Mechanizm działa bez crashy i bez zmian w logice danych.
+Pierwszy krok wykonawczy:
+- zostawić `html_component` oraz dołożyć drugi, lokalny fallback JS przez `st.markdown(..., unsafe_allow_html=True)`.
+Wynik:
+- `app.py` (`_render_metryczka_editor`):
+  - po `html_component(...)` dodano równoległy fallback skryptu w `st.markdown`,
+  - fallback przewija `window` + typowe kontenery Streamlit i ustawia hash kotwicy.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

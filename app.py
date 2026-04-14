@@ -3107,6 +3107,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             (function(){{
               const id = {json.dumps(scroll_target)};
               const runId = {json.dumps(str(scroll_nonce))};
+              if (!runId) return;
 
               const findTarget = () => {{
                 let win = window;
@@ -3181,7 +3182,55 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             </script>
             """,
             height=1,
-            key=f"{widget_prefix}scroll_restore_{scroll_nonce}",
+        )
+        st.markdown(
+            f"""
+            <script>
+            (function(){{
+              const id = {json.dumps(scroll_target)};
+              const runId = {json.dumps(str(scroll_nonce))};
+              if (!runId) return;
+
+              const scrollLocal = () => {{
+                const el = document.getElementById(id);
+                if (!el) return false;
+                try {{
+                  const rect = el.getBoundingClientRect();
+                  const top = Math.max(0, rect.top + window.pageYOffset - Math.round(window.innerHeight * 0.22));
+                  window.scrollTo({{ top, behavior: 'auto' }});
+                  const extra = [
+                    document.querySelector('section.main'),
+                    document.querySelector('[data-testid="stAppViewContainer"]'),
+                    document.querySelector('.block-container')?.parentElement
+                  ].filter(Boolean);
+                  for (const tgt of extra) {{
+                    try {{
+                      const tRect = tgt.getBoundingClientRect();
+                      const relTop = (rect.top - tRect.top) + (tgt.scrollTop || 0) - 24;
+                      if (typeof tgt.scrollTo === 'function') tgt.scrollTo({{ top: Math.max(0, relTop), behavior: 'auto' }});
+                      else tgt.scrollTop = Math.max(0, relTop);
+                    }} catch (e) {{}}
+                  }}
+                }} catch (e) {{
+                  try {{ el.scrollIntoView({{ behavior: 'auto', block: 'center' }}); }} catch (e2) {{}}
+                }}
+                try {{
+                  const hashTarget = `#${{id}}`;
+                  if (window.location.hash === hashTarget) window.location.hash = '';
+                  window.location.hash = hashTarget;
+                }} catch (e) {{}}
+                return true;
+              }};
+
+              let tries = 0;
+              const timer = setInterval(() => {{
+                tries += 1;
+                if (scrollLocal() || tries > 40) clearInterval(timer);
+              }}, 75);
+            }})();
+            </script>
+            """,
+            unsafe_allow_html=True,
         )
 
     return deepcopy(st.session_state.get(state_key) or cfg_out)
