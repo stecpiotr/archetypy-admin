@@ -5461,6 +5461,53 @@ def _norm_demo_token(value: Any) -> str:
     return re.sub(r"\s+", " ", txt).strip()
 
 
+def _matching_guess_variable_emoji(field: str, label: str) -> str:
+    key = _norm_demo_token(f"{field} {label}")
+    if any(k in key for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
+        return "🏘️"
+    if any(k in key for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
+        return "🗳️"
+    if any(k in key for k in ("orientac", "poglad", "politycz", "ideolog")):
+        return "🧭"
+    return "📌"
+
+
+def _matching_guess_value_emoji(var_label: str, code: str) -> str:
+    nk_var = _norm_demo_token(var_label)
+    nk = _norm_demo_token(code)
+    nk_sp = nk.replace("-", " ")
+    if not nk:
+        return "❔"
+    if any(k in nk_var for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
+        if "miasto" in nk:
+            return "🏙️"
+        if "wies" in nk:
+            return "🌾"
+    if any(k in nk_var for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
+        if "odmow" in nk:
+            return "🤐"
+        if "nie wiem" in nk or "niezdecyd" in nk or "trudno" in nk:
+            return "❓"
+        return "🗳️"
+    if any(k in nk_var for k in ("orientac", "poglad", "politycz", "ideolog")):
+        if "centro prawic" in nk_sp:
+            return "↗️"
+        if "prawic" in nk:
+            return "➡️"
+        if "centro lewic" in nk_sp:
+            return "↖️"
+        if "lewic" in nk:
+            return "⬅️"
+        if "centr" in nk:
+            return "⚖️"
+        if "odmow" in nk:
+            return "🤐"
+        if "nie wiem" in nk or "trudno" in nk:
+            return "❓"
+        return "🧭"
+    return "📌"
+
+
 def _canon_demo_value(field: str, value: Any) -> str:
     raw = str(value or "").strip()
     n = _norm_demo_token(value)
@@ -5601,11 +5648,6 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
             core_label = str(q.get("table_label") or core_meta.get("label") or field).strip() or field
             for cat in list(core_meta.get("order") or []):
                 display_labels[str(cat)] = str(cat)
-            for opt in opts:
-                raw = str(opt.get("code") or opt.get("label") or "").strip()
-                canon = _canon_demo_value(field, raw)
-                if canon and canon != "brak danych":
-                    display_labels[canon] = str(opt.get("label") or canon).strip()
             specs.append(
                 {
                     "field": field,
@@ -5629,6 +5671,11 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
             if str(opt.get("code") or "").strip()
         }
         label = str(q.get("table_label") or q.get("prompt") or field).strip() or field
+        var_emoji = _matching_guess_variable_emoji(field, label)
+        value_emoji = {
+            code: _matching_guess_value_emoji(label, code)
+            for code in order_codes
+        }
         specs.append(
             {
                 "field": field,
@@ -5636,8 +5683,8 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
                 "order_codes": order_codes,
                 "display_labels": display_labels,
                 "options": opts,
-                "variable_emoji": "📌",
-                "value_emoji": {},
+                "variable_emoji": var_emoji,
+                "value_emoji": value_emoji,
                 "is_core": False,
             }
         )

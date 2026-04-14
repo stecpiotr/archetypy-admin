@@ -2919,3 +2919,25 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py db_jst_utils.py metryczka_config.py admin_dashboard.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Hotfix H-105 [DONE]
+Temat: Automatyczne kodowanie rdzenia metryczki + spójne ikonki + przebudowa radaru demografii personalnej.
+Kryteria ukończenia:
+1. Rdzeń metryczki (`M_PLEC`, `M_WIEK`, `M_WYKSZT`, `M_ZAWOD`, `M_MATERIAL`) ma automatyczne, skrócone kodowanie analityczne w tabelach demograficznych.
+2. Ikony zmiennych i kategorii są spójne w tabelach demograficznych Matchingu/Segmentów i podstronie demografii personalnej.
+3. Dla custom zmiennych dodane heurystyki ikon dla: preferencje polityczne, miejsce zamieszkania, orientacja/poglądy polityczne.
+4. W podstronie `Profile demograficzne archetypu` radar jest zbliżony do stylu z Matchingu (2 profile + TOP2), a pod nim jest sekcja porównania kół 0-100.
+Pierwszy krok wykonawczy:
+- dopiąć mapowanie kodów/ikon w `app.py` i `admin_dashboard.py`, potem przebudować blok radarowy i dodać sekcję 0-100.
+Wynik:
+- `app.py`:
+  - w `Matching` rdzeń metryczki nie nadpisuje już skróconych kodów długimi etykietami z pytania,
+  - dodano heurystyki ikon dla custom zmiennych i kategorii (`preferencje`, `obszar/miejsce zamieszkania`, `orientacja/poglądy polityczne`).
+- `admin_dashboard.py`:
+  - dodano wspólną mapę kodowania rdzenia metryczki (kanonizacja wartości),
+  - podstrona demografii personalnej używa kodów rdzenia (`60+`, `podst./gim./zaw.`, `prac. umysłowy`, `odmowa`, itd.),
+  - ikony zmiennych i kategorii odpowiadają uzgodnionemu zestawowi,
+  - radar `Podgląd radarowy podgrupy` przebudowany do stylu porównawczego (cała próba vs podgrupa + markery TOP2),
+  - dodano sekcję `Profile archetypowe 0-100` z dwoma kołami profilowymi i legendą osi kolorów.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).

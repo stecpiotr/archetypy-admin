@@ -2306,3 +2306,23 @@
 - Testy techniczne:
   - `python -m py_compile app.py db_jst_utils.py metryczka_config.py admin_dashboard.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Zrobione w Hotfix H-105 (2026-04-15, auto-kody rdzenia + ikonki + radar/koła 0-100 w demografii personalnej)
+- `archetypy-admin/app.py` (`🧭 Matching`):
+  - dla rdzenia metryczki utrzymano skrócone kody analityczne w tabelach (np. `60+`, `podst./gim./zaw.`, `prac. umysłowy`, `odmowa`) bez nadpisywania długimi etykietami pytań,
+  - dodano heurystyki ikon dla custom zmiennych/kategorii, zwłaszcza:
+    - preferencje polityczne,
+    - miejsce zamieszkania,
+    - orientacja/poglądy polityczne.
+- `archetypy-admin/admin_dashboard.py` (`Profile demograficzne archetypu`):
+  - dodano kanonizację kodowania rdzenia metryczki (spójne kody jak w Matchingu),
+  - filtry i tabele demograficzne pracują na kodach analitycznych (rdzeń) oraz kodach custom,
+  - dodano spójne ikonki zmiennych i kategorii:
+    - `👫Płeć`, `🧭Wiek`, `🎓Wykształcenie`, `💼Status zawodowy`, `💰Sytuacja materialna`,
+    - rozszerzone heurystyki dla `preferencji politycznych`, `miejsca zamieszkania`, `orientacji/poglądów`.
+  - przebudowano sekcję radaru:
+    - styl porównawczy jak w Matchingu (cała próba vs podgrupa, markery TOP2),
+    - dodatkowe boksy legend TOP2 pod radarem,
+    - pod radarem dodano sekcję `Profile archetypowe 0-100` (2 koła profilowe + legenda osi kolorów).
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).

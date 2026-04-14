@@ -3034,31 +3034,182 @@ def _metry_value_label(question: dict[str, object], code: str) -> str:
 
 
 PERSONAL_METRY_VARIABLE_ICONS = {
-    "M_PLEC": "👤",
-    "M_WIEK": "🎯",
+    "M_PLEC": "👫",
+    "M_WIEK": "🧭",
     "M_WYKSZT": "🎓",
     "M_ZAWOD": "💼",
     "M_MATERIAL": "💰",
-    "M_OBSZAR": "🏘️",
+    "M_OBSZAR": "📍",
 }
 
 
-def _personal_metry_var_icon(db_column: str) -> str:
+PERSONAL_CORE_DEMO_META = {
+    "M_PLEC": {
+        "order": ["kobieta", "mężczyzna"],
+        "value_emoji": {"kobieta": "👩", "mężczyzna": "👨"},
+    },
+    "M_WIEK": {
+        "order": ["15-39", "40-59", "60+"],
+        "value_emoji": {"15-39": "🧑", "40-59": "🧑‍💼", "60+": "🧓"},
+    },
+    "M_WYKSZT": {
+        "order": ["podst./gim./zaw.", "średnie", "wyższe"],
+        "value_emoji": {"podst./gim./zaw.": "🛠️", "średnie": "📘", "wyższe": "🎓"},
+    },
+    "M_ZAWOD": {
+        "order": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
+        "value_emoji": {
+            "prac. umysłowy": "🧠",
+            "prac. fizyczny": "🛠️",
+            "własna firma": "🏢",
+            "student/uczeń": "🧑‍🎓",
+            "bezrobotny": "🔎",
+            "rencista/emeryt": "🌿",
+            "inna": "🧩",
+        },
+    },
+    "M_MATERIAL": {
+        "order": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
+        "value_emoji": {
+            "bardzo dobra": "😄",
+            "raczej dobra": "🙂",
+            "przeciętna": "😐",
+            "raczej zła": "🙁",
+            "bardzo zła": "😟",
+            "odmowa": "🤐",
+        },
+    },
+}
+
+
+def _personal_demo_canon_value(field: str, value: object) -> str:
+    raw = str(value or "").strip()
+    n = _norm_text_token(value)
+    if not n:
+        return "brak danych"
+    if field == "M_PLEC":
+        if n in {"1", "k", "kobieta"} or "kobiet" in n:
+            return "kobieta"
+        if n in {"2", "m", "mezczyzna"} or "mezczyzn" in n:
+            return "mężczyzna"
+    elif field == "M_WIEK":
+        if re.search(r"15\D*39", n):
+            return "15-39"
+        if re.search(r"40\D*59", n):
+            return "40-59"
+        if "60" in n:
+            return "60+"
+    elif field == "M_WYKSZT":
+        if "wyzsze" in n:
+            return "wyższe"
+        if "srednie" in n:
+            return "średnie"
+        if any(k in n for k in ("podstaw", "gimnaz", "zawod")):
+            return "podst./gim./zaw."
+    elif field == "M_ZAWOD":
+        if "umysl" in n:
+            return "prac. umysłowy"
+        if "fizycz" in n:
+            return "prac. fizyczny"
+        if "wlasn" in n and "firm" in n:
+            return "własna firma"
+        if "student" in n or "uczen" in n:
+            return "student/uczeń"
+        if "bezrobot" in n:
+            return "bezrobotny"
+        if "renc" in n or "emery" in n:
+            return "rencista/emeryt"
+        if "inna" in n or "jaka" in n:
+            return "inna"
+    elif field == "M_MATERIAL":
+        if "odmaw" in n:
+            return "odmowa"
+        if "bardzo dobrze" in n or "bardzo dobra" in n:
+            return "bardzo dobra"
+        if "raczej dobrze" in n or "raczej dobra" in n:
+            return "raczej dobra"
+        if "przeciet" in n or "srednio" in n:
+            return "przeciętna"
+        if "raczej zle" in n or "raczej zla" in n:
+            return "raczej zła"
+        if "bardzo zle" in n or "bardzo zla" in n or "ciezk" in n:
+            return "bardzo zła"
+    return raw or "brak danych"
+
+
+def _personal_demo_code(db_column: str, value: object, table_label: str = "") -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    field = str(db_column or "").strip().upper()
+    if field in PERSONAL_CORE_DEMO_META:
+        canon = _personal_demo_canon_value(field, raw)
+        return canon if canon and canon != "brak danych" else raw
+    return raw
+
+
+def _personal_metry_var_icon(db_column: str, table_label: str = "") -> str:
     key = str(db_column or "").strip().upper()
     if key in PERSONAL_METRY_VARIABLE_ICONS:
         return PERSONAL_METRY_VARIABLE_ICONS[key]
+    nk = _norm_text_token(f"{table_label} {key}")
     if "WIEK" in key:
-        return "🎯"
+        return "🧭"
     if "PLEC" in key:
-        return "👤"
+        return "👫"
     if "WYKSZ" in key:
         return "🎓"
     if "ZAWOD" in key:
         return "💼"
     if "MATERIAL" in key:
         return "💰"
-    if "OBSZAR" in key or "MIESZKA" in key:
-        return "🏘️"
+    if any(k in nk for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
+        return "📍"
+    if any(k in nk for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
+        return "🗳️"
+    if any(k in nk for k in ("orientac", "pogl", "politycz", "ideolog")):
+        return "🧭"
+    return "📌"
+
+
+def _personal_metry_cat_icon(db_column: str, table_label: str, code: str) -> str:
+    field = str(db_column or "").strip().upper()
+    canon = _personal_demo_code(field, code, table_label)
+    core_meta = PERSONAL_CORE_DEMO_META.get(field) or {}
+    core_icons = core_meta.get("value_emoji") if isinstance(core_meta.get("value_emoji"), dict) else {}
+    if canon in core_icons:
+        return str(core_icons.get(canon) or "📌")
+    nk_var = _norm_text_token(table_label)
+    nk = _norm_text_token(canon)
+    nk_sp = nk.replace("-", " ")
+    if any(k in nk_var for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
+        if "miasto" in nk:
+            return "🏙️"
+        if "wies" in nk:
+            return "🌾"
+        return "📍"
+    if any(k in nk_var for k in ("orientac", "pogl", "politycz", "ideolog")):
+        if "centro prawic" in nk_sp:
+            return "↗️"
+        if "prawic" in nk:
+            return "➡️"
+        if "centro lewic" in nk_sp:
+            return "↖️"
+        if "lewic" in nk:
+            return "⬅️"
+        if "centr" in nk:
+            return "⚖️"
+        if "odmow" in nk:
+            return "🤐"
+        if "nie wiem" in nk or "trudno" in nk:
+            return "❓"
+        return "🧭"
+    if any(k in nk_var for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
+        if "odmow" in nk:
+            return "🤐"
+        if "nie wiem" in nk or "niezdecyd" in nk or "trudno" in nk:
+            return "❓"
+        return "🗳️"
     return "📌"
 
 
@@ -3074,14 +3225,23 @@ def _collect_personal_metry_available(
         col_name = f"METRY_{db_col}"
         if col_name not in results_df.columns:
             continue
-        col_series = results_df[col_name].fillna("").astype(str).str.strip()
+        table_label = str((mq or {}).get("table_label") or (mq or {}).get("prompt") or db_col).strip()
+        col_series = (
+            results_df[col_name]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
+        )
         if not bool(col_series.ne("").any()):
             continue
         ordered_codes = [
-            str((opt or {}).get("code") or "").strip()
+            _personal_demo_code(db_col, str((opt or {}).get("code") or "").strip(), table_label)
             for opt in list(mq.get("options") or [])
         ]
         ordered_codes = [c for c in ordered_codes if c]
+        seen_codes: set[str] = set()
+        ordered_codes = [c for c in ordered_codes if not (c in seen_codes or seen_codes.add(c))]
         present = [c for c in ordered_codes if bool((col_series == c).any())]
         extra = sorted(set(col_series[col_series != ""]) - set(present))
         codes = present + list(extra)
@@ -3228,9 +3388,89 @@ def _render_personal_demography_subpage(
             font-weight:800;
             font-size:13.5px;
           }
+          .pdemo-radar-title{
+            margin-top:22px;
+            margin-bottom:8px;
+            font-size:2.0rem;
+            font-weight:900;
+            color:#1f2f44;
+            line-height:1.05;
+          }
+          .pdemo-top2-grid{
+            display:grid;
+            grid-template-columns:repeat(2,minmax(220px,1fr));
+            gap:12px;
+            margin:8px 0 4px 0;
+          }
+          .pdemo-top2-card{
+            border:1px solid #dbe4ef;
+            border-radius:12px;
+            background:#fff;
+            padding:10px 12px;
+            text-align:center;
+          }
+          .pdemo-top2-title{
+            font-size:15px;
+            font-weight:800;
+            color:#1f2f44;
+            margin-bottom:6px;
+          }
+          .pdemo-top2-line{
+            font-size:13px;
+            font-weight:700;
+            color:#334155;
+          }
+          .pdemo-wheel-title{
+            margin-top:20px;
+            margin-bottom:6px;
+            font-size:2.0rem;
+            font-weight:900;
+            color:#1f2f44;
+            line-height:1.05;
+          }
+          .pdemo-profile-title{
+            font-weight:800;
+            font-size:1.7rem;
+            color:#1f2f44;
+            margin:2px 0 8px 0;
+            text-align:center;
+          }
+          .pdemo-wheel-legend-wrap{
+            display:flex;
+            justify-content:center;
+            margin-top:6px;
+          }
+          .pdemo-wheel-legend{
+            border:1px solid #cfd9e8;
+            background:#fff;
+            border-radius:14px;
+            padding:10px 16px;
+            display:flex;
+            gap:20px;
+            align-items:center;
+            flex-wrap:wrap;
+            justify-content:center;
+          }
+          .pdemo-wheel-legend span{
+            font-size:13px;
+            font-weight:700;
+            color:#334155;
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+          }
+          .pdemo-wheel-legend i{
+            width:11px;
+            height:11px;
+            border-radius:3px;
+            display:inline-block;
+          }
           @media (max-width:900px){
             .pdemo-title{font-size:1.42rem;}
             .pdemo-table-wrap{max-width:100%;}
+            .pdemo-radar-title,.pdemo-wheel-title{font-size:1.35rem;}
+            .pdemo-top2-grid{grid-template-columns:1fr;}
+            .pdemo-profile-title{font-size:1.1rem;}
           }
         </style>
         """,
@@ -3302,18 +3542,36 @@ def _render_personal_demography_subpage(
         db_col = str((mq or {}).get("db_column") or "").strip()
         prompt = str((mq or {}).get("prompt") or db_col).strip()
         table_label = str((mq or {}).get("table_label") or prompt or db_col).strip()
+        demo_col = f"{col_name}__DEMO"
+        if demo_col not in filt_df.columns:
+            filt_df[demo_col] = (
+                results_df[col_name]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
+            )
         select_options = [all_token] + [str(code) for code in list(item["codes"])]
         col_ctx = filter_cols[idx % len(filter_cols)]
         with col_ctx:
             selected_code = st.selectbox(
                 table_label,
                 options=select_options,
-                format_func=(lambda code, q=mq: "— brak filtra —" if code == all_token else _metry_value_label(q, code)),
+                format_func=(
+                    lambda code, dbc=db_col, tbl=table_label: (
+                        "— brak filtra —"
+                        if code == all_token
+                        else f"{_personal_metry_cat_icon(dbc, tbl, str(code))} {str(code)}"
+                    )
+                ),
                 key=f"personal_demo_sub_filter_single_{study_id}_{db_col}",
             )
         if selected_code != all_token:
-            filt_df = filt_df[filt_df[col_name].astype(str) == str(selected_code)]
-            active_filters.append(f"{table_label}: {str(selected_code)}")
+            filt_df = filt_df[filt_df[demo_col].astype(str) == str(selected_code)]
+            active_filters.append(
+                f"{_personal_metry_var_icon(db_col, table_label)} {table_label}: "
+                f"{_personal_metry_cat_icon(db_col, table_label, str(selected_code))} {str(selected_code)}"
+            )
 
     n_filtered = int(len(filt_df))
     if active_filters:
@@ -3353,10 +3611,25 @@ def _render_personal_demography_subpage(
         db_col = str((mq or {}).get("db_column") or "").strip()
         prompt = str((mq or {}).get("prompt") or db_col).strip()
         table_label = str((mq or {}).get("table_label") or prompt or db_col).strip()
-        icon = _personal_metry_var_icon(db_col)
-
-        q_all = results_df[col_name].fillna("").astype(str).str.strip()
-        q_sub = filt_df[col_name].fillna("").astype(str).str.strip()
+        icon = _personal_metry_var_icon(db_col, table_label)
+        demo_col = f"{col_name}__DEMO"
+        q_all = (
+            results_df[col_name]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
+        )
+        if demo_col in filt_df.columns:
+            q_sub = filt_df[demo_col].fillna("").astype(str).str.strip()
+        else:
+            q_sub = (
+                filt_df[col_name]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
+            )
         if not bool(q_all.ne("").any()):
             continue
 
@@ -3387,7 +3660,7 @@ def _render_personal_demography_subpage(
             f"""
             <div class="pdemo-stat">
               <div class="pdemo-stat-label">{html.escape(icon)} {html.escape(table_label.upper())}</div>
-              <div class="pdemo-stat-main">{html.escape(str(strongest.get("label") or ""))}</div>
+              <div class="pdemo-stat-main">{html.escape(_personal_metry_cat_icon(db_col, table_label, str(strongest.get("label") or "")))} {html.escape(str(strongest.get("label") or ""))}</div>
               <div class="pdemo-stat-sub">{float(strongest.get("pct_sub") or 0.0):.1f}% • {float(strongest.get("diff") or 0.0):+,.1f} pp</div>
             </div>
             """
@@ -3418,7 +3691,12 @@ def _render_personal_demography_subpage(
             table_rows_html.append(
                 "<tr>"
                 f"{first_col}"
-                f"<td style=\"font-size:13.5px; font-weight:{'800' if is_top else '500'}; {top_border if idx == 0 else ''}\">{html.escape(str(cat['label']))}</td>"
+                f"<td style=\"font-size:13.5px; font-weight:{'800' if is_top else '500'}; {top_border if idx == 0 else ''}\">"
+                "<span style='display:inline-flex; align-items:center; gap:6px;'>"
+                f"<span>{html.escape(_personal_metry_cat_icon(db_col, table_label, str(cat['label'])))}</span>"
+                f"<span>{html.escape(str(cat['label']))}</span>"
+                "</span>"
+                "</td>"
                 f"<td style=\"padding:0; min-width:176px; border:1px solid #dfe4ea; {top_border if idx == 0 else ''}\">"
                 "<div style=\"position:relative; height:34px; background:#fff;\">"
                 f"<div style=\"position:absolute; left:0; top:0; bottom:0; width:{bar_w:.1f}%; background:{fill_color}; opacity:0.96;\"></div>"
@@ -3459,28 +3737,31 @@ def _render_personal_demography_subpage(
         )
         st.markdown(table_html, unsafe_allow_html=True)
 
-    filtered_top = pick_top_3_archetypes(filtered_means_20, archetype_names)
-    filtered_main = filtered_top[0] if len(filtered_top) > 0 else None
-    filtered_aux = filtered_top[1] if len(filtered_top) > 1 else None
-    filtered_supp = filtered_top[2] if len(filtered_top) > 2 else None
+    all_top = [x for x in pick_top_3_archetypes(means_20_all, archetype_names) if x][:2]
+    sub_top = [x for x in pick_top_3_archetypes(filtered_means_20, archetype_names) if x][:2]
     theta = [disp_name_fn(n) for n in archetype_names]
     all_vals = [float(means_20_all.get(n, 0.0)) for n in archetype_names]
     filt_vals = [float(filtered_means_20.get(n, 0.0)) for n in archetype_names]
-    marker_r = []
-    marker_c = []
-    for n in archetype_names:
-        if n == filtered_main:
-            marker_r.append(float(filtered_means_20.get(n, 0.0)))
-            marker_c.append("#ef4444")
-        elif n == filtered_aux:
-            marker_r.append(float(filtered_means_20.get(n, 0.0)))
-            marker_c.append("#f59e0b")
-        elif n == filtered_supp:
-            marker_r.append(float(filtered_means_20.get(n, 0.0)))
-            marker_c.append("#22c55e")
-        else:
-            marker_r.append(None)
-            marker_c.append("rgba(0,0,0,0)")
+
+    def _marker_series(profile: dict[str, float], top2: list[str], palette: dict[str, str]) -> tuple[list[float | None], list[str]]:
+        mapping: dict[str, str] = {}
+        if len(top2) > 0:
+            mapping[top2[0]] = palette["main"]
+        if len(top2) > 1:
+            mapping[top2[1]] = palette["aux"]
+        r_vals: list[float | None] = []
+        c_vals: list[str] = []
+        for arch in archetype_names:
+            if arch in mapping:
+                r_vals.append(float(profile.get(arch, 0.0)))
+                c_vals.append(str(mapping[arch]))
+            else:
+                r_vals.append(None)
+                c_vals.append("rgba(0,0,0,0)")
+        return r_vals, c_vals
+
+    all_marker_r, all_marker_c = _marker_series(means_20_all, all_top, {"main": "#ef4444", "aux": "#f59e0b"})
+    sub_marker_r, sub_marker_c = _marker_series(filtered_means_20, sub_top, {"main": "#2563eb", "aux": "#8b5cf6"})
 
     demo_fig = go.Figure(
         data=[
@@ -3488,32 +3769,42 @@ def _render_personal_demography_subpage(
                 r=all_vals + [all_vals[0]],
                 theta=theta + [theta[0]],
                 fill="toself",
-                fillcolor="rgba(37,99,235,0.14)",
-                line=dict(color="#2563eb", width=2.3),
-                name=f"Cała próba (N={n_all})",
+                fillcolor="rgba(37,99,235,0.18)",
+                line=dict(color="#2563eb", width=3),
+                marker=dict(size=5, symbol="circle"),
+                name=f"profil całej próby (N={n_all})",
                 hovertemplate="<b>%{theta}</b><br>Cała próba: %{r:.2f}<extra></extra>",
             ),
             go.Scatterpolar(
                 r=filt_vals + [filt_vals[0]],
                 theta=theta + [theta[0]],
                 fill="toself",
-                fillcolor="rgba(14,165,233,0.12)",
-                line=dict(color="#0284c7", width=3.0, dash="dot"),
-                name=f"Podgrupa filtrowana (N={n_filtered})",
+                fillcolor="rgba(15,118,110,0.16)",
+                line=dict(color="#0f766e", width=3, dash="dot"),
+                marker=dict(size=6, symbol="square"),
+                name=f"profil podgrupy filtrowanej (N={n_filtered})",
                 hovertemplate="<b>%{theta}</b><br>Podgrupa: %{r:.2f}<extra></extra>",
             ),
             go.Scatterpolar(
-                r=marker_r,
+                r=all_marker_r,
                 theta=theta,
                 mode="markers",
-                marker=dict(size=14, color=marker_c, line=dict(color="#0f172a", width=1.7)),
+                marker=dict(size=16, symbol="circle", color=all_marker_c, opacity=0.92, line=dict(color="black", width=2.4)),
                 showlegend=False,
-                hovertemplate="<b>%{theta}</b><br>TOP podgrupy: %{r:.2f}<extra></extra>",
+                hovertemplate="<b>%{theta}</b><br>TOP2 całej próby: %{r:.2f}<extra></extra>",
+            ),
+            go.Scatterpolar(
+                r=sub_marker_r,
+                theta=theta,
+                mode="markers",
+                marker=dict(size=14, symbol="square", color=sub_marker_c, opacity=0.94, line=dict(color="#0f172a", width=1.9)),
+                showlegend=False,
+                hovertemplate="<b>%{theta}</b><br>TOP2 podgrupy: %{r:.2f}<extra></extra>",
             ),
         ]
     )
     demo_fig.update_layout(
-        height=560 if not is_mobile else 430,
+        height=640 if not is_mobile else 450,
         paper_bgcolor="rgba(0,0,0,0)",
         polar=dict(
             bgcolor="rgba(0,0,0,0)",
@@ -3521,36 +3812,94 @@ def _render_personal_demography_subpage(
             angularaxis=dict(
                 rotation=90,
                 direction="clockwise",
-                tickfont=dict(size=14 if not is_mobile else 10.5),
+                tickfont=dict(size=16 if not is_mobile else 10.5),
             ),
         ),
-        margin=dict(l=20, r=20, t=40, b=40),
+        margin=dict(l=24, r=24, t=66, b=90),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.06,
+            y=1.15,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(255,255,255,0.92)",
-            bordercolor="#dbe4ef",
+            font=dict(size=13.5),
+            bgcolor="rgba(255,255,255,0.94)",
+            bordercolor="#cfd9e8",
             borderwidth=1,
+            entrywidthmode="pixels",
+            entrywidth=250,
+            tracegroupgap=22,
         ),
     )
-    st.markdown(
-        """
-        <div class="pdemo-box">
-          <div class="pdemo-box-label">🕸️ PODGLĄD RADAROWY PODGRUPY</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+
+    st.markdown("<div class='pdemo-radar-title'>Podgląd radarowy podgrupy</div>", unsafe_allow_html=True)
     st.plotly_chart(
         demo_fig,
         use_container_width=True,
         config={"displaylogo": False, "displayModeBar": False, "responsive": True},
         key=f"personal_demo_profile_radar_subpage_{study_id}",
     )
+    st.markdown(
+        """
+        <div class="pdemo-top2-grid">
+          <div class="pdemo-top2-card">
+            <div class="pdemo-top2-title">TOP2 całej próby</div>
+            <div class="pdemo-top2-line"><span style="color:#ef4444;">●</span> główny &nbsp;&nbsp; <span style="color:#f59e0b;">●</span> wspierający</div>
+          </div>
+          <div class="pdemo-top2-card">
+            <div class="pdemo-top2-title">TOP2 podgrupy</div>
+            <div class="pdemo-top2-line"><span style="color:#2563eb;">■</span> główny &nbsp;&nbsp; <span style="color:#8b5cf6;">■</span> wspierający</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.caption("Radar pokazuje średnią siłę archetypu w skali 0-20 dla całej próby oraz filtrowanej podgrupy.")
+
+    st.markdown("<div class='pdemo-wheel-title'>Profile archetypowe 0-100 (siła archetypu, skala: 0-100)</div>", unsafe_allow_html=True)
+    wheels_col1, wheels_col2 = st.columns(2, gap="large")
+    try:
+        safe_study = re.sub(r"[^A-Za-z0-9_-]+", "_", str(study_id or "study"))
+        profile_all_100 = {k: max(0.0, min(100.0, float(means_20_all.get(k, 0.0)) * 5.0)) for k in archetype_names}
+        profile_sub_100 = {k: max(0.0, min(100.0, float(filtered_means_20.get(k, 0.0)) * 5.0)) for k in archetype_names}
+        wheel_all = make_segment_profile_wheel_png(
+            mean_scores=profile_all_100,
+            out_path=f"personal_demo_all_{safe_study}.png",
+            label_mode="arche",
+        )
+        wheel_sub = make_segment_profile_wheel_png(
+            mean_scores=profile_sub_100,
+            out_path=f"personal_demo_sub_{safe_study}.png",
+            label_mode="arche",
+        )
+
+        def _show_image_compat(img_path: str, max_width_px: int = 560) -> None:
+            try:
+                st.image(img_path, width=max_width_px)
+            except TypeError:
+                st.image(img_path, use_column_width=True)
+
+        with wheels_col1:
+            st.markdown("<div class='pdemo-profile-title'>Profil archetypowy całej próby</div>", unsafe_allow_html=True)
+            _show_image_compat(wheel_all, max_width_px=520)
+        with wheels_col2:
+            st.markdown("<div class='pdemo-profile-title'>Profil archetypowy podgrupy filtrowanej</div>", unsafe_allow_html=True)
+            _show_image_compat(wheel_sub, max_width_px=520)
+        st.markdown(
+            """
+            <div class="pdemo-wheel-legend-wrap">
+              <div class="pdemo-wheel-legend">
+                <span><i style="background:#e53935"></i>Zmiana</span>
+                <span><i style="background:#1e88e5"></i>Ludzie</span>
+                <span><i style="background:#2e7d32"></i>Porządek</span>
+                <span><i style="background:#7e57c2"></i>Niezależność</span>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception as e:
+        st.info(f"Nie udało się wygenerować porównania kół 0-100: {e}")
 
 
 

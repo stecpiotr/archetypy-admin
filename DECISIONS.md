@@ -2124,3 +2124,33 @@ Decyzja:
 - Celem jest pionowe rozszerzanie tabeli przy dodawaniu pozycji, zamiast wymuszania ciągłego przewijania wewnątrz komponentu.
 Uzasadnienie:
 - Użytkownik edytuje często długie listy odpowiedzi; wewnętrzny scrollbar utrudnia kontrolę i zwiększa ryzyko błędów.
+
+### D-234: Rdzeń metryczki ma stałe, kanoniczne kody analityczne w tabelach demograficznych
+Decyzja:
+- W warstwie analitycznej/demograficznej wartości rdzenia metryczki są kanonizowane do stałych kodów:
+  - `M_PLEC`: `kobieta`, `mężczyzna`
+  - `M_WIEK`: `15-39`, `40-59`, `60+`
+  - `M_WYKSZT`: `podst./gim./zaw.`, `średnie`, `wyższe`
+  - `M_ZAWOD`: `prac. umysłowy`, `prac. fizyczny`, `własna firma`, `student/uczeń`, `bezrobotny`, `rencista/emeryt`, `inna`
+  - `M_MATERIAL`: `bardzo dobra`, `raczej dobra`, `przeciętna`, `raczej zła`, `bardzo zła`, `odmowa`
+Uzasadnienie:
+- Skraca i ujednolica prezentację tabel demograficznych niezależnie od historycznych wariantów odpowiedzi w payloadach.
+
+### D-235: Ikonografia demografii jest rozszerzana heurystycznie dla custom zmiennych politycznych
+Decyzja:
+- Oprócz mapy rdzenia, wprowadzamy heurystyki ikon dla zmiennych/kategorii custom:
+  - `preferencje polityczne` -> ikonografia wyborcza (`🗳️`),
+  - `miejsce zamieszkania/obszar` -> `📍` + kategorie `🏙️`/`🌾`,
+  - `orientacja/poglądy polityczne` -> `🧭` + kierunkowe ikony kategorii.
+Uzasadnienie:
+- Użytkownik oczekuje czytelnych i spójnych wizualnie tabel także dla często używanych pytań dodatkowych.
+
+### D-236: Radar demografii personalnej przyjmuje układ porównawczy z Matchingu
+Decyzja:
+- Sekcja `Podgląd radarowy podgrupy` w `Profile demograficzne archetypu`:
+  - pokazuje dwa profile (cała próba vs podgrupa),
+  - zawiera markery TOP2 dla obu profili,
+  - ma dedykowane boksy legend TOP2 pod wykresem.
+- Pod radarem dodajemy sekcję `Profile archetypowe 0-100` (dwa koła profilowe + legenda osi).
+Uzasadnienie:
+- Ujednolicenie z wyglądem Matchingu zmniejsza próg interpretacji i spełnia wskazany przez użytkownika wzorzec UX.
