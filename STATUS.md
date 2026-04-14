@@ -1761,3 +1761,15 @@
 - Testy techniczne:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-072 (2026-04-14, iPhone: bez dzielenia wyrazów w pytaniu)
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - w mobile portrait dla `.single-question-text` wyłączono dzielenie i łamanie wewnątrz słów:
+    - `overflow-wrap: normal`,
+    - `word-break: normal`,
+    - `hyphens: none`.
+- Efekt:
+  - pytanie główne zawija się wyłącznie między wyrazami (bez `wy-` / `cofywać` itp.).
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

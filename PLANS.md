@@ -2239,3 +2239,20 @@ Wynik:
 - Smoke-check:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-072 [DONE]
+Temat: Mobile iPhone — całkowite wyłączenie dzielenia wyrazów w treści pytania.
+Kryteria ukończenia:
+1. Pytanie główne nie dzieli wyrazów myślnikiem (`wy-`, `społeczny-` itd.).
+2. Zawijanie działa wyłącznie między pełnymi wyrazami.
+Pierwszy krok wykonawczy:
+- wycofać hyphenację i agresywne łamanie dla `.single-question-text` w mobile portrait.
+Wynik:
+- `archetypy-ankieta/src/SingleQuestionnaire.css` (mobile portrait):
+  - ustawiono:
+    - `overflow-wrap: normal`,
+    - `word-break: normal`,
+    - `hyphens: none`.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

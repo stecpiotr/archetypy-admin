@@ -1629,3 +1629,16 @@ Decyzja:
 - W `SingleQuestionnaire.css` dla `@media (max-width: 900px) and (orientation: portrait)` zwiększamy `margin-top` sekcji `.single-footer-actions` z `20px` do `30px`.
 Uzasadnienie:
 - User zgłosił, że `Dalej` jest za blisko paska odpowiedzi; korekta ma poprawić czytelność i separację akcji.
+
+### D-181: W mobile pytanie główne nie może używać dzielenia wyrazów
+Decyzja:
+- W `SingleQuestionnaire.css` (mobile portrait, `.single-question-text`) wyłączamy:
+  - `hyphens`,
+  - łamanie wewnątrz wyrazu (`word-break`),
+  - awaryjne zawijanie znakowe (`overflow-wrap`).
+- Docelowe ustawienia:
+  - `hyphens: none`,
+  - `word-break: normal`,
+  - `overflow-wrap: normal`.
+Uzasadnienie:
+- User wymaga braku podziałów typu `wy-` / `cofywać` i `społeczny-` / `ch`; tekst ma zawijać się wyłącznie między pełnymi wyrazami.
