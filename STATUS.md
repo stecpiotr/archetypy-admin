@@ -1910,3 +1910,15 @@
   - szybsze uzupełnianie kodowania po wklejeniu odpowiedzi.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-084 (2026-04-14, metryczka: układ przycisków akcji)
+- `archetypy-admin/app.py`:
+  - `➕ Dodaj pytanie metryczkowe` odsunięty od przycisku `📋 Wklej pytanie i odpowiedzi` przez dodatkowy pionowy odstęp (`0.55rem`),
+  - `💾 Zapisz metryczkę` przeniesiony wizualnie na prawą stronę (layout kolumnowy) w:
+    - `jst_metryczka_view`,
+    - `personal_metryczka_view`.
+- Efekt:
+  - przyciski wykonawcze są ustawione bardziej logicznie (główna akcja po prawej),
+  - większa czytelność sekcji końca edytora metryczki.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

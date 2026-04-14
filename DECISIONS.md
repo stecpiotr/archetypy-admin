@@ -1757,3 +1757,9 @@ Decyzja:
   - dla braków domyślnie proponujemy `kodowanie = treść odpowiedzi` (wartość edytowalna przez użytkownika).
 Uzasadnienie:
 - Użytkownik oczekuje szybkiej propozycji kodowania bez ręcznego przepisywania każdej pozycji, ale jednocześnie bez utraty już poprawionych kodów.
+
+### D-194: Główna akcja zapisu metryczki jest po prawej stronie sekcji
+Decyzja:
+- Przycisk `💾 Zapisz metryczkę` renderujemy w prawej kolumnie (JST i personal), jako akcję wykonawczą kończącą edycję.
+Uzasadnienie:
+- Użytkownik oczekuje standardowego układu UX, gdzie finalna akcja potwierdzająca znajduje się po prawej stronie.

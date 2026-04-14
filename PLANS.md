@@ -2451,3 +2451,18 @@ Wynik:
     - gdy brak dopasowania, proponuje `code = label` (treść odpowiedzi), bez narzucania numeracji.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-084 [DONE]
+Temat: Metryczka - korekta układu przycisków akcji (pozycja i odstępy).
+Kryteria ukończenia:
+1. Przycisk `💾 Zapisz metryczkę` jest po prawej stronie sekcji.
+2. `➕ Dodaj pytanie metryczkowe` ma większy odstęp od przycisku `📋 Wklej pytanie i odpowiedzi`.
+3. Zmiana działa dla metryczki JST i personalnej.
+Pierwszy krok wykonawczy:
+- zmienić layout przycisku zapisu na kolumny (`prawa kolumna`) i dodać pionowy spacer przed przyciskiem dodawania pytania.
+Wynik:
+- `app.py`:
+  - `_render_metryczka_editor`: dodano pionowy odstęp (`0.55rem`) przed `➕ Dodaj pytanie metryczkowe`,
+  - `jst_metryczka_view` i `personal_metryczka_view`: `💾 Zapisz metryczkę` osadzony w prawej kolumnie, z `use_container_width=True`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

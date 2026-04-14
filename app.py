@@ -3075,6 +3075,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             st.session_state[state_key] = working
             st.rerun()
 
+    st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
     if st.button("➕ Dodaj pytanie metryczkowe", key=f"{widget_prefix}add_q", type="secondary"):
         working = deepcopy(st.session_state.get(state_key) or cfg_out)
         q_list = list(working.get("questions") or [])
@@ -3207,7 +3208,15 @@ def jst_metryczka_view() -> None:
         normalize_jst_metryczka_config(study_row.get("metryczka_config")),
     )
 
-    if st.button("💾 Zapisz metryczkę", type="primary", key=f"jst_metryczka_save_{sid}"):
+    _, save_col = st.columns([0.66, 0.34], gap="small")
+    with save_col:
+        save_clicked = st.button(
+            "💾 Zapisz metryczkę",
+            type="primary",
+            key=f"jst_metryczka_save_{sid}",
+            use_container_width=True,
+        )
+    if save_clicked:
         valid, msg = _validate_metryczka_before_save(edited_cfg)
         if not valid:
             st.error(msg)
@@ -6896,7 +6905,15 @@ def personal_metryczka_view() -> None:
         _metryczka_normalize_config("personal", study.get("metryczka_config")),
     )
 
-    if st.button("💾 Zapisz metryczkę", type="primary", key=f"personal_metryczka_save_{study_id or slug}"):
+    _, save_col = st.columns([0.66, 0.34], gap="small")
+    with save_col:
+        save_clicked = st.button(
+            "💾 Zapisz metryczkę",
+            type="primary",
+            key=f"personal_metryczka_save_{study_id or slug}",
+            use_container_width=True,
+        )
+    if save_clicked:
         if not study_id:
             st.error("Brak identyfikatora badania.")
         else:
