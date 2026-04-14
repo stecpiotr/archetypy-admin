@@ -1975,3 +1975,26 @@ Uzasadnienie:
 
 Status:
 - D-209 zostaje doprecyzowana przez D-214 i D-215 (finalnie: baza 100% key-pool + kalibrowalne kary).
+
+### D-216: Generator JST używa wspólnej, dynamicznej warstwy metadanych demografii dla wszystkich sekcji raportu
+Decyzja:
+- Wprowadzamy wspólny model metadanych demograficznych:
+  - `var_order`,
+  - `cat_order`,
+  - `var_icons`,
+  - `cat_icons`,
+  budowany dynamicznie z aktualnych `M_*` (rdzeń + custom).
+- Sekcje prezentacyjne (`Segmenty`, `Demografia_Seg`, `B2 declared`, `TOP5 simulation`) korzystają z tych samych metadanych zamiast lokalnych hardcoded fallbacków stałej piątki.
+- Kolejność custom `M_*` zachowuje kolejność wejściową kolumn, a nie sortowanie alfabetyczne.
+Uzasadnienie:
+- User zgłosił niedomkniętą spójność prezentacji dla custom metryczki (etykiety/kolejność/ikony).
+- Jeden wspólny mechanizm usuwa rozjazdy między sekcjami i upraszcza utrzymanie przy dalszym rozszerzaniu metryczki.
+
+### D-217: `Siła kar segmentowych` jest zapamiętywana trwale per badanie JST
+Decyzja:
+- W `jst_studies` przechowujemy `matching_segments_penalty_strength` (`łagodna|standard|ostra`, domyślnie `standard`).
+- Zakładka `🧭 Matching > Segmenty` odczytuje tę wartość przy wejściu i zapisuje zmianę suwaka bezpośrednio do badania JST.
+- Klucz UI suwaka działa per `jst_study_id`.
+Uzasadnienie:
+- User oczekuje zapamiętywania ustawienia „per badanie”, a nie wyłącznie w pamięci bieżącej sesji.
+- Parametr należy domenowo do segmentacji mieszkańców, więc naturalnym miejscem trwałego zapisu jest rekord badania JST.

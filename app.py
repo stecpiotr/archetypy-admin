@@ -55,6 +55,7 @@ from db_jst_utils import (
     soft_delete_jst_study,
     set_jst_study_status,
     list_metryczka_question_templates,
+    normalize_matching_segments_penalty_strength,
     normalize_study_status as normalize_jst_study_status,
     update_jst_study,
 )
@@ -7207,6 +7208,17 @@ def matching_view() -> None:
         if not segment_profiles:
             st.info("Brak danych segmentów do porównania w tym badaniu JST.")
         else:
+            jst_row_live: Dict[str, Any] = {}
+            if jst_sid:
+                with contextlib.suppress(Exception):
+                    jst_row_live = fetch_jst_study_by_id(sb, jst_sid) or {}
+            stored_penalty_strength = normalize_matching_segments_penalty_strength(
+                (jst_row_live or {}).get("matching_segments_penalty_strength")
+            )
+            penalty_strength_widget_key = f"matching_segments_penalty_strength_{jst_sid}"
+            if penalty_strength_widget_key not in st.session_state:
+                st.session_state[penalty_strength_widget_key] = stored_penalty_strength
+
             jst_n = int(result.get("jst_n") or 0)
             default_min_seg_n = max(30, int(round(jst_n * 0.06))) if jst_n > 0 else 60
             ctrl_a, ctrl_b, ctrl_c = st.columns([0.42, 0.30, 0.28], gap="large")
@@ -7230,14 +7242,24 @@ def matching_view() -> None:
                     )
                 )
             with ctrl_c:
-                penalty_strength = str(
+                penalty_strength = normalize_matching_segments_penalty_strength(
                     st.select_slider(
                         "Siła kar segmentowych",
                         options=["łagodna", "standard", "ostra"],
-                        value="standard",
-                        key=f"matching_segments_penalty_strength_{person_sid}_{jst_sid}",
+                        key=penalty_strength_widget_key,
                     )
                 )
+            if jst_sid and penalty_strength != stored_penalty_strength:
+                with contextlib.suppress(Exception):
+                    updated_jst = update_jst_study(
+                        sb,
+                        jst_sid,
+                        {"matching_segments_penalty_strength": penalty_strength},
+                    )
+                    jst_row_live = dict(updated_jst or {})
+                if isinstance(jst_row_live, dict):
+                    jst_row_live["matching_segments_penalty_strength"] = penalty_strength
+                result["matching_segments_penalty_strength"] = penalty_strength
 
             arch_order = list(JST_ARCHETYPES)
             penalty_profiles: Dict[str, Dict[str, float]] = {

@@ -138,6 +138,7 @@ def ensure_jst_schema() -> None:
       survey_notify_last_sent_at TIMESTAMPTZ NULL,
       metryczka_config JSONB NULL,
       metryczka_config_version INTEGER NOT NULL DEFAULT 1,
+      matching_segments_penalty_strength TEXT NOT NULL DEFAULT 'standard',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at TIMESTAMPTZ NULL
@@ -185,6 +186,8 @@ def ensure_jst_schema() -> None:
       ADD COLUMN IF NOT EXISTS metryczka_config JSONB NULL;
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS metryczka_config_version INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS matching_segments_penalty_strength TEXT NOT NULL DEFAULT 'standard';
     DO $jst_status_chk$
     BEGIN
       IF NOT EXISTS (
@@ -213,6 +216,20 @@ def ensure_jst_schema() -> None:
     END;
     $jst_survey_mode_chk$;
 
+    DO $jst_segments_penalty_chk$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'jst_studies_segments_penalty_chk'
+      ) THEN
+        ALTER TABLE public.jst_studies
+          ADD CONSTRAINT jst_studies_segments_penalty_chk
+          CHECK (matching_segments_penalty_strength IN ('łagodna','standard','ostra'));
+      END IF;
+    END;
+    $jst_segments_penalty_chk$;
+
     UPDATE public.jst_studies
     SET study_status = CASE
       WHEN COALESCE(is_active, true) = false OR deleted_at IS NOT NULL THEN 'deleted'
@@ -223,6 +240,10 @@ def ensure_jst_schema() -> None:
     UPDATE public.jst_studies
     SET started_at = COALESCE(started_at, created_at, NOW())
     WHERE started_at IS NULL;
+
+    UPDATE public.jst_studies
+    SET matching_segments_penalty_strength = 'standard'
+    WHERE COALESCE(matching_segments_penalty_strength, '') = '';
 
     DO $studies_status$
     BEGIN
@@ -1009,6 +1030,7 @@ def _utc_now_iso() -> str:
 
 _ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
 _TEMPLATE_KINDS = {"jst", "personal", "both"}
+_ALLOWED_SEGMENT_PENALTY_STRENGTHS = {"łagodna", "standard", "ostra"}
 
 
 def normalize_study_status(raw: Optional[str], *, is_active: Optional[bool] = None, deleted_at: Optional[str] = None) -> str:
@@ -1020,6 +1042,13 @@ def normalize_study_status(raw: Optional[str], *, is_active: Optional[bool] = No
     if is_active is False:
         return "deleted"
     return "active"
+
+
+def normalize_matching_segments_penalty_strength(raw: Any) -> str:
+    txt = str(raw or "").strip().lower()
+    if txt in _ALLOWED_SEGMENT_PENALTY_STRENGTHS:
+        return txt
+    return "standard"
 
 
 def _notify_postgrest_schema_reload() -> None:
@@ -1058,6 +1087,9 @@ def fetch_jst_studies(sb: Client, include_inactive: bool = False) -> List[Dict[s
         cfg = normalize_jst_metryczka_config(rec.get("metryczka_config"))
         rec["metryczka_config"] = cfg
         rec["metryczka_config_version"] = int(cfg.get("version") or 1)
+        rec["matching_segments_penalty_strength"] = normalize_matching_segments_penalty_strength(
+            rec.get("matching_segments_penalty_strength")
+        )
         out.append(rec)
     return out
 
@@ -1071,6 +1103,9 @@ def fetch_jst_study_by_id(sb: Client, study_id: str) -> Optional[Dict[str, Any]]
     cfg = normalize_jst_metryczka_config(rec.get("metryczka_config"))
     rec["metryczka_config"] = cfg
     rec["metryczka_config_version"] = int(cfg.get("version") or 1)
+    rec["matching_segments_penalty_strength"] = normalize_matching_segments_penalty_strength(
+        rec.get("matching_segments_penalty_strength")
+    )
     return rec
 
 
@@ -1249,8 +1284,12 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data.setdefault("survey_notify_email", None)
     data.setdefault("survey_notify_last_count", 0)
     data.setdefault("survey_notify_last_sent_at", None)
+    data.setdefault("matching_segments_penalty_strength", "standard")
     data["metryczka_config"] = cfg_metryczka if raw_metryczka is not None else default_jst_metryczka_config()
     data.setdefault("metryczka_config_version", int(cfg_metryczka.get("version") or 1))
+    data["matching_segments_penalty_strength"] = normalize_matching_segments_penalty_strength(
+        data.get("matching_segments_penalty_strength")
+    )
     data.setdefault("created_at", now_iso)
     data.setdefault("updated_at", now_iso)
     try:
@@ -1272,6 +1311,10 @@ def update_jst_study(sb: Client, study_id: str, payload: Dict[str, Any]) -> Dict
         cfg = normalize_jst_metryczka_config(data.get("metryczka_config"))
         data["metryczka_config"] = cfg
         data["metryczka_config_version"] = int(cfg.get("version") or 1)
+    if "matching_segments_penalty_strength" in data:
+        data["matching_segments_penalty_strength"] = normalize_matching_segments_penalty_strength(
+            data.get("matching_segments_penalty_strength")
+        )
     data["updated_at"] = _utc_now_iso()
     try:
         sb.table("jst_studies").update(data).eq("id", str(study_id)).execute()

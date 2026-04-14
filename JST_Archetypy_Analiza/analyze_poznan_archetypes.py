@@ -12056,12 +12056,262 @@ _CORE_METRY_VAR_LABELS = {
     "M_ZAWOD": "Status zawodowy",
     "M_MATERIAL": "Sytuacja materialna",
 }
+_DEMO_CORE_VAR_ORDER = [
+    "Płeć",
+    "Wiek",
+    "Wykształcenie",
+    "Status zawodowy",
+    "Sytuacja materialna",
+]
+_DEMO_CORE_CAT_ORDER: Dict[str, List[str]] = {
+    "Płeć": ["kobieta", "mężczyzna"],
+    "Wiek": ["15-39", "40-59", "60+", "60 i więcej"],
+    "Wykształcenie": [
+        "podst./gim./zaw.",
+        "podstawowe, gimnazjalne, zasadnicze zawodowe",
+        "średnie",
+        "wyższe",
+    ],
+    "Status zawodowy": [
+        "prac. umysłowy",
+        "pracownik umysłowy",
+        "prac. fizyczny",
+        "pracownik fizyczny",
+        "własna firma",
+        "prowadzę własną firmę",
+        "student/uczeń",
+        "bezrobotny",
+        "rencista/emeryt",
+        "inna",
+        "inna (jaka?)",
+    ],
+    "Sytuacja materialna": [
+        "bardzo dobra",
+        "powodzi mi się bardzo dobrze",
+        "raczej dobra",
+        "powodzi mi się raczej dobrze",
+        "przeciętna",
+        "powodzi mi się przeciętnie, średnio",
+        "raczej zła",
+        "powodzi mi się raczej źle",
+        "bardzo zła",
+        "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
+        "odmowa",
+        "odmawiam udzielenia odpowiedzi",
+    ],
+}
+_DEMO_VAR_ICON_MAP: Dict[str, str] = {
+    "płeć": "👫",
+    "wiek": "🧭",
+    "wykształcenie": "🎓",
+    "status zawodowy": "💼",
+    "sytuacja materialna": "💰",
+}
+_DEMO_CAT_ICON_MAP: Dict[str, str] = {
+    "kobieta": "👩",
+    "mężczyzna": "👨",
+    "15-39": "🧑",
+    "40-59": "🧑‍💼",
+    "60+": "🧓",
+    "60 i więcej": "🧓",
+    "podst./gim./zaw.": "🛠️",
+    "podstawowe, gimnazjalne, zasadnicze zawodowe": "🛠️",
+    "średnie": "📘",
+    "wyższe": "🎓",
+    "prac. umysłowy": "🧠",
+    "pracownik umysłowy": "🧠",
+    "prac. fizyczny": "🛠️",
+    "pracownik fizyczny": "🛠️",
+    "własna firma": "🏢",
+    "prowadzę własną firmę": "🏢",
+    "student/uczeń": "🧑‍🎓",
+    "bezrobotny": "🔎",
+    "rencista/emeryt": "🌿",
+    "inna": "🧩",
+    "inna (jaka?)": "🧩",
+    "bardzo dobra": "😄",
+    "powodzi mi się bardzo dobrze": "😄",
+    "raczej dobra": "🙂",
+    "powodzi mi się raczej dobrze": "🙂",
+    "przeciętna": "😐",
+    "powodzi mi się przeciętnie, średnio": "😐",
+    "raczej zła": "🙁",
+    "powodzi mi się raczej źle": "🙁",
+    "bardzo zła": "😟",
+    "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej": "😟",
+    "odmowa": "🤐",
+    "odmawiam udzielenia odpowiedzi": "🤐",
+}
+
+
+def _demo_nk(x: Any) -> str:
+    return " ".join(str(x or "").split()).strip().lower()
+
+
+def _demo_pick_var_icon(var_label: str) -> str:
+    nk = _demo_nk(var_label)
+    icon = _DEMO_VAR_ICON_MAP.get(nk)
+    if icon:
+        return icon
+    if any(k in nk for k in ["obszar", "miejsce", "lokaliz", "zamiesz", "wieś", "wies", "miasto"]):
+        return "🗺️"
+    if any(k in nk for k in ["pogląd", "pogl", "orientac", "ideolog", "politycz"]):
+        return "🗳️"
+    if any(k in nk for k in ["relig", "wiar"]):
+        return "⛪"
+    if any(k in nk for k in ["doch", "zarob", "przych", "material"]):
+        return "💸"
+    if any(k in nk for k in ["rodzin", "dzieci", "gospod"]):
+        return "🏠"
+    return "📌"
+
+
+def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
+    nk_cat = _demo_nk(cat_label)
+    icon = _DEMO_CAT_ICON_MAP.get(nk_cat)
+    if icon:
+        return icon
+    if nk_cat in {"tak", "zdecydowanie tak", "raczej tak"}:
+        return "✅"
+    if nk_cat in {"nie", "zdecydowanie nie", "raczej nie"}:
+        return "❌"
+    if "nie wiem" in nk_cat or "trudno powiedzieć" in nk_cat:
+        return "❓"
+    nk_var = _demo_nk(var_label)
+    if any(k in nk_var for k in ["obszar", "miejsce", "zamiesz", "lokaliz"]):
+        if "miast" in nk_cat:
+            return "🏙️"
+        if "wieś" in nk_cat or "wies" in nk_cat:
+            return "🌾"
+    if "wiek" in nk_var:
+        if re.search(r"\b60\b", nk_cat):
+            return "🧓"
+        if "40" in nk_cat or "59" in nk_cat:
+            return "🧑‍💼"
+        if "15" in nk_cat or "39" in nk_cat:
+            return "🧑"
+    return _demo_pick_var_icon(var_label)
+
+
+def _demo_merge_category_order(var_label: str, cats_present: List[str]) -> List[str]:
+    ordered: List[str] = []
+    seen: set[str] = set()
+    for cat in list(_DEMO_CORE_CAT_ORDER.get(str(var_label), [])):
+        nk = _demo_nk(cat)
+        if nk in seen:
+            continue
+        if any(_demo_nk(c) == nk for c in cats_present):
+            ordered.append(str(cat))
+            seen.add(nk)
+    for cat in cats_present:
+        nk = _demo_nk(cat)
+        if nk in seen:
+            continue
+        ordered.append(str(cat))
+        seen.add(nk)
+    return ordered
+
+
+def _build_demo_schema_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    grouped: Dict[str, List[str]] = {}
+    var_seen_order: List[str] = []
+    for r in list(rows or []):
+        if not isinstance(r, dict):
+            continue
+        var_label = str(r.get("zmienna", "")).strip()
+        cat_label = str(r.get("kategoria", "")).strip()
+        if not var_label or not cat_label:
+            continue
+        if var_label not in grouped:
+            grouped[var_label] = []
+            var_seen_order.append(var_label)
+        grouped[var_label].append(cat_label)
+
+    var_order: List[str] = []
+    seen_var: set[str] = set()
+    for core_var in _DEMO_CORE_VAR_ORDER:
+        if core_var in grouped and core_var not in seen_var:
+            var_order.append(core_var)
+            seen_var.add(core_var)
+    for var_label in var_seen_order:
+        if var_label not in seen_var:
+            var_order.append(var_label)
+            seen_var.add(var_label)
+
+    cat_order: Dict[str, List[str]] = {}
+    for var_label in var_order:
+        cats = grouped.get(var_label, [])
+        unique_cats: List[str] = []
+        seen_cat: set[str] = set()
+        for cat in cats:
+            nk = _demo_nk(cat)
+            if nk in seen_cat:
+                continue
+            seen_cat.add(nk)
+            unique_cats.append(str(cat))
+        cat_order[var_label] = _demo_merge_category_order(var_label, unique_cats)
+
+    var_icons = {str(v).upper(): _demo_pick_var_icon(v) for v in var_order}
+    cat_icons: Dict[str, str] = {}
+    for var_label in var_order:
+        for cat in cat_order.get(var_label, []):
+            nk = _demo_nk(cat)
+            if nk in cat_icons:
+                continue
+            cat_icons[nk] = _demo_pick_cat_icon(var_label, cat)
+
+    return {
+        "var_order": var_order,
+        "cat_order": cat_order,
+        "var_icons": var_icons,
+        "cat_icons": cat_icons,
+    }
+
+
+def _build_metry_demo_schema(metry: Optional[pd.DataFrame]) -> Dict[str, Any]:
+    if metry is None or len(metry) == 0:
+        var_order = list(_DEMO_CORE_VAR_ORDER)
+        cat_order = {k: list(v) for k, v in _DEMO_CORE_CAT_ORDER.items()}
+    else:
+        var_order = []
+        cat_order: Dict[str, List[str]] = {}
+        for col in _ordered_metry_columns(metry):
+            var_label = _metry_var_label(col)
+            if var_label not in var_order:
+                var_order.append(var_label)
+            cats_raw = [str(lbl) for _raw, lbl, _mask in _metry_column_categories(metry, col)]
+            unique_cats: List[str] = []
+            seen_cats: set[str] = set()
+            for cat in cats_raw:
+                nk = _demo_nk(cat)
+                if nk in seen_cats:
+                    continue
+                seen_cats.add(nk)
+                unique_cats.append(cat)
+            cat_order[var_label] = _demo_merge_category_order(var_label, unique_cats)
+
+    var_icons = {str(v).upper(): _demo_pick_var_icon(v) for v in var_order}
+    cat_icons: Dict[str, str] = {}
+    for var_label, cats in cat_order.items():
+        for cat in cats:
+            nk = _demo_nk(cat)
+            if nk in cat_icons:
+                continue
+            cat_icons[nk] = _demo_pick_cat_icon(var_label, cat)
+
+    return {
+        "var_order": var_order,
+        "cat_order": cat_order,
+        "var_icons": var_icons,
+        "cat_icons": cat_icons,
+    }
 
 
 def _ordered_metry_columns(metry: pd.DataFrame) -> List[str]:
     if metry is None or len(metry.columns) == 0:
         return []
     by_upper: Dict[str, str] = {}
+    encounter_order: List[str] = []
     for col in list(metry.columns):
         c = str(col or "").strip()
         cu = c.upper()
@@ -12069,8 +12319,9 @@ def _ordered_metry_columns(metry: pd.DataFrame) -> List[str]:
             continue
         if cu not in by_upper:
             by_upper[cu] = c
+            encounter_order.append(cu)
     ordered_upper = [c for c in _CORE_METRY_COL_ORDER if c in by_upper]
-    extras = sorted([c for c in by_upper.keys() if c not in ordered_upper])
+    extras = [c for c in encounter_order if c not in ordered_upper]
     ordered_upper.extend(extras)
     return [by_upper[c] for c in ordered_upper]
 
@@ -12479,100 +12730,6 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
         accent = html.escape(str(palette.get("accent", "#495057")))
         soft = html.escape(str(palette.get("soft", "#f8f9fa")))
 
-        def _norm_key(x: Any) -> str:
-            return " ".join(str(x or "").split()).strip().lower()
-
-        summary_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
-        detail_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
-
-        cat_order = {
-            "Płeć": ["kobieta", "mężczyzna"],
-            "Wiek": ["15-39", "40-59", "60+", "60 i więcej"],
-            "Wykształcenie": [
-                "podst./gim./zaw.",
-                "podstawowe, gimnazjalne, zasadnicze zawodowe",
-                "średnie",
-                "wyższe",
-            ],
-            "Status zawodowy": [
-                "prac. umysłowy",
-                "pracownik umysłowy",
-                "prac. fizyczny",
-                "pracownik fizyczny",
-                "własna firma",
-                "prowadzę własną firmę",
-                "student/uczeń",
-                "bezrobotny",
-                "rencista/emeryt",
-                "inna",
-                "inna (jaka?)",
-            ],
-            "Sytuacja materialna": [
-                "bardzo dobra",
-                "powodzi mi się bardzo dobrze",
-                "raczej dobra",
-                "powodzi mi się raczej dobrze",
-                "przeciętna",
-                "powodzi mi się przeciętnie, średnio",
-                "raczej zła",
-                "powodzi mi się raczej źle",
-                "bardzo zła",
-                "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
-                "odmowa",
-                "odmawiam udzielenia odpowiedzi",
-            ],
-        }
-
-        var_icons = {
-            "płeć": "👤",
-            "wiek": "🧭",
-            "wykształcenie": "🎓",
-            "status zawodowy": "💼",
-            "sytuacja materialna": "💰",
-        }
-
-        demo_icons = {
-            "kobieta": "👩",
-            "mężczyzna": "👨",
-            "15-39": "🧑",
-            "40-59": "🧑‍💼",
-            "60+": "🧓",
-            "60 i więcej": "🧓",
-            "podst./gim./zaw.": "🛠️",
-            "podstawowe, gimnazjalne, zasadnicze zawodowe": "🛠️",
-            "średnie": "📘",
-            "wyższe": "🎓",
-            "prac. umysłowy": "🧠",
-            "pracownik umysłowy": "🧠",
-            "prac. fizyczny": "🛠️",
-            "pracownik fizyczny": "🛠️",
-            "własna firma": "🏢",
-            "prowadzę własną firmę": "🏢",
-            "student/uczeń": "🧑‍🎓",
-            "bezrobotny": "🔎",
-            "rencista/emeryt": "🌿",
-            "inna": "🧩",
-            "inna (jaka?)": "🧩",
-            "bardzo dobra": "😄",
-            "powodzi mi się bardzo dobrze": "😄",
-            "raczej dobra": "🙂",
-            "powodzi mi się raczej dobrze": "🙂",
-            "przeciętna": "😐",
-            "powodzi mi się przeciętnie, średnio": "😐",
-            "raczej zła": "🙁",
-            "powodzi mi się raczej źle": "🙁",
-            "bardzo zła": "😟",
-            "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej": "😟",
-            "odmowa": "🤐",
-            "odmawiam udzielenia odpowiedzi": "🤐",
-        }
-
-        def _pick_demo_icon(zm: str, kat: str) -> str:
-            icon = demo_icons.get(_norm_key(kat), "")
-            if icon:
-                return icon
-            return var_icons.get(_norm_key(zm), "📌")
-
         def _hex_to_rgb(_hex: str) -> Tuple[int, int, int]:
             h = str(_hex or "").strip().lstrip("#")
             if len(h) == 3:
@@ -12616,6 +12773,17 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
                 "lift_pp": _safe_float(r.get("lift_pp", 0.0)),
             })
 
+        demo_schema = _build_demo_schema_from_rows(
+            [
+                {"zmienna": rr.get("zmienna"), "kategoria": rr.get("kategoria")}
+                for rr in list(rows or [])
+                if isinstance(rr, dict)
+            ]
+        )
+        summary_order = list(demo_schema.get("var_order") or [])
+        detail_order = list(summary_order)
+        cat_order = dict(demo_schema.get("cat_order") or {})
+
         if not grouped:
             return (
                 "<div class='seg-demo-wrap'>"
@@ -12639,7 +12807,7 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
             best = items_sorted[0]
 
             best_cat = str(best.get("kategoria", ""))
-            best_icon = _pick_demo_icon(zm, best_cat)
+            best_icon = _demo_pick_cat_icon(zm, best_cat)
 
             summary_bits.append(
                 "<div style='padding:8px 10px; border:1px solid {line}; border-radius:12px; "
@@ -12672,12 +12840,12 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
                 continue
 
             wanted = cat_order.get(zm, [])
-            wanted_norm = {_norm_key(x): i for i, x in enumerate(wanted)}
+            wanted_norm = {_demo_nk(x): i for i, x in enumerate(wanted)}
 
             items_sorted = sorted(
                 items,
                 key=lambda rr: (
-                    wanted_norm.get(_norm_key(rr.get("kategoria", "")), 999),
+                    wanted_norm.get(_demo_nk(rr.get("kategoria", "")), 999),
                     -float(rr.get("pct_seg", 0.0)),
                 )
             )
@@ -12714,7 +12882,7 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
                 body_rows.append(
                     "<tr>"
                     f"{zm_cell}"
-                    f"<td style='{top_border} font-weight:{cat_fw};'><span style='display:inline-flex; align-items:center; gap:6px;'><span>{html.escape(str(_pick_demo_icon(zm, rr.get('kategoria', ''))))}</span><span>{html.escape(str(rr.get('kategoria', '')))}</span></span></td>"
+                    f"<td style='{top_border} font-weight:{cat_fw};'><span style='display:inline-flex; align-items:center; gap:6px;'><span>{html.escape(str(_demo_pick_cat_icon(zm, str(rr.get('kategoria', '')))) )}</span><span>{html.escape(str(rr.get('kategoria', '')))}</span></span></td>"
                     f"{pct_seg_cell}"
                     f"<td style='text-align:right; {top_border}'>{float(rr.get('pct_all', 0.0)):.0f}%</td>"
                     f"<td style='text-align:right; color:{lift_color}; {top_border}'>{lift_val:+.1f} pp</td>"
@@ -13563,33 +13731,6 @@ def _render_demografia_seg_panel(segs: List[Dict[str, Any]], city_label: str = "
             "</div>"
         )
 
-    def _nk(x: Any) -> str:
-        return " ".join(str(x or "").split()).strip().lower()
-
-    var_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
-    cat_order = {
-        "Płeć": ["kobieta", "mężczyzna"],
-        "Wiek": ["15-39", "40-59", "60+"],
-        "Wykształcenie": ["podst./gim./zaw.", "średnie", "wyższe"],
-        "Status zawodowy": [
-            "prac. umysłowy",
-            "prac. fizyczny",
-            "własna firma",
-            "student/uczeń",
-            "bezrobotny",
-            "rencista/emeryt",
-            "inna",
-        ],
-        "Sytuacja materialna": [
-            "bardzo dobra",
-            "raczej dobra",
-            "przeciętna",
-            "raczej zła",
-            "bardzo zła",
-            "odmowa",
-        ],
-    }
-
     segs = sorted(
         segs,
         key=lambda s: int(_safe_float(s.get("segment_rank", s.get("segment_id", 0))))
@@ -13627,40 +13768,18 @@ def _render_demografia_seg_panel(segs: List[Dict[str, Any]], city_label: str = "
 
         seg_maps[seg_label] = local_map
 
-    seen_vars = {_nk(v) for v in var_order}
-    extra_vars: List[str] = []
-    for (zm, _kat) in probe_map.keys():
-        if _nk(zm) not in seen_vars:
-            extra_vars.append(zm)
-            seen_vars.add(_nk(zm))
-    var_order.extend(sorted(extra_vars, key=lambda x: _nk(x)))
+    schema_rows: List[Dict[str, Any]] = []
+    for (zm, kat), _pct in probe_map.items():
+        schema_rows.append({"zmienna": zm, "kategoria": kat})
+    for seg_label in seg_labels:
+        for (zm, kat), _pct in seg_maps.get(seg_label, {}).items():
+            schema_rows.append({"zmienna": zm, "kategoria": kat})
+    demo_schema = _build_demo_schema_from_rows(schema_rows)
+    var_order = list(demo_schema.get("var_order") or [])
+    cat_order = dict(demo_schema.get("cat_order") or {})
 
     def _ordered_categories(var_name: str) -> List[str]:
-        seen = set()
-        ordered: List[str] = []
-
-        for cat in cat_order.get(var_name, []):
-            ordered.append(cat)
-            seen.add(_nk(cat))
-
-        for seg_label in seg_labels:
-            for (zm, kat), _pct in seg_maps.get(seg_label, {}).items():
-                if zm != var_name:
-                    continue
-                nk = _nk(kat)
-                if nk not in seen:
-                    ordered.append(kat)
-                    seen.add(nk)
-
-        for (zm, kat), _pct in probe_map.items():
-            if zm != var_name:
-                continue
-            nk = _nk(kat)
-            if nk not in seen:
-                ordered.append(kat)
-                seen.add(nk)
-
-        return ordered
+        return list(cat_order.get(var_name, []))
 
     def _max_cat_for_probe(var_name: str, cats: List[str]) -> str:
         best_cat = ""
@@ -13738,50 +13857,6 @@ def _render_demografia_seg_panel(segs: List[Dict[str, Any]], city_label: str = "
 
     body_rows: List[str] = []
 
-    var_icons = {
-        "PŁEĆ": "👫",
-        "WIEK": "🧭",
-        "WYKSZTAŁCENIE": "🎓",
-        "STATUS ZAWODOWY": "💼",
-        "SYTUACJA MATERIALNA": "💰",
-    }
-
-    cat_icons = {
-        "kobieta": "👩",
-        "mężczyzna": "👨",
-        "15-39": "🧑",
-        "40-59": "🧑‍💼",
-        "60+": "🧓",
-        "60 i więcej": "🧓",
-        "podst./gim./zaw.": "🛠️",
-        "podstawowe, gimnazjalne, zasadnicze zawodowe": "🛠️",
-        "średnie": "📘",
-        "wyższe": "🎓",
-        "prac. umysłowy": "🧠",
-        "pracownik umysłowy": "🧠",
-        "prac. fizyczny": "🛠️",
-        "pracownik fizyczny": "🛠️",
-        "własna firma": "🏢",
-        "prowadzę własną firmę": "🏢",
-        "student/uczeń": "🧑‍🎓",
-        "bezrobotny": "🔎",
-        "rencista/emeryt": "🌿",
-        "inna": "🧩",
-        "inna (jaka?)": "🧩",
-        "bardzo dobra": "😄",
-        "powodzi mi się bardzo dobrze": "😄",
-        "raczej dobra": "🙂",
-        "powodzi mi się raczej dobrze": "🙂",
-        "przeciętna": "😐",
-        "powodzi mi się przeciętnie, średnio": "😐",
-        "raczej zła": "🙁",
-        "powodzi mi się raczej źle": "🙁",
-        "bardzo zła": "😟",
-        "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej": "😟",
-        "odmowa": "🤐",
-        "odmawiam udzielenia odpowiedzi": "🤐",
-    }
-
 
     for var_name in var_order:
         cats = _ordered_categories(var_name)
@@ -13795,7 +13870,7 @@ def _render_demografia_seg_panel(segs: List[Dict[str, Any]], city_label: str = "
         for cat in cats:
             row_cells = ["<tr>"]
             if first_row:
-                icon = var_icons.get(str(var_name).upper(), "•")
+                icon = _demo_pick_var_icon(var_name)
                 row_cells.append(
                     f"<td rowspan='{len(cats)}' style='font-weight:700; text-transform:uppercase; vertical-align:middle; background:#fafafa; border-top:3px solid #b8c2cc; border-left:3px solid #b8c2cc;'>"
                     f"{icon} {html.escape(var_name)}"
@@ -13804,7 +13879,7 @@ def _render_demografia_seg_panel(segs: List[Dict[str, Any]], city_label: str = "
             else:
                 row_cells[0] = "<tr>"
 
-            cat_icon = cat_icons.get(_nk(cat), "📌")
+            cat_icon = _demo_pick_cat_icon(var_name, cat)
             row_cells.append(
                 f"<td style='font-weight:700; border-top:{'3px solid #b8c2cc' if first_row else '1px solid #dfe4ea'};'>"
                 f"<span style='display:inline-flex; align-items:center; gap:6px;'><span>{html.escape(cat_icon)}</span><span>{html.escape(cat)}</span></span>"
@@ -13924,22 +13999,11 @@ def _build_b2_declared_demo_payload(
         brand_values: Optional[Dict[str, str]] = None,
         city_label: str = "Poznań / próba",
 ) -> Dict[str, Any]:
-    var_order: List[str] = []
-    cat_order: Dict[str, List[str]] = {}
-    for col in _ordered_metry_columns(metry):
-        v_label = _metry_var_label(col)
-        if v_label not in var_order:
-            var_order.append(v_label)
-        cats = [str(lbl) for _raw, lbl, _mask in _metry_column_categories(metry, col)]
-        seen_cats: set[str] = set()
-        unique_cats: List[str] = []
-        for cat in cats:
-            nk = " ".join(str(cat).split()).strip().lower()
-            if nk in seen_cats:
-                continue
-            seen_cats.add(nk)
-            unique_cats.append(cat)
-        cat_order[v_label] = unique_cats
+    demo_schema = _build_metry_demo_schema(metry)
+    var_order: List[str] = list(demo_schema.get("var_order") or [])
+    cat_order: Dict[str, List[str]] = dict(demo_schema.get("cat_order") or {})
+    var_icons: Dict[str, str] = dict(demo_schema.get("var_icons") or {})
+    cat_icons: Dict[str, str] = dict(demo_schema.get("cat_icons") or {})
 
     value_map = {a: str((brand_values or {}).get(a, a)) for a in ARCHETYPES}
 
@@ -13956,6 +14020,8 @@ def _build_b2_declared_demo_payload(
         "value_map": value_map,
         "var_order": var_order,
         "cat_order": cat_order,
+        "var_icons": var_icons,
+        "cat_icons": cat_icons,
         "city_label": str(city_label),
     }
 
@@ -14164,29 +14230,11 @@ def _build_top5_simulation_payload(
     """
     from itertools import combinations
 
-    var_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
-    cat_order = {
-        "Płeć": ["kobieta", "mężczyzna"],
-        "Wiek": ["15-39", "40-59", "60+"],
-        "Wykształcenie": ["podst./gim./zaw.", "średnie", "wyższe"],
-        "Status zawodowy": [
-            "prac. umysłowy",
-            "prac. fizyczny",
-            "własna firma",
-            "student/uczeń",
-            "bezrobotny",
-            "rencista/emeryt",
-            "inna",
-        ],
-        "Sytuacja materialna": [
-            "bardzo dobra",
-            "raczej dobra",
-            "przeciętna",
-            "raczej zła",
-            "bardzo zła",
-            "odmowa",
-        ],
-    }
+    demo_schema = _build_metry_demo_schema(metry)
+    var_order: List[str] = list(demo_schema.get("var_order") or [])
+    cat_order: Dict[str, List[str]] = dict(demo_schema.get("cat_order") or {})
+    var_icons: Dict[str, str] = dict(demo_schema.get("var_icons") or {})
+    cat_icons: Dict[str, str] = dict(demo_schema.get("cat_icons") or {})
 
     pop15 = _safe_float(population_15_plus)
     if not np.isfinite(pop15) or pop15 <= 0:
@@ -14207,6 +14255,8 @@ def _build_top5_simulation_payload(
         "value_map": value_map,
         "var_order": var_order,
         "cat_order": cat_order,
+        "var_icons": var_icons,
+        "cat_icons": cat_icons,
         "city_label": str(city_label),
         "population_15_plus": float(pop15),
         "model": {
@@ -14414,8 +14464,10 @@ def _render_top5_simulation_panel(payload: Dict[str, Any], city_label: str = "Po
             for a, b in SEG_FORBIDDEN_ARCHETYPE_PAIRS
             if str(a) in ARCHETYPES and str(b) in ARCHETYPES
         ],
-        "var_order": payload.get("var_order") or ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"],
+        "var_order": payload.get("var_order") or list(_DEMO_CORE_VAR_ORDER),
         "cat_order": payload.get("cat_order") or {},
+        "var_icons": payload.get("var_icons") or {},
+        "cat_icons": payload.get("cat_icons") or {},
         "city_label": str(payload.get("city_label") or city_label),
         "population_15_plus": float(_safe_float(payload.get("population_15_plus", 0.0))),
     }
@@ -14648,49 +14700,8 @@ def _render_top5_simulation_panel(payload: Dict[str, Any], city_label: str = "Po
       const DATA = __PAYLOAD_JSON__;
       const CITY_LABEL = __CITY_JSON__;
 
-      const VAR_ICONS = {
-        "PŁEĆ": "👫",
-        "WIEK": "🧭",
-        "WYKSZTAŁCENIE": "🎓",
-        "STATUS ZAWODOWY": "💼",
-        "SYTUACJA MATERIALNA": "💰",
-      };
-
-      const CAT_ICONS = {
-        "kobieta": "👩",
-        "mężczyzna": "👨",
-        "15-39": "🧑",
-        "40-59": "🧑‍💼",
-        "60+": "🧓",
-        "60 i więcej": "🧓",
-        "podst./gim./zaw.": "🛠️",
-        "podstawowe, gimnazjalne, zasadnicze zawodowe": "🛠️",
-        "średnie": "📘",
-        "wyższe": "🎓",
-        "prac. umysłowy": "🧠",
-        "pracownik umysłowy": "🧠",
-        "prac. fizyczny": "🛠️",
-        "pracownik fizyczny": "🛠️",
-        "własna firma": "🏢",
-        "prowadzę własną firmę": "🏢",
-        "student/uczeń": "🧑‍🎓",
-        "bezrobotny": "🔎",
-        "rencista/emeryt": "🌿",
-        "inna": "🧩",
-        "inna (jaka?)": "🧩",
-        "bardzo dobra": "😄",
-        "powodzi mi się bardzo dobrze": "😄",
-        "raczej dobra": "🙂",
-        "powodzi mi się raczej dobrze": "🙂",
-        "przeciętna": "😐",
-        "powodzi mi się przeciętnie, średnio": "😐",
-        "raczej zła": "🙁",
-        "powodzi mi się raczej źle": "🙁",
-        "bardzo zła": "😟",
-        "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej": "😟",
-        "odmowa": "🤐",
-        "odmawiam udzielenia odpowiedzi": "🤐",
-      };
+      const VAR_ICONS = (DATA.var_icons && typeof DATA.var_icons === "object") ? DATA.var_icons : {};
+      const CAT_ICONS = (DATA.cat_icons && typeof DATA.cat_icons === "object") ? DATA.cat_icons : {};
 
       function escHtml(x) {
         return String(x == null ? "" : x)
@@ -15117,8 +15128,10 @@ def _render_b2_declared_demo_panel(payload: Dict[str, Any], city_label: str = "P
         }],
         "value_map": payload.get("value_map") or {a: a for a in ARCHETYPES},
 
-        "var_order": payload.get("var_order") or ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"],
+        "var_order": payload.get("var_order") or list(_DEMO_CORE_VAR_ORDER),
         "cat_order": payload.get("cat_order") or {},
+        "var_icons": payload.get("var_icons") or {},
+        "cat_icons": payload.get("cat_icons") or {},
         "city_label": str(payload.get("city_label") or city_label),
     }
 
@@ -15275,49 +15288,8 @@ def _render_b2_declared_demo_panel(payload: Dict[str, Any], city_label: str = "P
       const DATA = __PAYLOAD_JSON__;
       const CITY_LABEL = __CITY_JSON__;
 
-      const VAR_ICONS = {
-        "PŁEĆ": "👫",
-        "WIEK": "🧭",
-        "WYKSZTAŁCENIE": "🎓",
-        "STATUS ZAWODOWY": "💼",
-        "SYTUACJA MATERIALNA": "💰",
-      };
-
-      const CAT_ICONS = {
-        "kobieta": "👩",
-        "mężczyzna": "👨",
-        "15-39": "🧑",
-        "40-59": "🧑‍💼",
-        "60+": "🧓",
-        "60 i więcej": "🧓",
-        "podst./gim./zaw.": "🛠️",
-        "podstawowe, gimnazjalne, zasadnicze zawodowe": "🛠️",
-        "średnie": "📘",
-        "wyższe": "🎓",
-        "prac. umysłowy": "🧠",
-        "pracownik umysłowy": "🧠",
-        "prac. fizyczny": "🛠️",
-        "pracownik fizyczny": "🛠️",
-        "własna firma": "🏢",
-        "prowadzę własną firmę": "🏢",
-        "student/uczeń": "🧑‍🎓",
-        "bezrobotny": "🔎",
-        "rencista/emeryt": "🌿",
-        "inna": "🧩",
-        "inna (jaka?)": "🧩",
-        "bardzo dobra": "😄",
-        "powodzi mi się bardzo dobrze": "😄",
-        "raczej dobra": "🙂",
-        "powodzi mi się raczej dobrze": "🙂",
-        "przeciętna": "😐",
-        "powodzi mi się przeciętnie, średnio": "😐",
-        "raczej zła": "🙁",
-        "powodzi mi się raczej źle": "🙁",
-        "bardzo zła": "😟",
-        "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej": "😟",
-        "odmowa": "🤐",
-        "odmawiam udzielenia odpowiedzi": "🤐",
-      };
+      const VAR_ICONS = (DATA.var_icons && typeof DATA.var_icons === "object") ? DATA.var_icons : {};
+      const CAT_ICONS = (DATA.cat_icons && typeof DATA.cat_icons === "object") ? DATA.cat_icons : {};
 
       function escHtml(x) {
         return String(x == null ? "" : x)

@@ -2720,3 +2720,27 @@ Wynik:
   - zaktualizowano podpisy metody (górny opis i podpis pod radarem).
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-097 [DONE]
+Temat: Domknięcie warstwy prezentacyjnej generatora JST pod `custom M_*` + trwałe zapamiętywanie siły kar per badanie JST.
+Kryteria ukończenia:
+1. Sekcje raportu JST z tabelami demograficznymi nie gubią `custom M_*` i nie wracają do stałej piątki przy etykietach/kolejności.
+2. Ikony demograficzne mają spójny mechanizm: mapy bazowe + heurystyki fallback dla zmiennych/kategorii custom.
+3. Suwak `Siła kar segmentowych` w `🧭 Matching > Segmenty` zapamiętuje się per badanie JST (trwale, nie tylko w session state).
+Pierwszy krok wykonawczy:
+- ujednolicić metadane demografii (`var_order`, `cat_order`, ikony) we wspólnych helperach generatora, podpiąć pod wszystkie sekcje prezentacyjne korzystające z payloadu; następnie dodać kolumnę + normalizację + zapis preferencji siły kar w `jst_studies`.
+Wynik:
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dodano wspólne helpery metadanych demograficznych (`_build_metry_demo_schema`, `_build_demo_schema_from_rows`) i ikon fallback,
+  - uporządkowano kolejność `M_*` extras wg kolejności wejściowej (bez sortowania alfabetycznego),
+  - segmentowe tabele demograficzne (`_render_demo_table`, `Demografia_Seg`) renderują teraz także custom zmienne/kategorie,
+  - payloady `B2` i `TOP5` zawierają dynamiczne `var_order`, `cat_order`, `var_icons`, `cat_icons`,
+  - panele JS (`B2`/`TOP5`) czytają mapy ikon z payloadu zamiast hardcodu.
+- `db_jst_utils.py`:
+  - schema `jst_studies` rozszerzona o `matching_segments_penalty_strength` z walidacją (`łagodna|standard|ostra`) i defaultem `standard`,
+  - dodana normalizacja tej wartości i podpięcie jej do fetch/insert/update.
+- `app.py`:
+  - `🧭 Matching > Segmenty` używa i zapisuje `Siłę kar segmentowych` per `jst_study_id` (trwale przez `update_jst_study`),
+  - klucz widgetu przeniesiony na poziom badania JST (`matching_segments_penalty_strength_{jst_sid}`).
+- Smoke-check:
+  - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).

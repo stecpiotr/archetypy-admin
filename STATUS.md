@@ -2142,3 +2142,31 @@
   - zaktualizowano opisy metodologii (górny opis i podpis pod radarem), aby jasno komunikowały nową logikę.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-097 (2026-04-14, generator JST custom M_* + pamięć siły kar per badanie)
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dodano wspólną warstwę metadanych demografii:
+    - dynamiczne `var_order` i `cat_order`,
+    - mapy ikon `var_icons` i `cat_icons` z fallbackami heurystycznymi dla custom `M_*`,
+  - `extras` metryczki zachowują kolejność wejściową kolumn (`_ordered_metry_columns`), zamiast sortowania alfabetycznego,
+  - sekcja kart segmentów (`_render_demo_table`) renderuje wszystkie dostępne zmienne/kategorie demograficzne (nie tylko stałą piątkę),
+  - panel `Demografia_Seg` buduje porządek i ikony dynamicznie na podstawie realnych danych,
+  - payloady `B2 declared` i `TOP5 simulation` niosą dynamiczne:
+    - `var_order`,
+    - `cat_order`,
+    - `var_icons`,
+    - `cat_icons`,
+  - frontend JS w panelach `B2` i `TOP5` czyta mapy ikon z payloadu zamiast statycznych słowników.
+- `archetypy-admin/db_jst_utils.py`:
+  - schema `jst_studies` rozszerzona o:
+    - `matching_segments_penalty_strength TEXT NOT NULL DEFAULT 'standard'`,
+    - constraint wartości: `łagodna | standard | ostra`,
+  - dodano normalizator `normalize_matching_segments_penalty_strength(...)`,
+  - fetch/insert/update badania JST normalizują i zwracają to pole.
+- `archetypy-admin/app.py` (`🧭 Matching > Segmenty`):
+  - suwak `Siła kar segmentowych` został spięty z trwałym zapisem per badanie JST (`jst_study_id`),
+  - wartość startowa jest odczytywana z DB, a zmiana suwaka zapisuje się przez `update_jst_study(...)`,
+  - klucz widgetu zmieniono na per-JST:
+    - `matching_segments_penalty_strength_{jst_sid}`.
+- Test techniczny:
+  - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
