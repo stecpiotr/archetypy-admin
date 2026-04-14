@@ -1957,3 +1957,31 @@
   - wyraźnie większa odporność na przypadek „po `Wstaw` wraca do `1. M_PLEC`”.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-088 (2026-04-14, runtime metryczki + mapowanie import/raport)
+- `archetypy-ankieta/src/lib/metryczka.ts`:
+  - dodano wspólny model i normalizator metryczki (`core + custom`) na frontend,
+  - helpery do budowania payloadu (`db_column -> code`) i obsługi `M_ZAWOD = inna (jaka?)`.
+- `archetypy-ankieta/src/JstSurvey.tsx`:
+  - metryczka jest renderowana dynamicznie z `study.metryczka_config`,
+  - walidacja metryczki działa po konfiguracji (`required`) + walidacja doprecyzowania `M_ZAWOD_OTHER`,
+  - zapis do `add_jst_response_by_slug` zawiera:
+    - odpowiedzi core/custom jako mapę `db_column -> code`,
+    - `M_ZAWOD_OTHER` (jeśli dotyczy).
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - dodano krok metryczki po ekranie powitalnym i przed pytaniami właściwymi (niezależnie od trybu matrix/single),
+  - metryczka personalna zapisuje się wraz z odpowiedziami przez `p_scores: { metryczka: ... }`,
+  - tryb single-screen działa tylko dla pytań właściwych; metryczka jest osobnym etapem.
+- `archetypy-ankieta/src/lib/studies.ts` + `src/lib/jstStudies.ts`:
+  - rozszerzono typy/odczyt o `metryczka_config` i `metryczka_config_version`.
+- `archetypy-admin/db_jst_utils.py`:
+  - dodano dynamiczne kolumny odpowiedzi `response_columns(...)` = kanoniczne + custom z configu,
+  - `normalize_response_row(...)` obsługuje teraz `metryczka_config` (mapowanie kodowania dla core/custom),
+  - `response_rows_to_dataframe(...)` i `make_payload_from_row(...)` przyjmują config i zachowują custom kolumny.
+- `archetypy-admin/app.py`:
+  - `jst_io_view` (import/eksport) przekazuje `study.metryczka_config` do normalizacji i zapisu payloadu,
+  - `jst_analysis_view` generuje raport na pełnym dataframe (kanoniczne + custom), bez obcinania do stałego zestawu.
+- Testy techniczne:
+  - `python -m py_compile app.py db_jst_utils.py metryczka_config.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

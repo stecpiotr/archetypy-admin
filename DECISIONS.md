@@ -1786,3 +1786,27 @@ Decyzja:
 - Oba tory korzystają z tego samego `scroll_target`/`scroll_nonce`.
 Uzasadnienie:
 - W części osadzeń Streamlit przewijanie z poziomu iframe bywa niestabilne względem głównego kontenera strony; lokalny fallback zwiększa skuteczność utrzymania pozycji na edytowanym pytaniu.
+
+### D-198: Runtime ankiet (JST + personal) renderuje metryczkę wyłącznie z `metryczka_config`
+Decyzja:
+- Frontend nie trzyma już hardcodu pytań metryczkowych; oba runtime (`JstSurvey`, `Questionnaire`) normalizują i renderują pytania z konfiguracji badania.
+- Zapis metryczki idzie jako mapa `db_column -> code` (nie etykieta UI), z zachowaniem kompatybilności rdzenia (`code=label` dla 5 pól core).
+Uzasadnienie:
+- Tylko taki model pozwala wdrażać pytania custom bez kolejnych zmian kodu frontendu i utrzymać spójność zapisu z konfiguracją edytora metryczki.
+
+### D-199: Metryczka personalna jest zapisywana w `responses.scores` pod kluczem `metryczka`
+Decyzja:
+- RPC `add_response_by_slug` otrzymuje `p_scores` jako obiekt JSON: `{ "metryczka": { ... } }`.
+- Nie zmieniamy schematu odpowiedzi personalnych (`answers` pozostaje bez zmian).
+Uzasadnienie:
+- Pozwala to wdrożyć zapis metryczki dla `archetypy.badania.pro` bez migracji schematu i bez regresji istniejącej logiki liczenia archetypów.
+
+### D-200: Import/eksport/raport JST używa dynamicznego zestawu kolumn metryczki (kanoniczne + custom)
+Decyzja:
+- `db_jst_utils` buduje kolumny odpowiedzi jako:
+  - stałe `CANONICAL_COLUMNS`,
+  - plus custom `M_*` wynikające z `metryczka_config`.
+- `jst_io_view` i `jst_analysis_view` przekazują `metryczka_config` do normalizacji/payloadu/dataframe.
+- Generowanie raportu JST dostaje pełny dataframe z kolumnami custom (bez obcinania do samego kanonu).
+Uzasadnienie:
+- Bez tego custom metryczka byłaby tracona przy imporcie/eksporcie i niewidoczna w `data.csv`, co blokowałoby dalszą analitykę demograficzną.

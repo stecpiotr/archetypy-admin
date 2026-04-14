@@ -39,7 +39,6 @@ from db_utils import (
 )
 from db_jst_utils import (
     ARCHETYPES as JST_ARCHETYPES,
-    CANONICAL_COLUMNS as JST_CANONICAL_COLUMNS,
     check_jst_slug_availability,
     delete_jst_responses_by_respondent_ids,
     ensure_jst_schema,
@@ -3634,7 +3633,11 @@ def jst_io_view() -> None:
                         if not rid:
                             rid = f"R{next_n:04d}"
                             next_n += 1
-                        norm = jst_normalize_response_row(raw, respondent_id_fallback=rid)
+                        norm = jst_normalize_response_row(
+                            raw,
+                            respondent_id_fallback=rid,
+                            metryczka_config=study.get("metryczka_config"),
+                        )
                         if not norm.get("respondent_id"):
                             norm["respondent_id"] = rid
 
@@ -3645,7 +3648,7 @@ def jst_io_view() -> None:
                                 sb,
                                 study_id=study_id,
                                 respondent_id=str(norm["respondent_id"]),
-                                payload=jst_make_payload_from_row(norm),
+                                payload=jst_make_payload_from_row(norm, metryczka_config=study.get("metryczka_config")),
                                 source="import",
                                 skip_if_exists=True,
                             )
@@ -3674,7 +3677,7 @@ def jst_io_view() -> None:
     if not rows:
         st.info("Brak odpowiedzi do eksportu.")
         return
-    out_df = jst_response_rows_to_dataframe(rows)
+    out_df = jst_response_rows_to_dataframe(rows, metryczka_config=study.get("metryczka_config"))
     slug = str(study.get("slug") or "jst")
     safe_name = slugify(str(study.get("jst_full_nom") or slug)) or slug
 
@@ -4111,7 +4114,7 @@ def jst_analysis_view() -> None:
         if not rows:
             st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
             return
-        out_df = jst_response_rows_to_dataframe(rows)
+        out_df = jst_response_rows_to_dataframe(rows, metryczka_config=(study or {}).get("metryczka_config"))
         study_for_report = dict(study or {})
         study_for_report["segment_hit_threshold_overrides"] = active_overrides
         with st.spinner("Generujemy raport dla tego badania. Prosimy o chwilę cierpliwości."):
@@ -4120,7 +4123,7 @@ def jst_analysis_view() -> None:
                     template_root=template_root,
                     run_base_dir=run_base,
                     study=study_for_report,
-                    data_df=out_df[JST_CANONICAL_COLUMNS].copy(),
+                    data_df=out_df.copy(),
                     force=bool(regenerate_now),
                 )
                 raw_html = report_path.read_text(encoding="utf-8", errors="ignore")

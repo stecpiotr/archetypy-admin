@@ -11,7 +11,12 @@ import pandas as pd
 import psycopg2
 import streamlit as st
 from supabase import Client
-from metryczka_config import default_jst_metryczka_config, normalize_jst_metryczka_config
+from metryczka_config import (
+    default_jst_metryczka_config,
+    metryczka_custom_columns,
+    metryczka_questions,
+    normalize_jst_metryczka_config,
+)
 
 
 ARCHETYPES: List[str] = [
@@ -62,6 +67,15 @@ M_MATERIAL_VALUES = [
     "powodzi mi się bardzo dobrze",
     "odmawiam udzielenia odpowiedzi",
 ]
+
+
+def response_columns(metryczka_config: Any = None) -> List[str]:
+    cols: List[str] = list(CANONICAL_COLUMNS)
+    for col in metryczka_custom_columns(metryczka_config):
+        txt = str(col or "").strip().upper()
+        if txt and txt not in cols:
+            cols.append(txt)
+    return cols
 
 
 def _db_connect():
@@ -1437,37 +1451,123 @@ def _norm_choice(value: Any, allowed: List[str]) -> str:
     return raw
 
 
-def normalize_response_row(raw: Dict[str, Any], respondent_id_fallback: str = "") -> Dict[str, Any]:
-    row: Dict[str, Any] = {c: "" for c in CANONICAL_COLUMNS}
+def _choice_to_code(value: Any, options: List[Dict[str, Any]]) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    n = _norm(raw)
+    for opt in options:
+        if not isinstance(opt, dict):
+            continue
+        label = str(opt.get("label") or "").strip()
+        code = str(opt.get("code") or "").strip()
+        if not label and not code:
+            continue
+        ln = _norm(label)
+        cn = _norm(code)
+        if n == ln or n == cn:
+            return code or label
+        if ln and (n in ln or ln in n):
+            return code or label
+        if cn and (n in cn or cn in n):
+            return code or label
+    return raw
 
-    rid = str(raw.get("respondent_id") or raw.get("Respondent_ID") or "").strip()
+
+def _metryczka_questions_by_column(metryczka_config: Any = None) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for q in metryczka_questions(metryczka_config):
+        if not isinstance(q, dict):
+            continue
+        col = str(q.get("db_column") or "").strip().upper()
+        if not col:
+            continue
+        out[col] = q
+    return out
+
+
+def normalize_response_row(raw: Dict[str, Any], respondent_id_fallback: str = "", metryczka_config: Any = None) -> Dict[str, Any]:
+    cols = response_columns(metryczka_config)
+    row: Dict[str, Any] = {c: "" for c in cols}
+    raw = dict(raw or {})
+    q_by_col = _metryczka_questions_by_column(metryczka_config)
+    norm_key_map: Dict[str, Any] = {}
+    for k, v in raw.items():
+        nk = _norm(k)
+        if nk and nk not in norm_key_map:
+            norm_key_map[nk] = v
+
+    def pick(*keys: Any) -> Any:
+        for key in keys:
+            txt = str(key or "").strip()
+            if not txt:
+                continue
+            if txt in raw:
+                return raw.get(txt)
+            nk = _norm(txt)
+            if nk and nk in norm_key_map:
+                return norm_key_map[nk]
+        return None
+
+    def q_options(col: str, fallback_values: List[str]) -> List[Dict[str, str]]:
+        q = q_by_col.get(col) or {}
+        options = q.get("options")
+        out: List[Dict[str, str]] = []
+        if isinstance(options, list):
+            for item in options:
+                if not isinstance(item, dict):
+                    continue
+                label = str(item.get("label") or "").strip()
+                code = str(item.get("code") or "").strip()
+                if not label or not code:
+                    continue
+                out.append({"label": label, "code": code})
+        if out:
+            return out
+        return [{"label": v, "code": v} for v in fallback_values]
+
+    rid = str(pick("respondent_id", "Respondent_ID") or "").strip()
     row["respondent_id"] = rid or str(respondent_id_fallback or "")
 
-    row["M_PLEC"] = _norm_choice(raw.get("M_PLEC"), M_PLEC_VALUES)
-    row["M_WIEK"] = _norm_choice(raw.get("M_WIEK"), M_WIEK_VALUES)
-    row["M_WYKSZT"] = _norm_choice(raw.get("M_WYKSZT"), M_WYKSZT_VALUES)
-    row["M_ZAWOD"] = _norm_choice(raw.get("M_ZAWOD"), M_ZAWOD_VALUES)
-    row["M_MATERIAL"] = _norm_choice(raw.get("M_MATERIAL"), M_MATERIAL_VALUES)
+    row["M_PLEC"] = _choice_to_code(pick("M_PLEC"), q_options("M_PLEC", M_PLEC_VALUES))
+    row["M_WIEK"] = _choice_to_code(pick("M_WIEK"), q_options("M_WIEK", M_WIEK_VALUES))
+    row["M_WYKSZT"] = _choice_to_code(pick("M_WYKSZT"), q_options("M_WYKSZT", M_WYKSZT_VALUES))
+    row["M_ZAWOD"] = _choice_to_code(pick("M_ZAWOD"), q_options("M_ZAWOD", M_ZAWOD_VALUES))
+    row["M_MATERIAL"] = _choice_to_code(pick("M_MATERIAL"), q_options("M_MATERIAL", M_MATERIAL_VALUES))
 
     for col in A_COLUMNS:
-        v = _to_int_1_7(raw.get(col))
+        v = _to_int_1_7(pick(col))
         row[col] = int(v) if v is not None else ""
 
     for arche in ARCHETYPES:
         k = f"B1_{arche}"
-        row[k] = int(_to_flag(raw.get(k)))
+        row[k] = int(_to_flag(pick(k)))
 
-    row["B2"] = canonical_archetype(raw.get("B2"))
+    row["B2"] = canonical_archetype(pick("B2"))
 
     for col in D_COLUMNS:
-        row[col] = _to_ab(raw.get(col))
+        row[col] = _to_ab(pick(col))
 
-    row["D13"] = canonical_archetype(raw.get("D13"))
+    row["D13"] = canonical_archetype(pick("D13"))
+
+    for col in cols:
+        if col in CANONICAL_COLUMNS:
+            continue
+        q = q_by_col.get(col) or {}
+        aliases = q.get("aliases") if isinstance(q.get("aliases"), list) else []
+        qid = str(q.get("id") or "").strip()
+        raw_val = pick(col, qid, *aliases)
+        options = q.get("options") if isinstance(q.get("options"), list) else []
+        if isinstance(options, list) and options:
+            row[col] = _choice_to_code(raw_val, options)
+        else:
+            row[col] = str(raw_val or "").strip()
 
     return row
 
 
-def response_rows_to_dataframe(rows: Iterable[Dict[str, Any]]) -> pd.DataFrame:
+def response_rows_to_dataframe(rows: Iterable[Dict[str, Any]], metryczka_config: Any = None) -> pd.DataFrame:
+    cols = response_columns(metryczka_config)
     out_rows: List[Dict[str, Any]] = []
     for idx, rec in enumerate(rows, start=1):
         payload = rec.get("payload") or {}
@@ -1475,18 +1575,19 @@ def response_rows_to_dataframe(rows: Iterable[Dict[str, Any]]) -> pd.DataFrame:
             payload = {}
         merged = dict(payload)
         merged.setdefault("respondent_id", rec.get("respondent_id") or "")
-        norm = normalize_response_row(merged, respondent_id_fallback=f"R{idx:04d}")
+        norm = normalize_response_row(merged, respondent_id_fallback=f"R{idx:04d}", metryczka_config=metryczka_config)
         if not norm.get("respondent_id"):
             norm["respondent_id"] = f"R{idx:04d}"
         out_rows.append(norm)
 
     df = pd.DataFrame(out_rows)
-    for c in CANONICAL_COLUMNS:
+    for c in cols:
         if c not in df.columns:
             df[c] = ""
-    return df[CANONICAL_COLUMNS].copy()
+    return df[cols].copy()
 
 
-def make_payload_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
-    payload = {k: row.get(k, "") for k in CANONICAL_COLUMNS if k != "respondent_id"}
+def make_payload_from_row(row: Dict[str, Any], metryczka_config: Any = None) -> Dict[str, Any]:
+    cols = response_columns(metryczka_config)
+    payload = {k: row.get(k, "") for k in cols if k != "respondent_id"}
     return payload

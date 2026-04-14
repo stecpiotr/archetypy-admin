@@ -2513,3 +2513,30 @@ Wynik:
   - fallback przewija `window` + typowe kontenery Streamlit i ustawia hash kotwicy.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-088 [DONE]
+Temat: Podpięcie metryczki konfigurowalnej do runtime (`jst.badania.pro` + `archetypy.badania.pro`) oraz mapowania JST do importu/raportu.
+Kryteria ukończenia:
+1. Runtime JST renderuje metryczkę z `metryczka_config` (bez hardcodu 5 pytań) i zapisuje odpowiedzi (core + custom) do payloadu.
+2. Runtime personalny ma krok metryczki po ekranie powitalnym i zapisuje odpowiedzi metryczki razem z ankietą.
+3. Import/eksport JST obsługuje kolumny custom metryczki zgodnie z konfiguracją badania.
+4. Dataset raportowy JST (`data.csv`) zawiera także custom kolumny metryczki (bez utraty kolumn kanonicznych).
+Pierwszy krok wykonawczy:
+- wdrożyć wspólny normalizator metryczki po stronie frontendu, a następnie podpiąć go do `JstSurvey.tsx` i `Questionnaire.tsx`; na końcu rozszerzyć `db_jst_utils.py` oraz call-site w `app.py` o dynamiczne kolumny.
+Wynik:
+- `archetypy-ankieta`:
+  - dodano wspólny moduł `src/lib/metryczka.ts` (normalizacja configu, payload metryczki, helpery `M_ZAWOD`),
+  - `JstSurvey.tsx` renderuje metryczkę dynamicznie z `study.metryczka_config`, waliduje wymagane pola i zapisuje `db_column -> code` + `M_ZAWOD_OTHER`,
+  - `Questionnaire.tsx` dostał osobny krok metryczki przed pytaniami właściwymi (dla obu trybów ankiety), a zapis personalny wysyła metryczkę do `p_scores.metryczka`,
+  - `lib/studies.ts` i `lib/jstStudies.ts` rozszerzone o pola `metryczka_config`.
+- `archetypy-admin`:
+  - `db_jst_utils.py`:
+    - dodano `response_columns(...)` (kanoniczne + custom z configu),
+    - `normalize_response_row(...)`, `response_rows_to_dataframe(...)`, `make_payload_from_row(...)` obsługują teraz `metryczka_config` i mapowanie custom kolumn,
+  - `app.py`:
+    - `jst_io_view` (import/eksport) przekazuje `study.metryczka_config` do normalizacji/payloadu/dataframe,
+    - `jst_analysis_view` generuje raport z pełnego `out_df` (kanoniczne + custom), bez obcinania do samych kolumn kanonicznych.
+- Smoke-check:
+  - `python -m py_compile app.py db_jst_utils.py metryczka_config.py` (OK),
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
