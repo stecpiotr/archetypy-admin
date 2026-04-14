@@ -1881,3 +1881,15 @@
   - redukcja objawu „muszę wpisać kodowanie drugi raz”.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-082 (2026-04-14, metryczka: stabilizacja odpowiedzi + zapisu)
+- `archetypy-admin/app.py`:
+  - parser tabeli odpowiedzi (`_metryczka_options_from_df`) nie wyrzuca już wierszy tylko dlatego, że kodowanie jest chwilowo puste,
+  - scroll-restore po `Wstaw/Anuluj` w panelu wklejki ma retry i fallback hash,
+  - wycofano fazowy zapis `arm/commit` — zapis metryczki wrócił do prostego trybu bez dodatkowych rerunów.
+- Efekt:
+  - po wklejce do nowego pytania odpowiedzi nie „znikają” z tabeli,
+  - walidacja zgłasza właściwy problem brakującego kodowania (gdy dotyczy),
+  - mniejsze ryzyko utraty świeżego wpisu kodowania przez nadmiarowy rerun flow zapisu.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

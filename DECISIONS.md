@@ -1728,3 +1728,13 @@ Decyzja:
 Uzasadnienie:
 - Na części interakcji `data_editor` potrzebuje dodatkowego przebiegu, by pewnie zatwierdzić aktywną komórkę.
 - Fazy zapisu minimalizują ryzyko utraty ostatniej zmiany kodowania przy pojedynczym kliknięciu `💾 Zapisz metryczkę`.
+
+### D-191: Edytor metryczki ma zachowywać etykiety odpowiedzi nawet przy pustym kodzie i unikać nadmiarowych rerunów zapisu
+Decyzja:
+- `_metryczka_options_from_df` zachowuje każdy wiersz z niepustą etykietą odpowiedzi; pusty kod nie usuwa wiersza.
+- Deduplikacja działa tylko dla niepustych kodów.
+- Zapis metryczki działa bez wielofazowego `save intent` (bez sztucznych rerunów).
+- Scroll do edytowanego pytania po wklejce realizujemy skryptem z retry (`hash + scrollIntoView`).
+Uzasadnienie:
+- Usuwanie wierszy z pustym kodem dawało mylący błąd „co najmniej 2 odpowiedzi” zamiast informacji o brakującym kodowaniu.
+- Nadmiarowe reruny w ścieżce zapisu pogarszały stabilność commitu pól edycyjnych.

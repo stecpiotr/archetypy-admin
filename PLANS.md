@@ -2408,3 +2408,24 @@ Wynik:
     - następny przebieg wykonuje właściwy zapis i czyści flagę.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-082 [DONE]
+Temat: Metryczka — nowe pytanie z wklejki gubiło odpowiedzi/kodowanie, a zapis kodowania nadal bywał niestabilny.
+Kryteria ukończenia:
+1. Wiersze odpowiedzi z pustym kodowaniem nie znikają z edytora.
+2. Komunikat walidacji dla brakującego kodowania jest adekwatny (a nie „dodaj co najmniej 2 odpowiedzi”).
+3. Scroll-restore po `Wstaw/Anuluj` działa stabilniej.
+4. Zapis metryczki nie ma dodatkowych faz rerun, które mogły psuć commit pola kodowania.
+Pierwszy krok wykonawczy:
+- poprawić `_metryczka_options_from_df`, scroll script i uprościć flow zapisu metryczki (JST + personal).
+Wynik:
+- `app.py`:
+  - `_metryczka_options_from_df(...)`:
+    - zachowuje wiersze z niepustą etykietą nawet przy pustym kodowaniu,
+    - deduplikacja kodów tylko dla niepustych wartości,
+  - scroll-restore po wklejce:
+    - wrócono do `st.markdown(<script>)` z retry (`setInterval`) i fallbackiem `location.hash + scrollIntoView`,
+  - zapis metryczki (`jst_metryczka_view`, `personal_metryczka_view`) uproszczony do bezpośredniego zapisu po kliknięciu,
+    bez faz `arm/commit` i dodatkowych rerunów technicznych.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

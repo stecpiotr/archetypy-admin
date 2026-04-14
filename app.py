@@ -2567,10 +2567,6 @@ def _bump_metryczka_editor_nonce(kind: str, study_key: str) -> None:
     st.session_state[nonce_key] = current + 1
 
 
-def _metryczka_save_intent_key(kind: str, study_key: str) -> str:
-    return f"{kind}_metryczka_editor_save_intent_{study_key}"
-
-
 def _metryczka_scroll_target_key(kind: str, study_key: str) -> str:
     return f"{kind}_metryczka_editor_scroll_target_{study_key}"
 
@@ -2606,12 +2602,15 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, str]]:
     for _, row in df.iterrows():
         label = str(row.get("Odpowiedź") or "").strip()
         code = str(row.get("Kodowanie") or "").strip()
-        if not label or not code:
+        if not label:
             continue
-        code_norm = code.lower()
-        if code_norm in seen_codes:
-            continue
-        seen_codes.add(code_norm)
+        # Zachowujemy wiersze nawet z pustym kodowaniem, aby nie gubić odpowiedzi w UI.
+        # Duplikaty filtrujemy tylko dla niepustych kodów.
+        if code:
+            code_norm = code.lower()
+            if code_norm in seen_codes:
+                continue
+            seen_codes.add(code_norm)
         out.append({"label": label, "code": code})
     return out
 
@@ -3079,20 +3078,42 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
 
     scroll_target = str(st.session_state.pop(scroll_target_key, "") or "").strip()
     if scroll_target:
-        html_component(
+        st.markdown(
             f"""
             <script>
             (function(){{
               const id = {json.dumps(scroll_target)};
-              const root = (window.parent && window.parent.document) ? window.parent.document : document;
-              const el = root.getElementById(id);
-              if (el) {{
-                setTimeout(() => el.scrollIntoView({{behavior:'auto', block:'center'}}), 10);
-              }}
+              const roots = [];
+              try {{ if (window && window.document) roots.push(window.document); }} catch(e) {{}}
+              try {{
+                if (window.parent && window.parent.document && window.parent.document !== window.document) {{
+                  roots.push(window.parent.document);
+                }}
+              }} catch(e) {{}}
+
+              const run = () => {{
+                for (const root of roots) {{
+                  const el = root.getElementById(id);
+                  if (el) {{
+                    try {{ root.defaultView.location.hash = id; }} catch(e) {{}}
+                    try {{ el.scrollIntoView({{behavior:'auto', block:'center'}}); }} catch(e) {{}}
+                    return true;
+                  }}
+                }}
+                return false;
+              }};
+
+              let tries = 0;
+              const timer = setInterval(() => {{
+                tries += 1;
+                if (run() || tries > 30) {{
+                  clearInterval(timer);
+                }}
+              }}, 80);
             }})();
             </script>
             """,
-            height=0,
+            unsafe_allow_html=True,
         )
 
     return deepcopy(st.session_state.get(state_key) or cfg_out)
@@ -3158,20 +3179,7 @@ def jst_metryczka_view() -> None:
         normalize_jst_metryczka_config(study_row.get("metryczka_config")),
     )
 
-    save_intent_key = _metryczka_save_intent_key("jst", sid)
-    save_intent = str(st.session_state.get(save_intent_key) or "").strip().lower()
     if st.button("💾 Zapisz metryczkę", type="primary", key=f"jst_metryczka_save_{sid}"):
-        # 1. klik uzbraja zapis; dalsze fazy robią bezpieczny commit edytora.
-        st.session_state[save_intent_key] = "arm"
-        st.rerun()
-
-    if save_intent == "arm":
-        # Faza 2: dodatkowy rerun, żeby data_editor na pewno zacommitował aktywną komórkę.
-        st.session_state[save_intent_key] = "commit"
-        st.rerun()
-
-    if save_intent == "commit":
-        st.session_state.pop(save_intent_key, None)
         valid, msg = _validate_metryczka_before_save(edited_cfg)
         if not valid:
             st.error(msg)
@@ -6860,20 +6868,7 @@ def personal_metryczka_view() -> None:
         _metryczka_normalize_config("personal", study.get("metryczka_config")),
     )
 
-    save_intent_key = _metryczka_save_intent_key("personal", study_id or slug)
-    save_intent = str(st.session_state.get(save_intent_key) or "").strip().lower()
     if st.button("💾 Zapisz metryczkę", type="primary", key=f"personal_metryczka_save_{study_id or slug}"):
-        # 1. klik uzbraja zapis; dalsze fazy robią bezpieczny commit edytora.
-        st.session_state[save_intent_key] = "arm"
-        st.rerun()
-
-    if save_intent == "arm":
-        # Faza 2: dodatkowy rerun, żeby data_editor na pewno zacommitował aktywną komórkę.
-        st.session_state[save_intent_key] = "commit"
-        st.rerun()
-
-    if save_intent == "commit":
-        st.session_state.pop(save_intent_key, None)
         if not study_id:
             st.error("Brak identyfikatora badania.")
         else:
