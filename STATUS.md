@@ -1774,6 +1774,16 @@
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
 
+### Zrobione w Hotfix H-076 (2026-04-14, iPhone: `rozwiązać pokojowo` na twardej spacji)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - do `PHRASE_GLUE_PATTERNS` dodano frazę:
+    - `rozwiązać pokojowo` (klejoną nierozdzielnie twardą spacją).
+- Efekt:
+  - w problematycznym pytaniu końcówka ma przechodzić w całości, bez rozdzielania `rozwiązać` i `pokojowo`.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### Zrobione w Hotfix H-073 (2026-04-14, metryczka paste: format edycyjny + wyższe pole)
 - `archetypy-admin/app.py`:
   - panel `📋 Wklej pytanie i odpowiedzi` dostał prefill w formacie:
@@ -1807,5 +1817,17 @@
 - Efekt:
   - panel `Wklej pytanie i odpowiedzi` pokazuje czysty, prosty tekst odpowiedzi,
   - numeracja pozostaje tam, gdzie powinna (w samym edytorze listy odpowiedzi), a nie w treści do wklejania/edycji.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-077 (2026-04-14, metryczka: zapis kodowania bez podwójnego wpisywania)
+- `archetypy-admin/app.py`:
+  - wdrożono mechanizm `save intent` dla metryczki (JST + personal):
+    - pierwsze kliknięcie `💾 Zapisz metryczkę` ustawia flagę i wymusza rerun,
+    - na kolejnym przebiegu wykonywany jest właściwy zapis do DB,
+    - dzięki temu ostatnio edytowana komórka `data_editor` jest już zatwierdzona.
+- Efekt:
+  - zniknął objaw „muszę wpisać kodowanie drugi raz”,
+  - jedno zapisanie powinno utrwalać bieżące kodowanie.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).

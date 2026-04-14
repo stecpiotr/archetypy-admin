@@ -2257,6 +2257,20 @@ Wynik:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
 
+### Hotfix H-076 [DONE]
+Temat: iPhone mobile — nierozdzielna fraza `rozwiązać pokojowo` w pytaniu.
+Kryteria ukończenia:
+1. W pytaniu `Wierzy, że większość problemów można rozwiązać pokojowo.` fraza `rozwiązać pokojowo` jest trzymana razem.
+2. Zmiana działa w `Pojedynczych ekranach` i nie psuje pozostałych pytań.
+Pierwszy krok wykonawczy:
+- dodać regułę frazy do `PHRASE_GLUE_PATTERNS` w `withHardSpaces(...)`.
+Wynik:
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - dodano regułę `\\brozwiązać\\s+pokojowo\\b` do listy fraz klejonych twardą spacją.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### Hotfix H-073 [DONE]
 Temat: Dopieszczenie panelu `Wklej pytanie i odpowiedzi` (format prefill + większe pole + ciaśniejszy podgląd).
 Kryteria ukończenia:
@@ -2308,5 +2322,23 @@ Wynik:
 - `app.py`:
   - prefill panelu zapisuje odpowiedzi jako czyste linie (bez numerów),
   - placeholder pokazuje wzorzec bez numeracji (`Odpowiedź 1`, `Odpowiedź 2`, `Odpowiedź 3`).
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-077 [DONE]
+Temat: Kodowanie w metryczce wymagało podwójnego wpisania (data_editor nie commitował ostatniej komórki przed zapisem).
+Kryteria ukończenia:
+1. Jedno kliknięcie `💾 Zapisz metryczkę` zapisuje aktualne kodowanie bez potrzeby ponownej edycji.
+2. Dotyczy widoków metryczki dla JST i personalnych.
+Pierwszy krok wykonawczy:
+- wprowadzić zapis 2-etapowy przez `save intent` + rerun, aby commit aktywnej komórki data_editor odbył się przed właściwym zapisem do bazy.
+Wynik:
+- `app.py`:
+  - dodano helper `_metryczka_save_intent_key(...)`,
+  - `jst_metryczka_view`:
+    - klik `💾 Zapisz metryczkę` ustawia flagę intent i robi `st.rerun()`,
+    - właściwy zapis wykonywany jest na kolejnym rerunie po pobraniu zatwierdzonych wartości z edytora,
+  - `personal_metryczka_view`:
+    - analogiczny mechanizm save-intent i zapis po rerunie.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).

@@ -2567,6 +2567,10 @@ def _bump_metryczka_editor_nonce(kind: str, study_key: str) -> None:
     st.session_state[nonce_key] = current + 1
 
 
+def _metryczka_save_intent_key(kind: str, study_key: str) -> str:
+    return f"{kind}_metryczka_editor_save_intent_{study_key}"
+
+
 def _metryczka_options_to_df(options: Any) -> pd.DataFrame:
     rows: List[Dict[str, str]] = []
     if isinstance(options, list):
@@ -3084,26 +3088,32 @@ def jst_metryczka_view() -> None:
         normalize_jst_metryczka_config(study_row.get("metryczka_config")),
     )
 
+    save_intent_key = _metryczka_save_intent_key("jst", sid)
     if st.button("💾 Zapisz metryczkę", type="primary", key=f"jst_metryczka_save_{sid}"):
+        # 1. klik kończy edycję aktywnej komórki data_editor, zapis robimy na kolejnym rerun.
+        st.session_state[save_intent_key] = True
+        st.rerun()
+
+    if bool(st.session_state.pop(save_intent_key, False)):
         valid, msg = _validate_metryczka_before_save(edited_cfg)
         if not valid:
             st.error(msg)
-            return
-        cfg_norm = normalize_jst_metryczka_config(edited_cfg)
-        try:
-            update_jst_study(
-                sb,
-                sid,
-                {
-                    "metryczka_config": cfg_norm,
-                    "metryczka_config_version": int(cfg_norm.get("version") or 1),
-                },
-            )
-            st.session_state[_metryczka_editor_state_key("jst", sid)] = deepcopy(cfg_norm)
-            st.success("Zapisano konfigurację metryczki.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Nie udało się zapisać metryczki: {exc}")
+        else:
+            cfg_norm = normalize_jst_metryczka_config(edited_cfg)
+            try:
+                update_jst_study(
+                    sb,
+                    sid,
+                    {
+                        "metryczka_config": cfg_norm,
+                        "metryczka_config_version": int(cfg_norm.get("version") or 1),
+                    },
+                )
+                st.session_state[_metryczka_editor_state_key("jst", sid)] = deepcopy(cfg_norm)
+                st.success("Zapisano konfigurację metryczki.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Nie udało się zapisać metryczki: {exc}")
 
 
 def jst_settings_view() -> None:
@@ -6773,29 +6783,35 @@ def personal_metryczka_view() -> None:
         _metryczka_normalize_config("personal", study.get("metryczka_config")),
     )
 
+    save_intent_key = _metryczka_save_intent_key("personal", study_id or slug)
     if st.button("💾 Zapisz metryczkę", type="primary", key=f"personal_metryczka_save_{study_id or slug}"):
+        # 1. klik kończy edycję aktywnej komórki data_editor, zapis robimy na kolejnym rerun.
+        st.session_state[save_intent_key] = True
+        st.rerun()
+
+    if bool(st.session_state.pop(save_intent_key, False)):
         if not study_id:
             st.error("Brak identyfikatora badania.")
-            return
-        valid, msg = _validate_metryczka_before_save(edited_cfg)
-        if not valid:
-            st.error(msg)
-            return
-        cfg_norm = normalize_personal_metryczka_config(edited_cfg)
-        try:
-            update_study(
-                sb,
-                study_id,
-                {
-                    "metryczka_config": cfg_norm,
-                    "metryczka_config_version": int(cfg_norm.get("version") or 1),
-                },
-            )
-            st.session_state[_metryczka_editor_state_key("personal", study_id or slug)] = deepcopy(cfg_norm)
-            st.success("Zapisano konfigurację metryczki.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Nie udało się zapisać metryczki: {exc}")
+        else:
+            valid, msg = _validate_metryczka_before_save(edited_cfg)
+            if not valid:
+                st.error(msg)
+            else:
+                cfg_norm = normalize_personal_metryczka_config(edited_cfg)
+                try:
+                    update_study(
+                        sb,
+                        study_id,
+                        {
+                            "metryczka_config": cfg_norm,
+                            "metryczka_config_version": int(cfg_norm.get("version") or 1),
+                        },
+                    )
+                    st.session_state[_metryczka_editor_state_key("personal", study_id or slug)] = deepcopy(cfg_norm)
+                    st.success("Zapisano konfigurację metryczki.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Nie udało się zapisać metryczki: {exc}")
 
 
 def personal_settings_view() -> None:

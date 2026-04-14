@@ -1643,6 +1643,14 @@ Decyzja:
 Uzasadnienie:
 - User wymaga braku podziałów typu `wy-` / `cofywać` i `społeczny-` / `ch`; tekst ma zawijać się wyłącznie między pełnymi wyrazami.
 
+### D-185: Dla krytycznego case iPhone fraza `rozwiązać pokojowo` jest traktowana jako nierozdzielna
+Decyzja:
+- Do `PHRASE_GLUE_PATTERNS` w `Questionnaire.tsx` dodajemy regułę:
+  - `\\brozwiązać\\s+pokojowo\\b`
+- Reguła zamienia spację wewnątrz frazy na twardą (`NBSP`) przez `withHardSpaces(...)`.
+Uzasadnienie:
+- User zgłosił, że właśnie to pytanie nadal obcina końcówkę; sklejenie tej pary słów wymusza bezpieczniejsze zawinięcie całej końcówki zdania.
+
 ### D-182: Prefill panelu `Wklej pytanie i odpowiedzi` ma być formatem edycyjnym, nie surową listą
 Decyzja:
 - Seed pola `Wklej treść` renderujemy jako:
@@ -1672,3 +1680,12 @@ Decyzja:
 - Placeholder również nie sugeruje numeracji.
 Uzasadnienie:
 - User wskazał, że numeracja w prefill jest zbędna i zaśmieca edycję; numerowanie odpowiedzi ma być elementem UI listy odpowiedzi, nie treści roboczej do wklejania.
+
+### D-186: Zapis metryczki działa przez `save intent` (rerun przed właściwym zapisem)
+Decyzja:
+- W widokach metryczki (`jst_metryczka_view`, `personal_metryczka_view`) zapis jest dwuetapowy technicznie:
+  - klik przycisku zapisuje `save_intent` i robi `st.rerun()`,
+  - właściwy zapis konfiguracji wykonujemy dopiero w kolejnym przebiegu.
+Uzasadnienie:
+- `st.data_editor` potrafi nie zatwierdzić aktywnie edytowanej komórki w tym samym przebiegu, w którym kliknięto przycisk zapisu.
+- `save intent` eliminuje konieczność podwójnego wpisywania kodowania i stabilizuje UX edytora.
