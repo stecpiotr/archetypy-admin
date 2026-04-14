@@ -2283,3 +2283,26 @@
 - Testy techniczne:
   - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Zrobione w Hotfix H-104 (2026-04-15, metryczka: auto-height tabeli + `Kodowanie do tabel` + kodowane kategorie)
+- `archetypy-admin/app.py`:
+  - tabela odpowiedzi w edytorze metryczki (`st.data_editor`) ma dynamiczny `height` liczony od liczby wierszy, więc rośnie pionowo zamiast trzymać niski, stały viewport,
+  - dodano pole `Kodowanie do tabel`:
+    - przy edycji pytania metryczkowego (JST/personal),
+    - w panelu edycji predefiniowanych pytań,
+  - `table_label` jest zapisywane do konfiguracji pytania i do payloadu predefiniowanego pytania,
+  - Matching (`Demografia` + `Segmenty`) czyta etykietę zmiennej z `table_label` (fallback: `prompt`) i dla custom pytań pokazuje kategorie jako `code`.
+- `archetypy-admin/metryczka_config.py`:
+  - rozszerzono normalizację o `table_label`,
+  - rdzeń metryczki ma domyślne skrócone etykiety tabelaryczne (`Płeć`, `Wiek`, `Wykształcenie`, `Status zawodowy`, `Sytuacja materialna`),
+  - custom pytania: `table_label` fallbackuje do `prompt`.
+- `archetypy-admin/db_jst_utils.py`:
+  - normalizacja pytań predefiniowanych obsługuje `table_label`.
+- `archetypy-admin/admin_dashboard.py`:
+  - profil demograficzny personalny używa `table_label` jako nazwy zmiennej,
+  - wartości kategorii w kartach/tabeli są prezentowane jako kodowania odpowiedzi.
+- `archetypy-ankieta/src/lib/metryczka.ts`:
+  - model i normalizacja TS rozszerzone o pole `table_label` (zgodność kontraktu z backendem).
+- Testy techniczne:
+  - `python -m py_compile app.py db_jst_utils.py metryczka_config.py admin_dashboard.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).

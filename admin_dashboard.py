@@ -3013,6 +3013,7 @@ def _build_personal_metry_questions(study: dict) -> list[dict[str, object]]:
                 "id": qid or db_col,
                 "db_column": db_col,
                 "prompt": str(q.get("prompt") or db_col).strip(),
+                "table_label": str(q.get("table_label") or q.get("prompt") or db_col).strip(),
                 "options": options,
             }
         )
@@ -3300,18 +3301,19 @@ def _render_personal_demography_subpage(
         col_name = str(item["col_name"])
         db_col = str((mq or {}).get("db_column") or "").strip()
         prompt = str((mq or {}).get("prompt") or db_col).strip()
+        table_label = str((mq or {}).get("table_label") or prompt or db_col).strip()
         select_options = [all_token] + [str(code) for code in list(item["codes"])]
         col_ctx = filter_cols[idx % len(filter_cols)]
         with col_ctx:
             selected_code = st.selectbox(
-                prompt,
+                table_label,
                 options=select_options,
                 format_func=(lambda code, q=mq: "— brak filtra —" if code == all_token else _metry_value_label(q, code)),
                 key=f"personal_demo_sub_filter_single_{study_id}_{db_col}",
             )
         if selected_code != all_token:
             filt_df = filt_df[filt_df[col_name].astype(str) == str(selected_code)]
-            active_filters.append(f"{prompt}: {_metry_value_label(mq, str(selected_code))}")
+            active_filters.append(f"{table_label}: {str(selected_code)}")
 
     n_filtered = int(len(filt_df))
     if active_filters:
@@ -3350,6 +3352,7 @@ def _render_personal_demography_subpage(
         col_name = str(item["col_name"])
         db_col = str((mq or {}).get("db_column") or "").strip()
         prompt = str((mq or {}).get("prompt") or db_col).strip()
+        table_label = str((mq or {}).get("table_label") or prompt or db_col).strip()
         icon = _personal_metry_var_icon(db_col)
 
         q_all = results_df[col_name].fillna("").astype(str).str.strip()
@@ -3369,7 +3372,7 @@ def _render_personal_demography_subpage(
             categories.append(
                 {
                     "code": code_txt,
-                    "label": _metry_value_label(mq, code_txt),
+                    "label": code_txt,
                     "pct_all": float(pct_all),
                     "pct_sub": float(pct_sub),
                     "diff": float(pct_sub - pct_all),
@@ -3383,7 +3386,7 @@ def _render_personal_demography_subpage(
         cards_html_parts.append(
             f"""
             <div class="pdemo-stat">
-              <div class="pdemo-stat-label">{html.escape(icon)} {html.escape(prompt.upper())}</div>
+              <div class="pdemo-stat-label">{html.escape(icon)} {html.escape(table_label.upper())}</div>
               <div class="pdemo-stat-main">{html.escape(str(strongest.get("label") or ""))}</div>
               <div class="pdemo-stat-sub">{float(strongest.get("pct_sub") or 0.0):.1f}% • {float(strongest.get("diff") or 0.0):+,.1f} pp</div>
             </div>
@@ -3406,7 +3409,7 @@ def _render_personal_demography_subpage(
                 f"style=\"font-weight:800; text-transform:uppercase; vertical-align:middle; background:#fafafa; border-left:3px solid #b8c2cc; {top_border}\">"
                 "<span style='display:inline-flex; align-items:center; gap:6px;'>"
                 f"<span>{html.escape(icon)}</span>"
-                f"<span>{html.escape(prompt)}</span>"
+                f"<span>{html.escape(table_label)}</span>"
                 "</span>"
                 "</td>"
                 if idx == 0

@@ -2886,3 +2886,36 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Hotfix H-104 [DONE]
+Temat: Metryczka — auto-rozszerzanie tabeli odpowiedzi + `Kodowanie do tabel` + kodowane kategorie w demografii.
+Kryteria ukończenia:
+1. Tabela odpowiedzi w edytorze metryczki rośnie w dół wraz z liczbą wierszy (bez stałego, niskiego viewportu i wewnętrznego scrollowania przy typowych zakresach).
+2. Każde pytanie metryczkowe ma pole `Kodowanie do tabel`.
+3. W tabelach demograficznych etykieta zmiennej pochodzi z `Kodowanie do tabel` (fallback: treść pytania).
+4. W tabelach demograficznych kategorie odpowiedzi dla pytań konfigurowalnych są prezentowane jako kodowania odpowiedzi.
+Pierwszy krok wykonawczy:
+- rozszerzyć model metryczki (`table_label`) i podpiąć to pole w edytorze JST/personal + predefiniowanych pytaniach, a następnie przepiąć render etykiet w demografii.
+Wynik:
+- `archetypy-admin/app.py`:
+  - dodano helper `_metryczka_data_editor_height(...)` i użycie `height=` w obu tabelach odpowiedzi (`st.data_editor`) — tabela rośnie razem z liczbą pozycji,
+  - dodano pole UI `Kodowanie do tabel`:
+    - w edycji pytania metryczki,
+    - w panelu predefiniowanych pytań,
+  - `table_label` jest zapisywane do konfiguracji pytań i do predefiniowanych,
+  - Matching (`_matching_demo_build_specs`) używa `table_label` jako etykiety zmiennej (fallback: `prompt`),
+  - Matching dla pytań custom pokazuje kategorie jako `code` (kodowanie odpowiedzi), nie jako pełny `label` respondenta.
+- `archetypy-admin/metryczka_config.py`:
+  - rozszerzono model pytania o `table_label`,
+  - rdzeń ma domyślne krótkie etykiety tabelaryczne (`Płeć`, `Wiek`, `Wykształcenie`, `Status zawodowy`, `Sytuacja materialna`),
+  - normalizacja custom pytań: `table_label` fallbackuje do `prompt`.
+- `archetypy-admin/db_jst_utils.py`:
+  - normalizacja predefiniowanego pytania (`_normalize_template_question_payload`) obsługuje `table_label`.
+- `archetypy-admin/admin_dashboard.py`:
+  - podstrona demografii personalnej używa `table_label` jako nazwy zmiennej,
+  - kategorie w kartach i tabeli demograficznej są prezentowane jako kodowania (`code`).
+- `archetypy-ankieta/src/lib/metryczka.ts`:
+  - model/normalizacja metryczki rozszerzone o `table_label` (spójność kontraktu danych).
+- Smoke-check:
+  - `python -m py_compile app.py db_jst_utils.py metryczka_config.py admin_dashboard.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).

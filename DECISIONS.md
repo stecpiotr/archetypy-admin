@@ -2099,3 +2099,28 @@ Decyzja:
 - Jednocześnie znormalizowana konfiguracja wygasza `randomize_exclude_last` (`False`).
 Uzasadnienie:
 - Zapewnia to brak regresji dla istniejących ankiet przy przejściu na nowy model blokad.
+
+### D-231: Pytanie metryczkowe ma dedykowane pole `table_label` (`Kodowanie do tabel`)
+Decyzja:
+- Rozszerzamy model pytania metryczkowego o `table_label`.
+- `table_label` służy wyłącznie do prezentacji nazwy zmiennej w tabelach/sekcjach demograficznych.
+- Fallback:
+  - jeśli `table_label` puste, używamy `prompt`.
+  - dla rdzenia metryczki domyślnie ustawiamy krótkie etykiety (`Płeć`, `Wiek`, `Wykształcenie`, `Status zawodowy`, `Sytuacja materialna`).
+Uzasadnienie:
+- Długie treści pytań obniżały czytelność tabel demograficznych i utrudniały interpretację wyników.
+
+### D-232: W tabelach demograficznych kategorie odpowiedzi dla pytań custom prezentujemy jako `code`
+Decyzja:
+- W warstwie analitycznej demografii (Matching + profil demograficzny personalny) dla pytań konfigurowalnych (`M_*` custom):
+  - prezentujemy kategorie odpowiedzi jako kodowania (`code`),
+  - nie pokazujemy pełnych etykiet respondentowych (`label`) jako wartości tabelarycznych.
+Uzasadnienie:
+- Kodowanie jest stabilnym kluczem analitycznym, porównywalnym między importami/raportami i krótszym wizualnie.
+
+### D-233: Edytor odpowiedzi metryczki używa dynamicznej wysokości tabeli
+Decyzja:
+- `st.data_editor` dla odpowiedzi metryczki (edytor pytań i predefiniowanych) dostaje dynamiczny `height` liczony od liczby wierszy.
+- Celem jest pionowe rozszerzanie tabeli przy dodawaniu pozycji, zamiast wymuszania ciągłego przewijania wewnątrz komponentu.
+Uzasadnienie:
+- Użytkownik edytuje często długie listy odpowiedzi; wewnętrzny scrollbar utrudnia kontrolę i zwiększa ryzyko błędów.

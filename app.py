@@ -2614,6 +2614,13 @@ def _metryczka_options_to_df(
     return pd.DataFrame(rows)
 
 
+def _metryczka_data_editor_height(df: Any, *, min_rows: int = 4, max_rows: int = 60) -> int:
+    row_count = int(len(df.index)) if isinstance(df, pd.DataFrame) else 0
+    visible_rows = min(max(row_count + 1, int(min_rows)), int(max_rows))
+    # Nagłówek + zapas na dolną kontrolkę dodawania wierszy.
+    return int(70 + visible_rows * 35)
+
+
 def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
     if not isinstance(df, pd.DataFrame):
         return []
@@ -2774,6 +2781,7 @@ def _new_custom_metryczka_question(questions: List[Dict[str, Any]]) -> Dict[str,
         "db_column": code,
         "_ui_key": f"q_{int(time.time() * 1_000_000)}",
         "prompt": "",
+        "table_label": "",
         "required": True,
         "multiple": False,
         "randomize_options": False,
@@ -2810,6 +2818,7 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
     desired_code = str(q_src.get("db_column") or q_src.get("id") or "").strip().upper()
     code = _unique_custom_metryczka_code(desired_code, questions)
     prompt = str(q_src.get("prompt") or "").strip()
+    table_label = str(q_src.get("table_label") or prompt).strip()
     randomize_options = bool(q_src.get("randomize_options") is True)
     legacy_exclude_last = bool(q_src.get("randomize_exclude_last") is True)
     options_out: List[Dict[str, Any]] = []
@@ -2849,6 +2858,7 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
         "db_column": code,
         "_ui_key": f"q_{int(time.time() * 1_000_000)}",
         "prompt": prompt,
+        "table_label": table_label,
         "required": True,
         "multiple": False,
         "randomize_options": randomize_options,
@@ -2967,6 +2977,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 picked_q = picked_tpl.get("question") if isinstance(picked_tpl.get("question"), dict) else {}
                 edit_name_key = f"{widget_prefix}tpl_edit_name_top"
                 edit_prompt_key = f"{widget_prefix}tpl_edit_prompt_top"
+                edit_table_label_key = f"{widget_prefix}tpl_edit_table_label_top"
                 edit_code_key = f"{widget_prefix}tpl_edit_code_top"
                 edit_rand_key = f"{widget_prefix}tpl_edit_rand_top"
                 edit_loaded_key = f"{widget_prefix}tpl_edit_loaded_top"
@@ -2978,6 +2989,9 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     st.session_state[edit_loaded_key] = picked_id
                     st.session_state[edit_name_key] = str(picked_tpl.get("name") or "").strip()
                     st.session_state[edit_prompt_key] = str(picked_q.get("prompt") or "").strip()
+                    st.session_state[edit_table_label_key] = str(
+                        picked_q.get("table_label") or picked_q.get("prompt") or ""
+                    ).strip()
                     st.session_state[edit_code_key] = str(picked_q.get("db_column") or picked_q.get("id") or "").strip().upper()
                     st.session_state[edit_rand_key] = bool(picked_q.get("randomize_options") is True)
                     st.session_state[edit_opts_key] = _metryczka_options_to_df(
@@ -2997,6 +3011,11 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         height=74,
                         placeholder="Treść pytania widoczna dla respondenta",
                     )
+                    st.text_input(
+                        "Kodowanie do tabel",
+                        key=edit_table_label_key,
+                        placeholder="Krótka etykieta zmiennej do tabel demograficznych",
+                    )
                 with e2:
                     st.text_input("Kodowanie", key=edit_code_key, placeholder="np. M_POWIAT")
                     st.checkbox(
@@ -3009,6 +3028,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     tpl_opts_df = _metryczka_options_to_df([])
                 tpl_opts_df = st.data_editor(
                     tpl_opts_df,
+                    height=_metryczka_data_editor_height(tpl_opts_df),
                     use_container_width=True,
                     hide_index=True,
                     num_rows="dynamic",
@@ -3045,6 +3065,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     "scope": "custom",
                     "db_column": str(st.session_state.get(edit_code_key) or "").strip().upper(),
                     "prompt": str(st.session_state.get(edit_prompt_key) or "").strip(),
+                    "table_label": str(st.session_state.get(edit_table_label_key) or "").strip(),
                     "randomize_options": bool(st.session_state.get(edit_rand_key)),
                     "randomize_exclude_last": False,
                     "options": _metryczka_options_from_df(tpl_opts_df),
@@ -3147,6 +3168,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         else:
             qid = str(q_dict.get("id") or db_column or f"M_CUSTOM_{idx}").strip().upper()
         prompt_default = str(q_dict.get("prompt") or "").strip()
+        table_label_default = str(q_dict.get("table_label") or prompt_default).strip()
         options_default = q_dict.get("options") or []
 
         st.markdown(f"<div id='{anchor_id}'></div>", unsafe_allow_html=True)
@@ -3169,6 +3191,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 key=f"{widget_prefix}prompt_{ui_key}",
                 height=56,
                 placeholder="Treść pytania widoczna dla respondenta",
+            )
+            table_label = st.text_input(
+                "Kodowanie do tabel",
+                value=table_label_default,
+                key=f"{widget_prefix}table_label_{ui_key}",
+                placeholder="Krótka etykieta zmiennej do tabel demograficznych",
             )
         with c_col:
             code_value = st.text_input(
@@ -3194,6 +3222,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         )
         edited_options_df = st.data_editor(
             options_df,
+            height=_metryczka_data_editor_height(options_df),
             use_container_width=True,
             hide_index=True,
             num_rows="dynamic",
@@ -3441,6 +3470,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             "scope": "custom",
                             "db_column": code_for_template,
                             "prompt": str(prompt or "").strip(),
+                            "table_label": str(table_label or prompt or "").strip(),
                             "randomize_options": bool(randomize_options_val),
                             "randomize_exclude_last": False,
                             "options": [
@@ -3476,6 +3506,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 "db_column": final_code,
                 "_ui_key": ui_key,
                 "prompt": str(prompt or "").strip(),
+                "table_label": str(table_label or prompt or "").strip(),
                 "required": True,
                 "multiple": False,
                 "randomize_options": bool(randomize_options_val),
@@ -5567,6 +5598,7 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
         core_meta = _MATCHING_CORE_DEMO_META.get(field)
         display_labels: Dict[str, str] = {}
         if core_meta:
+            core_label = str(q.get("table_label") or core_meta.get("label") or field).strip() or field
             for cat in list(core_meta.get("order") or []):
                 display_labels[str(cat)] = str(cat)
             for opt in opts:
@@ -5577,7 +5609,7 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
             specs.append(
                 {
                     "field": field,
-                    "label": str(core_meta.get("label") or field),
+                    "label": core_label,
                     "order_codes": list(core_meta.get("order") or []),
                     "display_labels": display_labels,
                     "options": opts,
@@ -5589,12 +5621,14 @@ def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
             continue
 
         order_codes = [str(opt.get("code") or "").strip() for opt in opts if str(opt.get("code") or "").strip()]
+        # W tabelach demograficznych dla pytań custom pokazujemy kodowania odpowiedzi
+        # (nie pełne etykiety dla respondentów), aby zachować spójność analityczną.
         display_labels = {
-            str(opt.get("code") or "").strip(): str(opt.get("label") or "").strip() or str(opt.get("code") or "").strip()
+            str(opt.get("code") or "").strip(): str(opt.get("code") or "").strip()
             for opt in opts
             if str(opt.get("code") or "").strip()
         }
-        label = str(q.get("prompt") or field).strip() or field
+        label = str(q.get("table_label") or q.get("prompt") or field).strip() or field
         specs.append(
             {
                 "field": field,

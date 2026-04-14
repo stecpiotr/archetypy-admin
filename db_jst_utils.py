@@ -1128,6 +1128,7 @@ def _normalize_template_kind(raw: Any) -> str:
 def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
     src = dict(raw or {}) if isinstance(raw, dict) else {}
     prompt = str(src.get("prompt") or "").strip()
+    table_label = str(src.get("table_label") or prompt).strip()
     db_column = str(src.get("db_column") or src.get("id") or "").strip().upper()
     scope = str(src.get("scope") or "custom").strip().lower() or "custom"
     qid = str(src.get("id") or db_column).strip().upper()
@@ -1166,6 +1167,7 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
         "scope": scope,
         "db_column": db_column,
         "prompt": prompt,
+        "table_label": table_label,
         "required": True,
         "multiple": False,
         "randomize_options": randomize_options,

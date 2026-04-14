@@ -23,6 +23,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "scope": "core",
             "db_column": "M_PLEC",
             "prompt": "Proszę o podanie płci.",
+            "table_label": "Płeć",
             "required": True,
             "multiple": False,
             "randomize_options": False,
@@ -38,6 +39,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "scope": "core",
             "db_column": "M_WIEK",
             "prompt": "Jaki jest Pana/Pani wiek?",
+            "table_label": "Wiek",
             "required": True,
             "multiple": False,
             "randomize_options": False,
@@ -54,6 +56,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "scope": "core",
             "db_column": "M_WYKSZT",
             "prompt": "Jakie ma Pan/Pani wykształcenie?",
+            "table_label": "Wykształcenie",
             "required": True,
             "multiple": False,
             "randomize_options": False,
@@ -74,6 +77,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "scope": "core",
             "db_column": "M_ZAWOD",
             "prompt": "Jaka jest Pana/Pani sytuacja zawodowa?",
+            "table_label": "Status zawodowy",
             "required": True,
             "multiple": False,
             "randomize_options": False,
@@ -94,6 +98,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "scope": "core",
             "db_column": "M_MATERIAL",
             "prompt": "Jak ocenia Pan/Pani własną sytuację materialną?",
+            "table_label": "Sytuacja materialna",
             "required": True,
             "multiple": False,
             "randomize_options": False,
@@ -251,6 +256,7 @@ def _normalize_custom_question(raw: Dict[str, Any], used_columns: set[str]) -> D
     prompt = _safe_text(raw.get("prompt"))
     if not prompt:
         return {}
+    table_label = _safe_text(raw.get("table_label"), prompt)
 
     fallback_options: List[Dict[str, Any]] = []
     randomize_options = _safe_bool(raw.get("randomize_options"), False)
@@ -270,6 +276,7 @@ def _normalize_custom_question(raw: Dict[str, Any], used_columns: set[str]) -> D
         "scope": "custom",
         "db_column": db_column,
         "prompt": prompt,
+        "table_label": table_label,
         "required": _safe_bool(raw.get("required"), True),
         "multiple": _safe_bool(raw.get("multiple"), False),
         "randomize_options": randomize_options,
@@ -308,6 +315,7 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
         randomize_options = _safe_bool(src.get("randomize_options"), False)
         randomize_exclude_last = _safe_bool(src.get("randomize_exclude_last"), False)
         base["prompt"] = _safe_text(src.get("prompt"), base["prompt"])
+        base["table_label"] = _safe_text(src.get("table_label"), _safe_text(base.get("table_label"), base["prompt"]))
         base["required"] = True
         base["multiple"] = False
         base["randomize_options"] = randomize_options
