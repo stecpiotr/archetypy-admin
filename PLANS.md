@@ -2807,3 +2807,22 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py db_jst_utils.py metryczka_config.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Hotfix H-100 [DONE]
+Temat: Raport personalny — pozycja przycisku demografii + czysty widok podstrony + selektory filtrów w stylu Segmentacji.
+Kryteria ukończenia:
+1. Przycisk `Raport demograficzny` jest w górnym rzędzie, przed szybkim menu (`| Opisy archetypów | Raport | Tabela | Udostępnij`).
+2. Po wejściu do podstrony demograficznej nie renderuje się blok nagłówka raportu personalnego (`Archetypy ... panel administratora` + kafel liczebności).
+3. W podstronie demograficznej wybór cech działa przez selektory jednokrotnego wyboru (single-select), zamiast multiselectów.
+Pierwszy krok wykonawczy:
+- przepiąć render przycisku i quicknav w `results_view`, a w `admin_dashboard.py` warunkowo ukryć header i przebudować filtry na `selectbox`.
+Wynik:
+- `app.py` (`results_view`):
+  - przycisk `👥 Raport demograficzny` przeniesiony do górnego rzędu, przed quicknav,
+  - usunięto dolny duplikat przycisku,
+  - otwieranie podstrony demograficznej działa dla aktualnie wybranej osoby.
+- `admin_dashboard.py`:
+  - nagłówek raportu personalnego jest ukrywany, gdy aktywna jest podstrona demograficzna,
+  - filtry wielocechowe działają jako single-select z opcją `— brak filtra —`, w układzie 2-kolumnowym.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

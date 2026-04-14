@@ -9347,6 +9347,15 @@ def results_view() -> None:
     studies = fetch_studies(sb)
     if not studies:
         st.info("Brak rekordów w bazie."); return
+    options = {
+        f"{s.get('last_name_nom') or s['last_name']} {s.get('first_name_nom') or s['first_name']} ({s['city']}) – /{s['slug']}"
+        : s for s in studies
+    }
+    option_labels = list(options.keys())
+    choice_key = "results_view_choice"
+    if (choice_key not in st.session_state) or (st.session_state.get(choice_key) not in options):
+        st.session_state[choice_key] = option_labels[0]
+    open_demo_requested = False
 
     # ── GÓRNY RZĄD: 1) przełącznik szerokości + 2) szybka nawigacja
     if "wide_report" not in st.session_state:
@@ -9361,26 +9370,34 @@ def results_view() -> None:
             unsafe_allow_html=True
         )
     with topR:
-        st.markdown("""
-        <div class="quicknav">
-          <b class="sep">|</b>
-          <a href="#opisy">Opisy archetypów</a>
-          <a href="#raport">Raport</a>
-          <a href="#tabela">Tabela</a>
-          <a href="#udostepnij">Udostępnij</a>
-        </div>
-        <script>
-          const root = window.document;
-          root.querySelectorAll('.quicknav a').forEach(a=>{
-            a.addEventListener('click', (e)=>{
-              e.preventDefault();
-              const id = a.getAttribute('href');
-              const el = root.querySelector(id);
-              if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
-            });
-          });
-        </script>
-        """, unsafe_allow_html=True)
+        nav_btn_col, nav_links_col = st.columns([0.36, 0.64], gap="small")
+        with nav_btn_col:
+            open_demo_requested = st.button(
+                "👥 Raport demograficzny",
+                key="open_personal_demography_from_results_top",
+                use_container_width=True,
+            )
+        with nav_links_col:
+            st.markdown("""
+            <div class="quicknav">
+              <b class="sep">|</b>
+              <a href="#opisy">Opisy archetypów</a>
+              <a href="#raport">Raport</a>
+              <a href="#tabela">Tabela</a>
+              <a href="#udostepnij">Udostępnij</a>
+            </div>
+            <script>
+              const root = window.document;
+              root.querySelectorAll('.quicknav a').forEach(a=>{
+                a.addEventListener('click', (e)=>{
+                  e.preventDefault();
+                  const id = a.getAttribute('href');
+                  const el = root.querySelector(id);
+                  if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+                });
+              });
+            </script>
+            """, unsafe_allow_html=True)
 
     # lokalny wrapper, żeby CSS działał tylko tutaj
     st.markdown('<div id="results-choose"><div class="section-label">Wybierz osobę:</div>', unsafe_allow_html=True)
@@ -9394,11 +9411,12 @@ def results_view() -> None:
         unsafe_allow_html=True,
     )
 
-    options = {
-        f"{s.get('last_name_nom') or s['last_name']} {s.get('first_name_nom') or s['first_name']} ({s['city']}) – /{s['slug']}"
-        : s for s in studies
-    }
-    choice = st.selectbox("Wybierz widok", options=list(options.keys()), label_visibility="collapsed")
+    choice = st.selectbox(
+        "Wybierz widok",
+        options=option_labels,
+        label_visibility="collapsed",
+        key=choice_key,
+    )
     st.markdown(
         """
         <script>
@@ -9441,15 +9459,9 @@ def results_view() -> None:
         unsafe_allow_html=True,
     )
     study = options[choice]
-    _demo_btn_left, _demo_btn_right = st.columns([0.80, 0.20], gap="small")
-    with _demo_btn_right:
-        if st.button(
-            "👥 Raport demograficzny",
-            key=f"open_personal_demography_from_results_{study['id']}",
-            use_container_width=True,
-        ):
-            st.session_state[f"personal_demo_page_{study['id']}"] = True
-            st.rerun()
+    if open_demo_requested:
+        st.session_state[f"personal_demo_page_{study['id']}"] = True
+        st.rerun()
     render_titlebar([
         "Panel", "Wyniki",
         f"{(study.get('last_name_nom') or study['last_name'])} "

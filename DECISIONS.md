@@ -2046,3 +2046,23 @@ Decyzja:
 - Panel pozwala edytować zapisane pytanie (treść, kodowanie, randomizację, odpowiedzi i flagi `is_open`) oraz zapisywać zmiany bez opuszczania ekranu metryczki.
 Uzasadnienie:
 - Użytkownik wskazał potrzebę szybkiej edycji zapisanych pozycji w miejscu pracy nad metryczką, bez schodzenia do dolnych sekcji.
+
+### D-224: Wejście do demografii personalnej jest elementem górnej nawigacji wyników
+Decyzja:
+- Przycisk `👥 Raport demograficzny` renderujemy w górnym rzędzie `results_view`, przed szybkim menu (`Opisy archetypów`, `Raport`, `Tabela`, `Udostępnij`).
+- Usuwamy jego dolny duplikat spod selektora osoby.
+Uzasadnienie:
+- Użytkownik wymagał logicznego położenia akcji analitycznej obok pozostałej nawigacji raportu.
+
+### D-225: Podstrona demografii personalnej nie renderuje głównego bannera raportu
+Decyzja:
+- Gdy aktywna jest podstrona `personal_demo_page_*`, ukrywamy w `show_report` blok nagłówka panelu personalnego (`Archetypy ... – panel administratora` + licznik uczestników).
+Uzasadnienie:
+- Ten blok dublował kontekst i zaburzał odbiór dedykowanej podstrony demograficznej.
+
+### D-226: Filtry wielocechowe na podstronie demografii personalnej działają jako single-select
+Decyzja:
+- Każda zmienna metryczkowa ma pojedynczy selektor (`selectbox`) z opcją `— brak filtra —`.
+- Aktywne selekcje łączą się dalej logiką AND między cechami.
+Uzasadnienie:
+- Użytkownik zgłosił konieczność uproszczenia i upodobnienia wyboru cech do wzorca z Segmentacji (kontrolki jednokrotnego wyboru).

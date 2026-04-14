@@ -2227,3 +2227,18 @@
     - `matching_segments_penalty_strength_{jst_sid}`.
 - Test techniczny:
   - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Zrobione w Hotfix H-100 (2026-04-14, raport personalny: przycisk demografii + czysty widok + selektory cech)
+- `archetypy-admin/app.py` (`results_view`):
+  - przeniesiono przycisk `👥 Raport demograficzny` do górnego rzędu (przed quicknav),
+  - usunięto dolny przycisk pod selectem,
+  - otwieranie podstrony demograficznej jest spięte z aktualnie wybraną osobą.
+- `archetypy-admin/admin_dashboard.py`:
+  - gdy aktywna podstrona demograficzna (`personal_demo_page_*`), nie renderuje się blok nagłówka:
+    - niebieski banner `Archetypy ... – panel administratora`,
+    - kafel liczby uczestników,
+    - separator pod tym blokiem,
+  - filtry `FILTR WIELOCECHOWY` przebudowano z `multiselect` na `selectbox` (single-select) z opcją `— brak filtra —`,
+  - zachowano logikę AND między aktywnymi cechami.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

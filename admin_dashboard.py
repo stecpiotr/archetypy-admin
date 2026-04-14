@@ -3293,23 +3293,25 @@ def _render_personal_demography_subpage(
 
     filt_df = results_df.copy()
     active_filters: list[str] = []
-    for item in available:
+    filter_cols = st.columns(2, gap="medium") if len(available) > 1 else [st]
+    all_token = "__ALL__"
+    for idx, item in enumerate(available):
         mq = item["question"]
         col_name = str(item["col_name"])
         db_col = str((mq or {}).get("db_column") or "").strip()
         prompt = str((mq or {}).get("prompt") or db_col).strip()
-        options = list(item["codes"])
-        selected = st.multiselect(
-            prompt,
-            options=options,
-            default=[],
-            format_func=(lambda code, q=mq: _metry_value_label(q, code)),
-            key=f"personal_demo_sub_filter_{study_id}_{db_col}",
-        )
-        if selected:
-            filt_df = filt_df[filt_df[col_name].astype(str).isin([str(x) for x in selected])]
-            labels = [_metry_value_label(mq, str(x)) for x in selected]
-            active_filters.append(f"{prompt}: {', '.join(labels)}")
+        select_options = [all_token] + [str(code) for code in list(item["codes"])]
+        col_ctx = filter_cols[idx % len(filter_cols)]
+        with col_ctx:
+            selected_code = st.selectbox(
+                prompt,
+                options=select_options,
+                format_func=(lambda code, q=mq: "— brak filtra —" if code == all_token else _metry_value_label(q, code)),
+                key=f"personal_demo_sub_filter_single_{study_id}_{db_col}",
+            )
+        if selected_code != all_token:
+            filt_df = filt_df[filt_df[col_name].astype(str) == str(selected_code)]
+            active_filters.append(f"{prompt}: {_metry_value_label(mq, str(selected_code))}")
 
     n_filtered = int(len(filt_df))
     if active_filters:
@@ -6629,6 +6631,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     study_id = study["id"]
     demo_page_key = f"personal_demo_page_{study_id}"
     st.session_state.setdefault(demo_page_key, False)
+    show_demo_subpage = (not public_view) and bool(st.session_state.get(demo_page_key))
     data = load(study_id)
 
     # ❗️ZBIERAMY WSZYSTKIE PRZYPADKI DO SŁOWNIKA DLA WORDA
@@ -6647,7 +6650,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
     num_ankiet = len(data) if not data.empty else 0
 
-    if not public_view:
+    if not public_view and not show_demo_subpage:
         header_col1, header_col2 = st.columns([0.77, 0.23])
         with header_col1:
             st.markdown(
