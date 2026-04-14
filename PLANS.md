@@ -2671,3 +2671,35 @@ Wynik:
   - legenda nad radarem przeniesiona do szerszej wersji HTML (`match-seg-radar-legend` + pill), a legenda Plotly dla tego radaru wyłączona.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-095 [DONE]
+Temat: Dynamiczna metryczka w tabelach demograficznych Matching + biblioteka zapisanych pytań + rozpoczęcie migracji generatora JST.
+Kryteria ukończenia:
+1. W `🧭 Matching` tabele demograficzne (`Demografia` i `Segmenty`) liczą zmienne z `metryczka_config` JST, a nie ze stałej piątki.
+2. W edytorze metryczki można:
+   - zapisać pytanie jako predefiniowane,
+   - wstawić pytanie z listy zapisanych.
+3. Generator raportu JST zaczyna obsługę dynamicznych pól `M_*` (nie tylko rdzeń 5 kolumn) w kluczowych funkcjach demograficznych.
+Pierwszy krok wykonawczy:
+- dodać tabelę i helpery backendowe dla zapisanych pytań metryczkowych, następnie przepiąć obie tabele demograficzne w `app.py`, a na końcu rozszerzyć dynamiczne kolumny `M_*` w `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`.
+Wynik:
+- `db_jst_utils.py`:
+  - dodano schemat i indeks dla `public.metryczka_question_templates`,
+  - dodano API:
+    - `list_metryczka_question_templates(...)`,
+    - `save_metryczka_question_template(...)`.
+- `app.py`:
+  - edytor metryczki:
+    - zapis pytania do biblioteki (`💾 Zapisz do zapisanych`),
+    - panel `📚 Wybierz z zapisanych` i wstawianie do ankiety,
+  - Matching:
+    - dodano dynamiczny silnik specyfikacji demografii oparty o `metryczka_config`,
+    - zakładka `Demografia` i sekcja demograficzna w `Segmentach` liczą i renderują zmienne dynamicznie (rdzeń + custom `M_*`),
+    - zachowane noty o wagowaniu i pokryciu mapowania segmentów.
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - `parse_metryczka(...)` przepuszcza dodatkowe kolumny `M_*` do ramki metryczki,
+  - `_onehot_metry(...)` działa na dynamicznej liście kolumn `M_*`,
+  - `_format_segment_demography_rows(...)` oraz `_format_demography_rows_between_masks(...)` liczą dynamicznie po `M_*`,
+  - `_build_b2_declared_demo_payload(...)` buduje `var_order/cat_order` dynamicznie.
+- Smoke-check:
+  - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).

@@ -1919,3 +1919,34 @@ Decyzja:
 Uzasadnienie:
 - Legenda Plotly przy dłuższych nazwach segmentów bywała obcinana.
 - Wersja HTML daje stabilną szerokość i czytelność niezależnie od długości etykiet.
+
+### D-211: Biblioteka predefiniowanych pytań metryczkowych jest wspólna dla JST i personalnych (`kind=both`)
+Decyzja:
+- Dodano tabelę `public.metryczka_question_templates` i API zapisu/odczytu szablonów pytań metryczkowych.
+- W edytorze metryczki można:
+  - zapisać pytanie do biblioteki,
+  - wstawić pytanie z biblioteki do bieżącej ankiety.
+- Szablony zapisywane z poziomu edytora trafiają domyślnie do wspólnego zakresu `both`.
+Uzasadnienie:
+- User chce wielokrotnie używać tych samych pytań (np. `M_OBSZAR`) między badaniami.
+- Wspólna biblioteka upraszcza ponowne użycie także między JST i personalnymi.
+
+### D-212: Tabele demograficzne w Matching liczone dynamicznie z `metryczka_config`
+Decyzja:
+- W `Matching` (`Demografia` i sekcja demografii w `Segmentach`) odchodzimy od stałej piątki pól.
+- Specyfikacja zmiennych i kategorii jest budowana z `metryczka_config` JST:
+  - rdzeń (`M_PLEC..M_MATERIAL`) zachowuje kanoniczną normalizację,
+  - custom `M_*` są liczone i renderowane dynamicznie.
+Uzasadnienie:
+- Przy metryczce konfigurowalnej hardcoded 5 pól prowadziło do utraty części danych demograficznych w Matching.
+- Dynamiczny mechanizm utrzymuje spójność z konfiguracją ankiety i umożliwia przyszłe rozszerzenia bez zmian kodu tabel.
+
+### D-213: Generator JST zaczyna przejście na dynamiczne `M_*` (rdzeń + custom)
+Decyzja:
+- W skrypcie `JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - `parse_metryczka(...)` przepuszcza dodatkowe kolumny `M_*`,
+  - `_onehot_metry(...)` i główne funkcje demograficzne iterują po dynamicznej liście `M_*`,
+  - payload demografii (`var_order/cat_order`) budowany jest z aktualnych kolumn metryczki.
+Uzasadnienie:
+- To pierwszy bezpieczny etap migracji generatora do obsługi metryczki konfigurowalnej.
+- Pozwala utrzymać działający pipeline raportu i jednocześnie włączać customowe zmienne do tabel demograficznych.

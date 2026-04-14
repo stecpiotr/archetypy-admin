@@ -51,8 +51,10 @@ from db_jst_utils import (
     make_payload_from_row as jst_make_payload_from_row,
     normalize_response_row as jst_normalize_response_row,
     response_rows_to_dataframe as jst_response_rows_to_dataframe,
+    save_metryczka_question_template,
     soft_delete_jst_study,
     set_jst_study_status,
+    list_metryczka_question_templates,
     normalize_study_status as normalize_jst_study_status,
     update_jst_study,
 )
@@ -2737,6 +2739,59 @@ def _new_custom_metryczka_question(questions: List[Dict[str, Any]]) -> Dict[str,
     }
 
 
+def _unique_custom_metryczka_code(preferred: str, questions: List[Dict[str, Any]]) -> str:
+    used: set[str] = set()
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        used.add(str(q.get("db_column") or "").strip().upper())
+        used.add(str(q.get("id") or "").strip().upper())
+    pref = str(preferred or "").strip().upper()
+    if _METRY_CUSTOM_CODE_RE.fullmatch(pref) and pref not in used:
+        return pref
+    if _METRY_CUSTOM_CODE_RE.fullmatch(pref):
+        base = re.sub(r"_\d+$", "", pref)
+        for i in range(2, 500):
+            cand = f"{base}_{i}"
+            if _METRY_CUSTOM_CODE_RE.fullmatch(cand) and cand not in used:
+                return cand
+    return _next_custom_metryczka_code(questions)
+
+
+def _question_from_template_payload(template_q: Dict[str, Any], questions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    q_src = dict(template_q or {})
+    desired_code = str(q_src.get("db_column") or q_src.get("id") or "").strip().upper()
+    code = _unique_custom_metryczka_code(desired_code, questions)
+    prompt = str(q_src.get("prompt") or "").strip()
+    options_out: List[Dict[str, str]] = []
+    seen_codes: set[str] = set()
+    for opt in list(q_src.get("options") or []):
+        if not isinstance(opt, dict):
+            continue
+        label = str(opt.get("label") or "").strip()
+        code_opt = str(opt.get("code") or label).strip()
+        if not label or not code_opt:
+            continue
+        code_key = code_opt.upper()
+        if code_key in seen_codes:
+            continue
+        seen_codes.add(code_key)
+        options_out.append({"label": label, "code": code_opt})
+    if len(options_out) < 2:
+        options_out = [{"label": "", "code": ""}, {"label": "", "code": ""}]
+    return {
+        "id": code,
+        "scope": "custom",
+        "db_column": code,
+        "_ui_key": f"q_{int(time.time() * 1_000_000)}",
+        "prompt": prompt,
+        "required": True,
+        "multiple": False,
+        "aliases": [],
+        "options": options_out,
+    }
+
+
 def _validate_metryczka_before_save(raw_cfg: Dict[str, Any]) -> Tuple[bool, str]:
     questions = raw_cfg.get("questions")
     if not isinstance(questions, list) or not questions:
@@ -3048,6 +3103,47 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
                         st.rerun()
 
+        if not is_core:
+            template_name_key = f"{widget_prefix}tpl_name_{ui_key}"
+            if template_name_key not in st.session_state:
+                st.session_state[template_name_key] = str(db_column or qid or "").strip().upper()
+            tcol1, tcol2 = st.columns([0.64, 0.36], gap="small")
+            with tcol1:
+                tpl_name = st.text_input(
+                    "Nazwa zapisanego pytania",
+                    key=template_name_key,
+                    placeholder="np. M_OBSZAR",
+                )
+            with tcol2:
+                st.markdown("<div style='height:1.6rem;'></div>", unsafe_allow_html=True)
+                if st.button("💾 Zapisz do zapisanych", key=f"{widget_prefix}save_tpl_{ui_key}", use_container_width=True):
+                    try:
+                        code_for_template = str(code_value or "").strip().upper()
+                        template_question = {
+                            "id": code_for_template,
+                            "scope": "custom",
+                            "db_column": code_for_template,
+                            "prompt": str(prompt or "").strip(),
+                            "options": [
+                                {
+                                    "label": str(opt.get("label") or "").strip(),
+                                    "code": str(opt.get("code") or "").strip(),
+                                }
+                                for opt in options
+                                if isinstance(opt, dict)
+                            ],
+                        }
+                        saved_tpl = save_metryczka_question_template(
+                            sb,
+                            name=str(tpl_name or code_for_template).strip(),
+                            question=template_question,
+                            kind="both",
+                        )
+                        saved_name = str(saved_tpl.get("name") or tpl_name or code_for_template).strip()
+                        st.success(f"Zapisano pytanie w bibliotece: {saved_name}")
+                    except Exception as e:
+                        st.error(f"Nie udało się zapisać pytania w bibliotece: {e}")
+
         final_code = str(code_value or "").strip().upper()
         if is_core:
             final_code = db_column
@@ -3082,18 +3178,79 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             st.rerun()
 
     st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-    if st.button("➕ Dodaj pytanie metryczkowe", key=f"{widget_prefix}add_q", type="secondary"):
-        working = deepcopy(st.session_state.get(state_key) or cfg_out)
-        q_list = list(working.get("questions") or [])
-        new_q = _new_custom_metryczka_question(q_list)
-        q_list.append(new_q)
-        working["questions"] = q_list
-        st.session_state[state_key] = working
-        st.session_state[scroll_target_key] = _metryczka_anchor_id(
-            kind, study_key, str(new_q.get("_ui_key") or "")
-        )
-        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
-        st.rerun()
+    tpl_panel_key = f"{widget_prefix}tpl_panel_open"
+    controls_col1, controls_col2, _ = st.columns([0.25, 0.25, 0.50], gap="small")
+    with controls_col1:
+        if st.button("➕ Dodaj pytanie metryczkowe", key=f"{widget_prefix}add_q", type="secondary", use_container_width=True):
+            working = deepcopy(st.session_state.get(state_key) or cfg_out)
+            q_list = list(working.get("questions") or [])
+            new_q = _new_custom_metryczka_question(q_list)
+            q_list.append(new_q)
+            working["questions"] = q_list
+            st.session_state[state_key] = working
+            st.session_state[scroll_target_key] = _metryczka_anchor_id(
+                kind, study_key, str(new_q.get("_ui_key") or "")
+            )
+            st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+            st.rerun()
+    with controls_col2:
+        if st.button("📚 Wybierz z zapisanych", key=f"{widget_prefix}open_tpl_panel", type="secondary", use_container_width=True):
+            st.session_state[tpl_panel_key] = not bool(st.session_state.get(tpl_panel_key, False))
+
+    if bool(st.session_state.get(tpl_panel_key, False)):
+        templates = list_metryczka_question_templates(sb, kind=kind)
+        with st.container(border=True):
+            st.markdown("**Wybierz pytanie z zapisanych**")
+            if not templates:
+                st.caption("Brak zapisanych pytań metryczkowych. Zapisz pierwsze pytanie przyciskiem „💾 Zapisz do zapisanych”.")
+            else:
+                tpl_options: Dict[str, Dict[str, Any]] = {}
+                for tpl in templates:
+                    name = str(tpl.get("name") or "").strip() or "bez nazwy"
+                    kind_lbl = str(tpl.get("kind") or "").strip().lower()
+                    if kind_lbl == "both":
+                        kind_lbl = "jst + personal"
+                    q_tpl = tpl.get("question") if isinstance(tpl.get("question"), dict) else {}
+                    code = str(q_tpl.get("db_column") or "").strip().upper()
+                    prompt = str(q_tpl.get("prompt") or "").strip()
+                    answers_n = len(list(q_tpl.get("options") or []))
+                    label = f"{name} ({code}, odp.: {answers_n}, zakres: {kind_lbl})"
+                    if prompt:
+                        label = f"{label} — {prompt[:80]}"
+                    tpl_options[label] = tpl
+
+                pick_key = f"{widget_prefix}tpl_pick"
+                picked_label = st.selectbox(
+                    "Zapisane pytanie",
+                    list(tpl_options.keys()),
+                    key=pick_key,
+                    label_visibility="collapsed",
+                )
+                picked_tpl = tpl_options[picked_label]
+                picked_q = picked_tpl.get("question") if isinstance(picked_tpl.get("question"), dict) else {}
+                st.caption(
+                    f"Kodowanie pytania: {str(picked_q.get('db_column') or '').strip().upper()} • "
+                    f"Odpowiedzi: {len(list(picked_q.get('options') or []))}"
+                )
+                t_insert_col, t_close_col = st.columns([0.22, 0.22], gap="small")
+                with t_insert_col:
+                    if st.button("Wstaw pytanie", key=f"{widget_prefix}tpl_insert", type="primary", use_container_width=True):
+                        working = deepcopy(st.session_state.get(state_key) or cfg_out)
+                        q_list = list(working.get("questions") or [])
+                        new_q = _question_from_template_payload(picked_q, q_list)
+                        q_list.append(new_q)
+                        working["questions"] = q_list
+                        st.session_state[state_key] = working
+                        st.session_state[tpl_panel_key] = False
+                        st.session_state[scroll_target_key] = _metryczka_anchor_id(
+                            kind, study_key, str(new_q.get("_ui_key") or "")
+                        )
+                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                        st.rerun()
+                with t_close_col:
+                    if st.button("Zamknij", key=f"{widget_prefix}tpl_close", type="secondary", use_container_width=True):
+                        st.session_state[tpl_panel_key] = False
+                        st.rerun()
 
     scroll_target = str(st.session_state.pop(scroll_target_key, "") or "").strip()
     scroll_nonce = int(st.session_state.pop(scroll_nonce_key, 0) or 0)
@@ -5064,6 +5221,235 @@ def _canon_demo_value(field: str, value: Any) -> str:
     return raw or "brak danych"
 
 
+_MATCHING_CORE_DEMO_META: Dict[str, Dict[str, Any]] = {
+    "M_PLEC": {
+        "label": "Płeć",
+        "order": ["kobieta", "mężczyzna"],
+        "variable_emoji": "👫",
+        "value_emoji": {"kobieta": "👩", "mężczyzna": "👨"},
+    },
+    "M_WIEK": {
+        "label": "Wiek",
+        "order": ["15-39", "40-59", "60+"],
+        "variable_emoji": "🧭",
+        "value_emoji": {"15-39": "🧑", "40-59": "🧑‍💼", "60+": "🧓"},
+    },
+    "M_WYKSZT": {
+        "label": "Wykształcenie",
+        "order": ["podst./gim./zaw.", "średnie", "wyższe"],
+        "variable_emoji": "🎓",
+        "value_emoji": {"podst./gim./zaw.": "🛠️", "średnie": "📘", "wyższe": "🎓"},
+    },
+    "M_ZAWOD": {
+        "label": "Status zawodowy",
+        "order": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
+        "variable_emoji": "💼",
+        "value_emoji": {
+            "prac. umysłowy": "🧠",
+            "prac. fizyczny": "🛠️",
+            "własna firma": "🏢",
+            "student/uczeń": "🧑‍🎓",
+            "bezrobotny": "🔎",
+            "rencista/emeryt": "🌿",
+            "inna": "🧩",
+        },
+    },
+    "M_MATERIAL": {
+        "label": "Sytuacja materialna",
+        "order": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
+        "variable_emoji": "💰",
+        "value_emoji": {
+            "bardzo dobra": "😄",
+            "raczej dobra": "🙂",
+            "przeciętna": "😐",
+            "raczej zła": "🙁",
+            "bardzo zła": "😟",
+            "odmowa": "🤐",
+        },
+    },
+}
+
+
+def _matching_demo_options(question: Dict[str, Any]) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    seen: set[str] = set()
+    for opt in list(question.get("options") or []):
+        if not isinstance(opt, dict):
+            continue
+        label = str(opt.get("label") or "").strip()
+        code = str(opt.get("code") or label).strip()
+        if not label or not code:
+            continue
+        code_u = code.upper()
+        if code_u in seen:
+            continue
+        seen.add(code_u)
+        out.append({"code": code, "label": label})
+    return out
+
+
+def _matching_demo_build_specs(metryczka_config: Any) -> List[Dict[str, Any]]:
+    cfg = normalize_jst_metryczka_config(metryczka_config)
+    specs: List[Dict[str, Any]] = []
+    seen_fields: set[str] = set()
+    for q in list(cfg.get("questions") or []):
+        if not isinstance(q, dict):
+            continue
+        field = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not field or field in seen_fields:
+            continue
+        seen_fields.add(field)
+        opts = _matching_demo_options(q)
+        core_meta = _MATCHING_CORE_DEMO_META.get(field)
+        display_labels: Dict[str, str] = {}
+        if core_meta:
+            for cat in list(core_meta.get("order") or []):
+                display_labels[str(cat)] = str(cat)
+            for opt in opts:
+                raw = str(opt.get("code") or opt.get("label") or "").strip()
+                canon = _canon_demo_value(field, raw)
+                if canon and canon != "brak danych":
+                    display_labels[canon] = str(opt.get("label") or canon).strip()
+            specs.append(
+                {
+                    "field": field,
+                    "label": str(core_meta.get("label") or field),
+                    "order_codes": list(core_meta.get("order") or []),
+                    "display_labels": display_labels,
+                    "options": opts,
+                    "variable_emoji": str(core_meta.get("variable_emoji") or "📌"),
+                    "value_emoji": dict(core_meta.get("value_emoji") or {}),
+                    "is_core": True,
+                }
+            )
+            continue
+
+        order_codes = [str(opt.get("code") or "").strip() for opt in opts if str(opt.get("code") or "").strip()]
+        display_labels = {
+            str(opt.get("code") or "").strip(): str(opt.get("label") or "").strip() or str(opt.get("code") or "").strip()
+            for opt in opts
+            if str(opt.get("code") or "").strip()
+        }
+        label = str(q.get("prompt") or field).strip() or field
+        specs.append(
+            {
+                "field": field,
+                "label": label,
+                "order_codes": order_codes,
+                "display_labels": display_labels,
+                "options": opts,
+                "variable_emoji": "📌",
+                "value_emoji": {},
+                "is_core": False,
+            }
+        )
+    return specs
+
+
+def _matching_demo_value_for_spec(spec: Dict[str, Any], value: Any) -> str:
+    field = str(spec.get("field") or "").strip().upper()
+    if str(spec.get("is_core") or "").lower() == "true" or bool(spec.get("is_core")):
+        return _canon_demo_value(field, value)
+    raw = str(value or "").strip()
+    if not raw:
+        return "brak danych"
+    n_raw = _norm_demo_token(raw)
+    for opt in list(spec.get("options") or []):
+        if not isinstance(opt, dict):
+            continue
+        code = str(opt.get("code") or "").strip()
+        label = str(opt.get("label") or "").strip()
+        if not code:
+            continue
+        if n_raw in {_norm_demo_token(code), _norm_demo_token(label)}:
+            return code
+    return raw
+
+
+def _matching_demo_label_for_code(spec: Dict[str, Any], code: str) -> str:
+    txt = str(code or "").strip()
+    if not txt:
+        return "brak danych"
+    if txt == "brak danych":
+        return "brak danych"
+    labels = spec.get("display_labels") if isinstance(spec.get("display_labels"), dict) else {}
+    return str(labels.get(txt) or txt)
+
+
+def _matching_demo_build_rows(
+    subset_records: List[Dict[str, Any]],
+    all_records: List[Dict[str, Any]],
+    specs: List[Dict[str, Any]],
+    subset_col_name: str,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def _weighted_count_records(records: List[Dict[str, Any]], spec: Dict[str, Any]) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+        field = str(spec.get("field") or "").strip().upper()
+        for rec in records:
+            payload = rec.get("payload") if isinstance(rec.get("payload"), dict) else {}
+            w = float(rec.get("weight") or 1.0)
+            if not math.isfinite(w) or w <= 0:
+                continue
+            val = _matching_demo_value_for_spec(spec, payload.get(field))
+            out[val] = float(out.get(val, 0.0)) + w
+        return out
+
+    demo_rows: List[Dict[str, Any]] = []
+    demo_cards: List[Dict[str, Any]] = []
+    for spec in specs:
+        dim_label = str(spec.get("label") or spec.get("field") or "").strip()
+        if not dim_label:
+            continue
+        dist_sub = _weighted_count_records(subset_records, spec)
+        dist_all = _weighted_count_records(all_records, spec)
+        sum_sub = float(sum(float(v) for v in dist_sub.values()))
+        sum_all = float(sum(float(v) for v in dist_all.values()))
+        known_order = [str(x) for x in list(spec.get("order_codes") or []) if str(x).strip()]
+        unknown = sorted((set(dist_sub.keys()) | set(dist_all.keys())) - set(known_order))
+        cats = known_order + list(unknown)
+        if not cats:
+            continue
+
+        top_cat: Optional[str] = None
+        top_pct = -1.0
+        top_all_pct = 0.0
+        for cat in cats:
+            c_sub = float(dist_sub.get(cat, 0.0))
+            c_all = float(dist_all.get(cat, 0.0))
+            pct_sub = (100.0 * c_sub / sum_sub) if sum_sub > 0 else 0.0
+            pct_all = (100.0 * c_all / sum_all) if sum_all > 0 else 0.0
+            if pct_sub > top_pct:
+                top_pct = pct_sub
+                top_cat = str(cat)
+                top_all_pct = pct_all
+            demo_rows.append(
+                {
+                    "Zmienna": dim_label,
+                    "Pole": str(spec.get("field") or "").strip().upper(),
+                    "KategoriaKod": str(cat),
+                    "Kategoria": _matching_demo_label_for_code(spec, str(cat)),
+                    subset_col_name: round(pct_sub, 1),
+                    "% ogół mieszkańców (ważony)": round(pct_all, 1),
+                    "Róznica (w pp.)": round(pct_sub - pct_all, 1),
+                }
+            )
+        if top_cat is not None:
+            value_emoji = spec.get("value_emoji") if isinstance(spec.get("value_emoji"), dict) else {}
+            demo_cards.append(
+                {
+                    "field": str(spec.get("field") or "").strip().upper(),
+                    "label": dim_label,
+                    "top_code": str(top_cat),
+                    "top": _matching_demo_label_for_code(spec, str(top_cat)),
+                    "pct": round(max(top_pct, 0.0), 1),
+                    "diff_pp": round(top_pct - top_all_pct, 1),
+                    "emoji": str(value_emoji.get(str(top_cat), "•")),
+                    "variable_emoji": str(spec.get("variable_emoji") or "📌"),
+                }
+            )
+    return demo_rows, demo_cards
+
+
 def _poststrat_cell_from_payload(payload: Dict[str, Any]) -> Optional[str]:
     g = _canon_demo_value("M_PLEC", payload.get("M_PLEC"))
     a = _canon_demo_value("M_WIEK", payload.get("M_WIEK"))
@@ -5528,173 +5914,34 @@ def matching_view() -> None:
             if not jst_name_gen:
                 jst_name_gen = jst_name_nom
 
-            dim_specs = [
-                {
-                    "label": "Płeć",
-                    "field": "M_PLEC",
-                    "order": ["kobieta", "mężczyzna"],
-                    "emoji": {"kobieta": "👩", "mężczyzna": "👨"},
-                },
-                {
-                    "label": "Wiek",
-                    "field": "M_WIEK",
-                    "order": ["15-39", "40-59", "60+"],
-                    "emoji": {"15-39": "🧑", "40-59": "🧑‍💼", "60+": "🧓"},
-                },
-                {
-                    "label": "Wykształcenie",
-                    "field": "M_WYKSZT",
-                    "order": ["podst./gim./zaw.", "średnie", "wyższe"],
-                    "emoji": {"podst./gim./zaw.": "🛠️", "średnie": "📘", "wyższe": "🎓"},
-                },
-                {
-                    "label": "Status zawodowy",
-                    "field": "M_ZAWOD",
-                    "order": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
-                    "emoji": {
-                        "prac. umysłowy": "🧠",
-                        "prac. fizyczny": "🛠️",
-                        "własna firma": "🏢",
-                        "student/uczeń": "🧑‍🎓",
-                        "bezrobotny": "🔎",
-                        "rencista/emeryt": "🌿",
-                        "inna": "🧩",
-                    },
-                },
-                {
-                    "label": "Sytuacja materialna",
-                    "field": "M_MATERIAL",
-                    "order": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
-                    "emoji": {
-                        "bardzo dobra": "😄",
-                        "raczej dobra": "🙂",
-                        "przeciętna": "😐",
-                        "raczej zła": "🙁",
-                        "bardzo zła": "😟",
-                        "odmowa": "🤐",
-                    },
-                },
-            ]
-
-            def _norm_demo(value: Any) -> str:
-                txt = str(value or "").strip().lower()
-                for src, dst in (("ą", "a"), ("ć", "c"), ("ę", "e"), ("ł", "l"), ("ń", "n"), ("ó", "o"), ("ś", "s"), ("ż", "z"), ("ź", "z")):
-                    txt = txt.replace(src, dst)
-                return re.sub(r"\s+", " ", txt)
-
-            def _canon_demo(field: str, value: Any) -> str:
-                raw = str(value or "").strip()
-                n = _norm_demo(value)
-                if not n:
-                    return "brak danych"
-                if field == "M_PLEC":
-                    if n in {"1", "k", "kobieta"} or "kobiet" in n:
-                        return "kobieta"
-                    if n in {"2", "m", "mezczyzna"} or "mezczyzn" in n:
-                        return "mężczyzna"
-                elif field == "M_WIEK":
-                    if re.search(r"15\D*39", n):
-                        return "15-39"
-                    if re.search(r"40\D*59", n):
-                        return "40-59"
-                    if "60" in n:
-                        return "60+"
-                elif field == "M_WYKSZT":
-                    if "wyzsze" in n:
-                        return "wyższe"
-                    if "srednie" in n:
-                        return "średnie"
-                    if any(k in n for k in ("podstaw", "gimnaz", "zawod")):
-                        return "podst./gim./zaw."
-                elif field == "M_ZAWOD":
-                    if "umysl" in n:
-                        return "prac. umysłowy"
-                    if "fizycz" in n:
-                        return "prac. fizyczny"
-                    if "wlasn" in n and "firm" in n:
-                        return "własna firma"
-                    if "student" in n or "uczen" in n:
-                        return "student/uczeń"
-                    if "bezrobot" in n:
-                        return "bezrobotny"
-                    if "renc" in n or "emery" in n:
-                        return "rencista/emeryt"
-                    if "inna" in n or "jaka" in n:
-                        return "inna"
-                elif field == "M_MATERIAL":
-                    if "odmaw" in n:
-                        return "odmowa"
-                    if "bardzo dobrze" in n or "bardzo dobra" in n:
-                        return "bardzo dobra"
-                    if "raczej dobrze" in n or "raczej dobra" in n:
-                        return "raczej dobra"
-                    if "przeciet" in n or "srednio" in n:
-                        return "przeciętna"
-                    if "raczej zle" in n or "raczej zla" in n:
-                        return "raczej zła"
-                    if "bardzo zle" in n or "bardzo zla" in n or "ciezk" in n:
-                        return "bardzo zła"
-                return raw or "brak danych"
-
             if not subset_weights:
                 subset_weights = [1.0] * len(subset_payloads)
             if not all_weights:
                 all_weights = [1.0] * len(all_payloads)
 
-            def _weighted_count(payloads: List[Dict[str, Any]], weights: List[float], field: str) -> Dict[str, float]:
-                out: Dict[str, float] = {}
-                for idx, p in enumerate(payloads):
-                    w = float(weights[idx]) if idx < len(weights) else 1.0
-                    if w <= 0:
-                        continue
-                    val = _canon_demo(field, p.get(field))
-                    out[val] = float(out.get(val, 0.0)) + w
-                return out
-
-            demo_rows: List[Dict[str, Any]] = []
-            demo_cards: List[Dict[str, Any]] = []
-            for spec in dim_specs:
-                dim_label = str(spec["label"])
-                field = str(spec["field"])
-                dist_sub = _weighted_count(subset_payloads, subset_weights, field)
-                dist_all = _weighted_count(all_payloads, all_weights, field)
-                sum_sub = float(sum(float(v) for v in dist_sub.values()))
-                sum_all = float(sum(float(v) for v in dist_all.values()))
-                known_order = list(spec.get("order") or [])
-                unknown = sorted((set(dist_sub.keys()) | set(dist_all.keys())) - set(known_order))
-                cats = known_order + unknown
-
-                top_cat = None
-                top_pct = -1.0
-                top_all_pct = 0.0
-                for cat in cats:
-                    c_sub = float(dist_sub.get(cat, 0.0))
-                    c_all = float(dist_all.get(cat, 0.0))
-                    pct_sub = (100.0 * c_sub / sum_sub) if sum_sub > 0 else 0.0
-                    pct_all = (100.0 * c_all / sum_all) if sum_all > 0 else 0.0
-                    if pct_sub > top_pct:
-                        top_pct = pct_sub
-                        top_cat = cat
-                        top_all_pct = pct_all
-                    demo_rows.append(
-                        {
-                            "Zmienna": dim_label,
-                            "Kategoria": cat,
-                            "% grupa dopasowana": round(pct_sub, 1),
-                            "% ogół mieszkańców (ważony)": round(pct_all, 1),
-                            "Róznica (w pp.)": round(pct_sub - pct_all, 1),
-                        }
-                    )
-                if top_cat is not None:
-                    demo_cards.append(
-                        {
-                            "label": dim_label,
-                            "top": str(top_cat),
-                            "pct": round(max(top_pct, 0.0), 1),
-                            "diff_pp": round(top_pct - top_all_pct, 1),
-                            "emoji": str((spec.get("emoji") or {}).get(str(top_cat), "•")),
-                        }
-                    )
+            demo_specs = _matching_demo_build_specs(jst_study.get("metryczka_config"))
+            if not demo_specs:
+                demo_specs = _matching_demo_build_specs(None)
+            all_demo_records = [
+                {
+                    "payload": p,
+                    "weight": float(all_weights[idx]) if idx < len(all_weights) and math.isfinite(float(all_weights[idx])) else 1.0,
+                }
+                for idx, p in enumerate(all_payloads)
+            ]
+            subset_demo_records = [
+                {
+                    "payload": p,
+                    "weight": float(subset_weights[idx]) if idx < len(subset_weights) and math.isfinite(float(subset_weights[idx])) else 1.0,
+                }
+                for idx, p in enumerate(subset_payloads)
+            ]
+            demo_rows, demo_cards = _matching_demo_build_rows(
+                subset_demo_records,
+                all_demo_records,
+                demo_specs,
+                "% grupa dopasowana",
+            )
 
             st.session_state["matching_result"] = {
                 "person_label": pick_personal,
@@ -5742,6 +5989,7 @@ def matching_view() -> None:
                 },
                 "demo_cards": demo_cards,
                 "demo_rows": demo_rows,
+                "demo_specs": demo_specs,
                 "demo_jst_weighted_header": f"{jst_name_nom} / (po wagowaniu)",
                 "demo_weights_used": bool(weights_used),
                 "target_audit": target_audit,
@@ -6783,19 +7031,25 @@ def matching_view() -> None:
             """,
             unsafe_allow_html=True,
         )
+        demo_specs = [dict(x) for x in list(result.get("demo_specs") or []) if isinstance(x, dict)]
+        if not demo_specs:
+            demo_specs = _matching_demo_build_specs(None)
+        spec_by_label = {
+            str(spec.get("label") or "").strip(): spec
+            for spec in demo_specs
+            if str(spec.get("label") or "").strip()
+        }
         variable_emoji = {
-            "Płeć": "👫",
-            "Wiek": "🧭",
-            "Wykształcenie": "🎓",
-            "Status zawodowy": "💼",
-            "Sytuacja materialna": "💰",
+            str(spec.get("label") or "").strip(): str(spec.get("variable_emoji") or "📌")
+            for spec in demo_specs
+            if str(spec.get("label") or "").strip()
         }
         cards = result.get("demo_cards") or []
         if cards:
             cards_html = "".join(
                 f"""
                 <div class="match-demo-stat">
-                  <div class="match-demo-stat-label">{html.escape(str(variable_emoji.get(str(c.get("label") or ""), "📌")))} {html.escape(str(c.get("label") or "").upper())}</div>
+                  <div class="match-demo-stat-label">{html.escape(str(c.get("variable_emoji") or variable_emoji.get(str(c.get("label") or ""), "📌")))} {html.escape(str(c.get("label") or "").upper())}</div>
                   <div class="match-demo-stat-main">{html.escape(str(c.get("emoji") or ""))} {html.escape(str(c.get("top") or ""))}</div>
                   <div class="match-demo-stat-sub">{float(c.get("pct") or 0.0):.1f}% • {float(c.get("diff_pp") or 0.0):+,.1f} pp</div>
                 </div>
@@ -6817,48 +7071,22 @@ def matching_view() -> None:
         else:
             jst_weighted_header = str(result.get("demo_jst_weighted_header") or "JST / (po wagowaniu)")
             ddf = ddf.copy()
+            if "KategoriaKod" not in ddf.columns:
+                ddf["KategoriaKod"] = ddf["Kategoria"].astype(str)
             ddf["% grupa dopasowana"] = pd.to_numeric(ddf["% grupa dopasowana"], errors="coerce").fillna(0.0).round(1)
             ddf["% ogół mieszkańców (ważony)"] = pd.to_numeric(ddf["% ogół mieszkańców (ważony)"], errors="coerce").fillna(0.0).round(1)
             ddf["Róznica (w pp.)"] = pd.to_numeric(ddf["Róznica (w pp.)"], errors="coerce").fillna(0.0).round(1)
 
-            variable_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
-            category_order = {
-                "Płeć": ["kobieta", "mężczyzna"],
-                "Wiek": ["15-39", "40-59", "60+"],
-                "Wykształcenie": ["podst./gim./zaw.", "średnie", "wyższe"],
-                "Status zawodowy": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
-                "Sytuacja materialna": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
-            }
-            category_emoji = {
-                "kobieta": "👩",
-                "mężczyzna": "👨",
-                "15-39": "🧑",
-                "40-59": "🧑‍💼",
-                "60+": "🧓",
-                "podst./gim./zaw.": "🛠️",
-                "średnie": "📘",
-                "wyższe": "🎓",
-                "prac. umysłowy": "🧠",
-                "prac. fizyczny": "🛠️",
-                "własna firma": "🏢",
-                "student/uczeń": "🧑‍🎓",
-                "bezrobotny": "🔎",
-                "rencista/emeryt": "🌿",
-                "inna": "🧩",
-                "bardzo dobra": "😄",
-                "raczej dobra": "🙂",
-                "przeciętna": "😐",
-                "raczej zła": "🙁",
-                "bardzo zła": "😟",
-                "odmowa": "🤐",
-                "brak danych": "❔",
-            }
-
-            ddf["__var_order"] = ddf["Zmienna"].map(lambda v: variable_order.index(v) if v in variable_order else 999)
+            variable_order = [str(spec.get("label") or "").strip() for spec in demo_specs if str(spec.get("label") or "").strip()]
+            for extra_label in [str(v) for v in list(ddf["Zmienna"].astype(str).unique())]:
+                if extra_label not in variable_order:
+                    variable_order.append(extra_label)
+            variable_pos = {label: idx for idx, label in enumerate(variable_order)}
+            ddf["__var_order"] = ddf["Zmienna"].map(lambda v: int(variable_pos.get(str(v), 999)))
             ddf["__cat_order"] = ddf.apply(
                 lambda row: (
-                    category_order.get(str(row["Zmienna"]), []).index(str(row["Kategoria"]))
-                    if str(row["Kategoria"]) in category_order.get(str(row["Zmienna"]), [])
+                    list((spec_by_label.get(str(row["Zmienna"])) or {}).get("order_codes") or []).index(str(row.get("KategoriaKod") or ""))
+                    if str(row.get("KategoriaKod") or "") in list((spec_by_label.get(str(row["Zmienna"])) or {}).get("order_codes") or [])
                     else 999
                 ),
                 axis=1,
@@ -6870,16 +7098,24 @@ def matching_view() -> None:
                 part = ddf[ddf["Zmienna"] == var_name].copy()
                 if part.empty:
                     continue
+                spec = spec_by_label.get(var_name) or {}
+                value_emoji_map = (
+                    dict(spec.get("value_emoji") or {})
+                    if isinstance(spec.get("value_emoji"), dict)
+                    else {}
+                )
                 top_idx = part["% grupa dopasowana"].idxmax()
                 rowspan = len(part.index)
                 for idx, (_, row) in enumerate(part.iterrows()):
                     cat = str(row["Kategoria"])
+                    cat_code = str(row.get("KategoriaKod") or cat)
                     pct_sub = float(row["% grupa dopasowana"])
                     pct_all = float(row["% ogół mieszkańców (ważony)"])
                     diff = float(row["Róznica (w pp.)"])
                     is_top = bool(row.name == top_idx)
                     bar_w = max(0.0, min(100.0, pct_sub))
                     var_icon = variable_emoji.get(var_name, "📌")
+                    cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")
                     fill_color = "#8ecae6" if is_top else "#d8e5f1"
                     top_border = "border-top:3px solid #b8c2cc;"
                     diff_color = "#0f766e" if diff >= 0 else "#9a3412"
@@ -6903,7 +7139,7 @@ def matching_view() -> None:
                         f"{first_col}"
                         f"<td style=\"font-size:13.5px; font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
                         "<span style='display:inline-flex; align-items:center; gap:6px;'>"
-                        f"<span>{html.escape(category_emoji.get(cat, '📌'))}</span>"
+                        f"<span>{html.escape(cat_icon)}</span>"
                         f"<span>{html.escape(cat)}</span>"
                         "</span>"
                         "</td>"
@@ -7703,105 +7939,32 @@ def matching_view() -> None:
                         elif not subset_records:
                             st.caption("Brak danych respondentów dla wybranego segmentu.")
                         else:
-                            variable_emoji = {
-                                "Płeć": "👫",
-                                "Wiek": "🧭",
-                                "Wykształcenie": "🎓",
-                                "Status zawodowy": "💼",
-                                "Sytuacja materialna": "💰",
+                            seg_demo_specs = [dict(x) for x in list(result.get("demo_specs") or []) if isinstance(x, dict)]
+                            if not seg_demo_specs:
+                                seg_demo_specs = _matching_demo_build_specs((fetch_jst_study_by_id(sb, jst_sid) or {}).get("metryczka_config"))
+                            if not seg_demo_specs:
+                                seg_demo_specs = _matching_demo_build_specs(None)
+                            seg_spec_by_label = {
+                                str(spec.get("label") or "").strip(): spec
+                                for spec in seg_demo_specs
+                                if str(spec.get("label") or "").strip()
                             }
-                            dim_specs_seg = [
-                                {"label": "Płeć", "field": "M_PLEC", "order": ["kobieta", "mężczyzna"]},
-                                {"label": "Wiek", "field": "M_WIEK", "order": ["15-39", "40-59", "60+"]},
-                                {"label": "Wykształcenie", "field": "M_WYKSZT", "order": ["podst./gim./zaw.", "średnie", "wyższe"]},
-                                {"label": "Status zawodowy", "field": "M_ZAWOD", "order": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"]},
-                                {"label": "Sytuacja materialna", "field": "M_MATERIAL", "order": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"]},
-                            ]
-                            category_emoji = {
-                                "kobieta": "👩",
-                                "mężczyzna": "👨",
-                                "15-39": "🧑",
-                                "40-59": "🧑‍💼",
-                                "60+": "🧓",
-                                "podst./gim./zaw.": "🛠️",
-                                "średnie": "📘",
-                                "wyższe": "🎓",
-                                "prac. umysłowy": "🧠",
-                                "prac. fizyczny": "🛠️",
-                                "własna firma": "🏢",
-                                "student/uczeń": "🧑‍🎓",
-                                "bezrobotny": "🔎",
-                                "rencista/emeryt": "🌿",
-                                "inna": "🧩",
-                                "bardzo dobra": "😄",
-                                "raczej dobra": "🙂",
-                                "przeciętna": "😐",
-                                "raczej zła": "🙁",
-                                "bardzo zła": "😟",
-                                "odmowa": "🤐",
-                                "brak danych": "❔",
+                            seg_variable_emoji = {
+                                str(spec.get("label") or "").strip(): str(spec.get("variable_emoji") or "📌")
+                                for spec in seg_demo_specs
+                                if str(spec.get("label") or "").strip()
                             }
-
-                            def _weighted_count_records(records: List[Dict[str, Any]], field: str) -> Dict[str, float]:
-                                out: Dict[str, float] = {}
-                                for rec in records:
-                                    payload = rec.get("payload") if isinstance(rec.get("payload"), dict) else {}
-                                    w = float(rec.get("weight") or 1.0)
-                                    if not math.isfinite(w) or w <= 0:
-                                        continue
-                                    val = _canon_demo_value(field, payload.get(field))
-                                    out[val] = float(out.get(val, 0.0)) + w
-                                return out
-
-                            seg_demo_rows: List[Dict[str, Any]] = []
-                            seg_demo_cards: List[Dict[str, Any]] = []
-                            for spec in dim_specs_seg:
-                                dim_label = str(spec["label"])
-                                field = str(spec["field"])
-                                dist_sub = _weighted_count_records(subset_records, field)
-                                dist_all = _weighted_count_records(all_records, field)
-                                sum_sub = float(sum(float(v) for v in dist_sub.values()))
-                                sum_all = float(sum(float(v) for v in dist_all.values()))
-                                known_order = list(spec.get("order") or [])
-                                unknown = sorted((set(dist_sub.keys()) | set(dist_all.keys())) - set(known_order))
-                                cats = known_order + unknown
-
-                                top_cat: Optional[str] = None
-                                top_pct = -1.0
-                                top_all_pct = 0.0
-                                for cat in cats:
-                                    c_sub = float(dist_sub.get(cat, 0.0))
-                                    c_all = float(dist_all.get(cat, 0.0))
-                                    pct_sub = (100.0 * c_sub / sum_sub) if sum_sub > 0 else 0.0
-                                    pct_all = (100.0 * c_all / sum_all) if sum_all > 0 else 0.0
-                                    if pct_sub > top_pct:
-                                        top_pct = pct_sub
-                                        top_cat = str(cat)
-                                        top_all_pct = pct_all
-                                    seg_demo_rows.append(
-                                        {
-                                            "Zmienna": dim_label,
-                                            "Kategoria": str(cat),
-                                            "% segment": round(pct_sub, 1),
-                                            "% ogół mieszkańców (ważony)": round(pct_all, 1),
-                                            "Róznica (w pp.)": round(pct_sub - pct_all, 1),
-                                        }
-                                    )
-                                if top_cat is not None:
-                                    seg_demo_cards.append(
-                                        {
-                                            "label": dim_label,
-                                            "top": str(top_cat),
-                                            "pct": round(max(top_pct, 0.0), 1),
-                                            "diff_pp": round(top_pct - top_all_pct, 1),
-                                            "emoji": str(category_emoji.get(str(top_cat), "•")),
-                                        }
-                                    )
+                            seg_demo_rows, seg_demo_cards = _matching_demo_build_rows(
+                                subset_records,
+                                all_records,
+                                seg_demo_specs,
+                                "% segment",
+                            )
 
                             cards_html = "".join(
                                 f"""
                                 <div class="match-seg-demo-stat">
-                                  <div class="match-seg-demo-stat-label">{html.escape(str(variable_emoji.get(str(c.get("label") or ""), "📌")))} {html.escape(str(c.get("label") or "").upper())}</div>
+                                  <div class="match-seg-demo-stat-label">{html.escape(str(c.get("variable_emoji") or seg_variable_emoji.get(str(c.get("label") or ""), "📌")))} {html.escape(str(c.get("label") or "").upper())}</div>
                                   <div class="match-seg-demo-stat-main">{html.escape(str(c.get("emoji") or ""))} {html.escape(str(c.get("top") or ""))}</div>
                                   <div class="match-seg-demo-stat-sub">{float(c.get("pct") or 0.0):.1f}% • {float(c.get("diff_pp") or 0.0):+,.1f} pp</div>
                                 </div>
@@ -7832,22 +7995,21 @@ def matching_view() -> None:
                             if ddf.empty:
                                 st.caption("Brak danych demograficznych dla wybranego segmentu.")
                             else:
-                                variable_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
-                                category_order = {
-                                    "Płeć": ["kobieta", "mężczyzna"],
-                                    "Wiek": ["15-39", "40-59", "60+"],
-                                    "Wykształcenie": ["podst./gim./zaw.", "średnie", "wyższe"],
-                                    "Status zawodowy": ["prac. umysłowy", "prac. fizyczny", "własna firma", "student/uczeń", "bezrobotny", "rencista/emeryt", "inna"],
-                                    "Sytuacja materialna": ["bardzo dobra", "raczej dobra", "przeciętna", "raczej zła", "bardzo zła", "odmowa"],
-                                }
+                                if "KategoriaKod" not in ddf.columns:
+                                    ddf["KategoriaKod"] = ddf["Kategoria"].astype(str)
                                 ddf["% segment"] = pd.to_numeric(ddf["% segment"], errors="coerce").fillna(0.0).round(1)
                                 ddf["% ogół mieszkańców (ważony)"] = pd.to_numeric(ddf["% ogół mieszkańców (ważony)"], errors="coerce").fillna(0.0).round(1)
                                 ddf["Róznica (w pp.)"] = pd.to_numeric(ddf["Róznica (w pp.)"], errors="coerce").fillna(0.0).round(1)
-                                ddf["__var_order"] = ddf["Zmienna"].map(lambda v: variable_order.index(v) if v in variable_order else 999)
+                                variable_order = [str(spec.get("label") or "").strip() for spec in seg_demo_specs if str(spec.get("label") or "").strip()]
+                                for extra_label in [str(v) for v in list(ddf["Zmienna"].astype(str).unique())]:
+                                    if extra_label not in variable_order:
+                                        variable_order.append(extra_label)
+                                variable_pos = {label: idx for idx, label in enumerate(variable_order)}
+                                ddf["__var_order"] = ddf["Zmienna"].map(lambda v: int(variable_pos.get(str(v), 999)))
                                 ddf["__cat_order"] = ddf.apply(
                                     lambda row: (
-                                        category_order.get(str(row["Zmienna"]), []).index(str(row["Kategoria"]))
-                                        if str(row["Kategoria"]) in category_order.get(str(row["Zmienna"]), [])
+                                        list((seg_spec_by_label.get(str(row["Zmienna"])) or {}).get("order_codes") or []).index(str(row.get("KategoriaKod") or ""))
+                                        if str(row.get("KategoriaKod") or "") in list((seg_spec_by_label.get(str(row["Zmienna"])) or {}).get("order_codes") or [])
                                         else 999
                                     ),
                                     axis=1,
@@ -7859,16 +8021,24 @@ def matching_view() -> None:
                                     part = ddf[ddf["Zmienna"] == var_name].copy()
                                     if part.empty:
                                         continue
+                                    spec = seg_spec_by_label.get(var_name) or {}
+                                    value_emoji_map = (
+                                        dict(spec.get("value_emoji") or {})
+                                        if isinstance(spec.get("value_emoji"), dict)
+                                        else {}
+                                    )
                                     top_idx = part["% segment"].idxmax()
                                     rowspan = len(part.index)
                                     for idx, (_, row) in enumerate(part.iterrows()):
                                         cat = str(row["Kategoria"])
+                                        cat_code = str(row.get("KategoriaKod") or cat)
                                         pct_sub = float(row["% segment"])
                                         pct_all = float(row["% ogół mieszkańców (ważony)"])
                                         diff = float(row["Róznica (w pp.)"])
                                         is_top = bool(row.name == top_idx)
                                         bar_w = max(0.0, min(100.0, pct_sub))
-                                        var_icon = variable_emoji.get(var_name, "📌")
+                                        var_icon = seg_variable_emoji.get(var_name, "📌")
+                                        cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")
                                         fill_color = "#8ecae6" if is_top else "#d8e5f1"
                                         top_border = "border-top:3px solid #b8c2cc;"
                                         diff_color = "#0f766e" if diff >= 0 else "#9a3412"
@@ -7892,7 +8062,7 @@ def matching_view() -> None:
                                             f"{first_col}"
                                             f"<td style=\"font-size:13.5px; font-weight:{cat_weight}; {top_border if idx == 0 else ''}\">"
                                             "<span style='display:inline-flex; align-items:center; gap:6px;'>"
-                                            f"<span>{html.escape(category_emoji.get(cat, '📌'))}</span>"
+                                            f"<span>{html.escape(cat_icon)}</span>"
                                             f"<span>{html.escape(cat)}</span>"
                                             "</span>"
                                             "</td>"

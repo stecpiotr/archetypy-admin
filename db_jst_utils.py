@@ -322,6 +322,34 @@ def ensure_jst_schema() -> None:
     CREATE INDEX IF NOT EXISTS idx_jst_responses_study ON public.jst_responses(study_id);
     CREATE INDEX IF NOT EXISTS idx_jst_responses_created ON public.jst_responses(created_at);
 
+    CREATE TABLE IF NOT EXISTS public.metryczka_question_templates (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      kind TEXT NOT NULL DEFAULT 'both',
+      name TEXT NOT NULL,
+      question JSONB NOT NULL DEFAULT '{}'::jsonb,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT metry_q_tpl_kind_chk CHECK (kind IN ('jst','personal','both')),
+      CONSTRAINT uq_metry_q_tpl_kind_name UNIQUE (kind, name)
+    );
+
+    ALTER TABLE public.metryczka_question_templates
+      ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'both';
+    ALTER TABLE public.metryczka_question_templates
+      ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE public.metryczka_question_templates
+      ADD COLUMN IF NOT EXISTS question JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE public.metryczka_question_templates
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE public.metryczka_question_templates
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ALTER TABLE public.metryczka_question_templates
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+    CREATE INDEX IF NOT EXISTS idx_metry_q_tpl_kind_active
+      ON public.metryczka_question_templates(kind, is_active);
+
     CREATE OR REPLACE VIEW public.jst_response_count_v
       WITH (security_invoker = on) AS
       SELECT study_id, COUNT(*)::INT AS responses
@@ -980,6 +1008,7 @@ def _utc_now_iso() -> str:
 
 
 _ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
+_TEMPLATE_KINDS = {"jst", "personal", "both"}
 
 
 def normalize_study_status(raw: Optional[str], *, is_active: Optional[bool] = None, deleted_at: Optional[str] = None) -> str:
@@ -1043,6 +1072,161 @@ def fetch_jst_study_by_id(sb: Client, study_id: str) -> Optional[Dict[str, Any]]
     rec["metryczka_config"] = cfg
     rec["metryczka_config_version"] = int(cfg.get("version") or 1)
     return rec
+
+
+def _normalize_template_kind(raw: Any) -> str:
+    txt = str(raw or "").strip().lower()
+    return txt if txt in _TEMPLATE_KINDS else "both"
+
+
+def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
+    src = dict(raw or {}) if isinstance(raw, dict) else {}
+    prompt = str(src.get("prompt") or "").strip()
+    db_column = str(src.get("db_column") or src.get("id") or "").strip().upper()
+    scope = str(src.get("scope") or "custom").strip().lower() or "custom"
+    qid = str(src.get("id") or db_column).strip().upper()
+    options_out: List[Dict[str, str]] = []
+    seen_codes: set[str] = set()
+    for opt in list(src.get("options") or []):
+        if not isinstance(opt, dict):
+            continue
+        label = str(opt.get("label") or "").strip()
+        code = str(opt.get("code") or label).strip()
+        if not label or not code:
+            continue
+        code_u = code.upper()
+        if code_u in seen_codes:
+            continue
+        seen_codes.add(code_u)
+        options_out.append({"label": label, "code": code})
+    return {
+        "id": qid or db_column,
+        "scope": scope,
+        "db_column": db_column,
+        "prompt": prompt,
+        "required": True,
+        "multiple": False,
+        "aliases": [],
+        "options": options_out,
+    }
+
+
+def list_metryczka_question_templates(
+    sb: Client,
+    *,
+    kind: str = "both",
+    include_inactive: bool = False,
+) -> List[Dict[str, Any]]:
+    kind_norm = _normalize_template_kind(kind)
+    query = (
+        sb.table("metryczka_question_templates")
+        .select("*")
+        .order("updated_at", desc=True)
+        .order("name", desc=False)
+    )
+    if not include_inactive:
+        query = query.eq("is_active", True)
+    if kind_norm in {"jst", "personal"}:
+        query = query.in_("kind", [kind_norm, "both"])
+    try:
+        res = query.execute()
+    except Exception as e:
+        if _is_postgrest_missing_any_column_error(e, "metryczka_question_templates"):
+            _notify_postgrest_schema_reload()
+            res = query.execute()
+        else:
+            raise
+    out: List[Dict[str, Any]] = []
+    for row in (res.data or []):
+        rec = dict(row)
+        q = _normalize_template_question_payload(rec.get("question"))
+        if (
+            not str(q.get("prompt") or "").strip()
+            or not str(q.get("db_column") or "").strip()
+            or len(list(q.get("options") or [])) < 2
+        ):
+            continue
+        rec["kind"] = _normalize_template_kind(rec.get("kind"))
+        rec["question"] = q
+        out.append(rec)
+    return out
+
+
+def save_metryczka_question_template(
+    sb: Client,
+    *,
+    name: str,
+    question: Dict[str, Any],
+    kind: str = "both",
+) -> Dict[str, Any]:
+    name_txt = str(name or "").strip()
+    if not name_txt:
+        raise ValueError("Podaj nazwę zapisanego pytania.")
+    q = _normalize_template_question_payload(question)
+    if not str(q.get("prompt") or "").strip():
+        raise ValueError("Nie można zapisać pustej treści pytania.")
+    if not str(q.get("db_column") or "").strip():
+        raise ValueError("Nie można zapisać pytania bez kodowania kolumny.")
+    if len(list(q.get("options") or [])) < 2:
+        raise ValueError("Pytanie musi zawierać co najmniej 2 odpowiedzi.")
+
+    kind_norm = _normalize_template_kind(kind)
+    now_iso = _utc_now_iso()
+    payload = {
+        "kind": kind_norm,
+        "name": name_txt,
+        "question": q,
+        "is_active": True,
+        "updated_at": now_iso,
+    }
+    try:
+        existing = (
+            sb.table("metryczka_question_templates")
+            .select("id")
+            .eq("kind", kind_norm)
+            .eq("name", name_txt)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+    except Exception as e:
+        if _is_postgrest_missing_any_column_error(e, "metryczka_question_templates"):
+            _notify_postgrest_schema_reload()
+            existing = (
+                sb.table("metryczka_question_templates")
+                .select("id")
+                .eq("kind", kind_norm)
+                .eq("name", name_txt)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+        else:
+            raise
+
+    if existing:
+        rec_id = str(existing[0].get("id") or "").strip()
+        if not rec_id:
+            raise RuntimeError("Nie udało się ustalić ID zapisanego pytania.")
+        sb.table("metryczka_question_templates").update(payload).eq("id", rec_id).execute()
+        refreshed = (
+            sb.table("metryczka_question_templates")
+            .select("*")
+            .eq("id", rec_id)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        return dict(refreshed[0]) if refreshed else {"id": rec_id, **payload}
+
+    payload["created_at"] = now_iso
+    ins = sb.table("metryczka_question_templates").insert(payload).execute()
+    if ins.data:
+        return dict(ins.data[0])
+    raise RuntimeError("Nie udało się zapisać pytania metryczkowego.")
 
 
 def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:

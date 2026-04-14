@@ -2106,3 +2106,24 @@
   - podpis metody pod radarem zaktualizowany do `TOP6 + TOP6` i nowego miksu wag.
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-095 (2026-04-14, dynamiczna metryczka: Matching + biblioteka pytań + generator JST)
+- `archetypy-admin/db_jst_utils.py`:
+  - rozszerzono `ensure_jst_schema()` o tabelę `public.metryczka_question_templates` (z indeksem),
+  - dodano helpery:
+    - `list_metryczka_question_templates(...)`,
+    - `save_metryczka_question_template(...)`.
+- `archetypy-admin/app.py`:
+  - edytor metryczki (`_render_metryczka_editor`):
+    - przy pytaniu dodatkowym można zapisać szablon pytania (`💾 Zapisz do zapisanych`),
+    - na dole dodano panel `📚 Wybierz z zapisanych` z możliwością wstawienia zapisanego pytania do bieżącej metryczki,
+  - Matching:
+    - dodano dynamiczne helpery demograficzne (`_matching_demo_build_specs`, `_matching_demo_build_rows`, itd.),
+    - zakładka `Demografia` oraz demografia `Segmentów` przeszły z hardcoded 5 pól na dynamiczne `metryczka_config` (rdzeń + custom `M_*`),
+    - zachowano noty o wagowaniu i pokryciu mapowania.
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - `parse_metryczka(...)` zachowuje dodatkowe kolumny `M_*`,
+  - `_onehot_metry(...)` i funkcje tabel demograficznych liczą po dynamicznej liście kolumn `M_*`,
+  - payload demografii (`var_order/cat_order`) jest budowany dynamicznie.
+- Test techniczny:
+  - `python -m py_compile app.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).

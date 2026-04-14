@@ -1185,6 +1185,30 @@ def parse_metryczka(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Dict[int,
     out["M_ZAWOD"] = df[col_map["M_ZAWOD"]].map(_parse_employment).astype(int)
     out["M_MATERIAL"] = df[col_map["M_MATERIAL"]].map(_parse_material).astype(int)
 
+    # Dodatkowe pola metryczkowe (M_*) przepuszczamy dynamicznie.
+    # Dzięki temu raport może pokazać także niestandardowe zmienne demograficzne.
+    used_src_cols = {str(v) for v in col_map.values()}
+    for src_col in list(df.columns):
+        src_name = str(src_col or "").strip()
+        src_upper = src_name.upper()
+        if not src_upper.startswith("M_"):
+            continue
+        if src_upper in out.columns:
+            continue
+        if src_name in used_src_cols:
+            continue
+        series_raw = df[src_col]
+        series_num = pd.to_numeric(series_raw, errors="coerce")
+        non_na_num = int(series_num.notna().sum())
+        if non_na_num > 0 and non_na_num >= max(3, int(0.7 * max(1, len(series_num)))):
+            out[src_upper] = series_num.fillna(0).astype(int)
+        else:
+            out[src_upper] = (
+                series_raw.fillna("")
+                .astype(str)
+                .map(lambda x: " ".join(str(x).split()).strip())
+            )
+
     return out, METRY_DEFS
 
 def apply_poststrat_weights_from_targets(
@@ -12024,24 +12048,99 @@ def _segment_brand_title(primary: Optional[str],
     return f"{left} + {right}"
 
 
+_CORE_METRY_COL_ORDER = ["M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_MATERIAL"]
+_CORE_METRY_VAR_LABELS = {
+    "M_PLEC": "Płeć",
+    "M_WIEK": "Wiek",
+    "M_WYKSZT": "Wykształcenie",
+    "M_ZAWOD": "Status zawodowy",
+    "M_MATERIAL": "Sytuacja materialna",
+}
+
+
+def _ordered_metry_columns(metry: pd.DataFrame) -> List[str]:
+    if metry is None or len(metry.columns) == 0:
+        return []
+    by_upper: Dict[str, str] = {}
+    for col in list(metry.columns):
+        c = str(col or "").strip()
+        cu = c.upper()
+        if not cu.startswith("M_"):
+            continue
+        if cu not in by_upper:
+            by_upper[cu] = c
+    ordered_upper = [c for c in _CORE_METRY_COL_ORDER if c in by_upper]
+    extras = sorted([c for c in by_upper.keys() if c not in ordered_upper])
+    ordered_upper.extend(extras)
+    return [by_upper[c] for c in ordered_upper]
+
+
+def _metry_var_label(col_name: str) -> str:
+    cu = str(col_name or "").strip().upper()
+    if cu in _CORE_METRY_VAR_LABELS:
+        return _CORE_METRY_VAR_LABELS[cu]
+    txt = cu[2:] if cu.startswith("M_") else cu
+    txt = txt.replace("_", " ").strip()
+    return txt.title() if txt else cu
+
+
+def _metry_column_categories(metry: pd.DataFrame, col_name: str) -> List[Tuple[Any, str, np.ndarray]]:
+    if col_name not in metry.columns:
+        return []
+
+    cu = str(col_name or "").strip().upper()
+    defs = METRY_DEFS.get(cu, {})
+    series = metry[col_name]
+    series_num = pd.to_numeric(series, errors="coerce")
+    if defs and int(series_num.notna().sum()) > 0:
+        x = series_num.to_numpy(dtype=float)
+        m_x = np.isfinite(x)
+        cats = sorted({int(v) for v in x[m_x]})
+        out_num: List[Tuple[Any, str, np.ndarray]] = []
+        for cat in cats:
+            mask = m_x & (x == float(cat))
+            out_num.append((cat, str(defs.get(int(cat), int(cat))), mask))
+        return out_num
+
+    s = series.fillna("").astype(str).map(lambda x: " ".join(str(x).split()).strip())
+    arr = s.to_numpy(dtype=object)
+    is_missing = np.array([len(str(v).strip()) == 0 for v in arr], dtype=bool)
+    values = sorted({str(v).strip() for v in arr if str(v).strip()})
+    out_txt: List[Tuple[Any, str, np.ndarray]] = []
+    if bool(is_missing.any()):
+        out_txt.append(("__MISSING__", "brak danych", is_missing))
+    for val in values:
+        mask = np.array([str(v).strip() == val for v in arr], dtype=bool)
+        out_txt.append((val, val, mask))
+    return out_txt
+
+
 def _onehot_metry(metry: pd.DataFrame) -> np.ndarray:
     """One-hot metryczki (M_*), z zachowaniem 'brak danych' jako osobnej kategorii."""
-    cols = ["M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_MATERIAL"]
+    cols = _ordered_metry_columns(metry)
     mats = []
     for c in cols:
-        if c not in metry.columns:
+        cat_defs = _metry_column_categories(metry, c)
+        if not cat_defs:
             continue
-        s = pd.to_numeric(metry[c], errors="coerce").fillna(0).astype(int)
-        # zbuduj pełen zakres 0..max
-        mx = int(s.max()) if len(s) else 0
-        cats = list(range(0, mx + 1))
-        d = pd.get_dummies(s, prefix=c, prefix_sep="=", columns=[c])
-        # upewnij się, że wszystkie kolumny istnieją
-        for k in cats:
-            name = f"{c}={k}"
-            if name not in d.columns:
-                d[name] = 0
-        d = d[[f"{c}={k}" for k in cats]]
+        s = metry[c].fillna("").astype(str).map(lambda x: " ".join(str(x).split()).strip())
+        s_key = s.copy()
+        key_order: List[str] = []
+        key_to_label: Dict[str, str] = {}
+        for raw_key, disp_label, mask in cat_defs:
+            _ = mask
+            key = f"{c}::{raw_key}"
+            key_order.append(key)
+            key_to_label[key] = str(disp_label)
+            if str(raw_key) == "__MISSING__":
+                s_key = s_key.mask(s.str.len() == 0, key)
+            else:
+                s_key = s_key.mask(s == str(raw_key), key)
+        d = pd.get_dummies(s_key, prefix="", prefix_sep="")
+        for key in key_order:
+            if key not in d.columns:
+                d[key] = 0
+        d = d[key_order]
         mats.append(d.to_numpy(dtype=float))
     if not mats:
         return np.zeros((len(metry), 1), dtype=float)
@@ -13431,26 +13530,10 @@ def _format_segment_demography_rows(metry: pd.DataFrame, seg_mask: np.ndarray, w
     if total_w <= 0 or seg_w <= 0:
         return []
 
-    var_labels = {
-        "M_PLEC": "Płeć",
-        "M_WIEK": "Wiek",
-        "M_WYKSZT": "Wykształcenie",
-        "M_ZAWOD": "Status zawodowy",
-        "M_MATERIAL": "Sytuacja materialna",
-    }
-
     rows: List[Dict[str, Any]] = []
-    for col in ["M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_MATERIAL"]:
-        if col not in metry.columns:
-            continue
-
-        defs = METRY_DEFS.get(col, {})
-        x = pd.to_numeric(metry[col], errors="coerce").to_numpy(dtype=float)
-        m_x = np.isfinite(x)
-
-        cats = sorted({int(v) for v in x[m_x]})
-        for cat in cats:
-            m_cat = m_x & (x == float(cat)) & m_w
+    for col in _ordered_metry_columns(metry):
+        for _cat_key, cat_label, cat_mask in _metry_column_categories(metry, col):
+            m_cat = cat_mask & m_w
             w_all = float(w[m_cat].sum())
             w_seg_cat = float(w[m_cat & seg_mask].sum())
 
@@ -13459,8 +13542,8 @@ def _format_segment_demography_rows(metry: pd.DataFrame, seg_mask: np.ndarray, w
             lift_pp = pct_seg - pct_all
 
             rows.append({
-                "zmienna": var_labels.get(col, col),
-                "kategoria": str(defs.get(int(cat), int(cat))),
+                "zmienna": _metry_var_label(col),
+                "kategoria": str(cat_label),
                 "pct_seg": float(pct_seg),
                 "pct_all": float(pct_all),
                 "lift_pp": float(lift_pp),
@@ -13808,26 +13891,10 @@ def _format_demography_rows_between_masks(
     if base_w <= 0 or group_w <= 0:
         return []
 
-    var_labels = {
-        "M_PLEC": "Płeć",
-        "M_WIEK": "Wiek",
-        "M_WYKSZT": "Wykształcenie",
-        "M_ZAWOD": "Status zawodowy",
-        "M_MATERIAL": "Sytuacja materialna",
-    }
-
     rows: List[Dict[str, Any]] = []
-    for col in ["M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_MATERIAL"]:
-        if col not in metry.columns:
-            continue
-
-        defs = METRY_DEFS.get(col, {})
-        x = pd.to_numeric(metry[col], errors="coerce").to_numpy(dtype=float)
-        m_x = np.isfinite(x)
-
-        cats = sorted({int(v) for v in x[m_x]})
-        for cat in cats:
-            m_cat = m_x & (x == float(cat)) & m_w
+    for col in _ordered_metry_columns(metry):
+        for _cat_key, cat_label, cat_mask in _metry_column_categories(metry, col):
+            m_cat = cat_mask & m_w
             w_base_cat = float(w[m_cat & base_mask].sum())
             w_group_cat = float(w[m_cat & group_mask].sum())
 
@@ -13836,8 +13903,8 @@ def _format_demography_rows_between_masks(
             lift_pp = pct_seg - pct_all
 
             rows.append({
-                "zmienna": var_labels.get(col, col),
-                "kategoria": str(defs.get(int(cat), int(cat))),
+                "zmienna": _metry_var_label(col),
+                "kategoria": str(cat_label),
                 "pct_seg": float(pct_seg),
                 "pct_all": float(pct_all),
                 "lift_pp": float(lift_pp),
@@ -13857,29 +13924,22 @@ def _build_b2_declared_demo_payload(
         brand_values: Optional[Dict[str, str]] = None,
         city_label: str = "Poznań / próba",
 ) -> Dict[str, Any]:
-    var_order = ["Płeć", "Wiek", "Wykształcenie", "Status zawodowy", "Sytuacja materialna"]
-    cat_order = {
-        "Płeć": ["kobieta", "mężczyzna"],
-        "Wiek": ["15-39", "40-59", "60+"],
-        "Wykształcenie": ["podst./gim./zaw.", "średnie", "wyższe"],
-        "Status zawodowy": [
-            "prac. umysłowy",
-            "prac. fizyczny",
-            "własna firma",
-            "student/uczeń",
-            "bezrobotny",
-            "rencista/emeryt",
-            "inna",
-        ],
-        "Sytuacja materialna": [
-            "bardzo dobra",
-            "raczej dobra",
-            "przeciętna",
-            "raczej zła",
-            "bardzo zła",
-            "odmowa",
-        ],
-    }
+    var_order: List[str] = []
+    cat_order: Dict[str, List[str]] = {}
+    for col in _ordered_metry_columns(metry):
+        v_label = _metry_var_label(col)
+        if v_label not in var_order:
+            var_order.append(v_label)
+        cats = [str(lbl) for _raw, lbl, _mask in _metry_column_categories(metry, col)]
+        seen_cats: set[str] = set()
+        unique_cats: List[str] = []
+        for cat in cats:
+            nk = " ".join(str(cat).split()).strip().lower()
+            if nk in seen_cats:
+                continue
+            seen_cats.add(nk)
+            unique_cats.append(cat)
+        cat_order[v_label] = unique_cats
 
     value_map = {a: str((brand_values or {}).get(a, a)) for a in ARCHETYPES}
 
