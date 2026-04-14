@@ -2654,3 +2654,20 @@ Wynik:
     - `Śr. luka kluczowa |Δ| (pp)`.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-094 [DONE]
+Temat: Segmenty w Matching — złagodzenie zbyt agresywnych kar (problem 0%) + przejście na TOP6 + szersza legenda nad radarem.
+Kryteria ukończenia:
+1. Segmentowy scoring nadal key-focused, ale rzadziej wpada w 0% przy dużych lukach.
+2. Pula kluczowa liczona na `TOP6 polityka + TOP6 segmentu`.
+3. Legenda nad radarem ma większą szerokość i nie ucina etykiet.
+Pierwszy krok wykonawczy:
+- dostroić wagi/kary w `segment_strategic_score` i zastąpić legendę Plotly szerszą legendą HTML.
+Wynik:
+- `app.py`:
+  - key-pool zmieniony z TOP5 na TOP6,
+  - złagodzone kary segmentowe (`key_penalty`, `shared_priority_penalty`, `main_priority_mismatch_penalty`),
+  - zmieniony miks bazy (`global/key`) na mniej skrajny,
+  - legenda nad radarem przeniesiona do szerszej wersji HTML (`match-seg-radar-legend` + pill), a legenda Plotly dla tego radaru wyłączona.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

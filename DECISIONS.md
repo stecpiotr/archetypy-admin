@@ -1898,3 +1898,24 @@ Decyzja:
   - kartę `Poziom zgodności wybranego segmentu` (%, ocena, pasek).
 Uzasadnienie:
 - User potrzebuje natychmiastowego kontekstu „dla kogo” i bieżącej oceny wybranego segmentu bez scrollowania do radaru i tabel pomocniczych.
+
+### D-209: Segmentowy key-focused scoring przechodzi z TOP5 na TOP6 i ma łagodniejsze kary
+Decyzja:
+- Pula kluczowa dla `Segmentów`:
+  - `TOP6 polityka + TOP6 segmentu` (zamiast TOP5).
+- Dla segmentów obniżono agresywność kar:
+  - mniejsza kara za rozjazd TOP1,
+  - mniejsza kara za brak/wąską część wspólną TOP,
+  - łagodniejsza kara od `KEY_MAE` i `KEY_MAX`.
+- Miks bazowy:
+  - `35% global + 65% key` (zamiast silniejszego dociążenia key).
+Uzasadnienie:
+- User wskazał przypadki, w których wynik spadał do `0%` mimo oczekiwania bardziej zniuansowanej oceny.
+- Celem jest utrzymanie priorytetu osi kluczowych, ale bez „twardego zerowania” przy trudniejszych profilach.
+
+### D-210: Legenda nad radarem segmentowym renderowana jako szeroka legenda HTML
+Decyzja:
+- Dla radaru w zakładce `Segmenty` wyłączamy legendę Plotly i renderujemy własną, szerszą legendę HTML (pill).
+Uzasadnienie:
+- Legenda Plotly przy dłuższych nazwach segmentów bywała obcinana.
+- Wersja HTML daje stabilną szerokość i czytelność niezależnie od długości etykiet.

@@ -6962,7 +6962,7 @@ def matching_view() -> None:
         st.markdown(
             "Porównanie działa wyłącznie na wspólnej skali 12 archetypów (0-100): "
             "dla każdego segmentu liczona jest zgodność strategiczna z naciskiem na kluczowe archetypy "
-            "(TOP5 polityka + TOP5 segmentu, analiza TOP3/TOP2, luki i kary za rozjazdy priorytetów)."
+            "(TOP6 polityka + TOP6 segmentu, analiza TOP3/TOP2, luki i kary za rozjazdy priorytetów)."
         )
         if segment_err:
             st.warning(segment_err)
@@ -7006,7 +7006,7 @@ def matching_view() -> None:
                     return top3[:2]
                 return top3
 
-            def _segment_top_n(profile_100: Dict[str, float], n: int = 5) -> List[str]:
+            def _segment_top_n(profile_100: Dict[str, float], n: int = 6) -> List[str]:
                 ordered = sorted(
                     arch_order,
                     key=lambda a: (-float(profile_100.get(a, 0.0)), arch_order.index(a)),
@@ -7024,11 +7024,11 @@ def matching_view() -> None:
                 top3_gap_mae_all = float(sum(sorted(diff_vals_all, reverse=True)[:3]) / max(1, min(3, len(diff_vals_all))))
 
                 key_pool: List[str] = []
-                for a in _segment_top_n(person_profile_100, 5) + _segment_top_n(seg_profile_100, 5):
+                for a in _segment_top_n(person_profile_100, 6) + _segment_top_n(seg_profile_100, 6):
                     if a not in key_pool:
                         key_pool.append(a)
                 if not key_pool:
-                    key_pool = arch_order[:5]
+                    key_pool = arch_order[:6]
                 diff_vals_key = [float(diffs.get(a, 0.0)) for a in key_pool]
                 mae_key = float(sum(diff_vals_key) / max(1, len(diff_vals_key)))
                 rmse_key = math.sqrt(float(sum(v * v for v in diff_vals_key) / max(1, len(diff_vals_key))))
@@ -7045,10 +7045,10 @@ def matching_view() -> None:
                 key_gap_max = float(max(key_gap_vals)) if key_gap_vals else 0.0
                 shared_priority_count = len(set(person_top).intersection(set(seg_top)))
                 main_priority_mismatch_penalty = (
-                    3.0 if (person_top and seg_top and person_top[0] != seg_top[0]) else 0.0
+                    1.8 if (person_top and seg_top and person_top[0] != seg_top[0]) else 0.0
                 )
                 shared_priority_penalty = (
-                    7.0 if shared_priority_count == 0 else (3.0 if shared_priority_count == 1 else 0.0)
+                    4.0 if shared_priority_count == 0 else (1.5 if shared_priority_count == 1 else 0.0)
                 )
 
                 score_mae_all = max(0.0, min(100.0, 100.0 - mae_all))
@@ -7059,10 +7059,10 @@ def matching_view() -> None:
                 score_top3_key = max(0.0, min(100.0, 100.0 - top3_gap_mae_key))
                 base_global = 0.50 * score_mae_all + 0.20 * score_rmse_all + 0.30 * score_top3_all
                 base_key = 0.45 * score_mae_key + 0.25 * score_rmse_key + 0.30 * score_top3_key
-                base_score = 0.25 * base_global + 0.75 * base_key
+                base_score = 0.35 * base_global + 0.65 * base_key
                 key_penalty = (
-                    0.70 * key_gap_mae
-                    + 0.30 * max(0.0, key_gap_max - 10.0)
+                    0.50 * key_gap_mae
+                    + 0.18 * max(0.0, key_gap_max - 12.0)
                     + shared_priority_penalty
                     + main_priority_mismatch_penalty
                 )
@@ -7312,6 +7312,38 @@ def matching_view() -> None:
                       @media (max-width: 900px){
                         .match-seg-top3-style-grid{grid-template-columns:1fr;}
                       }
+                      .match-seg-radar-legend{
+                        margin:4px auto 10px auto;
+                        max-width:1140px;
+                        width:100%;
+                        display:flex;
+                        justify-content:center;
+                        gap:12px;
+                        flex-wrap:wrap;
+                      }
+                      .match-seg-radar-pill{
+                        display:inline-flex;
+                        align-items:center;
+                        gap:8px;
+                        border:1px solid #dbe4ef;
+                        background:#fff;
+                        border-radius:999px;
+                        padding:7px 14px;
+                        font-size:13px;
+                        font-weight:700;
+                        color:#1f2f44;
+                        min-width:340px;
+                        justify-content:center;
+                      }
+                      .match-seg-radar-line{
+                        width:30px;
+                        height:0;
+                        border-top:3px solid #2563eb;
+                        display:inline-block;
+                      }
+                      .match-seg-radar-line.dashed{
+                        border-top:3px dashed #0f766e;
+                      }
                     </style>
                     """,
                     unsafe_allow_html=True,
@@ -7392,6 +7424,15 @@ def matching_view() -> None:
                 segment_name_seg = str(selected_seg.get("segment_name") or selected_seg.get("segment") or "segment")
                 legend_person_label = f"profil polityka ({person_name_seg})"
                 legend_segment_label = f"profil segmentu ({segment_name_seg})"
+                st.markdown(
+                    f"""
+                    <div class="match-seg-radar-legend">
+                      <span class="match-seg-radar-pill"><span class="match-seg-radar-line"></span>{html.escape(legend_person_label)}</span>
+                      <span class="match-seg-radar-pill"><span class="match-seg-radar-line dashed"></span>{html.escape(legend_segment_label)}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
                 fig_seg = go.Figure(
                     data=[
@@ -7403,7 +7444,7 @@ def matching_view() -> None:
                             line=dict(color="#2563eb", width=3),
                             marker=dict(size=5, symbol="circle"),
                             name=legend_person_label,
-                            showlegend=True,
+                            showlegend=False,
                             hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
                         ),
                         go.Scatterpolar(
@@ -7414,7 +7455,7 @@ def matching_view() -> None:
                             line=dict(color="#0f766e", width=3, dash="dot"),
                             marker=dict(size=6, symbol="square"),
                             name=legend_segment_label,
-                            showlegend=True,
+                            showlegend=False,
                             hovertemplate="<b>%{theta}</b><br>Segment: %{r:.2f}<extra></extra>",
                         ),
                         go.Scatterpolar(
@@ -7452,21 +7493,7 @@ def matching_view() -> None:
                         ),
                     ),
                     margin=dict(l=24, r=24, t=66, b=90),
-                    showlegend=True,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.17,
-                        xanchor="center",
-                        x=0.5,
-                        font=dict(size=13),
-                        bgcolor="rgba(255,255,255,0.94)",
-                        bordercolor="#cfd9e8",
-                        borderwidth=1,
-                        tracegroupgap=18,
-                        itemclick="toggle",
-                        itemdoubleclick="toggleothers",
-                    ),
+                    showlegend=False,
                 )
                 seg_key_safe = re.sub(
                     r"[^a-zA-Z0-9_-]+",
@@ -7496,7 +7523,7 @@ def matching_view() -> None:
                 )
                 st.caption(
                     "Metoda porównania strategicznego (key-focused): 75% wagi ma pula kluczowa "
-                    "(TOP5 polityka + TOP5 segmentu), 25% ma profil pełny 12 archetypów; "
+                    "(TOP6 polityka + TOP6 segmentu), 35% ma profil pełny 12 archetypów; "
                     "dodatkowo działa kara za luki priorytetów TOP3/TOP2."
                 )
 

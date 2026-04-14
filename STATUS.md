@@ -2091,3 +2091,18 @@
     - `Zgodność (%)`.
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-094 (2026-04-14, segmenty: TOP6 + złagodzenie kar + szersza legenda)
+- `archetypy-admin/app.py` (`🧭 Matching > Segmenty`):
+  - segmentowa pula kluczowa zmieniona na `TOP6 polityka + TOP6 segmentu` (zamiast TOP5),
+  - złagodzono agresywność kar, które powodowały częste zjazdy do `0,0%`:
+    - niższa kara za rozjazd TOP1,
+    - niższa kara za brak/wąską część wspólną TOP,
+    - słabsza kara liniowa od `KEY_MAE` i od `KEY_MAX`,
+  - miks bazowy zmieniono na mniej skrajny (`35% global`, `65% key`) zamiast silniejszego dociążenia key.
+  - legenda nad radarem:
+    - zastąpiona szeroką legendą HTML (`match-seg-radar-legend`),
+    - wyłączona legenda Plotly dla radaru segmentowego (żeby uniknąć obcinania etykiet).
+  - podpis metody pod radarem zaktualizowany do `TOP6 + TOP6` i nowego miksu wag.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).
