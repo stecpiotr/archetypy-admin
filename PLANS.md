@@ -2256,3 +2256,24 @@ Wynik:
 - Smoke-check:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Hotfix H-073 [DONE]
+Temat: Dopieszczenie panelu `Wklej pytanie i odpowiedzi` (format prefill + większe pole + ciaśniejszy podgląd).
+Kryteria ukończenia:
+1. Prefill panelu odpowiada workflow edycyjnemu (`Pytanie:` + `Odpowiedzi:` + numerowane opcje).
+2. Parser rozumie prefiks `Pytanie:` i nie przepuszcza go do treści pytania.
+3. Pole `Wklej treść` jest wyraźnie wyższe.
+4. W podglądzie lista odpowiedzi ma ciaśniejsze odstępy.
+Pierwszy krok wykonawczy:
+- poprawić seed i parser w `_render_metryczka_editor` / `_parse_pasted_question_and_answers` oraz podnieść `height` textarea.
+Wynik:
+- `app.py`:
+  - parser akceptuje i czyści prefiks `Pytanie:`,
+  - prefill pola `Wklej treść`:
+    - `Pytanie: ...`,
+    - `Odpowiedzi:`,
+    - `1. ...`, `2. ...`, ...,
+  - wysokość pola `Wklej treść` podniesiona z `170` do `260`,
+  - podgląd odpowiedzi renderowany bardziej kompaktowo (mniejsze marginesy i line-height `ul/li`).
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

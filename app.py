@@ -2622,9 +2622,10 @@ def _parse_pasted_question_and_answers(raw_text: Any, fallback_prompt: str = "")
         if not txt:
             continue
         low = txt.lower().rstrip(":")
-        if low in {"treść pytania", "tresc pytania", "odpowiedzi", "odpowiedź", "odpowiedz"}:
+        if low in {"treść pytania", "tresc pytania", "pytanie", "odpowiedzi", "odpowiedź", "odpowiedz"}:
             continue
         txt = re.sub(r"^(?:treść pytania|tresc pytania)\s*:\s*", "", txt, flags=re.IGNORECASE).strip()
+        txt = re.sub(r"^(?:pytanie)\s*:\s*", "", txt, flags=re.IGNORECASE).strip()
         txt = re.sub(r"^(?:odpowiedzi|odpowiedź|odpowiedz)\s*:\s*", "", txt, flags=re.IGNORECASE).strip()
         if txt:
             lines.append(txt)
@@ -2868,8 +2869,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             else:
                 seed_lines: List[str] = []
                 if existing_prompt:
-                    seed_lines.append(existing_prompt)
-                seed_lines.extend(existing_answers)
+                    seed_lines.append(f"Pytanie: {existing_prompt}")
+                if existing_answers:
+                    seed_lines.append("Odpowiedzi:")
+                    seed_lines.extend([f"{i}. {ans}" for i, ans in enumerate(existing_answers, start=1)])
                 st.session_state[paste_text_key] = "\n".join(seed_lines).strip()
 
         if bool(st.session_state.get(paste_toggle_key, False)):
@@ -2884,12 +2887,13 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     pasted_text = st.text_area(
                         "Wklej treść",
                         key=paste_text_key,
-                        height=170,
+                        height=260,
                         placeholder=(
-                            "Treść pytania...\n"
-                            "Odpowiedź 1\n"
-                            "Odpowiedź 2\n"
-                            "Odpowiedź 3"
+                            "Pytanie: Treść pytania...\n"
+                            "Odpowiedzi:\n"
+                            "1. Odpowiedź 1\n"
+                            "2. Odpowiedź 2\n"
+                            "3. Odpowiedź 3"
                         ),
                         label_visibility="collapsed",
                     )
@@ -2908,12 +2912,13 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     if preview_answers:
                         st.markdown("**Odpowiedzi:**")
                         answers_html = "".join(
-                            f"<li>{html.escape(str(ans))}</li>" for ans in preview_answers
+                            f"<li style='margin:0.08rem 0;'>{html.escape(str(ans))}</li>"
+                            for ans in preview_answers
                         )
                         st.markdown(
                             (
-                                "<ul style='margin:0.2rem 0 0 1rem; padding-left:0.8rem; "
-                                "line-height:1.22; display:block;'>"
+                                "<ul style='margin:0.12rem 0 0.04rem 1rem; padding-left:0.75rem; "
+                                "line-height:1.14; list-style-position:outside; display:block;'>"
                                 f"{answers_html}</ul>"
                             ),
                             unsafe_allow_html=True,

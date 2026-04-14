@@ -1642,3 +1642,17 @@ Decyzja:
   - `overflow-wrap: normal`.
 Uzasadnienie:
 - User wymaga braku podziałów typu `wy-` / `cofywać` i `społeczny-` / `ch`; tekst ma zawijać się wyłącznie między pełnymi wyrazami.
+
+### D-182: Prefill panelu `Wklej pytanie i odpowiedzi` ma być formatem edycyjnym, nie surową listą
+Decyzja:
+- Seed pola `Wklej treść` renderujemy jako:
+  - `Pytanie: {treść}`,
+  - `Odpowiedzi:`,
+  - numerowane odpowiedzi (`1.`, `2.`, ...).
+- Parser obsługuje i czyści prefiks `Pytanie:` analogicznie do `Treść pytania:`.
+- Wysokość pola wejściowego zwiększamy do `260`.
+- Podgląd odpowiedzi renderujemy kompaktowo (ciasne `ul/li`).
+Uzasadnienie:
+- Użytkownik oczekuje workflow zgodnego z nagraniem referencyjnym: po otwarciu od razu edytowalny „blok” pytanie+odpowiedzi.
+- Większe pole wejściowe jest potrzebne przy realnych pytaniach z dłuższą listą odpowiedzi.
+- Domyślny markdown list dawał zbyt duże odstępy, co pogarszało czytelność podglądu.

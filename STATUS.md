@@ -1773,3 +1773,19 @@
 - Testy techniczne:
   - `npx tsc -p tsconfig.app.json --noEmit` (OK),
   - `npm run build` (OK).
+
+### Zrobione w Hotfix H-073 (2026-04-14, metryczka paste: format edycyjny + wyższe pole)
+- `archetypy-admin/app.py`:
+  - panel `📋 Wklej pytanie i odpowiedzi` dostał prefill w formacie:
+    - `Pytanie: ...`,
+    - `Odpowiedzi:`,
+    - numerowane odpowiedzi `1.`, `2.`, `3.` ...,
+  - parser czyści teraz także prefiks `Pytanie:`,
+  - pole `Wklej treść` zwiększono do `height=260`,
+  - lista `Odpowiedzi` w podglądzie ma ciaśniejsze odstępy (`ul/li` inline style).
+- Efekt:
+  - edycja istniejącego pytania i odpowiedzi jest szybsza i bardziej przewidywalna,
+  - obszar edycji jest wygodniejszy przy dłuższych zestawach odpowiedzi,
+  - podgląd nie „rozciąga” listy.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
