@@ -1879,3 +1879,22 @@ Uzasadnienie:
 
 Status:
 - Decyzja D-204 zostaje zastąpiona przez D-206.
+
+### D-207: Segmentowy scoring key-focused — 75% wagi dla puli kluczowej `TOP5 + TOP5`
+Decyzja:
+- W `Segmentach` finalny wynik zgodności liczony jest z przewagą puli kluczowej:
+  - `base_global` na wszystkich 12 archetypach,
+  - `base_key` na puli `TOP5 polityka + TOP5 segmentu`,
+  - finalnie: `0.25*base_global + 0.75*base_key - key_penalty`.
+- Kary priorytetowe TOP3/TOP2 są utrzymane i wzmocnione dla analizy segmentowej.
+Uzasadnienie:
+- User oczekuje, aby wynik segmentu był liczony „w głównej mierze po kluczowych archetypach”, a nie po pełnym profilu 12 archetypów.
+- Taki układ ogranicza ryzyko sztucznie zawyżonej zgodności, gdy zgodność globalna maskuje rozjazdy w osiach kluczowych kampanijnie.
+
+### D-208: Segmenty dostają własny panel kontekstowy u góry (kogo dotyczy + poziom wybranego segmentu)
+Decyzja:
+- Zakładka `Segmenty` renderuje na górze:
+  - blok kontekstowy (badanie personalne + badanie mieszkańców),
+  - kartę `Poziom zgodności wybranego segmentu` (%, ocena, pasek).
+Uzasadnienie:
+- User potrzebuje natychmiastowego kontekstu „dla kogo” i bieżącej oceny wybranego segmentu bez scrollowania do radaru i tabel pomocniczych.

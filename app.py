@@ -6961,10 +6961,8 @@ def matching_view() -> None:
 
         st.markdown(
             "Porównanie działa wyłącznie na wspólnej skali 12 archetypów (0-100): "
-            "dla każdego segmentu liczona jest średnia luka |Δ| względem profilu polityka."
-            " W `Segmentach` wskaźnik zgodności liczony jest teraz metryką strategiczną (jak w `Podsumowaniu`): "
-            "`base = 0.40*(100-MAE) + 0.20*(100-RMSE) + 0.20*(100-TOP3_MAE) + 0.20*(100-KEY_MAE)`, "
-            "`zgodność = clamp(0,100, base - kara_kluczowa)`."
+            "dla każdego segmentu liczona jest zgodność strategiczna z naciskiem na kluczowe archetypy "
+            "(TOP5 polityka + TOP5 segmentu, analiza TOP3/TOP2, luki i kary za rozjazdy priorytetów)."
         )
         if segment_err:
             st.warning(segment_err)
@@ -7008,16 +7006,33 @@ def matching_view() -> None:
                     return top3[:2]
                 return top3
 
+            def _segment_top_n(profile_100: Dict[str, float], n: int = 5) -> List[str]:
+                ordered = sorted(
+                    arch_order,
+                    key=lambda a: (-float(profile_100.get(a, 0.0)), arch_order.index(a)),
+                )
+                return ordered[: max(1, int(n))]
+
             def _segment_strategic_score(person_profile_100: Dict[str, float], seg_profile_100: Dict[str, float]) -> Dict[str, float]:
                 diffs = {
                     a: abs(float(person_profile_100.get(a, 0.0)) - float(seg_profile_100.get(a, 0.0)))
                     for a in arch_order
                 }
-                diff_vals = [float(v) for v in diffs.values()]
-                mae = float(sum(diff_vals) / max(1, len(diff_vals)))
-                rmse = math.sqrt(float(sum(v * v for v in diff_vals) / max(1, len(diff_vals))))
-                sorted_gaps_desc = sorted(diff_vals, reverse=True)
-                top3_gap_mae = float(sum(sorted_gaps_desc[:3]) / max(1, min(3, len(sorted_gaps_desc))))
+                diff_vals_all = [float(v) for v in diffs.values()]
+                mae_all = float(sum(diff_vals_all) / max(1, len(diff_vals_all)))
+                rmse_all = math.sqrt(float(sum(v * v for v in diff_vals_all) / max(1, len(diff_vals_all))))
+                top3_gap_mae_all = float(sum(sorted(diff_vals_all, reverse=True)[:3]) / max(1, min(3, len(diff_vals_all))))
+
+                key_pool: List[str] = []
+                for a in _segment_top_n(person_profile_100, 5) + _segment_top_n(seg_profile_100, 5):
+                    if a not in key_pool:
+                        key_pool.append(a)
+                if not key_pool:
+                    key_pool = arch_order[:5]
+                diff_vals_key = [float(diffs.get(a, 0.0)) for a in key_pool]
+                mae_key = float(sum(diff_vals_key) / max(1, len(diff_vals_key)))
+                rmse_key = math.sqrt(float(sum(v * v for v in diff_vals_key) / max(1, len(diff_vals_key))))
+                top3_gap_mae_key = float(sum(sorted(diff_vals_key, reverse=True)[:3]) / max(1, min(3, len(diff_vals_key))))
 
                 person_top = _segment_priority_pool(person_profile_100)
                 seg_top = _segment_priority_pool(seg_profile_100)
@@ -7030,29 +7045,35 @@ def matching_view() -> None:
                 key_gap_max = float(max(key_gap_vals)) if key_gap_vals else 0.0
                 shared_priority_count = len(set(person_top).intersection(set(seg_top)))
                 main_priority_mismatch_penalty = (
-                    2.5 if (person_top and seg_top and person_top[0] != seg_top[0]) else 0.0
+                    3.0 if (person_top and seg_top and person_top[0] != seg_top[0]) else 0.0
                 )
                 shared_priority_penalty = (
-                    5.5 if shared_priority_count == 0 else (2.0 if shared_priority_count == 1 else 0.0)
+                    7.0 if shared_priority_count == 0 else (3.0 if shared_priority_count == 1 else 0.0)
                 )
 
-                score_mae = max(0.0, min(100.0, 100.0 - mae))
-                score_rmse = max(0.0, min(100.0, 100.0 - rmse))
-                score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
-                score_key = max(0.0, min(100.0, 100.0 - key_gap_mae))
-                base_score = 0.40 * score_mae + 0.20 * score_rmse + 0.20 * score_top3 + 0.20 * score_key
+                score_mae_all = max(0.0, min(100.0, 100.0 - mae_all))
+                score_rmse_all = max(0.0, min(100.0, 100.0 - rmse_all))
+                score_top3_all = max(0.0, min(100.0, 100.0 - top3_gap_mae_all))
+                score_mae_key = max(0.0, min(100.0, 100.0 - mae_key))
+                score_rmse_key = max(0.0, min(100.0, 100.0 - rmse_key))
+                score_top3_key = max(0.0, min(100.0, 100.0 - top3_gap_mae_key))
+                base_global = 0.50 * score_mae_all + 0.20 * score_rmse_all + 0.30 * score_top3_all
+                base_key = 0.45 * score_mae_key + 0.25 * score_rmse_key + 0.30 * score_top3_key
+                base_score = 0.25 * base_global + 0.75 * base_key
                 key_penalty = (
-                    0.56 * key_gap_mae
-                    + 0.26 * max(0.0, key_gap_max - 10.0)
+                    0.70 * key_gap_mae
+                    + 0.30 * max(0.0, key_gap_max - 10.0)
                     + shared_priority_penalty
                     + main_priority_mismatch_penalty
                 )
                 match_score = max(0.0, min(100.0, base_score - key_penalty))
                 return {
-                    "mae": float(mae),
+                    "mae_key": float(mae_key),
+                    "mae_all": float(mae_all),
                     "match_pct": float(match_score),
                     "key_gap_mae": float(key_gap_mae),
                     "key_penalty": float(key_penalty),
+                    "key_pool_n": float(len(key_pool)),
                 }
 
             seg_rows: List[Dict[str, Any]] = []
@@ -7062,7 +7083,7 @@ def matching_view() -> None:
                     for a in JST_ARCHETYPES
                 }
                 seg_metrics = _segment_strategic_score(person_profile_match, seg_profile)
-                mae = float(seg_metrics.get("mae", 0.0))
+                mae = float(seg_metrics.get("mae_key", 0.0))
                 match_pct = float(seg_metrics.get("match_pct", 0.0))
                 seg_n = int(seg.get("n") or 0)
                 reliable = bool(seg_n >= min_seg_n)
@@ -7081,9 +7102,11 @@ def matching_view() -> None:
                         "n": seg_n,
                         "share_pct": float(seg.get("share_pct") or 0.0),
                         "mae": mae,
+                        "mae_all": float(seg_metrics.get("mae_all", 0.0)),
                         "match_pct": match_pct,
                         "key_gap_mae": float(seg_metrics.get("key_gap_mae", 0.0)),
                         "key_penalty": float(seg_metrics.get("key_penalty", 0.0)),
+                        "key_pool_n": int(seg_metrics.get("key_pool_n", 0.0)),
                         "reliable": reliable,
                         "profile": seg_profile,
                     }
@@ -7106,6 +7129,112 @@ def matching_view() -> None:
                     except Exception:
                         return "0,0"
 
+                opt_map: Dict[str, Dict[str, Any]] = {}
+                for r in visible_rows:
+                    status_suffix = " • niepewne" if not bool(r.get("reliable")) else ""
+                    label = (
+                        f"{r['segment']} — {r['segment_name']} "
+                        f"(N={int(r['n'])}, zgodność={_fmt1_pl(r['match_pct'])}%){status_suffix}"
+                    )
+                    opt_map[label] = r
+
+                selected_label = st.selectbox(
+                    "Wybrany segment do podsumowania",
+                    list(opt_map.keys()),
+                    key=f"matching_segments_pick_{person_sid}_{jst_sid}",
+                )
+                selected_seg = opt_map[selected_label]
+                selected_score = float(selected_seg.get("match_pct") or 0.0)
+                selected_score = max(0.0, min(100.0, selected_score))
+
+                if selected_score >= 90:
+                    seg_band_label = "Ekstremalnie wysokie dopasowanie"
+                    seg_band_desc = "Profil segmentu i profil polityka są niemal zbieżne także na osiach kluczowych."
+                    score_color = "#0f766e"
+                    score_bg = "#ecfeff"
+                elif selected_score >= 80:
+                    seg_band_label = "Bardzo wysokie dopasowanie"
+                    seg_band_desc = "Różnice są niewielkie i dotyczą głównie lokalnych odchyleń."
+                    score_color = "#0e7490"
+                    score_bg = "#ecfeff"
+                elif selected_score >= 70:
+                    seg_band_label = "Wysokie dopasowanie"
+                    seg_band_desc = "Segment jest dobrze dopasowany, ale są jeszcze punktowe luki priorytetowe."
+                    score_color = "#6d28d9"
+                    score_bg = "#f5f3ff"
+                elif selected_score >= 60:
+                    seg_band_label = "Znaczące dopasowanie"
+                    seg_band_desc = "Wspólny rdzeń jest wyraźny, jednak część kluczowych osi wymaga domknięcia."
+                    score_color = "#1d4ed8"
+                    score_bg = "#eff6ff"
+                elif selected_score >= 50:
+                    seg_band_label = "Umiarkowane dopasowanie"
+                    seg_band_desc = "Są elementy wspólne, ale strategiczne luki pozostają widoczne."
+                    score_color = "#b45309"
+                    score_bg = "#fffbeb"
+                elif selected_score >= 40:
+                    seg_band_label = "Niskie dopasowanie"
+                    seg_band_desc = "Dopasowanie segmentu jest słabe; profil wymaga istotnej korekty pod ten segment."
+                    score_color = "#c2410c"
+                    score_bg = "#fff7ed"
+                elif selected_score >= 30:
+                    seg_band_label = "Bardzo niskie dopasowanie"
+                    seg_band_desc = "Dominują rozjazdy strategiczne między politykiem a segmentem."
+                    score_color = "#be123c"
+                    score_bg = "#fff1f2"
+                else:
+                    seg_band_label = "Marginalne dopasowanie"
+                    seg_band_desc = "Segment i polityk są silnie rozbieżni na osiach kluczowych."
+                    score_color = "#7f1d1d"
+                    score_bg = "#fef2f2"
+
+                st.markdown(
+                    f"""
+                    <style>
+                      .match-seg-target-card{{border:1px solid #d5dfec;border-radius:14px;background:linear-gradient(180deg,#ffffff 0%,#f6f9ff 100%);padding:10px 12px;margin:10px 0 10px 0;}}
+                      .match-seg-target-title{{font-size:13px;font-weight:900;color:#334155;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.03em;}}
+                      .match-seg-target-grid{{display:grid;grid-template-columns:1fr 1fr;gap:10px;}}
+                      .match-seg-target-item{{border:1px solid #dbe4ef;border-radius:12px;background:#fff;padding:8px 10px;}}
+                      .match-seg-target-item .k{{font-size:12px;font-weight:800;color:#64748b;margin:0 0 2px 0;}}
+                      .match-seg-target-item .v{{font-size:16px;font-weight:900;color:#1f2f44;line-height:1.28;}}
+                      .match-seg-score-card{{border:1px solid #d5dfec;border-radius:12px;background:#ffffff;padding:12px 14px;margin:8px 0 10px 0;}}
+                      .match-seg-score-title{{font-size:15px;font-weight:800;color:#334155;margin:0 0 4px 0;}}
+                      .match-seg-score-value{{font-size:42px;line-height:1;font-weight:900;color:#0f172a;margin:0 0 8px 0;}}
+                      .match-seg-score-badge{{display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid {score_color};background:{score_bg};color:{score_color};font-weight:900;font-size:15px;}}
+                      .match-seg-score-desc{{margin:8px 0 10px 0;color:#475569;font-size:14px;font-weight:600;}}
+                      .match-seg-score-track{{height:14px;border-radius:999px;background:#d5dde8;border:1px solid #aebfd3;overflow:hidden;}}
+                      .match-seg-score-fill{{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb 0%,#22c55e 100%);width:{selected_score:.1f}%;}}
+                      .match-seg-score-scale{{display:flex;justify-content:space-between;color:#64748b;font-size:11px;margin-top:6px;font-weight:700;}}
+                      @media (max-width:900px){{ .match-seg-target-grid{{grid-template-columns:1fr;}} }}
+                    </style>
+                    <div class="match-seg-target-card">
+                      <div class="match-seg-target-title">Dla kogo liczona jest segmentacja</div>
+                      <div class="match-seg-target-grid">
+                        <div class="match-seg-target-item">
+                          <div class="k">👤 Badanie personalne</div>
+                          <div class="v">{html.escape(str(result.get('person_label') or ''))}</div>
+                        </div>
+                        <div class="match-seg-target-item">
+                          <div class="k">🏙️ Badanie mieszkańców</div>
+                          <div class="v">{html.escape(str(result.get('jst_label') or ''))}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="match-seg-score-card">
+                      <div class="match-seg-score-title">Poziom zgodności wybranego segmentu</div>
+                      <div class="match-seg-score-value">{_fmt1_pl(selected_score)}%</div>
+                      <div class="match-seg-score-badge">Ocena: {html.escape(seg_band_label)}</div>
+                      <div class="match-seg-score-desc">
+                        {html.escape(seg_band_desc)} Wybrany segment: {html.escape(str(selected_seg.get('segment') or ''))} — {html.escape(str(selected_seg.get('segment_name') or ''))}
+                        (N={int(selected_seg.get('n') or 0)}, udział={_fmt1_pl(selected_seg.get('share_pct') or 0.0)}%, luka kluczowa={_fmt1_pl(selected_seg.get('mae') or 0.0)} pp).
+                      </div>
+                      <div class="match-seg-score-track"><div class="match-seg-score-fill"></div></div>
+                      <div class="match-seg-score-scale"><span>0%</span><span>100%</span></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
                 table_df = pd.DataFrame(
                     [
                         {
@@ -7113,7 +7242,7 @@ def matching_view() -> None:
                             "Nazwa segmentu": str(r["segment_name"]),
                             "N": int(r["n"]),
                             "Udział (%)": _fmt1_pl(r["share_pct"]),
-                            "Śr. luka |Δ| (pp)": _fmt1_pl(r["mae"]),
+                            "Śr. luka kluczowa |Δ| (pp)": _fmt1_pl(r["mae"]),
                             "Zgodność (%)": _fmt1_pl(r["match_pct"]),
                             "Wiarygodność": ("OK" if bool(r["reliable"]) else f"Niepewne (N<{min_seg_n})"),
                         }
@@ -7140,14 +7269,6 @@ def matching_view() -> None:
                 else:
                     st.info("Brak segmentów spełniających próg wiarygodności. Obniż próg N lub traktuj wynik jako eksploracyjny.")
 
-                opt_map: Dict[str, Dict[str, Any]] = {}
-                for r in visible_rows:
-                    status_suffix = " • niepewne" if not bool(r.get("reliable")) else ""
-                    label = (
-                        f"{r['segment']} — {r['segment_name']} "
-                        f"(N={int(r['n'])}, zgodność={_fmt1_pl(r['match_pct'])}%){status_suffix}"
-                    )
-                    opt_map[label] = r
                 st.markdown(
                     """
                     <style>
@@ -7196,13 +7317,6 @@ def matching_view() -> None:
                     unsafe_allow_html=True,
                 )
                 st.markdown("<div class='match-seg-radar-label'>Podgląd radarowy segmentu</div>", unsafe_allow_html=True)
-                selected_label = st.selectbox(
-                    "Podgląd radarowy segmentu",
-                    list(opt_map.keys()),
-                    label_visibility="collapsed",
-                    key=f"matching_segments_pick_{person_sid}_{jst_sid}",
-                )
-                selected_seg = opt_map[selected_label]
                 if not bool(selected_seg.get("reliable")):
                     st.warning(
                         f"Wybrany segment ma N={int(selected_seg.get('n') or 0)} (<{min_seg_n}) — interpretuj radar ostrożnie."
@@ -7276,8 +7390,8 @@ def matching_view() -> None:
                 seg_vals_20 = [float(seg_profile_20.get(a, 0.0)) for a in radar_order]
                 person_name_seg = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
                 segment_name_seg = str(selected_seg.get("segment_name") or selected_seg.get("segment") or "segment")
-                legend_person_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil polityka ({person_name_seg})\u00a0\u00a0\u00a0"
-                legend_segment_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil segmentu ({segment_name_seg})\u00a0\u00a0\u00a0"
+                legend_person_label = f"profil polityka ({person_name_seg})"
+                legend_segment_label = f"profil segmentu ({segment_name_seg})"
 
                 fig_seg = go.Figure(
                     data=[
@@ -7342,16 +7456,14 @@ def matching_view() -> None:
                     legend=dict(
                         orientation="h",
                         yanchor="bottom",
-                        y=1.16,
+                        y=1.17,
                         xanchor="center",
                         x=0.5,
-                        font=dict(size=13.5),
+                        font=dict(size=13),
                         bgcolor="rgba(255,255,255,0.94)",
                         bordercolor="#cfd9e8",
                         borderwidth=1,
-                        entrywidthmode="pixels",
-                        entrywidth=232,
-                        tracegroupgap=28,
+                        tracegroupgap=18,
                         itemclick="toggle",
                         itemdoubleclick="toggleothers",
                     ),
@@ -7383,8 +7495,9 @@ def matching_view() -> None:
                     unsafe_allow_html=True,
                 )
                 st.caption(
-                    "Metoda porównania strategicznego: ta sama formuła co w Podsumowaniu "
-                    "(MAE + RMSE + TOP3_MAE + KEY_MAE oraz kary kluczowe), liczona dla polityk vs wybrany segment."
+                    "Metoda porównania strategicznego (key-focused): 75% wagi ma pula kluczowa "
+                    "(TOP5 polityka + TOP5 segmentu), 25% ma profil pełny 12 archetypów; "
+                    "dodatkowo działa kara za luki priorytetów TOP3/TOP2."
                 )
 
                 profile_title = (

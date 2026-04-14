@@ -2068,3 +2068,26 @@
   - porównanie Segmentów jest spójne metodycznie z `Podsumowaniem`.
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-093 (2026-04-14, segmenty: key-focused + panel górny + legenda radaru)
+- `archetypy-admin/app.py` (`🧭 Matching > Segmenty`):
+  - metryka zgodności segmentu została przestawiona na wariant key-focused:
+    - kluczowa pula = `TOP5 polityka + TOP5 segmentu`,
+    - baza finalna = `0.25*base_global + 0.75*base_key`,
+    - kary TOP3/TOP2 (shared TOP + mismatch TOP1 + KEY luki) wzmocnione względem poprzedniej wersji segmentowej,
+  - tabela segmentów pokazuje teraz:
+    - `Śr. luka kluczowa |Δ| (pp)`,
+    - `Zgodność (%)` z nowej metryki key-focused.
+  - na górze zakładki Segmenty dodano panel:
+    - selektor segmentu,
+    - „Dla kogo liczona jest segmentacja” (personal + JST),
+    - „Poziom zgodności wybranego segmentu” (duży % + ocena + pasek 0-100).
+  - poprawiono legendę nad radarem:
+    - usunięte sztywne `entrywidth`,
+    - uproszczone etykiety legendy (bez sztucznych spacji), co zmniejsza obcinanie nazw.
+  - zachowane i dopięte formatowanie do 1 miejsca po przecinku dla:
+    - `Udział (%)`,
+    - `Śr. luka kluczowa |Δ| (pp)`,
+    - `Zgodność (%)`.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

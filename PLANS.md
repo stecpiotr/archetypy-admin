@@ -2624,3 +2624,33 @@ Wynik:
   - utrzymano i dopięto formatowanie tabeli do stałego 1 miejsca po przecinku.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-093 [DONE]
+Temat: Segmenty w Matching — metryka key-focused (TOP5+TOP5) + panel kontekstowy u góry + poprawa legendy radaru.
+Kryteria ukończenia:
+1. Zgodność segmentu liczona głównie po kluczowych archetypach (TOP5 polityka + TOP5 segmentu), z karami TOP3/TOP2.
+2. Na górze zakładki Segmenty widoczny panel: kogo dotyczy segmentacja + poziom zgodności wybranego segmentu.
+3. Górna legenda nad radarem nie ucina nazw (dłuższe etykiety mieszczą się czytelniej).
+4. W tabeli Segmentów kolumny procentowe/luki/zgodność mają stałe 1 miejsce po przecinku.
+Pierwszy krok wykonawczy:
+- zmienić kalkulator segmentowy na key-focused i przebudować górny blok zakładki Segmenty pod wzór Podsumowania.
+Wynik:
+- `app.py`:
+  - dodano key-focused scoring segmentu:
+    - `base_global` (profil 12 archetypów),
+    - `base_key` (TOP5 polityka + TOP5 segmentu),
+    - finalnie: `0.25*base_global + 0.75*base_key - key_penalty`,
+  - kary priorytetowe (TOP3/TOP2) wzmocnione dla segmentów:
+    - większa kara za brak wspólnych priorytetów,
+    - większa kara za rozjazd TOP1,
+  - dołożono górny panel Segmentów:
+    - selektor wybranego segmentu,
+    - karty „Dla kogo liczona jest segmentacja”,
+    - karta „Poziom zgodności wybranego segmentu” (wartość %, ocena, pasek),
+  - poprawiono legendę radaru:
+    - usunięto sztuczne paddingi z nazw,
+    - usunięto sztywne `entrywidth`, zmniejszono ryzyko obcinania tekstu,
+  - utrzymano formatowanie 1 miejsca po przecinku i doprecyzowano kolumnę tabeli:
+    - `Śr. luka kluczowa |Δ| (pp)`.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).
