@@ -25,10 +25,12 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "prompt": "Proszę o podanie płci.",
             "required": True,
             "multiple": False,
+            "randomize_options": False,
+            "randomize_exclude_last": False,
             "aliases": ["M_PLEC", "Płeć", "Plec"],
             "options": [
-                {"label": "kobieta", "code": "kobieta"},
-                {"label": "mężczyzna", "code": "mężczyzna"},
+                {"label": "kobieta", "code": "kobieta", "is_open": False},
+                {"label": "mężczyzna", "code": "mężczyzna", "is_open": False},
             ],
         },
         "M_WIEK": {
@@ -38,11 +40,13 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "prompt": "Jaki jest Pana/Pani wiek?",
             "required": True,
             "multiple": False,
+            "randomize_options": False,
+            "randomize_exclude_last": False,
             "aliases": ["M_WIEK", "Wiek"],
             "options": [
-                {"label": "15-39", "code": "15-39"},
-                {"label": "40-59", "code": "40-59"},
-                {"label": "60 i więcej", "code": "60 i więcej"},
+                {"label": "15-39", "code": "15-39", "is_open": False},
+                {"label": "40-59", "code": "40-59", "is_open": False},
+                {"label": "60 i więcej", "code": "60 i więcej", "is_open": False},
             ],
         },
         "M_WYKSZT": {
@@ -52,14 +56,17 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "prompt": "Jakie ma Pan/Pani wykształcenie?",
             "required": True,
             "multiple": False,
+            "randomize_options": False,
+            "randomize_exclude_last": False,
             "aliases": ["M_WYKSZT", "Wykształcenie", "Wyksztalcenie"],
             "options": [
                 {
                     "label": "podstawowe, gimnazjalne, zasadnicze zawodowe",
                     "code": "podstawowe, gimnazjalne, zasadnicze zawodowe",
+                    "is_open": False,
                 },
-                {"label": "średnie", "code": "średnie"},
-                {"label": "wyższe", "code": "wyższe"},
+                {"label": "średnie", "code": "średnie", "is_open": False},
+                {"label": "wyższe", "code": "wyższe", "is_open": False},
             ],
         },
         "M_ZAWOD": {
@@ -69,15 +76,17 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "prompt": "Jaka jest Pana/Pani sytuacja zawodowa?",
             "required": True,
             "multiple": False,
+            "randomize_options": False,
+            "randomize_exclude_last": False,
             "aliases": ["M_ZAWOD", "Status zawodowy", "Sytuacja zawodowa"],
             "options": [
-                {"label": "pracownik umysłowy", "code": "pracownik umysłowy"},
-                {"label": "pracownik fizyczny", "code": "pracownik fizyczny"},
-                {"label": "prowadzę własną firmę", "code": "prowadzę własną firmę"},
-                {"label": "student/uczeń", "code": "student/uczeń"},
-                {"label": "bezrobotny", "code": "bezrobotny"},
-                {"label": "rencista/emeryt", "code": "rencista/emeryt"},
-                {"label": "inna (jaka?)", "code": "inna (jaka?)"},
+                {"label": "pracownik umysłowy", "code": "pracownik umysłowy", "is_open": False},
+                {"label": "pracownik fizyczny", "code": "pracownik fizyczny", "is_open": False},
+                {"label": "prowadzę własną firmę", "code": "prowadzę własną firmę", "is_open": False},
+                {"label": "student/uczeń", "code": "student/uczeń", "is_open": False},
+                {"label": "bezrobotny", "code": "bezrobotny", "is_open": False},
+                {"label": "rencista/emeryt", "code": "rencista/emeryt", "is_open": False},
+                {"label": "inna (jaka?)", "code": "inna (jaka?)", "is_open": True},
             ],
         },
         "M_MATERIAL": {
@@ -87,17 +96,24 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "prompt": "Jak ocenia Pan/Pani własną sytuację materialną?",
             "required": True,
             "multiple": False,
+            "randomize_options": False,
+            "randomize_exclude_last": False,
             "aliases": ["M_MATERIAL", "Sytuacja materialna"],
             "options": [
                 {
                     "label": "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
                     "code": "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
+                    "is_open": False,
                 },
-                {"label": "powodzi mi się raczej źle", "code": "powodzi mi się raczej źle"},
-                {"label": "powodzi mi się przeciętnie, średnio", "code": "powodzi mi się przeciętnie, średnio"},
-                {"label": "powodzi mi się raczej dobrze", "code": "powodzi mi się raczej dobrze"},
-                {"label": "powodzi mi się bardzo dobrze", "code": "powodzi mi się bardzo dobrze"},
-                {"label": "odmawiam udzielenia odpowiedzi", "code": "odmawiam udzielenia odpowiedzi"},
+                {"label": "powodzi mi się raczej źle", "code": "powodzi mi się raczej źle", "is_open": False},
+                {
+                    "label": "powodzi mi się przeciętnie, średnio",
+                    "code": "powodzi mi się przeciętnie, średnio",
+                    "is_open": False,
+                },
+                {"label": "powodzi mi się raczej dobrze", "code": "powodzi mi się raczej dobrze", "is_open": False},
+                {"label": "powodzi mi się bardzo dobrze", "code": "powodzi mi się bardzo dobrze", "is_open": False},
+                {"label": "odmawiam udzielenia odpowiedzi", "code": "odmawiam udzielenia odpowiedzi", "is_open": False},
             ],
         },
     }
@@ -132,10 +148,15 @@ def _safe_bool(value: Any, fallback: bool) -> bool:
     return bool(fallback)
 
 
-def _normalize_options(raw_options: Any, *, fallback: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+def _looks_like_open_label(text: str) -> bool:
+    t = str(text or "").strip().lower()
+    return "inna (jaka?)" in t or "inne (jakie?)" in t
+
+
+def _normalize_options(raw_options: Any, *, fallback: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not isinstance(raw_options, list):
         raw_options = []
-    out: List[Dict[str, str]] = []
+    out: List[Dict[str, Any]] = []
     seen_codes: set[str] = set()
     for item in raw_options:
         if not isinstance(item, dict):
@@ -144,11 +165,25 @@ def _normalize_options(raw_options: Any, *, fallback: List[Dict[str, Any]]) -> L
         code = _safe_text(item.get("code"))
         if not label or not code or code in seen_codes:
             continue
-        out.append({"label": label, "code": code})
+        is_open = _safe_bool(item.get("is_open"), _looks_like_open_label(label))
+        out.append({"label": label, "code": code, "is_open": bool(is_open)})
         seen_codes.add(code)
     if out:
         return out
-    return [{"label": _safe_text(o.get("label")), "code": _safe_text(o.get("code"))} for o in fallback]
+    fallback_out: List[Dict[str, Any]] = []
+    for o in fallback:
+        label = _safe_text(o.get("label"))
+        code = _safe_text(o.get("code"))
+        if not label or not code:
+            continue
+        fallback_out.append(
+            {
+                "label": label,
+                "code": code,
+                "is_open": _safe_bool(o.get("is_open"), _looks_like_open_label(label)),
+            }
+        )
+    return fallback_out
 
 
 def _normalize_aliases(raw_aliases: Any) -> List[str]:
@@ -197,6 +232,8 @@ def _normalize_custom_question(raw: Dict[str, Any], used_columns: set[str]) -> D
         "prompt": prompt,
         "required": _safe_bool(raw.get("required"), True),
         "multiple": _safe_bool(raw.get("multiple"), False),
+        "randomize_options": _safe_bool(raw.get("randomize_options"), False),
+        "randomize_exclude_last": _safe_bool(raw.get("randomize_exclude_last"), False),
         "aliases": _normalize_aliases(raw.get("aliases")),
         "options": options,
     }
@@ -231,9 +268,11 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
         base["prompt"] = _safe_text(src.get("prompt"), base["prompt"])
         base["required"] = True
         base["multiple"] = False
+        base["randomize_options"] = _safe_bool(src.get("randomize_options"), False)
+        base["randomize_exclude_last"] = _safe_bool(src.get("randomize_exclude_last"), False)
         base["aliases"] = _normalize_aliases(src.get("aliases")) or base["aliases"]
         core_opts = _normalize_options(src.get("options"), fallback=base["options"])
-        normalized_core_opts: List[Dict[str, str]] = []
+        normalized_core_opts: List[Dict[str, Any]] = []
         seen_labels: set[str] = set()
         for opt in core_opts:
             label = _safe_text(opt.get("label"))
@@ -242,9 +281,22 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
                 continue
             seen_labels.add(key)
             # Zgodność historyczna: dla 5 stałych pytań kodowanie odpowiedzi = tekst odpowiedzi.
-            normalized_core_opts.append({"label": label, "code": label})
+            normalized_core_opts.append(
+                {
+                    "label": label,
+                    "code": label,
+                    "is_open": _safe_bool(opt.get("is_open"), _looks_like_open_label(label)),
+                }
+            )
         if not normalized_core_opts:
-            normalized_core_opts = [{"label": _safe_text(o.get("label")), "code": _safe_text(o.get("label"))} for o in base["options"]]
+            normalized_core_opts = [
+                {
+                    "label": _safe_text(o.get("label")),
+                    "code": _safe_text(o.get("label")),
+                    "is_open": _safe_bool(o.get("is_open"), _looks_like_open_label(_safe_text(o.get("label")))),
+                }
+                for o in base["options"]
+            ]
         base["options"] = normalized_core_opts
         normalized_questions.append(base)
         used_columns.add(base["db_column"])

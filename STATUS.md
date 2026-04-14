@@ -276,6 +276,45 @@
   - dodano przycisk `👥 Raport demograficzny` dla wybranej osoby, który otwiera dedykowaną podstronę demografii.
 - Testy techniczne:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Zrobione w Hotfix H-099 (2026-04-14, metryczka: predef + randomizacja + otwarte)
+- `archetypy-admin/metryczka_config.py`:
+  - rozszerzono model pytań metryczki o:
+    - `randomize_options`,
+    - `randomize_exclude_last`,
+  - rozszerzono model odpowiedzi o:
+    - `is_open`,
+  - normalizacja rdzenia i custom pytań obsługuje nowe pola przy zachowaniu kompatybilności.
+- `archetypy-admin/db_jst_utils.py`:
+  - zapisane szablony pytań (`metryczka_question_templates`) przechowują i zwracają:
+    - ustawienia randomizacji,
+    - flagi `is_open` dla odpowiedzi.
+- `archetypy-admin/app.py`:
+  - edytor metryczki (`_render_metryczka_editor`) ma nowy górny przycisk:
+    - `📚 Predefiniowane metryczki`,
+  - panel predefiniowanych pytań pozwala:
+    - edytować treść, kodowanie, randomizację,
+    - oznaczać odpowiedzi jako `Otwarta`,
+    - zapisać zmiany i/lub wstawić pytanie do bieżącej metryczki,
+  - w tabeli odpowiedzi dodano kolumnę checkbox `Otwarta`,
+  - w pytaniu dodano checkboxy:
+    - `Losowa kolejność odpowiedzi`,
+    - `Nie losuj ostatniej odpowiedzi`,
+  - parser „Wklej pytanie i odpowiedzi” zachowuje także flagi `Otwarta` (gdy to możliwe).
+- `archetypy-ankieta/src/lib/metryczka.ts`:
+  - typy i normalizacja konfiguracji rozszerzone o nowe pola (`randomize_*`, `is_open`),
+  - dodano helper `isOpenOptionSelected(...)`.
+- `archetypy-ankieta/src/Questionnaire.tsx` (personal):
+  - losowanie odpowiedzi metryczki per pytanie wg konfiguracji,
+  - obsługa odpowiedzi otwartej dla dowolnego pytania metryczkowego (pole tekstowe wymagane),
+  - zapis doprecyzowań do payloadu jako `M_*_OTHER` (+ `M_ZAWOD_OTHER` dla zgodności).
+- `archetypy-ankieta/src/JstSurvey.tsx` (JST):
+  - analogiczna obsługa randomizacji i odpowiedzi otwartych,
+  - wymagane doprecyzowanie tekstowe dla zaznaczonej opcji otwartej,
+  - zapis `M_*_OTHER` (+ zgodność `M_ZAWOD_OTHER`).
+- Testy techniczne:
+  - `python -m py_compile app.py db_jst_utils.py metryczka_config.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).
     - dodano kompatybilny fallback dla `st.image` (`use_container_width` -> `use_column_width` -> bez parametru),
     - sekcja dwoch profili (polityk vs mieszkancy JST) nie wywala juz wyjatku.
   - uporzadkowano radar porownawczy 0-20:

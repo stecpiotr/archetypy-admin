@@ -2585,7 +2585,7 @@ def _metryczka_anchor_id(kind: str, study_key: str, ui_key: str) -> str:
 
 
 def _metryczka_options_to_df(options: Any) -> pd.DataFrame:
-    rows: List[Dict[str, str]] = []
+    rows: List[Dict[str, Any]] = []
     if isinstance(options, list):
         for opt in options:
             if not isinstance(opt, dict):
@@ -2594,21 +2594,23 @@ def _metryczka_options_to_df(options: Any) -> pd.DataFrame:
                 {
                     "Odpowiedź": str(opt.get("label") or "").strip(),
                     "Kodowanie": str(opt.get("code") or "").strip(),
+                    "Otwarta": bool(opt.get("is_open") is True),
                 }
             )
     if not rows:
-        rows = [{"Odpowiedź": "", "Kodowanie": ""}]
+        rows = [{"Odpowiedź": "", "Kodowanie": "", "Otwarta": False}]
     return pd.DataFrame(rows)
 
 
-def _metryczka_options_from_df(df: Any) -> List[Dict[str, str]]:
+def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
     if not isinstance(df, pd.DataFrame):
         return []
-    out: List[Dict[str, str]] = []
+    out: List[Dict[str, Any]] = []
     seen_codes: set[str] = set()
     for _, row in df.iterrows():
         label = str(row.get("Odpowiedź") or "").strip()
         code = str(row.get("Kodowanie") or "").strip()
+        is_open = bool(row.get("Otwarta") is True)
         if not label:
             continue
         # Zachowujemy wiersze nawet z pustym kodowaniem, aby nie gubić odpowiedzi w UI.
@@ -2618,7 +2620,7 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, str]]:
             if code_norm in seen_codes:
                 continue
             seen_codes.add(code_norm)
-        out.append({"label": label, "code": code})
+        out.append({"label": label, "code": code, "is_open": is_open})
     return out
 
 
@@ -2732,10 +2734,12 @@ def _new_custom_metryczka_question(questions: List[Dict[str, Any]]) -> Dict[str,
         "prompt": "",
         "required": True,
         "multiple": False,
+        "randomize_options": False,
+        "randomize_exclude_last": False,
         "aliases": [],
         "options": [
-            {"label": "", "code": "1"},
-            {"label": "", "code": "2"},
+            {"label": "", "code": "1", "is_open": False},
+            {"label": "", "code": "2", "is_open": False},
         ],
     }
 
@@ -2764,7 +2768,7 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
     desired_code = str(q_src.get("db_column") or q_src.get("id") or "").strip().upper()
     code = _unique_custom_metryczka_code(desired_code, questions)
     prompt = str(q_src.get("prompt") or "").strip()
-    options_out: List[Dict[str, str]] = []
+    options_out: List[Dict[str, Any]] = []
     seen_codes: set[str] = set()
     for opt in list(q_src.get("options") or []):
         if not isinstance(opt, dict):
@@ -2777,9 +2781,18 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
         if code_key in seen_codes:
             continue
         seen_codes.add(code_key)
-        options_out.append({"label": label, "code": code_opt})
+        options_out.append(
+            {
+                "label": label,
+                "code": code_opt,
+                "is_open": bool(opt.get("is_open") is True),
+            }
+        )
     if len(options_out) < 2:
-        options_out = [{"label": "", "code": ""}, {"label": "", "code": ""}]
+        options_out = [
+            {"label": "", "code": "", "is_open": False},
+            {"label": "", "code": "", "is_open": False},
+        ]
     return {
         "id": code,
         "scope": "custom",
@@ -2788,6 +2801,10 @@ def _question_from_template_payload(template_q: Dict[str, Any], questions: List[
         "prompt": prompt,
         "required": True,
         "multiple": False,
+        "randomize_options": bool(q_src.get("randomize_options") is True),
+        "randomize_exclude_last": bool(
+            q_src.get("randomize_options") is True and q_src.get("randomize_exclude_last") is True
+        ),
         "aliases": [],
         "options": options_out,
     }
@@ -2848,23 +2865,174 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
     scroll_nonce_key = _metryczka_scroll_nonce_key(kind, study_key)
     widget_prefix = _metryczka_editor_widget_prefix(kind, study_key)
     normalized_cfg = _metryczka_normalize_config(kind, current_cfg)
+    tpl_panel_key = f"{widget_prefix}tpl_panel_open"
 
     if state_key not in st.session_state:
         st.session_state[state_key] = deepcopy(normalized_cfg)
 
-    r1, r2 = st.columns([0.36, 0.64], gap="small")
+    r1, r2, r3 = st.columns([0.28, 0.28, 0.44], gap="small")
     with r1:
         if st.button("↩️ Odrzuć niezapisane zmiany", key=f"{widget_prefix}reset", use_container_width=True):
             st.session_state[state_key] = deepcopy(normalized_cfg)
             _bump_metryczka_editor_nonce(kind, study_key)
             st.rerun()
     with r2:
+        if st.button("📚 Predefiniowane metryczki", key=f"{widget_prefix}open_tpl_panel_top", type="secondary", use_container_width=True):
+            st.session_state[tpl_panel_key] = not bool(st.session_state.get(tpl_panel_key, False))
+    with r3:
         st.caption(
             "Pierwsze 5 pytań to rdzeń metryczki (stałe kodowanie kolumn). "
             "Możesz edytować treść pytań i odpowiedzi oraz dodawać pytania dodatkowe."
         )
 
     cfg_state = st.session_state.get(state_key) or deepcopy(normalized_cfg)
+    if bool(st.session_state.get(tpl_panel_key, False)):
+        templates = list_metryczka_question_templates(sb, kind=kind)
+        with st.container(border=True):
+            st.markdown("**Predefiniowane metryczki (zapisane pytania)**")
+            if not templates:
+                st.caption("Brak zapisanych pytań metryczkowych. Zapisz pierwsze pytanie przyciskiem „💾 Zapisz do zapisanych”.")
+            else:
+                tpl_options: Dict[str, Dict[str, Any]] = {}
+                for tpl in templates:
+                    name = str(tpl.get("name") or "").strip() or "bez nazwy"
+                    kind_lbl = str(tpl.get("kind") or "").strip().lower()
+                    if kind_lbl == "both":
+                        kind_lbl = "jst + personal"
+                    q_tpl = tpl.get("question") if isinstance(tpl.get("question"), dict) else {}
+                    code = str(q_tpl.get("db_column") or "").strip().upper()
+                    prompt = str(q_tpl.get("prompt") or "").strip()
+                    answers_n = len(list(q_tpl.get("options") or []))
+                    label = f"{name} ({code}, odp.: {answers_n}, zakres: {kind_lbl})"
+                    if prompt:
+                        label = f"{label} — {prompt[:80]}"
+                    tpl_options[label] = tpl
+
+                picked_label = st.selectbox(
+                    "Zapisane pytanie",
+                    list(tpl_options.keys()),
+                    key=f"{widget_prefix}tpl_pick_top",
+                    label_visibility="collapsed",
+                )
+                picked_tpl = tpl_options[picked_label]
+                picked_kind = str(picked_tpl.get("kind") or "both").strip().lower() or "both"
+                picked_q = picked_tpl.get("question") if isinstance(picked_tpl.get("question"), dict) else {}
+                edit_name_key = f"{widget_prefix}tpl_edit_name_top"
+                edit_prompt_key = f"{widget_prefix}tpl_edit_prompt_top"
+                edit_code_key = f"{widget_prefix}tpl_edit_code_top"
+                edit_rand_key = f"{widget_prefix}tpl_edit_rand_top"
+                edit_rand_last_key = f"{widget_prefix}tpl_edit_rand_last_top"
+                edit_loaded_key = f"{widget_prefix}tpl_edit_loaded_top"
+                edit_opts_key = f"{widget_prefix}tpl_edit_opts_top"
+                picked_id = str(picked_tpl.get("id") or "").strip()
+                if st.session_state.get(edit_loaded_key) != picked_id:
+                    st.session_state[edit_loaded_key] = picked_id
+                    st.session_state[edit_name_key] = str(picked_tpl.get("name") or "").strip()
+                    st.session_state[edit_prompt_key] = str(picked_q.get("prompt") or "").strip()
+                    st.session_state[edit_code_key] = str(picked_q.get("db_column") or picked_q.get("id") or "").strip().upper()
+                    st.session_state[edit_rand_key] = bool(picked_q.get("randomize_options") is True)
+                    st.session_state[edit_rand_last_key] = bool(picked_q.get("randomize_exclude_last") is True)
+                    st.session_state[edit_opts_key] = _metryczka_options_to_df(picked_q.get("options"))
+
+                st.text_input("Nazwa zapisanego pytania", key=edit_name_key, placeholder="np. M_OBSZAR")
+                e1, e2 = st.columns([0.68, 0.32], gap="small")
+                with e1:
+                    st.text_area(
+                        "Treść pytania",
+                        key=edit_prompt_key,
+                        height=74,
+                        placeholder="Treść pytania widoczna dla respondenta",
+                    )
+                with e2:
+                    st.text_input("Kodowanie", key=edit_code_key, placeholder="np. M_POWIAT")
+                    rand_val = st.checkbox(
+                        "Losowa kolejność odpowiedzi",
+                        key=edit_rand_key,
+                    )
+                    st.checkbox(
+                        "Nie losuj ostatniej odpowiedzi",
+                        key=edit_rand_last_key,
+                        disabled=not rand_val,
+                    )
+
+                tpl_opts_df = st.session_state.get(edit_opts_key)
+                if not isinstance(tpl_opts_df, pd.DataFrame):
+                    tpl_opts_df = _metryczka_options_to_df([])
+                tpl_opts_df = st.data_editor(
+                    tpl_opts_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="dynamic",
+                    key=f"{edit_opts_key}_editor_{picked_id}",
+                    column_config={
+                        "Odpowiedź": st.column_config.TextColumn(
+                            "Odpowiedź",
+                            help="Tekst widoczny dla respondenta.",
+                            width="large",
+                        ),
+                        "Kodowanie": st.column_config.TextColumn(
+                            "Kodowanie",
+                            help="Kod zapisywany dla tej odpowiedzi.",
+                            width="medium",
+                        ),
+                        "Otwarta": st.column_config.CheckboxColumn(
+                            "Otwarta",
+                            help="Po wyborze tej odpowiedzi respondent musi wpisać własną treść.",
+                            default=False,
+                            width="small",
+                        ),
+                    },
+                )
+                st.session_state[edit_opts_key] = tpl_opts_df
+
+                live_tpl_question = {
+                    "id": str(st.session_state.get(edit_code_key) or "").strip().upper(),
+                    "scope": "custom",
+                    "db_column": str(st.session_state.get(edit_code_key) or "").strip().upper(),
+                    "prompt": str(st.session_state.get(edit_prompt_key) or "").strip(),
+                    "randomize_options": bool(st.session_state.get(edit_rand_key)),
+                    "randomize_exclude_last": bool(
+                        st.session_state.get(edit_rand_key) and st.session_state.get(edit_rand_last_key)
+                    ),
+                    "options": _metryczka_options_from_df(tpl_opts_df),
+                }
+                st.caption(
+                    f"Kodowanie pytania: {str(live_tpl_question.get('db_column') or '').strip().upper()} • "
+                    f"Odpowiedzi: {len(list(live_tpl_question.get('options') or []))}"
+                )
+                t1, t2, t3 = st.columns([0.24, 0.24, 0.24], gap="small")
+                with t1:
+                    if st.button("💾 Zapisz zmiany", key=f"{widget_prefix}tpl_save_top", type="secondary", use_container_width=True):
+                        try:
+                            saved_tpl = save_metryczka_question_template(
+                                sb,
+                                name=str(st.session_state.get(edit_name_key) or "").strip(),
+                                question=live_tpl_question,
+                                kind=picked_kind if picked_kind in {"jst", "personal", "both"} else "both",
+                            )
+                            st.session_state[edit_loaded_key] = str(saved_tpl.get("id") or "").strip()
+                            st.success("Zapisano zmiany predefiniowanego pytania.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Nie udało się zapisać zmian: {e}")
+                with t2:
+                    if st.button("Wstaw pytanie", key=f"{widget_prefix}tpl_insert_top", type="primary", use_container_width=True):
+                        working = deepcopy(st.session_state.get(state_key) or cfg_state)
+                        q_list = list(working.get("questions") or [])
+                        new_q = _question_from_template_payload(live_tpl_question, q_list)
+                        q_list.append(new_q)
+                        working["questions"] = q_list
+                        st.session_state[state_key] = working
+                        st.session_state[scroll_target_key] = _metryczka_anchor_id(
+                            kind, study_key, str(new_q.get("_ui_key") or "")
+                        )
+                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                        st.rerun()
+                with t3:
+                    if st.button("Zamknij", key=f"{widget_prefix}tpl_close_top", type="secondary", use_container_width=True):
+                        st.session_state[tpl_panel_key] = False
+                        st.rerun()
+
     questions = list((cfg_state.get("questions") or []))
     rebuilt_questions: List[Dict[str, Any]] = []
     remove_idx: Optional[int] = None
@@ -2912,6 +3080,17 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 disabled=is_core,
                 placeholder="np. M_POWIAT",
             )
+            randomize_options_val = st.checkbox(
+                "Losowa kolejność odpowiedzi",
+                value=bool(q_dict.get("randomize_options") is True),
+                key=f"{widget_prefix}randomize_{ui_key}",
+            )
+            randomize_exclude_last_val = st.checkbox(
+                "Nie losuj ostatniej odpowiedzi",
+                value=bool(q_dict.get("randomize_exclude_last") is True),
+                key=f"{widget_prefix}randomize_last_{ui_key}",
+                disabled=not randomize_options_val,
+            )
             if is_core:
                 st.caption("Kodowanie rdzenia jest zgodne z historyczną bazą (tekst odpowiedzi).")
 
@@ -2933,6 +3112,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     "Kodowanie",
                     help="Kod zapisywany dla tej odpowiedzi.",
                     width="medium",
+                ),
+                "Otwarta": st.column_config.CheckboxColumn(
+                    "Otwarta",
+                    help="Po wyborze tej odpowiedzi respondent musi wpisać własną treść.",
+                    default=False,
+                    width="small",
                 ),
             },
         )
@@ -3045,6 +3230,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                     {
                                         "label": str(it.get("label") or "").strip(),
                                         "code": str(it.get("code") or "").strip(),
+                                        "is_open": bool(it.get("is_open") is True),
                                     }
                                 )
                             if not existing_opts:
@@ -3057,32 +3243,38 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                             {
                                                 "label": str(it.get("label") or "").strip(),
                                                 "code": str(it.get("code") or "").strip(),
+                                                "is_open": bool(it.get("is_open") is True),
                                             }
                                         )
 
                             old_codes_by_label: Dict[str, str] = {}
+                            old_open_by_label: Dict[str, bool] = {}
                             for opt in existing_opts:
                                 old_label = str(opt.get("label") or "").strip().lower()
                                 old_code = str(opt.get("code") or "").strip()
                                 if old_label and old_code and old_label not in old_codes_by_label:
                                     old_codes_by_label[old_label] = old_code
+                                if old_label and old_label not in old_open_by_label:
+                                    old_open_by_label[old_label] = bool(opt.get("is_open") is True)
 
-                            new_options: List[Dict[str, str]] = []
+                            new_options: List[Dict[str, Any]] = []
                             for i, ans in enumerate(parsed_answers):
                                 if q_scope == "core":
-                                    new_options.append({"label": ans, "code": ans})
+                                    new_options.append({"label": ans, "code": ans, "is_open": bool(old_open_by_label.get(str(ans).strip().lower(), False))})
                                     continue
                                 code_existing = old_codes_by_label.get(str(ans).strip().lower(), "")
+                                open_existing = bool(old_open_by_label.get(str(ans).strip().lower(), False))
                                 if (not code_existing) and i < len(existing_opts):
                                     idx_code = str(existing_opts[i].get("code") or "").strip()
                                     idx_label = str(existing_opts[i].get("label") or "").strip().lower()
                                     if idx_code and idx_label and idx_label == str(ans).strip().lower():
                                         code_existing = idx_code
+                                        open_existing = bool(existing_opts[i].get("is_open") is True)
                                 # Wklejka ma aktualizować treść pytania/odpowiedzi, nie narzucać nowych kodowań.
                                 if not code_existing:
                                     # Propozycja domyślna: kodowanie = treść odpowiedzi (edytowalne przez użytkownika).
                                     code_existing = ans
-                                new_options.append({"label": ans, "code": code_existing})
+                                new_options.append({"label": ans, "code": code_existing, "is_open": open_existing})
                             q_item["options"] = new_options
                             break
                         working["questions"] = q_list
@@ -3125,10 +3317,13 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             "scope": "custom",
                             "db_column": code_for_template,
                             "prompt": str(prompt or "").strip(),
+                            "randomize_options": bool(randomize_options_val),
+                            "randomize_exclude_last": bool(randomize_options_val and randomize_exclude_last_val),
                             "options": [
                                 {
                                     "label": str(opt.get("label") or "").strip(),
                                     "code": str(opt.get("code") or "").strip(),
+                                    "is_open": bool(opt.get("is_open") is True),
                                 }
                                 for opt in options
                                 if isinstance(opt, dict)
@@ -3158,6 +3353,8 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 "prompt": str(prompt or "").strip(),
                 "required": True,
                 "multiple": False,
+                "randomize_options": bool(randomize_options_val),
+                "randomize_exclude_last": bool(randomize_options_val and randomize_exclude_last_val),
                 "aliases": list(q_dict.get("aliases") or []),
                 "options": options,
             }
@@ -3179,8 +3376,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             st.rerun()
 
     st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-    tpl_panel_key = f"{widget_prefix}tpl_panel_open"
-    controls_col1, controls_col2, _ = st.columns([0.25, 0.25, 0.50], gap="small")
+    controls_col1, _ = st.columns([0.25, 0.75], gap="small")
     with controls_col1:
         if st.button("➕ Dodaj pytanie metryczkowe", key=f"{widget_prefix}add_q", type="secondary", use_container_width=True):
             working = deepcopy(st.session_state.get(state_key) or cfg_out)
@@ -3194,64 +3390,6 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             )
             st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
             st.rerun()
-    with controls_col2:
-        if st.button("📚 Wybierz z zapisanych", key=f"{widget_prefix}open_tpl_panel", type="secondary", use_container_width=True):
-            st.session_state[tpl_panel_key] = not bool(st.session_state.get(tpl_panel_key, False))
-
-    if bool(st.session_state.get(tpl_panel_key, False)):
-        templates = list_metryczka_question_templates(sb, kind=kind)
-        with st.container(border=True):
-            st.markdown("**Wybierz pytanie z zapisanych**")
-            if not templates:
-                st.caption("Brak zapisanych pytań metryczkowych. Zapisz pierwsze pytanie przyciskiem „💾 Zapisz do zapisanych”.")
-            else:
-                tpl_options: Dict[str, Dict[str, Any]] = {}
-                for tpl in templates:
-                    name = str(tpl.get("name") or "").strip() or "bez nazwy"
-                    kind_lbl = str(tpl.get("kind") or "").strip().lower()
-                    if kind_lbl == "both":
-                        kind_lbl = "jst + personal"
-                    q_tpl = tpl.get("question") if isinstance(tpl.get("question"), dict) else {}
-                    code = str(q_tpl.get("db_column") or "").strip().upper()
-                    prompt = str(q_tpl.get("prompt") or "").strip()
-                    answers_n = len(list(q_tpl.get("options") or []))
-                    label = f"{name} ({code}, odp.: {answers_n}, zakres: {kind_lbl})"
-                    if prompt:
-                        label = f"{label} — {prompt[:80]}"
-                    tpl_options[label] = tpl
-
-                pick_key = f"{widget_prefix}tpl_pick"
-                picked_label = st.selectbox(
-                    "Zapisane pytanie",
-                    list(tpl_options.keys()),
-                    key=pick_key,
-                    label_visibility="collapsed",
-                )
-                picked_tpl = tpl_options[picked_label]
-                picked_q = picked_tpl.get("question") if isinstance(picked_tpl.get("question"), dict) else {}
-                st.caption(
-                    f"Kodowanie pytania: {str(picked_q.get('db_column') or '').strip().upper()} • "
-                    f"Odpowiedzi: {len(list(picked_q.get('options') or []))}"
-                )
-                t_insert_col, t_close_col = st.columns([0.22, 0.22], gap="small")
-                with t_insert_col:
-                    if st.button("Wstaw pytanie", key=f"{widget_prefix}tpl_insert", type="primary", use_container_width=True):
-                        working = deepcopy(st.session_state.get(state_key) or cfg_out)
-                        q_list = list(working.get("questions") or [])
-                        new_q = _question_from_template_payload(picked_q, q_list)
-                        q_list.append(new_q)
-                        working["questions"] = q_list
-                        st.session_state[state_key] = working
-                        st.session_state[tpl_panel_key] = False
-                        st.session_state[scroll_target_key] = _metryczka_anchor_id(
-                            kind, study_key, str(new_q.get("_ui_key") or "")
-                        )
-                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
-                        st.rerun()
-                with t_close_col:
-                    if st.button("Zamknij", key=f"{widget_prefix}tpl_close", type="secondary", use_container_width=True):
-                        st.session_state[tpl_panel_key] = False
-                        st.rerun()
 
     scroll_target = str(st.session_state.pop(scroll_target_key, "") or "").strip()
     scroll_nonce = int(st.session_state.pop(scroll_nonce_key, 0) or 0)

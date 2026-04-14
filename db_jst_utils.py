@@ -1120,7 +1120,7 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
     db_column = str(src.get("db_column") or src.get("id") or "").strip().upper()
     scope = str(src.get("scope") or "custom").strip().lower() or "custom"
     qid = str(src.get("id") or db_column).strip().upper()
-    options_out: List[Dict[str, str]] = []
+    options_out: List[Dict[str, Any]] = []
     seen_codes: set[str] = set()
     for opt in list(src.get("options") or []):
         if not isinstance(opt, dict):
@@ -1133,7 +1133,8 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
         if code_u in seen_codes:
             continue
         seen_codes.add(code_u)
-        options_out.append({"label": label, "code": code})
+        is_open = _bool_from_any(opt.get("is_open"), False) or ("inna (jaka?)" in label.lower())
+        options_out.append({"label": label, "code": code, "is_open": bool(is_open)})
     return {
         "id": qid or db_column,
         "scope": scope,
@@ -1141,6 +1142,8 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
         "prompt": prompt,
         "required": True,
         "multiple": False,
+        "randomize_options": _bool_from_any(src.get("randomize_options"), False),
+        "randomize_exclude_last": _bool_from_any(src.get("randomize_exclude_last"), False),
         "aliases": [],
         "options": options_out,
     }

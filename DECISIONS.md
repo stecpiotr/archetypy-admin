@@ -2021,3 +2021,28 @@ Decyzja:
 - Wrapper tabeli `.ap-table-wrap` na desktopie ma `overflow-x: hidden`; poziomy scroll pozostaje tylko dla mobile przez dedykowane reguły responsywne.
 Uzasadnienie:
 - Dolny pasek przewijania był odbierany jako błąd UI i pogarszał odbiór raportu w widoku desktop.
+
+### D-221: Metryczka obsługuje randomizację odpowiedzi na poziomie pytania
+Decyzja:
+- Każde pytanie metryczkowe ma pola:
+  - `randomize_options` (losowanie kolejności odpowiedzi),
+  - `randomize_exclude_last` (ostatnia odpowiedź pozostaje na końcu, bez losowania).
+- Logika jest wspólna dla JST i personalnych.
+Uzasadnienie:
+- Użytkownik potrzebuje szybkiego sterowania efektem kolejności odpowiedzi bez ręcznych zmian listy opcji.
+- Wariant „nie losuj ostatniej” zabezpiecza klasyczne scenariusze z odpowiedzią specjalną/otwartą na końcu.
+
+### D-222: Odpowiedź otwarta jest cechą opcji (`is_open`), a nie hardcodem pytania
+Decyzja:
+- Opcja odpowiedzi metryczkowej może mieć flagę `is_open`.
+- Po wyborze takiej opcji respondent musi podać doprecyzowanie tekstowe (wymagane).
+- Runtime zapisuje doprecyzowanie jako `M_*_OTHER` (oraz `M_ZAWOD_OTHER` dla kompatybilności historycznej).
+Uzasadnienie:
+- Dotychczasowe podejście ograniczało „otwartą” tylko do `M_ZAWOD`; nowy model działa dla dowolnej zmiennej metryczkowej.
+
+### D-223: Predefiniowane pytania metryczkowe są edytowalne z poziomu górnego panelu edytora
+Decyzja:
+- W edytorze metryczki (JST i personal) dodano górny przycisk `📚 Predefiniowane metryczki`.
+- Panel pozwala edytować zapisane pytanie (treść, kodowanie, randomizację, odpowiedzi i flagi `is_open`) oraz zapisywać zmiany bez opuszczania ekranu metryczki.
+Uzasadnienie:
+- Użytkownik wskazał potrzebę szybkiej edycji zapisanych pozycji w miejscu pracy nad metryczką, bez schodzenia do dolnych sekcji.

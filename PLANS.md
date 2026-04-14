@@ -2764,3 +2764,46 @@ Wynik:
   - dodano w widoku wyników (`results_view`) przycisk `👥 Raport demograficzny`, który otwiera dedykowaną podstronę demografii dla wybranej osoby.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-099 [DONE]
+Temat: Metryczka JST + personal — predefiniowane pytania u góry + randomizacja odpowiedzi + odpowiedzi otwarte (wymagane).
+Kryteria ukończenia:
+1. W edytorze metryczki (JST i personal) jest przycisk u góry do predefiniowanych pytań oraz możliwość edycji zapisanych pozycji.
+2. Każde pytanie metryczkowe ma opcje:
+   - `Losowa kolejność odpowiedzi`,
+   - `Nie losuj ostatniej odpowiedzi`.
+3. Każda odpowiedź ma flagę `Otwarta`:
+   - po zaznaczeniu respondent widzi wymagane pole tekstowe,
+   - zapis obejmuje kod odpowiedzi oraz treść doprecyzowania (`*_OTHER`).
+4. Runtime ankiet `jst.badania.pro` i `archetypy.badania.pro` respektuje randomizację i obsługę odpowiedzi otwartych.
+Pierwszy krok wykonawczy:
+- rozszerzyć model metryczki (Python + TypeScript), następnie podpiąć nowe pola w edytorze i runtime obu ankiet.
+Wynik:
+- `metryczka_config.py`:
+  - dodano pola pytania: `randomize_options`, `randomize_exclude_last`,
+  - dodano pole odpowiedzi: `is_open`,
+  - normalizacja rdzenia i custom pytań obsługuje nowe pola (z kompatybilnym fallbackiem).
+- `db_jst_utils.py`:
+  - zapisane predefiniowane pytania (`metryczka_question_templates`) zachowują:
+    - randomizację pytań,
+    - flagi `is_open` dla odpowiedzi.
+- `app.py`:
+  - edytor metryczki:
+    - nowy górny przycisk `📚 Predefiniowane metryczki` (JST + personal),
+    - panel edycji zapisanych pytań (treść, kodowanie, randomizacja, `Otwarta`),
+    - `st.data_editor` odpowiedzi ma nową kolumnę checkbox `Otwarta`,
+    - pytania mają checkboxy randomizacji (`losuj`, `nie losuj ostatniej`),
+    - wklejanie pytań i odpowiedzi zachowuje kodowanie i flagę `Otwarta` tam, gdzie to możliwe.
+- `archetypy-ankieta`:
+  - `src/lib/metryczka.ts`: rozszerzone typy/normalizacja o `randomize_options`, `randomize_exclude_last`, `is_open`,
+  - `src/Questionnaire.tsx` (personal):
+    - losowanie odpowiedzi metryczki zgodnie z konfiguracją,
+    - obsługa odpowiedzi otwartych per pytanie (wymagane pole tekstowe),
+    - zapis do payloadu `M_*_OTHER` (+ zgodność `M_ZAWOD_OTHER`).
+  - `src/JstSurvey.tsx` (JST):
+    - analogiczna obsługa randomizacji i odpowiedzi otwartych,
+    - wymagane doprecyzowanie dla wybranej opcji otwartej,
+    - zapis `M_*_OTHER` (+ zgodność `M_ZAWOD_OTHER`).
+- Smoke-check:
+  - `python -m py_compile app.py db_jst_utils.py metryczka_config.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK).
