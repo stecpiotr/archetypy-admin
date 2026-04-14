@@ -1435,6 +1435,30 @@ Uzasadnienie:
 - Sam podgląd transliterowany bez transliteracji payloadu prowadził do „krzaków” u odbiorcy.
 - Spójność `podgląd = zapis = realna wysyłka` usuwa klasę tych błędów.
 
+### D-177: Single-screen mobile — neutralna etykieta odpowiedzi ma wymuszone dwie linie
+Decyzja:
+- W renderze single-screen etykietę `ani tak, ani nie` rozbijamy jawnie na dwie linie (`ani tak,` + `<br />` + `ani nie`).
+- CSS przycisku utrzymuje poprawne zawijanie także dla pozostałych etykiet.
+Uzasadnienie:
+- User wymagał dokładnego, stałego podziału tej etykiety na dwie linie w mobile.
+
+### D-178: iPhone portrait — priorytetem jest brak obcięć tekstu pytania i etykiet
+Decyzja:
+- W `SingleQuestionnaire.css` dla mobile stosujemy bezpieczne łamanie:
+  - `word-break: break-word`,
+  - `overflow-wrap: anywhere`,
+  - dodatkowo `hyphens: auto` dla pytania głównego.
+- Dla bardzo wąskich ekranów (`max-width:430px`) zmniejszamy font i padding etykiet odpowiedzi.
+- Dodatkowo uszczelniamy layout iOS:
+  - `overflow-x: hidden` na root kontenera ankiety,
+  - `min-width: 0` na kafelkach odpowiedzi,
+  - pełna szerokość + `box-sizing` + wewnętrzny padding bloku pytania.
+Uzasadnienie:
+- Na iPhone 15 Pro user raportował:
+  - ucięcie końcówki pytania po prawej stronie,
+  - wychodzenie słowa `zdecydowanie` poza kafelki.
+- Ta decyzja celuje dokładnie w ten case i nie dotyka logiki ankiety.
+
 ### D-162: Powiadomienia e-mail po nowych odpowiedziach opieramy na liczniku odpowiedzi + baseline per badanie
 Decyzja:
 - Dodajemy konfigurację powiadomień do `studies` i `jst_studies`:
@@ -1563,3 +1587,45 @@ Decyzja:
 Uzasadnienie:
 - Wariant `38px` po H-065 był zbyt niski w praktyce i utrudniał edycję dłuższych pytań.
 - `50px` daje czytelny start (ok. 2 linie) bez utraty kompaktowości widoku.
+
+### D-175: Pole `Pytanie` w metryczce nie może mieć sztywnego `height`, bo blokuje ręczny resize
+Decyzja:
+- Dla `textarea[aria-label="Pytanie"]` stosujemy:
+  - `min-height: 56px`,
+  - `height: auto`,
+  - `max-height: none`,
+  - `resize: vertical`.
+- Dodatkowo `st.text_area("Pytanie")` ma wysokość startową `56`.
+Uzasadnienie:
+- Sztywne `height: 50px !important` powodowało brak realnej możliwości rozszerzania pola mimo widocznego uchwytu resize.
+- Po zdjęciu sztywnej wysokości pole pozostaje kompaktowe, ale działa zgodnie z oczekiwanym UX edycji dłuższych pytań.
+
+### D-176: Panel `Wklej pytanie i odpowiedzi` startuje z prefill aktualnej treści pytania i odpowiedzi
+Decyzja:
+- Przy otwarciu panelu `📋 Wklej pytanie i odpowiedzi` ustawiamy `paste_text_*` jako seed:
+  - najpierw bieżące pytanie,
+  - potem aktualne odpowiedzi (po jednej w linii).
+- Podgląd odpowiedzi renderujemy jako kompaktową listę HTML (`<ul><li>`) z mniejszym spacingiem.
+Uzasadnienie:
+- User oczekuje workflow „edytuj istniejące” jak na nagraniu referencyjnym, a nie pustego pola wejściowego.
+- Domyślny markdown list w tym miejscu dawał zbyt duże odstępy i obniżał czytelność podglądu.
+
+### D-179: Etykiety skrajne Likerta w mobile mają jawne łamanie po słowach, nie automatyczne łamanie znakowe
+Decyzja:
+- W `Questionnaire.tsx` dla single-screen:
+  - `zdecydowanie nie` renderujemy jako `zdecydowanie` + `<br />` + `nie`,
+  - `zdecydowanie tak` renderujemy jako `zdecydowanie` + `<br />` + `tak`,
+  - neutralne `ani tak, ani nie` pozostaje jawnie dwuliniowe.
+- W `SingleQuestionnaire.css` wycofujemy łamanie „awaryjne” znak-po-znaku:
+  - `word-break: normal`,
+  - `overflow-wrap: normal`,
+  - `hyphens: none`.
+Uzasadnienie:
+- User wymagał, by nie występował podział `zdecydowani` / `e` w kafelkach na iPhone.
+- Jawne łamanie po słowach daje deterministyczny efekt niezależnie od przeglądarki.
+
+### D-180: Mobile portrait — przycisk `Dalej` ma mieć większy oddech od paska odpowiedzi
+Decyzja:
+- W `SingleQuestionnaire.css` dla `@media (max-width: 900px) and (orientation: portrait)` zwiększamy `margin-top` sekcji `.single-footer-actions` z `20px` do `30px`.
+Uzasadnienie:
+- User zgłosił, że `Dalej` jest za blisko paska odpowiedzi; korekta ma poprawić czytelność i separację akcji.

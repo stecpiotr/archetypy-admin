@@ -1912,6 +1912,33 @@ Wynik:
   - `npm run build` (OK),
   - `python -m py_compile send_link_jst.py` (OK).
 
+### Hotfix H-070 [DONE]
+Temat: iPhone mobile — ucięcie końcówki pytania + korekta etykiet kafelków odpowiedzi.
+Kryteria ukończenia:
+1. W mobile portrait długie pytanie nie jest ucinane po prawej stronie.
+2. W kafelku odpowiedzi etykieta `ani tak, ani nie` jest łamana do dwóch linii:
+   - `ani tak,`
+   - `ani nie`
+3. Etykiety z długim słowem `zdecydowanie` nie wychodzą poza kafelek.
+Pierwszy krok wykonawczy:
+- punktowo dostroić render etykiety odpowiedzi w `Questionnaire.tsx` i mikrotypografię mobile w `SingleQuestionnaire.css`.
+Wynik:
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - dla single-screen etykieta `ani tak, ani nie` jest renderowana jawnie w 2 liniach (`ani tak,` + `<br />` + `ani nie`).
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - przyciski skali mają `white-space: pre-line` (obsługa ręcznego złamania),
+  - wymuszono bezpieczne łamanie (`word-break: break-word`, `overflow-wrap: anywhere`),
+  - dla małych ekranów (`max-width:430px`) zmniejszono font i padding etykiet kafelków,
+  - w mobile portrait dla pytania głównego dodano bezpieczne łamanie/hyphenation, żeby uniknąć ucięcia końcówki tekstu,
+  - dołożono zabezpieczenie iOS pod ciasny viewport:
+    - `overflow-x: hidden` dla roota,
+    - `min-width: 0` dla kafelków,
+    - ciaśniejszą typografię kafelków na `max-width: 430px`,
+    - pełną szerokość + `box-sizing` + padding dla bloku pytania.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### Hotfix H-059 [DONE]
 Temat: Powiadomienia e-mail po nowych odpowiedziach (personalne + JST) z poziomu `⚙️ Ustawienia ankiety`.
 Kryteria ukończenia:
@@ -2148,3 +2175,67 @@ Wynik:
   - zachowano `resize: vertical`.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-068 [DONE]
+Temat: Metryczka — pole `Pytanie` nadal za niskie i brak możliwości ręcznego rozszerzania.
+Kryteria ukończenia:
+1. Pole `Pytanie` startuje od wysokości wygodnej do edycji (~2+ linie).
+2. Użytkownik może przeciągać uchwyt i zwiększać wysokość pola w dół.
+Pierwszy krok wykonawczy:
+- zdjąć sztywne `height` z CSS i podnieść wysokość startową textarea w `_render_metryczka_editor`.
+Wynik:
+- `app.py`:
+  - CSS dla `textarea[aria-label="Pytanie"]`:
+    - `min-height` podniesione do `56px`,
+    - usunięto sztywne `height: 50px`; wprowadzono `height: auto` + `max-height: none`,
+    - pozostawiono `resize: vertical`.
+  - widget `st.text_area("Pytanie", ...)`:
+    - `height` zwiększone z `24` do `56`.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-069 [DONE]
+Temat: Uspójnienie UX `Wklej pytanie i odpowiedzi` (prefill + zwarty podgląd).
+Kryteria ukończenia:
+1. Po kliknięciu `📋 Wklej pytanie i odpowiedzi` pole edycji jest wstępnie wypełnione bieżącą treścią pytania i istniejącymi odpowiedziami.
+2. Gdy pytanie ma już odpowiedzi, użytkownik widzi je od razu w polu edycji bez ręcznego kopiowania.
+3. Podgląd listy odpowiedzi ma zwarte odstępy (bez nadmiernych przerw między punktami).
+Pierwszy krok wykonawczy:
+- dodać seed tekstu przy otwarciu panelu i zmienić render wypunktowania w podglądzie na kompaktowy HTML list.
+Wynik:
+- `app.py` (`_render_metryczka_editor`):
+  - przy otwarciu panelu ustawiany jest `seed` do `paste_text_*`:
+    - 1. linia: bieżące pytanie,
+    - kolejne linie: aktualne odpowiedzi,
+  - fallback parsera/podglądu oparty o bieżące pytanie i odpowiedzi,
+  - lista `Odpowiedzi` w podglądzie renderowana jako kompaktowe `<ul><li>` z mniejszym `line-height` i marginesami.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-071 [DONE]
+Temat: iPhone mobile — łamanie etykiet `zdecydowanie ...` i większy odstęp przycisku `Dalej`.
+Kryteria ukończenia:
+1. W kafelkach odpowiedzi słowo `zdecydowanie` nie może być łamane na `zdecydowani` + `e`.
+2. `ani tak, ani nie` pozostaje podzielone na dwie linie.
+3. W mobile portrait przycisk `Dalej` jest niżej (większy odstęp od paska odpowiedzi).
+Pierwszy krok wykonawczy:
+- poprawić render etykiet w `Questionnaire.tsx` i mikrotypografię/odstępy w `SingleQuestionnaire.css`.
+Wynik:
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - etykiety skrajne renderowane jawnie dwuliniowo:
+    - `zdecydowanie` + `nie`,
+    - `zdecydowanie` + `tak`,
+  - etykieta neutralna pozostaje jawnie dwuliniowa (`ani tak,` + `ani nie`).
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - usunięto agresywne łamanie znak po znaku:
+    - `word-break: normal`,
+    - `overflow-wrap: normal`,
+    - `hyphens: none`,
+  - delikatnie zwiększono czytelność kafelków mobile (`max-width:430px`):
+    - `font-size: 0.64rem`,
+    - `line-height: 1.08`,
+  - zwiększono odstęp `Dalej` od paska odpowiedzi w portrait:
+    - `margin-top: 30px`.
+- Smoke-check:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).

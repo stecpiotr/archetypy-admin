@@ -527,10 +527,11 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 .form-label-note{ font-weight:400; color:#748096; margin-left:6px; }
 .section-gap{ margin-top:18px; } .section-gap-big{ margin-top:26px; }
 
-/* Metryczka: pole "Pytanie" startuje od ok. 2 linii, z możliwością rozszerzenia w dół */
+/* Metryczka: pole "Pytanie" startuje wyżej i daje się ręcznie rozszerzać w dół */
 textarea[aria-label="Pytanie"]{
-  min-height: 50px !important;
-  height: 50px !important;
+  min-height: 56px !important;
+  height: auto !important;
+  max-height: none !important;
   line-height: 1.3 !important;
   resize: vertical !important;
 }
@@ -2806,7 +2807,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 "Pytanie",
                 value=prompt_default,
                 key=f"{widget_prefix}prompt_{ui_key}",
-                height=24,
+                height=56,
                 placeholder="Treść pytania widoczna dla respondenta",
             )
         with c_col:
@@ -2846,6 +2847,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         paste_toggle_key = f"{widget_prefix}paste_open_{ui_key}"
         paste_text_key = f"{widget_prefix}paste_text_{ui_key}"
         paste_clear_key = f"{widget_prefix}paste_clear_{ui_key}"
+        existing_prompt = str(prompt or "").strip()
+        existing_answers = [
+            str(opt.get("label") or "").strip()
+            for opt in options
+            if str(opt.get("label") or "").strip()
+        ]
         if bool(st.session_state.get(paste_clear_key, False)):
             st.session_state.pop(paste_text_key, None)
             st.session_state[paste_clear_key] = False
@@ -2858,6 +2865,12 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             st.session_state[paste_toggle_key] = not is_open
             if is_open:
                 st.session_state[paste_clear_key] = True
+            else:
+                seed_lines: List[str] = []
+                if existing_prompt:
+                    seed_lines.append(existing_prompt)
+                seed_lines.extend(existing_answers)
+                st.session_state[paste_text_key] = "\n".join(seed_lines).strip()
 
         if bool(st.session_state.get(paste_toggle_key, False)):
             with st.container(border=True):
@@ -2882,15 +2895,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     )
                 parsed_question, parsed_answers = _parse_pasted_question_and_answers(
                     pasted_text,
-                    fallback_prompt=str(prompt or "").strip(),
+                    fallback_prompt=existing_prompt,
                 )
-                fallback_answers = [
-                    str(opt.get("label") or "").strip()
-                    for opt in options
-                    if str(opt.get("label") or "").strip()
-                ]
-                preview_question = parsed_question or str(prompt or "").strip()
-                preview_answers = parsed_answers if parsed_answers else fallback_answers
+                preview_question = parsed_question or existing_prompt
+                preview_answers = parsed_answers if parsed_answers else existing_answers
                 with col_preview:
                     st.markdown("**Podgląd**")
                     if preview_question:
@@ -2899,8 +2907,17 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.markdown("**Treść pytania:** _(brak)_")
                     if preview_answers:
                         st.markdown("**Odpowiedzi:**")
-                        for ans in preview_answers:
-                            st.markdown(f"- {ans}")
+                        answers_html = "".join(
+                            f"<li>{html.escape(str(ans))}</li>" for ans in preview_answers
+                        )
+                        st.markdown(
+                            (
+                                "<ul style='margin:0.2rem 0 0 1rem; padding-left:0.8rem; "
+                                "line-height:1.22; display:block;'>"
+                                f"{answers_html}</ul>"
+                            ),
+                            unsafe_allow_html=True,
+                        )
                     else:
                         st.markdown("**Odpowiedzi:** _(brak)_")
 

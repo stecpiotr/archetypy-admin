@@ -1530,6 +1530,28 @@
   - `npm run build` (OK),
   - `python -m py_compile send_link_jst.py` (OK).
 
+### Zrobione w Hotfix H-070 (2026-04-14, iPhone single-screen: pytanie + etykiety kafelków)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - w single-screen neutralna odpowiedź jest renderowana jako:
+    - `ani tak,`
+    - `ani nie`
+    (wymuszone złamanie linii tylko dla tego kafelka, jawnie przez `<br />`).
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - przyciski odpowiedzi mają teraz:
+    - `white-space: pre-line`,
+    - `word-break: break-word`,
+    - `overflow-wrap: anywhere`,
+  - dla `max-width:430px` zmniejszono font/padding etykiet, żeby słowo `zdecydowanie` mieściło się stabilnie w kafelku,
+  - w mobile portrait dla głównego pytania dodano bezpieczne łamanie (`overflow-wrap/word-break/hyphens`) i pełną szerokość bloku (`max-width:100%`), żeby nie ucinało końcówki zdania na iPhone.
+  - dogrywka iPhone 15 Pro:
+    - `overflow-x: hidden` dla `.single-survey-root`,
+    - `min-width: 0` dla `.single-scale-btn`,
+    - dodatkowe uszczelnienie mobile portrait (`width: 100%`, `box-sizing`, wewnętrzny padding pytania),
+    - mniejszy font kafelków dla `max-width:430px` (`0.62rem`), żeby `zdecydowanie` nie wychodziło poza ramkę.
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
+
 ### Zrobione w Hotfix H-059 (2026-04-14, powiadomienia e-mail po nowych odpowiedziach)
 - `db_jst_utils.py`:
   - `ensure_jst_schema()` rozszerza `jst_studies` i `studies` o pola powiadomień:
@@ -1697,3 +1719,45 @@
   - pole nie jest już zbyt „ściśnięte” i lepiej mieści pytanie już na starcie.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-068 (2026-04-14, metryczka: wysokość pola + odblokowanie resize)
+- `archetypy-admin/app.py`:
+  - usunięto efekt „zamrożenia” wysokości pola `Pytanie`:
+    - CSS nie trzyma już stałego `height: 50px`,
+    - zamiast tego: `min-height: 56px`, `height: auto`, `max-height: none`, `resize: vertical`.
+  - podniesiono wysokość startową widgetu `st.text_area("Pytanie")` do `56`.
+- Efekt:
+  - pole jest odrobinę wyższe na starcie,
+  - uchwyt w prawym dolnym rogu powinien znów pozwalać rozszerzać pole w dół.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-069 (2026-04-14, metryczka paste: prefill + zwarty podgląd)
+- `archetypy-admin/app.py` (`_render_metryczka_editor`):
+  - po kliknięciu `📋 Wklej pytanie i odpowiedzi` pole `Wklej treść` jest automatycznie zasilane bieżącą treścią pytania i istniejącymi odpowiedziami,
+  - podgląd (`Podgląd -> Odpowiedzi`) przeszedł na kompaktowy render HTML listy (`<ul><li>`),
+    co usuwa nadmierne odstępy między punktami.
+- Efekt:
+  - użytkownik od razu widzi i może edytować aktualny zestaw pytań/odpowiedzi,
+  - podgląd jest czytelniejszy i bardziej zwarty wizualnie.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-071 (2026-04-14, iPhone: `zdecydowanie` + odstęp `Dalej`)
+- `archetypy-ankieta/src/Questionnaire.tsx`:
+  - w single-screen etykiety skrajne są łamane jawnie po słowie:
+    - `zdecydowanie` / `nie`,
+    - `zdecydowanie` / `tak`,
+  - etykieta neutralna nadal:
+    - `ani tak,`
+    - `ani nie`.
+- `archetypy-ankieta/src/SingleQuestionnaire.css`:
+  - usunięto łamanie typu „dowolny znak”:
+    - `word-break: normal`,
+    - `overflow-wrap: normal`,
+    - `hyphens: none`,
+  - dla `max-width:430px` delikatnie dopracowano etykiety (`font-size: 0.64rem`, `line-height: 1.08`),
+  - zwiększono odstęp przycisku `Dalej` od paska odpowiedzi w mobile portrait (`margin-top: 30px`).
+- Testy techniczne:
+  - `npx tsc -p tsconfig.app.json --noEmit` (OK),
+  - `npm run build` (OK).
