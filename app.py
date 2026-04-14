@@ -2509,6 +2509,7 @@ def jst_edit_view() -> None:
 
 _METRY_CORE_IDS: Tuple[str, ...] = ("M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_MATERIAL")
 _METRY_CUSTOM_CODE_RE = re.compile(r"^M_[A-Z0-9_]{2,40}$")
+_METRY_PASTE_OPTION_PREFIX_RE = re.compile(r"^\s*(?:[-–—*•]+|\(?\d{1,3}[\)\].:-]|[A-Za-z][\)\].:-])\s+")
 
 
 def _metryczka_normalize_config(kind: str, raw: Any) -> Dict[str, Any]:
@@ -2574,6 +2575,89 @@ def _metryczka_options_from_df(df: Any) -> List[Dict[str, str]]:
         seen_codes.add(code_norm)
         out.append({"label": label, "code": code_norm})
     return out
+
+
+def _paste_line_normalize(raw_line: Any) -> str:
+    txt = str(raw_line or "").replace("\t", " ").strip()
+    txt = re.sub(r"\s+", " ", txt)
+    return txt
+
+
+def _paste_line_as_option(raw_line: Any) -> str:
+    txt = _paste_line_normalize(raw_line)
+    txt = _METRY_PASTE_OPTION_PREFIX_RE.sub("", txt).strip()
+    return txt
+
+
+def _paste_is_option_like(raw_line: Any) -> bool:
+    raw = str(raw_line or "").strip()
+    if not raw:
+        return False
+    if _METRY_PASTE_OPTION_PREFIX_RE.match(raw):
+        return True
+    txt = _paste_line_as_option(raw_line)
+    if not txt:
+        return False
+    if len(txt) > 90:
+        return False
+    if txt.endswith("?"):
+        return False
+    return True
+
+
+def _parse_pasted_question_and_answers(raw_text: Any, fallback_prompt: str = "") -> Tuple[str, List[str]]:
+    lines_raw = [str(x) for x in str(raw_text or "").splitlines()]
+    lines: List[str] = []
+    for ln in lines_raw:
+        txt = _paste_line_normalize(ln)
+        if not txt:
+            continue
+        low = txt.lower().rstrip(":")
+        if low in {"treść pytania", "tresc pytania", "odpowiedzi", "odpowiedź", "odpowiedz"}:
+            continue
+        txt = re.sub(r"^(?:treść pytania|tresc pytania)\s*:\s*", "", txt, flags=re.IGNORECASE).strip()
+        txt = re.sub(r"^(?:odpowiedzi|odpowiedź|odpowiedz)\s*:\s*", "", txt, flags=re.IGNORECASE).strip()
+        if txt:
+            lines.append(txt)
+
+    if not lines:
+        return "", []
+
+    if len(lines) >= 2 and fallback_prompt and _paste_is_option_like(lines[0]) and _paste_is_option_like(lines[1]):
+        answers_only = [_paste_line_as_option(x) for x in lines if _paste_line_as_option(x)]
+        return str(fallback_prompt or "").strip(), answers_only
+
+    split_idx: Optional[int] = None
+    for i in range(1, len(lines) - 1):
+        if _paste_is_option_like(lines[i]) and _paste_is_option_like(lines[i + 1]):
+            split_idx = i
+            break
+
+    if split_idx is None:
+        if len(lines) >= 2 and lines[0].rstrip().endswith("?"):
+            split_idx = 1
+        elif len(lines) >= 3:
+            split_idx = 2
+        else:
+            split_idx = 1 if len(lines) > 1 else len(lines)
+
+    question_lines = lines[:split_idx]
+    answer_lines = lines[split_idx:]
+    question = " ".join(question_lines).strip()
+    if not question:
+        question = str(fallback_prompt or "").strip()
+
+    answers: List[str] = []
+    seen: set[str] = set()
+    for ln in answer_lines:
+        opt = _paste_line_as_option(ln)
+        key = opt.lower()
+        if not opt or key in seen:
+            continue
+        seen.add(key)
+        answers.append(opt)
+
+    return question, answers
 
 
 def _next_custom_metryczka_code(questions: List[Dict[str, Any]]) -> str:
@@ -2750,6 +2834,92 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             },
         )
         options = _metryczka_options_from_df(edited_options_df)
+
+        paste_toggle_key = f"{widget_prefix}paste_open_{ui_key}"
+        paste_text_key = f"{widget_prefix}paste_text_{ui_key}"
+        if st.button(
+            "📋 Wklej pytanie i odpowiedzi",
+            key=f"{widget_prefix}paste_btn_{ui_key}",
+            type="secondary",
+        ):
+            st.session_state[paste_toggle_key] = not bool(st.session_state.get(paste_toggle_key, False))
+            if not st.session_state[paste_toggle_key]:
+                st.session_state[paste_text_key] = ""
+            st.rerun()
+
+        if bool(st.session_state.get(paste_toggle_key, False)):
+            with st.container(border=True):
+                st.markdown("**Wklej pytanie i odpowiedzi z innego źródła (np. Word/Excel)**")
+                st.caption(
+                    "Wklej treść, gdzie pierwsza część to pytanie, a kolejne linie to odpowiedzi. "
+                    "Parser usuwa automatycznie numerację/bulety (np. 1., -, •)."
+                )
+                col_input, col_preview = st.columns([0.5, 0.5], gap="small")
+                with col_input:
+                    pasted_text = st.text_area(
+                        "Wklej treść",
+                        key=paste_text_key,
+                        height=170,
+                        placeholder=(
+                            "Treść pytania...\n"
+                            "Odpowiedź 1\n"
+                            "Odpowiedź 2\n"
+                            "Odpowiedź 3"
+                        ),
+                        label_visibility="collapsed",
+                    )
+                parsed_question, parsed_answers = _parse_pasted_question_and_answers(
+                    st.session_state.get(paste_text_key, ""),
+                    fallback_prompt=str(prompt or "").strip(),
+                )
+                with col_preview:
+                    st.markdown("**Podgląd**")
+                    if parsed_question:
+                        st.markdown(f"**Treść pytania:** {parsed_question}")
+                    else:
+                        st.markdown("**Treść pytania:** _(brak)_")
+                    if parsed_answers:
+                        st.markdown("**Odpowiedzi:**")
+                        for ans in parsed_answers:
+                            st.markdown(f"- {ans}")
+                    else:
+                        st.markdown("**Odpowiedzi:** _(brak)_")
+
+                b1, b2 = st.columns([0.22, 0.22], gap="small")
+                with b1:
+                    if st.button(
+                        "Wstaw",
+                        key=f"{widget_prefix}paste_insert_{ui_key}",
+                        disabled=len(parsed_answers) < 2,
+                        type="primary",
+                    ):
+                        working = deepcopy(st.session_state.get(state_key) or cfg_state)
+                        q_list = list(working.get("questions") or [])
+                        for q_item in q_list:
+                            if str(q_item.get("_ui_key") or "").strip() != ui_key:
+                                continue
+                            if parsed_question:
+                                q_item["prompt"] = parsed_question
+                            q_item["options"] = [
+                                {"label": ans, "code": str(i + 1)}
+                                for i, ans in enumerate(parsed_answers)
+                            ]
+                            break
+                        working["questions"] = q_list
+                        st.session_state[state_key] = working
+                        st.session_state[paste_toggle_key] = False
+                        st.session_state[paste_text_key] = ""
+                        _bump_metryczka_editor_nonce(kind, study_key)
+                        st.rerun()
+                with b2:
+                    if st.button(
+                        "Anuluj",
+                        key=f"{widget_prefix}paste_cancel_{ui_key}",
+                        type="secondary",
+                    ):
+                        st.session_state[paste_toggle_key] = False
+                        st.session_state[paste_text_key] = ""
+                        st.rerun()
 
         final_code = str(code_value or "").strip().upper()
         if is_core:

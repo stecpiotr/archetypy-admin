@@ -1516,3 +1516,15 @@ Decyzja:
 Uzasadnienie:
 - User wymaga, aby metryczka była dostępna również dla `archetypy.badania.pro`.
 - Wspólny model minimalizuje ryzyko rozjazdu logiki między modułami i upraszcza dalsze wdrożenie raportowania demograficznego.
+
+### D-170: Wklejanie treści do metryczki realizujemy przez panel „Wklej pytanie i odpowiedzi” z podglądem parsowania
+Decyzja:
+- W edytorze metryczki każde pytanie ma opcję `📋 Wklej pytanie i odpowiedzi`.
+- UX panelu:
+  - lewe pole: surowy tekst do wklejenia,
+  - prawa strona: podgląd, jak parser rozumie `Treść pytania` i listę `Odpowiedzi`,
+  - akcja `Wstaw` zapisuje wynik do edytowanego pytania.
+- Przy `Wstaw` kodowanie odpowiedzi ustawiamy automatycznie sekwencją `1..N`.
+Uzasadnienie:
+- User pokazał referencyjny workflow na nagraniu i oczekiwał analogicznego, szybkiego sposobu masowego wprowadzania odpowiedzi.
+- Podgląd przed zatwierdzeniem ogranicza ryzyko błędnego parsowania przy wklejkach z Word/Excel.

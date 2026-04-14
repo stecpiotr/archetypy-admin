@@ -1629,3 +1629,21 @@
     - `metryczka_config_version`.
 - Test techniczny:
   - `python -m py_compile app.py db_utils.py db_jst_utils.py metryczka_config.py` (OK).
+
+### Zrobione w Hotfix H-063 (2026-04-14, wklejanie pytania i odpowiedzi do metryczki)
+- `app.py`:
+  - w edytorze metryczki dodano przycisk `📋 Wklej pytanie i odpowiedzi` przy każdym pytaniu,
+  - po kliknięciu otwiera się panel:
+    - pole wklejania treści,
+    - podgląd parsowania (`Treść pytania` + `Odpowiedzi`),
+    - akcje `Wstaw` / `Anuluj`,
+  - dodano parser treści wklejanej:
+    - usuwa numerację i bulety (`1.`, `-`, `•`, `a)` itd.),
+    - rozdziela pytanie od odpowiedzi heurystycznie (w tym przypadki wieloliniowego pytania),
+    - działa także dla wariantu „same odpowiedzi” (zostawia istniejące pytanie),
+  - `Wstaw`:
+    - aktualizuje treść pytania (jeśli wykryta),
+    - podmienia odpowiedzi,
+    - nadaje kodowanie odpowiedzi sekwencyjnie `1..N`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

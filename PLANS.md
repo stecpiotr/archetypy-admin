@@ -2043,3 +2043,33 @@ Wynik:
     - `metryczka_config_version INTEGER`.
 - Smoke-check:
   - `python -m py_compile app.py db_utils.py db_jst_utils.py metryczka_config.py` (OK).
+
+### Hotfix H-063 [DONE]
+Temat: Wklejanie `pytania + odpowiedzi` w edytorze metryczki (UX jak na nagraniu referencyjnym).
+Kryteria ukończenia:
+1. W każdej sekcji pytania metryczkowego jest przycisk `📋 Wklej pytanie i odpowiedzi`.
+2. Po kliknięciu otwiera się panel z:
+   - polem wklejania,
+   - podglądem parsowania (`Treść pytania` + lista `Odpowiedzi`),
+   - akcją `Wstaw`.
+3. Parser usuwa numerację/bulety (`1.`, `-`, `•`) i potrafi rozdzielić pytanie od odpowiedzi.
+4. `Wstaw` uzupełnia pytanie i odpowiedzi w metryczce, nadając kodowanie odpowiedzi sekwencyjnie (`1..N`).
+Pierwszy krok wykonawczy:
+- dodać parser tekstu i UI panelu w `_render_metryczka_editor` w `app.py`.
+Wynik:
+- `app.py`:
+  - dodano parser wklejanej treści:
+    - `_parse_pasted_question_and_answers(...)`,
+    - normalizacja linii i prefiksów list (`_paste_line_normalize`, `_paste_line_as_option`, `_paste_is_option_like`),
+  - w edytorze metryczki (dla JST i personalnych) dodano przycisk:
+    - `📋 Wklej pytanie i odpowiedzi`,
+  - po kliknięciu renderowany jest panel:
+    - textarea z treścią,
+    - podgląd parsowania po prawej,
+    - przyciski `Wstaw` / `Anuluj`,
+  - `Wstaw` aktualizuje bieżące pytanie:
+    - ustawia treść pytania (jeśli wykryta),
+    - wstawia odpowiedzi z auto-kodowaniem `1..N`,
+    - odświeża edytor bez utraty spójności stanu.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
