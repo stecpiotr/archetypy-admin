@@ -12374,8 +12374,8 @@ def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
     nk_cat = _demo_nk(cat_label)
     nk_var = _demo_nk(var_label)
     dyn_icon = _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK.get((nk_var, nk_cat))
-    if dyn_icon:
-        return str(dyn_icon)
+    if dyn_icon is not None:
+        return str(dyn_icon or "")
     icon = _DEMO_CAT_ICON_MAP.get(nk_cat)
     if icon:
         return icon
@@ -12389,7 +12389,7 @@ def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
         return "❓"
     if any(k in nk_var for k in ["obszar", "miejsce", "zamiesz", "lokaliz"]):
         if "miast" in nk_cat:
-            return "🏙️"
+            return "🏬"
         if "wieś" in nk_cat or "wies" in nk_cat:
             return "🌾"
     if "wiek" in nk_var:

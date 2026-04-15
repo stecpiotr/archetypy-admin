@@ -2448,3 +2448,10 @@ Decyzja:
 - W doborze ikon kategorii pusta ikona z konfiguracji nie nadpisuje fallbacku (mapa + heurystyki).
 Uzasadnienie:
 - Pomocnicze pola tekstowe „inna/jaka” były błędnie prezentowane jako pełne zmienne demograficzne (`Plec Other`, `Wiek Other`), co zaśmiecało raport i psuło czytelność kart/tabel.
+
+### D-273: Pusta ikona odpowiedzi (`value_emoji=""`) jest decyzją użytkownika i blokuje fallback
+Decyzja:
+- W raportach demograficznych (JST + raport wielocechowy) obecność kodu odpowiedzi z pustą ikoną oznacza „bez ikony” i nie uruchamia heurystycznego emoji fallback.
+- Dla kategorii `miasto` fallback jest standaryzowany do `🏬`.
+Uzasadnienie:
+- Użytkownik musi mieć możliwość celowego usunięcia ikon z wybranych odpowiedzi; fallback nie może ich „odradzać” automatycznie.

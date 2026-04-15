@@ -3257,3 +3257,24 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-121 [DONE]
+Temat: Ikony demografii po usunięciu w predef/metryczce + ujednolicenie `miasto -> 🏬`.
+Kryteria ukończenia:
+1. W raportach kategoria `miasto` ma `🏬` (nie `🏙️`).
+2. Gdy w predef/metryczce ikona odpowiedzi jest celowo pusta, raport respektuje pustkę (nie dokleja fallbackowej ikony).
+3. Dotyczy zarówno raportu JST (`analyze_poznan_archetypes.py`), jak i „Raportu wielocechowego” w panelu (`admin_dashboard.py`).
+Pierwszy krok wykonawczy:
+- poprawić logikę priorytetu ikon kategorii: obecność klucza z pustą wartością ma blokować fallback.
+Wynik:
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - `_demo_pick_cat_icon(...)` traktuje „ikona ustawiona na pusto” jako decyzję użytkownika (bez fallbacku),
+  - fallback dla kategorii `miasto` zmieniony na `🏬`.
+- `archetypy-admin/admin_dashboard.py`:
+  - `_personal_metry_cat_icon(...)` respektuje pustą ikonę w `option_icon_map`,
+  - budowanie `option_icons` zachowuje także puste wartości (`value_emoji=""`) zamiast je odrzucać.
+- Synchronizacja:
+  - zaktualizowano kopię generatora: `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

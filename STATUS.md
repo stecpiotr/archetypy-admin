@@ -2588,3 +2588,20 @@
 
 ### RYZYKO / do domknięcia
 - Do potwierdzenia manualnego na świeżo wygenerowanym raporcie: brak sekcji `* Other` w demografii segmentów i poprawne ikony kategorii.
+
+### Zrobione w Hotfix H-121 (2026-04-15, respektowanie pustych ikon + `miasto -> 🏬`)
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - `miasto` w fallbacku kategorii demograficznych ma `🏬`,
+  - pusta ikona kategorii z dynamicznej metryczki (`value_emoji=""`) nie uruchamia fallbacku (ikona pozostaje pusta).
+- `archetypy-admin/admin_dashboard.py`:
+  - raport wielocechowy respektuje puste ikony odpowiedzi z metryczki:
+    - puste `value_emoji` jest zachowane w `option_icons`,
+    - obecność kodu w mapie z pustą wartością blokuje fallback ikon.
+- Synchronizacja:
+  - zaktualizowano kopię generatora: `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do potwierdzenia manualnego na świeżo wygenerowanych raportach: brak niechcianych ikon przy celowo pustych `value_emoji` (np. `M_PREFERENCJE_POLITYCZNE`, `M_POGLADY`) i `miasto` jako `🏬`.

@@ -5,13 +5,16 @@ from collections import Counter, deque
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 
 ROOT = Path(__file__).resolve().parent
-FACES_DIR = ROOT / "assets" / "arche_cartoon"
+FACES_DIR_MALE = ROOT / "assets" / "arche_cartoon"
+FACES_DIR_FEMALE = ROOT / "assets" / "arche_cartoon"
+FACES_DIR_PERSON_ICONS = ROOT / "assets" / "person_icons"
 FONTS_DIR = ROOT / "assets" / "fonts"
-OUT_DIR = ROOT / "assets" / "archetype_profile_cards_male"
+OUT_DIR_MALE = ROOT / "assets" / "archetype_profile_cards_male"
+OUT_DIR_FEMALE = ROOT / "assets" / "archetype_profile_cards_female"
 
 CANVAS_W = 1024
 CANVAS_H = 335
@@ -73,6 +76,141 @@ ARCHETYPES: dict[str, dict[str, object]] = {
         "color": "#1565C0",
     },
 }
+
+ARCHETYPE_FILENAME_SLUG: dict[str, str] = {
+    "Opiekun": "opiekun",
+    "Kochanek": "kochanek",
+    "Błazen": "blazen",
+    "Buntownik": "buntownik",
+    "Odkrywca": "odkrywca",
+    "Twórca": "tworca",
+    "Bohater": "bohater",
+    "Czarodziej": "czarodziej",
+    "Mędrzec": "medrzec",
+    "Władca": "wladca",
+    "Niewinny": "niewinny",
+    "Towarzysz": "towarzysz",
+}
+
+FEMININE_TITLES: dict[str, str] = {
+    "Władca": "Władczyni",
+    "Bohater": "Bohaterka",
+    "Mędrzec": "Mędrczyni",
+    "Opiekun": "Opiekunka",
+    "Kochanek": "Kochanka",
+    "Błazen": "Komiczka",
+    "Twórca": "Twórczyni",
+    "Odkrywca": "Odkrywczyni",
+    "Czarodziej": "Czarodziejka",
+    "Towarzysz": "Towarzyszka",
+    "Niewinny": "Niewinna",
+    "Buntownik": "Buntowniczka",
+}
+
+
+def _fit_into_canvas_rgba(img: Image.Image, canvas_size: int = 768, padding: int = 46) -> Image.Image:
+    canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    max_w = canvas_size - 2 * padding
+    max_h = canvas_size - 2 * padding
+    ratio = min(max_w / img.width, max_h / img.height)
+    nw = max(1, int(round(img.width * ratio)))
+    nh = max(1, int(round(img.height * ratio)))
+    scaled = img.resize((nw, nh), Image.Resampling.LANCZOS)
+    ox = (canvas_size - nw) // 2
+    oy = (canvas_size - nh) // 2
+    canvas.alpha_composite(scaled, (ox, oy))
+    return canvas
+
+
+def _pencil_sketch_rgba(source: Image.Image) -> Image.Image:
+    src = source.convert("RGBA")
+    alpha = np.asarray(src.getchannel("A"), dtype=np.uint8)
+    rgb = src.convert("RGB")
+    gray = np.asarray(rgb.convert("L"), dtype=np.float32)
+
+    inv = 255.0 - gray
+    inv_blur = np.asarray(Image.fromarray(inv.astype(np.uint8), "L").filter(ImageFilter.GaussianBlur(radius=12)), dtype=np.float32)
+    dodge = gray * 255.0 / np.maximum(1.0, 255.0 - inv_blur)
+    dodge = np.clip(dodge, 0, 255)
+
+    edges_raw = np.asarray(Image.fromarray(gray.astype(np.uint8), "L").filter(ImageFilter.FIND_EDGES), dtype=np.float32)
+    edges = np.clip(edges_raw * 1.45, 0, 255)
+    sketch = np.clip(dodge * 0.64 + gray * 0.36, 0, 255)
+    sketch = np.clip(sketch - edges * 0.22 + 14.0, 0, 255)
+
+    sketch_img = Image.fromarray(sketch.astype(np.uint8), "L")
+    sketch_img = ImageOps.autocontrast(sketch_img, cutoff=1)
+    sketch_img = sketch_img.filter(ImageFilter.UnsharpMask(radius=1.4, percent=165, threshold=2))
+    sketch_arr = np.asarray(sketch_img, dtype=np.uint8)
+
+    # Delikatna "mgiełka" wokół postaci dla klimatu zbliżonego do arche_cartoon.
+    aura_alpha = Image.fromarray(alpha, "L").filter(ImageFilter.MaxFilter(size=17)).filter(ImageFilter.GaussianBlur(radius=8))
+    aura = Image.new("RGBA", src.size, (180, 180, 180, 0))
+    aura.putalpha(aura_alpha.point(lambda v: int(v * 0.12)))
+
+    out = Image.new("RGBA", src.size, (0, 0, 0, 0))
+    out.alpha_composite(aura)
+    sketch_rgba = Image.merge(
+        "RGBA",
+        (
+            Image.fromarray(sketch_arr, "L"),
+            Image.fromarray(sketch_arr, "L"),
+            Image.fromarray(sketch_arr, "L"),
+            Image.fromarray(alpha, "L"),
+        ),
+    )
+    out.alpha_composite(sketch_rgba)
+    return out
+
+
+def _build_female_face_from_icon(src_icon_path: Path, dst_face_path: Path) -> None:
+    src = Image.open(src_icon_path).convert("RGBA")
+    alpha = src.getchannel("A")
+    bbox = alpha.getbbox()
+    if not bbox:
+        raise ValueError(f"Pusta alfa dla pliku: {src_icon_path}")
+
+    src = src.crop(bbox)
+    # Zostawiamy górne ~58%, żeby uzyskać wyraźne popiersie zamiast pełnej sylwetki.
+    upper_h = max(1, int(round(src.height * 0.58)))
+    src = src.crop((0, 0, src.width, upper_h))
+
+    # Dociśnij poziomy kadr do "głowa + ramiona", żeby uniknąć pełnych rąk.
+    trim_left = int(round(src.width * 0.18))
+    trim_right = int(round(src.width * 0.18))
+    src = src.crop((trim_left, 0, max(trim_left + 2, src.width - trim_right), src.height))
+
+    normalized = _fit_into_canvas_rgba(src, canvas_size=768, padding=34)
+    sketch = _pencil_sketch_rgba(normalized)
+    dst_face_path.parent.mkdir(parents=True, exist_ok=True)
+    sketch.save(dst_face_path, "PNG", optimize=True)
+
+
+def ensure_female_faces(force: bool = False) -> None:
+    FACES_DIR_FEMALE.mkdir(parents=True, exist_ok=True)
+    for name, slug in ARCHETYPE_FILENAME_SLUG.items():
+        src = FACES_DIR_PERSON_ICONS / f"{slug}_K.png"
+        if not src.exists():
+            raise FileNotFoundError(f"Brak źródłowej ikony żeńskiej: {src}")
+        dst = FACES_DIR_FEMALE / f"{name}.png"
+        if force or not dst.exists():
+            _build_female_face_from_icon(src, dst)
+
+
+def face_path_for_archetype(name: str, gender_code: str) -> Path:
+    if gender_code.upper() == "K":
+        female_direct = FACES_DIR_FEMALE / f"{name}_K.png"
+        if female_direct.exists():
+            return female_direct
+        female_fallback = FACES_DIR_FEMALE / f"{name}.png"
+        if female_fallback.exists():
+            return female_fallback
+
+    male_direct = FACES_DIR_MALE / f"{name}.png"
+    if male_direct.exists():
+        return male_direct
+
+    raise FileNotFoundError(f"Brak grafiki twarzy dla archetypu: {name} ({gender_code})")
 
 
 def clamp(v: float, lo: float, hi: float) -> float:
@@ -295,7 +433,13 @@ def gradient_fill(
     return Image.fromarray(arr)
 
 
-def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> Image.Image:
+def draw_archetype_panel(
+    name: str,
+    values: tuple[int, ...],
+    color_hex: str,
+    face_path: Path,
+    display_name: str | None = None,
+) -> Image.Image:
     canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     color_rgb = hex_to_rgb(color_hex)
@@ -303,7 +447,7 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
     stroke_rgb = darken(color_rgb, 0.22)
 
     # Portret po lewej
-    face = prepare_face(FACES_DIR / f"{name}.png")
+    face = prepare_face(face_path)
     max_face_w = 290
     max_face_h = 250
     ratio = min(max_face_w / face.width, max_face_h / face.height)
@@ -320,13 +464,14 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
         ],
         size=42,
     )
-    title_bbox = draw.textbbox((0, 0), name, font=title_font)
+    shown_name = str(display_name or name)
+    title_bbox = draw.textbbox((0, 0), shown_name, font=title_font)
     title_w = title_bbox[2] - title_bbox[0]
     title_h = title_bbox[3] - title_bbox[1]
     face_bottom = fy + face.height
     # Nazwa zawsze pod portretem, z wyraźnym odstępem i bez obcinania dołu.
     title_y = min(CANVAS_H - title_h - 6, face_bottom + 0)
-    draw.text((160 - title_w // 2, int(title_y)), name, fill=(20, 20, 20, 255), font=title_font)
+    draw.text((160 - title_w // 2, int(title_y)), shown_name, fill=(20, 20, 20, 255), font=title_font)
 
     # Delikatna linia bazowa wykresu
     draw.line((CHART_X0 - 8, BASELINE_Y, CHART_X1 + 8, BASELINE_Y), fill=(*stroke_rgb, 92), width=2)
@@ -422,9 +567,32 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate archetype profile cards.")
     parser.add_argument("--only", type=str, default="", help="Generate only one archetype by exact name.")
+    parser.add_argument(
+        "--gender",
+        type=str,
+        default="M",
+        choices=["M", "K", "m", "k"],
+        help="M = męskie twarze (arche_cartoon), K = żeńskie twarze (arche_cartoon)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default="",
+        help="Opcjonalna ścieżka wyjściowa; domyślnie zależna od --gender.",
+    )
+    parser.add_argument(
+        "--rebuild-female-faces",
+        action="store_true",
+        help="Wymuś przebudowę pomocniczych szkiców żeńskich.",
+    )
     args = parser.parse_args()
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    gender_code = args.gender.upper()
+    if args.rebuild_female_faces:
+        ensure_female_faces(force=True)
+
+    out_dir = Path(args.out_dir) if args.out_dir else (OUT_DIR_FEMALE if gender_code == "K" else OUT_DIR_MALE)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     items = list(ARCHETYPES.items())
     if args.only:
@@ -435,8 +603,16 @@ def main() -> None:
     for arche_name, config in items:
         values = config["values"]  # type: ignore[assignment]
         color = str(config["color"])
-        panel = draw_archetype_panel(arche_name, values, color)
-        out = OUT_DIR / f"{arche_name}.png"
+        face_path = face_path_for_archetype(arche_name, gender_code=gender_code)
+        display_name = FEMININE_TITLES.get(arche_name, arche_name) if gender_code == "K" else arche_name
+        panel = draw_archetype_panel(
+            arche_name,
+            values,
+            color,
+            face_path=face_path,
+            display_name=display_name,
+        )
+        out = out_dir / f"{arche_name}.png"
         panel.save(out, "PNG", optimize=True)
         print(f"[OK] {out}")
 

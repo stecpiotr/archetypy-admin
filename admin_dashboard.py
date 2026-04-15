@@ -462,19 +462,23 @@ def _card_file_for(archetype_name: str):
     return None
 
 
-def _profile_card_file_for(archetype_name: str):
+def _profile_card_file_for(archetype_name: str, gender_code: str = "M"):
     """
-    Zwraca ścieżkę do profilowej grafiki archetypu z assets/archetype_profile_cards_male.
+    Zwraca ścieżkę do profilowej grafiki archetypu.
+    Dla kobiet najpierw sprawdza assets/archetype_profile_cards_female,
+    a potem fallback do assets/archetype_profile_cards_male.
     Dopasowanie odporne na brak polskich znaków i warianty nazw.
     """
     try:
         base_masc = base_masc_from_any(str(archetype_name or "").strip())
-        if not base_masc or not ARCHETYPE_PROFILE_CARD_DIR.exists():
+        if not base_masc:
             return None
 
-        direct = ARCHETYPE_PROFILE_CARD_DIR / f"{base_masc}.png"
-        if direct.exists():
-            return direct
+        gender_code = str(gender_code or "M").upper()
+        dirs = []
+        if gender_code == "K":
+            dirs.append(ARCHETYPE_PROFILE_CARD_DIR_FEMALE)
+        dirs.append(ARCHETYPE_PROFILE_CARD_DIR_MALE)
 
         def _norm(v: str) -> str:
             return re.sub(r"[^a-z0-9]+", "", _slug_pl(v or ""))
@@ -484,18 +488,22 @@ def _profile_card_file_for(archetype_name: str):
         if not target_keys:
             return None
 
-        files = sorted(
-            [
-                p
-                for p in ARCHETYPE_PROFILE_CARD_DIR.iterdir()
-                if p.is_file() and p.suffix.lower() == ".png"
-            ],
-            key=lambda p: p.name.lower(),
-        )
-        for path in files:
-            stem_norm = _norm(path.stem)
-            if stem_norm and stem_norm in target_keys:
-                return path
+        for cards_dir in dirs:
+            if not cards_dir.exists():
+                continue
+
+            direct = cards_dir / f"{base_masc}.png"
+            if direct.exists():
+                return direct
+
+            files = sorted(
+                [p for p in cards_dir.iterdir() if p.is_file() and p.suffix.lower() == ".png"],
+                key=lambda p: p.name.lower(),
+            )
+            for path in files:
+                stem_norm = _norm(path.stem)
+                if stem_norm and stem_norm in target_keys:
+                    return path
     except Exception:
         return None
     return None
@@ -1054,7 +1062,8 @@ ARCHETYPE_ICON_DIR = Path(__file__).with_name("assets") / "person_icons"
 # Karty archetypów (PNG/JPG) pokazywane m.in. przy "5.1.2. Zestawy praktyczne"
 ARCHETYPE_CARD_DIR = Path(__file__).with_name("assets") / "card"
 # Karty profilowe archetypów (PNG) używane przy TOP2/TOP3
-ARCHETYPE_PROFILE_CARD_DIR = Path(__file__).with_name("assets") / "archetype_profile_cards_male"
+ARCHETYPE_PROFILE_CARD_DIR_MALE = Path(__file__).with_name("assets") / "archetype_profile_cards_male"
+ARCHETYPE_PROFILE_CARD_DIR_FEMALE = Path(__file__).with_name("assets") / "archetype_profile_cards_female"
 # Ikony do etykiet wykresu skumulowanego (nie mylić z person_icons)
 ARCHE_STACKED_ICON_DIR = Path(__file__).with_name("assets") / "arche_icons"
 
@@ -3421,9 +3430,9 @@ def _personal_metry_cat_icon(
     if pref:
         return pref
     if isinstance(option_icon_map, dict):
-        icon_from_map = str(option_icon_map.get(str(code or "").strip()) or "").strip()
-        if icon_from_map:
-            return icon_from_map
+        map_key = str(code or "").strip()
+        if map_key in option_icon_map:
+            return str(option_icon_map.get(map_key) or "").strip()
     field = str(db_column or "").strip().upper()
     canon = _personal_demo_code(field, code, table_label)
     core_meta = PERSONAL_CORE_DEMO_META.get(field) or {}
@@ -3501,12 +3510,9 @@ def _collect_personal_metry_available(
         for opt in list(mq.get("options") or []):
             if not isinstance(opt, dict):
                 continue
-            icon = str(opt.get("value_emoji") or "").strip()
-            if not icon:
-                continue
             canon_code = _personal_demo_code(db_col, str(opt.get("code") or "").strip(), table_label)
             if canon_code and canon_code not in option_icons:
-                option_icons[canon_code] = icon
+                option_icons[canon_code] = str(opt.get("value_emoji") or "").strip()
         ordered_codes = [c for c in ordered_codes if c]
         seen_codes: set[str] = set()
         ordered_codes = [c for c in ordered_codes if not (c in seen_codes or seen_codes.add(c))]
@@ -8425,7 +8431,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             profile_cards_for_top: list[tuple[int, str, Path]] = []
             for rank, arch_name in enumerate(top_profile_archetypes, start=1):
-                profile_path = _profile_card_file_for(arch_name)
+                profile_path = _profile_card_file_for(arch_name, gender_code=report_gender_code)
                 if profile_path and Path(profile_path).exists():
                     profile_cards_for_top.append((rank, disp_name(arch_name), Path(profile_path)))
 
