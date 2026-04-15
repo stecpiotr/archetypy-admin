@@ -51,7 +51,9 @@ def guess_metry_variable_emoji(db_column: Any, table_label: Any = "", prompt: An
         return "📍"
     if any(k in token for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
         return "🗳️"
-    if any(k in token for k in ("orientac", "poglad", "politycz", "ideolog")):
+    if "orientac" in token:
+        return "🧭"
+    if any(k in token for k in ("poglad", "politycz", "ideolog")):
         return "⚖️"
     return "📌"
 
@@ -125,11 +127,13 @@ def guess_metry_value_emoji(variable_label: Any, code: Any, db_column: Any = "")
         if "lewic" in code_token:
             return "⬅️"
         if "centr" in code_token:
-            return "⚖️"
+            return "↔️"
         if "odmow" in code_token:
             return "🤐"
         if "trudno" in code_token:
             return "🤷"
+        if "niewaz" in code_token:
+            return "⭕"
         if "nie wiem" in code_token:
             return "❓"
         return "🧭"
@@ -138,6 +142,8 @@ def guess_metry_value_emoji(variable_label: Any, code: Any, db_column: Any = "")
             return "🤐"
         if "trudno" in code_token:
             return "🤷"
+        if "niewaz" in code_token:
+            return "⭕"
         if "nie wiem" in code_token or "niezdecyd" in code_token:
             return "❓"
         return "🗳️"

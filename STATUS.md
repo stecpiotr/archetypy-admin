@@ -2463,3 +2463,55 @@
 - Testy techniczne:
   - `python -m py_compile app.py admin_dashboard.py metryczka_config.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Zrobione w Hotfix H-115 (2026-04-15, Etap 6: audyt języka archetypów żeńskich)
+- Zakres: `D:\PythonProject\archetypy\archetypy-admin\opisy_archetypow` (pełny przegląd dokumentów żeńskich `.docx`).
+- Poprawione dokumenty:
+  - `opisy_Bohaterka.docx`
+  - `opisy_Buntowniczka.docx`
+  - `opisy_Czarodziejka.docx`
+  - `opisy_Kochanka.docx`
+  - `opisy_Komiczka.docx`
+  - `opisy_Mędrczyni.docx`
+  - `opisy_Niewinna.docx`
+  - `opisy_Odkrywczyni.docx`
+  - `opisy_Opiekunka.docx`
+  - `opisy_Towarzyszka.docx`
+  - `opisy_Władczyni.docx`
+- Typy naprawionych błędów:
+  - męskie formy przymiotnikowe/czasownikowe odnoszone do żeńskiego archetypu (`postrzegany`, `skłonny`, `uzależniony`, `nieodpowiedzialny`, `agresywny`, `stabilny`, `dumny`, itd.),
+  - niespójność nazwy archetypu (`Kochanka` vs `Kochanek` w sekcji balansu),
+  - niespójności tonów/checklist i pytań diagnostycznych.
+- Kontrola końcowa:
+  - wykonano ponowny skan treści żeńskich opisów regexem pod kątem najczęstszych błędnych form męskich,
+  - w wynikach zostały wyłącznie neutralne konteksty techniczne (np. `agresywnych kontrastów`), bez błędnych odniesień do żeńskich archetypów.
+
+### Zrobione w Hotfix H-116 (2026-04-15, metryczka/radar/koło archetypów)
+- `archetypy-admin/app.py`:
+  - dodano/uzupełniono predefiniowane ikonki:
+    - `orientacja 🧭`,
+    - `poglądy ⚖️`,
+    - `centrowe ↔️`,
+    - `trudno powiedzieć 🤷`,
+    - `nieważny ⭕`,
+  - `st.data_editor`:
+    - `_editor_live_df(...)` obsługuje delta-state (`edited_rows`, `added_rows`, `deleted_rows`),
+    - znika efekt „muszę wpisać drugi raz”, bo pierwsza edycja jest od razu rekonstruowana i zapisywana w stanie pytania.
+  - fallback ikon w Matchingu (`_matching_guess_value_emoji`) rozszerzony o nowe mapowanie.
+- `archetypy-admin/metryczka_config.py`:
+  - heurystyki ikon dopasowane do nowego słownika (`↔️`, `🤷`, `⭕`, rozdział `orientacja` vs `poglądy`).
+- `archetypy-admin/admin_dashboard.py`:
+  - naprawiono podświetlenie koła archetypów:
+    - maska działa na pierścieniu, a nie na pełnym klinie od środka,
+  - naprawiono radar podgrupy:
+    - `theta` przełączone na wartości kategoryczne (nazwy archetypów),
+    - `angularaxis.type="category"` dla stabilnego rozmieszczenia etykiet,
+  - poprawiono dolną legendę TOP2/TOP3:
+    - większy gap i osobne elementy `pdemo-role-item` (czytelne odstępy).
+- Dodatkowa weryfikacja ignore:
+  - nadal ignorowane są:
+    - `opisy_archetypow/` (linia 100 `.gitignore`),
+    - rootowe `/*.png` (linia 94 `.gitignore`),
+  - pliki kodowe (`app.py`, `admin_dashboard.py`, `metryczka_config.py`, `db_jst_utils.py`, `assets/...`) nie są ignorowane.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).

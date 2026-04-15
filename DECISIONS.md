@@ -2327,3 +2327,53 @@ Decyzja:
   - `C:\Poznan_Archetypy_Analiza`.
 Uzasadnienie:
 - Zapobiega rozjazdom obliczeń i renderu między środowiskami roboczymi.
+
+### D-257: Opisy archetypów żeńskich muszą mieć w 100% żeńskie formy językowe
+Decyzja:
+- W katalogu `opisy_archetypow` przyjmujemy zasadę pełnej zgodności gramatycznej opisów żeńskich archetypów:
+  - formy osobowe, cechy, cienie, ton i pytania kontrolne odnoszone do archetypu żeńskiego mają być w rodzaju żeńskim.
+- Dotyczy to także sekcji tabelarycznych/checklist i form skrótowych (`Ton: ...`, `Cień: ...`) oraz nazw archetypów w środku treści.
+Uzasadnienie:
+- Niespójne formy męskie obniżają wiarygodność raportu, wprowadzają dysonans językowy i były wielokrotnie zgłaszane przez użytkownika jako błąd jakościowy.
+- Spójność językowa jest częścią jakości produktu analitycznego, nie tylko kosmetyką redakcyjną.
+
+### D-258: Audyt językowy opisów żeńskich prowadzimy przez eksport tekstu roboczego i skan kontrolny
+Decyzja:
+- Przy większej korekcie redakcyjnej dokumentów `.docx` stosujemy workflow:
+  1) eksport treści do roboczych plików tekstowych,
+  2) korekty źródeł `.docx`,
+  3) ponowny eksport i skan regexowy pod kątem błędnych form,
+  4) usunięcie plików roboczych.
+Uzasadnienie:
+- Pozwala to wykryć błędy rozsiane po całych dokumentach (również w tabelach), a jednocześnie nie zostawia artefaktów pomocniczych w repo.
+
+### D-259: `st.data_editor` metryczki czyta i aplikuje delta-state, aby nie gubić pierwszej edycji
+Decyzja:
+- W helperze `_editor_live_df(...)` obsługujemy stan widgetu typu dict (`edited_rows`, `added_rows`, `deleted_rows`) i aplikujemy go do ostatniego DataFrame.
+- Sam fallback do `returned_df` pozostaje, ale nie jest jedynym źródłem prawdy.
+Uzasadnienie:
+- W praktyce Streamlit potrafi zwracać dane opóźnione o jeden rerun, co dawało efekt „muszę wpisać dwa razy”.
+- Rekonstrukcja delta-state usuwa ten lag bez zmiany UX użytkownika.
+
+### D-260: Podświetlenie koła archetypów ma działać wyłącznie na pierścieniu
+Decyzja:
+- `mask_for(...)` w `admin_dashboard.py` rysuje sektor na pierścieniu (zewnętrzny promień + wycięty środek), nie na pełnym klinie od centrum.
+Uzasadnienie:
+- Eliminuje artefakty wizualne (duże trójkąty wychodzące poza właściwe koło).
+
+### D-261: Radar podgrupy używa osi kategorycznej
+Decyzja:
+- W `Podgląd radarowy podgrupy` przekazujemy `theta` jako etykiety kategorii archetypów i ustawiamy `angularaxis.type="category"`.
+Uzasadnienie:
+- Stabilizuje układ etykiet osi i zapobiega ich kolapsowi do jednego punktu przy różnych wersjach Plotly.
+
+### D-262: Biblioteka predefiniowanych ikon metryczki zawiera jawne rozróżnienie `orientacja`/`poglądy`
+Decyzja:
+- Do biblioteki ikon i heurystyk dodano:
+  - `orientacja 🧭`,
+  - `poglądy ⚖️`,
+  - `centrowe ↔️`,
+  - `trudno powiedzieć 🤷`,
+  - `nieważny ⭕`.
+Uzasadnienie:
+- Użytkownik wymagał precyzyjnego, powtarzalnego słownika ikon dla najczęściej używanych zmiennych i kategorii.

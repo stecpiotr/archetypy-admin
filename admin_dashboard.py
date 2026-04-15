@@ -2743,12 +2743,15 @@ def mask_for(idx, color, gender_code: str = "M"):
     base = load_base_arche_img(gender_code)
     w, h = base.size
     cx, cy = w//2, h//2
-    rad = w//2
-    mask = Image.new("RGBA", (w, h), (0,0,0,0))
-    draw = ImageDraw.Draw(mask)
+    r_outer = int(min(w, h) * 0.39)
+    r_inner = int(min(w, h) * 0.13)
+    mask = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(mask, "RGBA")
     start = -90 + idx*30
     end = start + 30
-    draw.pieslice([cx-rad, cy-rad, cx+rad, cy+rad], start, end, fill=color)
+    # Podświetlamy wyłącznie pierścień koła (bez zalewania całego sektora od środka).
+    draw.pieslice([cx-r_outer, cy-r_outer, cx+r_outer, cy+r_outer], start, end, fill=color)
+    draw.ellipse([cx-r_inner, cy-r_inner, cx+r_inner, cy+r_inner], fill=(0, 0, 0, 0))
     return mask
 
 def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None, gender_code: str = "M"):
@@ -3359,8 +3362,10 @@ def _personal_metry_var_icon(db_column: str, table_label: str = "", preferred_ic
         return "📍"
     if any(k in nk for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
         return "🗳️"
-    if any(k in nk for k in ("orientac", "pogl", "politycz", "ideolog")):
+    if "orientac" in nk:
         return "🧭"
+    if any(k in nk for k in ("pogl", "politycz", "ideolog")):
+        return "⚖️"
     return "📌"
 
 
@@ -3403,16 +3408,24 @@ def _personal_metry_cat_icon(
         if "lewic" in nk:
             return "⬅️"
         if "centr" in nk:
-            return "⚖️"
+            return "↔️"
         if "odmow" in nk:
             return "🤐"
-        if "nie wiem" in nk or "trudno" in nk:
+        if "trudno" in nk:
+            return "🤷"
+        if "niewaz" in nk:
+            return "⭕"
+        if "nie wiem" in nk:
             return "❓"
         return "🧭"
     if any(k in nk_var for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
         if "odmow" in nk:
             return "🤐"
-        if "nie wiem" in nk or "niezdecyd" in nk or "trudno" in nk:
+        if "trudno" in nk:
+            return "🤷"
+        if "niewaz" in nk:
+            return "⭕"
+        if "nie wiem" in nk or "niezdecyd" in nk:
             return "❓"
         return "🗳️"
     return "📌"
@@ -3647,6 +3660,17 @@ def _render_personal_demography_subpage(
             color:#334155;
             line-height:1.28;
             letter-spacing:.01em;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            gap:16px;
+            flex-wrap:wrap;
+          }
+          .pdemo-top2-line .pdemo-role-item{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            white-space:nowrap;
           }
           .pdemo-wheel-title{
             margin-top:28px;
@@ -4119,7 +4143,7 @@ def _render_personal_demography_subpage(
     all_top = _priority_top_for_ui_demo(means_20_all, archetype_names)
     sub_top = _priority_top_for_ui_demo(filtered_means_20, archetype_names)
     theta_labels = [disp_name_fn(n) for n in archetype_names]
-    theta_display = list(range(len(archetype_names)))
+    theta_display = [str(lbl) for lbl in theta_labels]
     radar_top_union = set(all_top + sub_top)
     radar_tick_text = [
         (f"<b>{html.escape(str(lbl))}</b>" if arch in radar_top_union else html.escape(str(lbl)))
@@ -4199,6 +4223,7 @@ def _render_personal_demography_subpage(
             bgcolor="rgba(0,0,0,0)",
             radialaxis=dict(visible=True, range=[0, 20]),
             angularaxis=dict(
+                type="category",
                 rotation=90,
                 direction="clockwise",
                 tickfont=dict(size=16 if not is_mobile else 10.5),
@@ -4238,9 +4263,9 @@ def _render_personal_demography_subpage(
             if idx >= max(0, int(count)):
                 break
             items.append(
-                f"<span><span style=\"color:{palette[role_key]};\">{marker}</span> {label}</span>"
+                f"<span class=\"pdemo-role-item\"><span style=\"color:{palette[role_key]};\">{marker}</span><span>{label}</span></span>"
             )
-        return " ".join(items)
+        return "".join(items)
 
     st.markdown(
         f"""

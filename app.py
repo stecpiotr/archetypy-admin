@@ -2546,7 +2546,8 @@ _METRY_ICON_LIBRARY: List[Tuple[str, str]] = [
     ("👩", "kobieta"),
     ("👨", "mężczyzna"),
     ("⌛", "wiek"),
-    ("⚖️", "orientacja / poglądy"),
+    ("🧭", "orientacja"),
+    ("⚖️", "poglądy"),
     ("🧑", "wiek 15-39"),
     ("🧑‍💼", "wiek 40-59"),
     ("🧓", "wiek 60+"),
@@ -2573,9 +2574,11 @@ _METRY_ICON_LIBRARY: List[Tuple[str, str]] = [
     ("🗳️", "preferencje polityczne"),
     ("➡️", "prawicowe"),
     ("↗️", "centro-prawicowe"),
-    ("⚖️", "centrowe"),
+    ("↔️", "centrowe"),
     ("↖️", "centro-lewicowe"),
     ("⬅️", "lewicowe"),
+    ("🤷", "trudno powiedzieć"),
+    ("⭕", "nieważny"),
     ("❓", "nie wiem"),
     ("✅", "tak"),
     ("❌", "nie"),
@@ -2820,13 +2823,64 @@ def _editor_live_df(returned_df: Any, widget_state: Any) -> pd.DataFrame:
     """
     Streamlit bywa niespójny: `st.data_editor` zwraca DataFrame, ale session_state
     pod kluczem widgetu czasem przechowuje obiekt stanu (dict), nie tabelę.
-    Nigdy nie traktujemy takiego dict jako źródła danych do zapisu.
+    W przypadku dict aplikujemy delty edycji do ostatniej tabeli, aby uniknąć efektu
+    "muszę wpisać drugi raz".
     """
     if isinstance(widget_state, pd.DataFrame):
         return widget_state
+    base_df = returned_df.copy() if isinstance(returned_df, pd.DataFrame) else pd.DataFrame()
+    if isinstance(widget_state, dict):
+        work = base_df.copy()
+        if work.empty:
+            work = _metryczka_attach_move_marker(
+                _metryczka_editor_df_clean(returned_df),
+                selected_index=-1,
+            )
+        default_row = {
+            "Przesuń": False,
+            "Odpowiedź": "",
+            "Kodowanie": "",
+            "Otwarta": False,
+            "Blokuj losowanie": False,
+            "Ikona": "",
+        }
+        deleted_rows = widget_state.get("deleted_rows") if isinstance(widget_state.get("deleted_rows"), list) else []
+        for raw_idx in sorted(
+            [int(i) for i in deleted_rows if isinstance(i, (int, float, str)) and str(i).strip().isdigit()],
+            reverse=True,
+        ):
+            if 0 <= raw_idx < len(work.index):
+                work = work.drop(work.index[raw_idx])
+        work = work.reset_index(drop=True)
+
+        added_rows = widget_state.get("added_rows") if isinstance(widget_state.get("added_rows"), list) else []
+        for row in added_rows:
+            payload = dict(default_row)
+            if isinstance(row, dict):
+                for k, v in row.items():
+                    if k in payload:
+                        payload[k] = v
+            work = pd.concat([work, pd.DataFrame([payload])], ignore_index=True)
+
+        edited_rows = widget_state.get("edited_rows") if isinstance(widget_state.get("edited_rows"), dict) else {}
+        for raw_idx, change_map in edited_rows.items():
+            try:
+                idx = int(raw_idx)
+            except Exception:
+                continue
+            if idx < 0:
+                continue
+            while idx >= len(work.index):
+                work = pd.concat([work, pd.DataFrame([default_row])], ignore_index=True)
+            if isinstance(change_map, dict):
+                for col, val in change_map.items():
+                    if col not in work.columns:
+                        work[col] = None
+                    work.at[idx, col] = val
+        return work
     if isinstance(returned_df, pd.DataFrame):
         return returned_df
-    return _metryczka_editor_df_clean(returned_df)
+    return _metryczka_attach_move_marker(_metryczka_editor_df_clean(returned_df), selected_index=-1)
 
 
 def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
@@ -6385,7 +6439,9 @@ def _matching_guess_variable_emoji(field: str, label: str) -> str:
         return "🏘️"
     if any(k in key for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
         return "🗳️"
-    if any(k in key for k in ("orientac", "poglad", "politycz", "ideolog")):
+    if "orientac" in key:
+        return "🧭"
+    if any(k in key for k in ("poglad", "politycz", "ideolog")):
         return "⚖️"
     return "📌"
 
@@ -6406,6 +6462,8 @@ def _matching_guess_value_emoji(var_label: str, code: str) -> str:
             return "🤐"
         if "trudno" in nk:
             return "🤷"
+        if "niewaz" in nk:
+            return "⭕"
         if "nie wiem" in nk or "niezdecyd" in nk:
             return "❓"
         return "🗳️"
@@ -6419,11 +6477,13 @@ def _matching_guess_value_emoji(var_label: str, code: str) -> str:
         if "lewic" in nk:
             return "⬅️"
         if "centr" in nk:
-            return "⚖️"
+            return "↔️"
         if "odmow" in nk:
             return "🤐"
         if "trudno" in nk:
             return "🤷"
+        if "niewaz" in nk:
+            return "⭕"
         if "nie wiem" in nk:
             return "❓"
         return "🧭"

@@ -3125,3 +3125,39 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py metryczka_config.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-115 [DONE]
+Temat: Etap 6 — pełny audyt i korekta form żeńskich w opisach archetypów (`opisy_archetypow`).
+Kryteria ukończenia:
+1. Usunięcie męskich form odnoszących się do archetypów żeńskich (opis, cień, ton, checklisty, pytania kontrolne).
+2. Zachowanie sensu merytorycznego i struktury dokumentów `.docx`.
+3. Kontrola końcowa regexem na najczęstsze męskie formy błędnie przypisane do żeńskich archetypów.
+Pierwszy krok wykonawczy:
+- wyeksportować treść dokumentów żeńskich do audytu i zbudować listę rzeczywistych kolizji językowych.
+Wynik:
+- poprawiono formy żeńskie w 11 dokumentach (`Bohaterka`, `Buntowniczka`, `Czarodziejka`, `Kochanka`, `Komiczka`, `Mędrczyni`, `Niewinna`, `Odkrywczyni`, `Opiekunka`, `Towarzyszka`, `Władczyni`),
+- usunięto pozostałości typu: `postrzegany`, `skłonny`, `uzależniony`, `nieodpowiedzialny`, `zmienny`, `bezwzględny`, `agresywny`, `dumny`, `Kochanka/Kochanek` w złym kontekście,
+- wykonano kontrolę końcową skanem regex (pozostały tylko neutralne użycia, np. `agresywnych kontrastów`),
+- usunięto pliki pomocnicze audytu (`_audit_txt`) po zakończeniu prac.
+
+### Hotfix H-116 [DONE]
+Temat: Ikony metryczki + koło archetypów + radar podgrupy + stabilizacja pierwszego zapisu edycji.
+Kryteria ukończenia:
+1. Lista predefiniowanych ikonek zawiera: `centrowe ↔️`, `orientacja 🧭`, `poglądy ⚖️`, `trudno powiedzieć 🤷`, `nieważny ⭕`.
+2. Podświetlenie koła archetypów nie zalewa całych trójkątnych sektorów poza pierścieniem.
+3. `Podgląd radarowy podgrupy` renderuje poprawnie osie/archetypy (bez zlepienia etykiet w jednym punkcie).
+4. Dolna legenda TOP2/TOP3 ma większe odstępy między rolami.
+5. Edycja w tabeli odpowiedzi metryczki nie wymaga podwójnego wpisu.
+Wynik:
+- `app.py`:
+  - rozszerzono bibliotekę ikon (`_METRY_ICON_LIBRARY`) o nowe pozycje,
+  - heurystyki fallback w Matchingu (`_matching_guess_*_emoji`) uwzględniają nowe ikony (`↔️`, `🤷`, `⭕`),
+  - `st.data_editor` odczytuje live-zmiany również ze stanu delta (`edited_rows/added_rows/deleted_rows`) w `_editor_live_df`, co eliminuje efekt „zapisuje się dopiero za drugim razem”.
+- `metryczka_config.py`:
+  - heurystyki ikon zmiennej/kategorii dopięte do nowego mapowania (`orientacja -> 🧭`, `poglądy -> ⚖️`, `centrowe -> ↔️`, `trudno -> 🤷`, `nieważny -> ⭕`).
+- `admin_dashboard.py`:
+  - `mask_for(...)` podświetla wyłącznie pierścień koła archetypów (bez dużych klinów od środka),
+  - radar podgrupy używa osi kategorycznej (`theta` jako etykiety), co stabilizuje render etykiet,
+  - dolna legenda TOP2/TOP3 ma większe odstępy i czytelniejszy układ.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).
