@@ -46,28 +46,28 @@ CANONICAL_COLUMNS: List[str] = [
 
 # Kolejność i dokładne etykiety wymagane przez analizator JST
 M_PLEC_VALUES = ["kobieta", "mężczyzna"]
-M_WIEK_VALUES = ["15-39", "40-59", "60 i więcej"]
+M_WIEK_VALUES = ["15-39", "40-59", "60+"]
 M_WYKSZT_VALUES = [
-    "podstawowe, gimnazjalne, zasadnicze zawodowe",
+    "podst./gim./zaw.",
     "średnie",
     "wyższe",
 ]
 M_ZAWOD_VALUES = [
     "pracownik umysłowy",
     "pracownik fizyczny",
-    "prowadzę własną firmę",
+    "własna firma",
     "student/uczeń",
     "bezrobotny",
     "rencista/emeryt",
-    "inna (jaka?)",
+    "inna",
 ]
 M_MATERIAL_VALUES = [
-    "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
-    "powodzi mi się raczej źle",
-    "powodzi mi się przeciętnie, średnio",
-    "powodzi mi się raczej dobrze",
-    "powodzi mi się bardzo dobrze",
-    "odmawiam udzielenia odpowiedzi",
+    "bardzo zła",
+    "raczej zła",
+    "przeciętna",
+    "raczej dobra",
+    "bardzo dobra",
+    "odmowa",
 ]
 
 

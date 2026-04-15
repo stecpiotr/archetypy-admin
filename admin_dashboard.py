@@ -31,6 +31,7 @@ from PIL import Image, ImageDraw
 import io
 import re
 import html
+import base64
 from textwrap import dedent
 from datetime import datetime
 import pytz
@@ -3217,7 +3218,7 @@ def _metry_value_label(question: dict[str, object], code: str) -> str:
 
 PERSONAL_METRY_VARIABLE_ICONS = {
     "M_PLEC": "👫",
-    "M_WIEK": "🧭",
+    "M_WIEK": "⌛",
     "M_WYKSZT": "🎓",
     "M_ZAWOD": "💼",
     "M_MATERIAL": "💰",
@@ -3339,7 +3340,7 @@ def _personal_metry_var_icon(db_column: str, table_label: str = "", preferred_ic
         return PERSONAL_METRY_VARIABLE_ICONS[key]
     nk = _norm_text_token(f"{table_label} {key}")
     if "WIEK" in key:
-        return "🧭"
+        return "⌛"
     if "PLEC" in key:
         return "👫"
     if "WYKSZ" in key:
@@ -3421,18 +3422,17 @@ def _collect_personal_metry_available(
         if not db_col:
             continue
         col_name = f"METRY_{db_col}"
-        if col_name not in results_df.columns:
-            continue
         table_label = str((mq or {}).get("table_label") or (mq or {}).get("prompt") or db_col).strip()
-        col_series = (
-            results_df[col_name]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-            .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
-        )
-        if not bool(col_series.ne("").any()):
-            continue
+        if col_name in results_df.columns:
+            col_series = (
+                results_df[col_name]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
+            )
+        else:
+            col_series = pd.Series([""] * len(results_df.index), index=results_df.index, dtype=object)
         ordered_codes = [
             _personal_demo_code(db_col, str((opt or {}).get("code") or "").strip(), table_label)
             for opt in list(mq.get("options") or [])
@@ -3450,9 +3450,8 @@ def _collect_personal_metry_available(
         ordered_codes = [c for c in ordered_codes if c]
         seen_codes: set[str] = set()
         ordered_codes = [c for c in ordered_codes if not (c in seen_codes or seen_codes.add(c))]
-        present = [c for c in ordered_codes if bool((col_series == c).any())]
-        extra = sorted(set(col_series[col_series != ""]) - set(present))
-        codes = present + list(extra)
+        extra = sorted(set(col_series[col_series != ""]) - set(ordered_codes))
+        codes = ordered_codes + list(extra)
         if not codes:
             continue
         out.append(
@@ -3614,10 +3613,12 @@ def _render_personal_demography_subpage(
             line-height:1.05;
           }
           .pdemo-top2-grid{
-            display:grid;
-            grid-template-columns:repeat(2,minmax(220px,1fr));
+            display:flex;
+            justify-content:center;
+            align-items:stretch;
             gap:12px;
-            margin:8px 0 4px 0;
+            margin:2px 0 0 0;
+            flex-wrap:wrap;
           }
           .pdemo-top2-card{
             border:1px solid #dbe4ef;
@@ -3625,6 +3626,8 @@ def _render_personal_demography_subpage(
             background:#fff;
             padding:10px 12px;
             text-align:center;
+            width:min(380px, 48%);
+            min-width:260px;
           }
           .pdemo-top2-title{
             font-size:15px;
@@ -3638,20 +3641,38 @@ def _render_personal_demography_subpage(
             color:#334155;
           }
           .pdemo-wheel-title{
-            margin-top:20px;
+            margin-top:28px;
             margin-bottom:6px;
             font-size:2.0rem;
             font-weight:900;
             color:#1f2f44;
             line-height:1.05;
           }
+          .pdemo-wheel-sep{
+            border-top:1px solid #d9e2ef;
+            margin:30px 0 16px 0;
+            width:100%;
+          }
           .pdemo-profile-title{
-            font-weight:800;
-            font-size:1.7rem;
+            font-weight:600;
+            font-size:1.4rem;
             color:#1f2f44;
             margin:2px 0 8px 0;
             text-align:center;
           }
+          .pdemo-wheel-image{
+            display:flex;
+            justify-content:center;
+            margin-top:6px;
+          }
+          .pdemo-score-card{border:1px solid #d5dfec;border-radius:12px;background:#ffffff;padding:12px 14px;margin:8px 0 10px 0;}
+          .pdemo-score-title{font-size:15px;font-weight:800;color:#334155;margin:0 0 4px 0;}
+          .pdemo-score-value{font-size:46px;line-height:1;font-weight:900;color:#0f172a;margin:0 0 8px 0;}
+          .pdemo-score-badge{display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid var(--pdemo-score-color,#0ea5e9);background:var(--pdemo-score-bg,#eff6ff);color:var(--pdemo-score-color,#0ea5e9);font-weight:900;font-size:15px;}
+          .pdemo-score-desc{margin:8px 0 10px 0;color:#475569;font-size:14px;font-weight:600;}
+          .pdemo-score-track{height:14px;border-radius:999px;background:#d5dde8;border:1px solid #aebfd3;overflow:hidden;}
+          .pdemo-score-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb 0%,#22c55e 100%);width:var(--pdemo-score-width,0%);}
+          .pdemo-score-scale{display:flex;justify-content:space-between;color:#64748b;font-size:11px;margin-top:6px;font-weight:700;}
           .pdemo-wheel-legend-wrap{
             display:flex;
             justify-content:center;
@@ -3686,7 +3707,8 @@ def _render_personal_demography_subpage(
             .pdemo-title{font-size:1.42rem;}
             .pdemo-table-wrap{max-width:100%;}
             .pdemo-radar-title,.pdemo-wheel-title{font-size:1.35rem;}
-            .pdemo-top2-grid{grid-template-columns:1fr;}
+            .pdemo-top2-grid{justify-content:stretch;}
+            .pdemo-top2-card{width:100%;min-width:0;}
             .pdemo-profile-title{font-size:1.1rem;}
           }
         </style>
@@ -3861,8 +3883,6 @@ def _render_personal_demography_subpage(
                 continue
             pct_all = 100.0 * float((q_all == code_txt).sum()) / max(1, int(q_all.ne("").sum()))
             pct_sub = 100.0 * float((q_sub == code_txt).sum()) / max(1, int(q_sub.ne("").sum()))
-            if pct_all <= 0.0 and pct_sub <= 0.0:
-                continue
             categories.append(
                 {
                     "code": code_txt,
@@ -3875,8 +3895,10 @@ def _render_personal_demography_subpage(
         if not categories:
             continue
 
-        categories = sorted(categories, key=lambda c: (-float(c["pct_sub"]), str(c["label"])))
-        strongest = categories[0]
+        strongest = max(
+            categories,
+            key=lambda c: (float(c.get("pct_sub") or 0.0), -int(categories.index(c))),
+        )
         cards_html_parts.append(
             f"""
             <div class="pdemo-stat">
@@ -3957,6 +3979,121 @@ def _render_personal_demography_subpage(
             + "</tbody></table></div></div>"
         )
         st.markdown(table_html, unsafe_allow_html=True)
+
+    def _demo_match_summary(profile_all_20: dict[str, float], profile_sub_20: dict[str, float]) -> dict[str, object]:
+        all_100 = {a: max(0.0, min(100.0, float(profile_all_20.get(a, 0.0)) * 5.0)) for a in archetype_names}
+        sub_100 = {a: max(0.0, min(100.0, float(profile_sub_20.get(a, 0.0)) * 5.0)) for a in archetype_names}
+        diffs = {a: abs(float(all_100.get(a, 0.0)) - float(sub_100.get(a, 0.0))) for a in archetype_names}
+        diff_vals = [float(v) for v in diffs.values()]
+        mae = float(sum(diff_vals) / max(1, len(diff_vals)))
+        rmse = math.sqrt(float(sum(v * v for v in diff_vals) / max(1, len(diff_vals))))
+        sorted_gaps_desc = sorted(diff_vals, reverse=True)
+        top3_gap_mae = float(sum(sorted_gaps_desc[:3]) / max(1, min(3, len(sorted_gaps_desc))))
+
+        def _key_priority_pool(profile_100: Dict[str, float]) -> List[str]:
+            ordered = sorted(
+                archetype_names,
+                key=lambda a: (-float(profile_100.get(a, 0.0)), archetype_names.index(a)),
+            )
+            top3 = ordered[:3]
+            if len(top3) >= 3 and float(profile_100.get(top3[2], 0.0)) < 70.0:
+                return top3[:2]
+            return top3
+
+        all_top = _key_priority_pool(all_100)
+        sub_top = _key_priority_pool(sub_100)
+        key_archetypes: List[str] = []
+        for arche in all_top + sub_top:
+            if arche not in key_archetypes:
+                key_archetypes.append(arche)
+        key_gap_vals = [float(diffs.get(a, 0.0)) for a in key_archetypes]
+        key_gap_mae = float(sum(key_gap_vals) / max(1, len(key_gap_vals)))
+        key_gap_max = float(max(key_gap_vals)) if key_gap_vals else 0.0
+        shared_priority_count = len(set(all_top).intersection(set(sub_top)))
+        main_priority_mismatch_penalty = 2.5 if (all_top and sub_top and all_top[0] != sub_top[0]) else 0.0
+        shared_priority_penalty = 5.5 if shared_priority_count == 0 else (2.0 if shared_priority_count == 1 else 0.0)
+
+        score_mae = max(0.0, min(100.0, 100.0 - mae))
+        score_rmse = max(0.0, min(100.0, 100.0 - rmse))
+        score_top3 = max(0.0, min(100.0, 100.0 - top3_gap_mae))
+        score_key = max(0.0, min(100.0, 100.0 - key_gap_mae))
+        base_score = 0.40 * score_mae + 0.20 * score_rmse + 0.20 * score_top3 + 0.20 * score_key
+        key_penalty = (
+            0.56 * key_gap_mae
+            + 0.26 * max(0.0, key_gap_max - 10.0)
+            + shared_priority_penalty
+            + main_priority_mismatch_penalty
+        )
+        match_score = max(0.0, min(100.0, base_score - key_penalty))
+        match_bands: List[Tuple[str, str]] = [
+            ("Marginalne dopasowanie", "Profile są w dużej mierze rozbieżne; potrzebna gruntowna korekta przekazu i priorytetów."),
+            ("Bardzo niskie dopasowanie", "Dopasowanie jest słabe i niestabilne; dominują rozjazdy strategiczne."),
+            ("Niskie dopasowanie", "Widać pojedyncze punkty wspólne, ale profil nadal wyraźnie się rozjeżdża."),
+            ("Umiarkowane dopasowanie", "Istnieje wspólny rdzeń, ale kluczowe luki nadal wymagają korekty."),
+            ("Znaczące dopasowanie", "Dopasowanie jest zauważalne, choć nadal potrzebne są poprawki na kluczowych pozycjach."),
+            ("Wysokie dopasowanie", "Profil jest w dużej części zgodny; pozostają pojedyncze luki do domknięcia."),
+            ("Bardzo wysokie dopasowanie", "Różnice są niewielkie i dotyczą głównie lokalnych odchyleń."),
+            ("Ekstremalnie wysokie dopasowanie", "Profile są niemal zbieżne także na kluczowych archetypach."),
+        ]
+        if match_score >= 90:
+            band_idx = 7
+        elif match_score >= 80:
+            band_idx = 6
+        elif match_score >= 70:
+            band_idx = 5
+        elif match_score >= 60:
+            band_idx = 4
+        elif match_score >= 50:
+            band_idx = 3
+        elif match_score >= 40:
+            band_idx = 2
+        elif match_score >= 30:
+            band_idx = 1
+        else:
+            band_idx = 0
+        band_label, band_desc = match_bands[band_idx]
+        return {
+            "score": float(match_score),
+            "band_label": band_label,
+            "band_desc": band_desc,
+            "mae": float(mae),
+            "rmse": float(rmse),
+            "top3_gap_mae": float(top3_gap_mae),
+            "key_gap_mae": float(key_gap_mae),
+            "key_gap_max": float(key_gap_max),
+        }
+
+    demo_match = _demo_match_summary(means_20_all, filtered_means_20)
+    score_pct = max(0.0, min(100.0, float(demo_match.get("score") or 0.0)))
+    if score_pct >= 90:
+        score_color, score_bg = "#0f766e", "#ecfeff"
+    elif score_pct >= 80:
+        score_color, score_bg = "#0e7490", "#ecfeff"
+    elif score_pct >= 70:
+        score_color, score_bg = "#6d28d9", "#f5f3ff"
+    elif score_pct >= 60:
+        score_color, score_bg = "#1d4ed8", "#eff6ff"
+    elif score_pct >= 50:
+        score_color, score_bg = "#b45309", "#fffbeb"
+    elif score_pct >= 40:
+        score_color, score_bg = "#c2410c", "#fff7ed"
+    elif score_pct >= 30:
+        score_color, score_bg = "#be123c", "#fff1f2"
+    else:
+        score_color, score_bg = "#7f1d1d", "#fef2f2"
+    st.markdown(
+        f"""
+        <div class="pdemo-score-card" style="--pdemo-score-color:{score_color}; --pdemo-score-bg:{score_bg}; --pdemo-score-width:{score_pct:.1f}%;">
+          <div class="pdemo-score-title">Poziom dopasowania podgrupy do całej próby</div>
+          <div class="pdemo-score-value">{score_pct:.1f}%</div>
+          <div class="pdemo-score-badge">Ocena: {html.escape(str(demo_match.get('band_label') or ''))}</div>
+          <div class="pdemo-score-desc">{html.escape(str(demo_match.get('band_desc') or ''))}</div>
+          <div class="pdemo-score-track"><div class="pdemo-score-fill"></div></div>
+          <div class="pdemo-score-scale"><span>0%</span><span>100%</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     def _priority_top_for_ui_demo(profile_20: dict[str, float], order: list[str]) -> list[str]:
         ordered = sorted(order, key=lambda a: (-float(profile_20.get(a, 0.0)), order.index(a)))
@@ -4100,6 +4237,7 @@ def _render_personal_demography_subpage(
     )
     st.caption("Radar pokazuje średnią siłę archetypu w skali 0-20 dla całej próby oraz filtrowanej podgrupy.")
 
+    st.markdown("<div class='pdemo-wheel-sep'></div>", unsafe_allow_html=True)
     st.markdown("<div class='pdemo-wheel-title'>Profile archetypowe 0-100 (siła archetypu, skala: 0-100)</div>", unsafe_allow_html=True)
     wheels_col1, wheels_col2 = st.columns(2, gap="large")
     try:
@@ -4121,9 +4259,22 @@ def _render_personal_demography_subpage(
 
         def _show_image_compat(img_path: str, max_width_px: int = 560) -> None:
             try:
-                st.image(img_path, width=max_width_px)
-            except TypeError:
-                st.image(img_path, use_column_width=True)
+                raw = Path(img_path).read_bytes()
+                b64 = base64.b64encode(raw).decode("ascii")
+                st.markdown(
+                    (
+                        "<div class='pdemo-wheel-image'>"
+                        f"<img src='data:image/png;base64,{b64}' "
+                        f"style='width:min(100%, {int(max_width_px)}px);height:auto;'/>"
+                        "</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+            except Exception:
+                try:
+                    st.image(img_path, width=max_width_px)
+                except TypeError:
+                    st.image(img_path, use_column_width=True)
 
         with wheels_col1:
             st.markdown("<div class='pdemo-profile-title'>Profil archetypowy całej próby</div>", unsafe_allow_html=True)

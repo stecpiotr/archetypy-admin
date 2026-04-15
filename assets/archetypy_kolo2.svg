@@ -7,7 +7,7 @@
    id="svg106"
    sodipodi:docname="archetypy_kolo2.svg"
    inkscape:version="1.4 (86a8ad7, 2024-10-11)"
-   inkscape:export-filename="archetype_wheel.png"
+   inkscape:export-filename="archetype_wheel_female.png"
    inkscape:export-xdpi="96"
    inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
@@ -25,8 +25,8 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="1.3258252"
-     inkscape:cx="566.06256"
-     inkscape:cy="724.45448"
+     inkscape:cx="566.06255"
+     inkscape:cy="483.84961"
      inkscape:window-width="1920"
      inkscape:window-height="1129"
      inkscape:window-x="2552"
@@ -1145,7 +1145,7 @@ text, tspan{font-family:Inter, Segoe UI, Roboto, Arial, system-ui, -apple-system
        class="nameEdge"
        id="text37"
        style="font-size:21.3333px"
-       transform="translate(4.0078499,-1.3189795)"><textPath
+       transform="translate(3.2536027,2.4522567)"><textPath
          href="#edge0"
          startOffset="50%"
          text-anchor="middle"

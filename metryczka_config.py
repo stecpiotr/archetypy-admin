@@ -40,7 +40,7 @@ def guess_metry_variable_emoji(db_column: Any, table_label: Any = "", prompt: An
     if "M_PLEC" in db_col or "plec" in token:
         return "👫"
     if "M_WIEK" in db_col or "wiek" in token:
-        return "🧭"
+        return "⌛"
     if "M_WYKSZT" in db_col or "wykszt" in token:
         return "🎓"
     if "M_ZAWOD" in db_col or "zawod" in token:
@@ -165,7 +165,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "db_column": "M_WIEK",
             "prompt": "Jaki jest Pana/Pani wiek?",
             "table_label": "Wiek",
-            "variable_emoji": "🧭",
+            "variable_emoji": "⌛",
             "required": True,
             "multiple": False,
             "randomize_options": False,
@@ -174,7 +174,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "options": [
                 {"label": "15-39", "code": "15-39", "is_open": False, "value_emoji": "🧑"},
                 {"label": "40-59", "code": "40-59", "is_open": False, "value_emoji": "🧑‍💼"},
-                {"label": "60 i więcej", "code": "60 i więcej", "is_open": False, "value_emoji": "🧓"},
+                {"label": "60 i więcej", "code": "60+", "is_open": False, "value_emoji": "🧓"},
             ],
         },
         "M_WYKSZT": {
@@ -192,7 +192,7 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "options": [
                 {
                     "label": "podstawowe, gimnazjalne, zasadnicze zawodowe",
-                    "code": "podstawowe, gimnazjalne, zasadnicze zawodowe",
+                    "code": "podst./gim./zaw.",
                     "is_open": False,
                     "value_emoji": "🛠️",
                 },
@@ -215,11 +215,11 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "options": [
                 {"label": "pracownik umysłowy", "code": "pracownik umysłowy", "is_open": False, "value_emoji": "🧠"},
                 {"label": "pracownik fizyczny", "code": "pracownik fizyczny", "is_open": False, "value_emoji": "🛠️"},
-                {"label": "prowadzę własną firmę", "code": "prowadzę własną firmę", "is_open": False, "value_emoji": "🏢"},
+                {"label": "prowadzę własną firmę", "code": "własna firma", "is_open": False, "value_emoji": "🏢"},
                 {"label": "student/uczeń", "code": "student/uczeń", "is_open": False, "value_emoji": "🧑‍🎓"},
                 {"label": "bezrobotny", "code": "bezrobotny", "is_open": False, "value_emoji": "🔎"},
                 {"label": "rencista/emeryt", "code": "rencista/emeryt", "is_open": False, "value_emoji": "🌿"},
-                {"label": "inna (jaka?)", "code": "inna (jaka?)", "is_open": True, "value_emoji": "🧩"},
+                {"label": "inna (jaka?)", "code": "inna", "is_open": True, "value_emoji": "🧩"},
             ],
         },
         "M_MATERIAL": {
@@ -237,20 +237,20 @@ def _core_question_defaults() -> Dict[str, Dict[str, Any]]:
             "options": [
                 {
                     "label": "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
-                    "code": "powodzi mi się bardzo źle, jestem w ciężkiej sytuacji materialnej",
+                    "code": "bardzo zła",
                     "is_open": False,
                     "value_emoji": "😟",
                 },
-                {"label": "powodzi mi się raczej źle", "code": "powodzi mi się raczej źle", "is_open": False, "value_emoji": "🙁"},
+                {"label": "powodzi mi się raczej źle", "code": "raczej zła", "is_open": False, "value_emoji": "🙁"},
                 {
                     "label": "powodzi mi się przeciętnie, średnio",
-                    "code": "powodzi mi się przeciętnie, średnio",
+                    "code": "przeciętna",
                     "is_open": False,
                     "value_emoji": "😐",
                 },
-                {"label": "powodzi mi się raczej dobrze", "code": "powodzi mi się raczej dobrze", "is_open": False, "value_emoji": "🙂"},
-                {"label": "powodzi mi się bardzo dobrze", "code": "powodzi mi się bardzo dobrze", "is_open": False, "value_emoji": "😄"},
-                {"label": "odmawiam udzielenia odpowiedzi", "code": "odmawiam udzielenia odpowiedzi", "is_open": False, "value_emoji": "🤐"},
+                {"label": "powodzi mi się raczej dobrze", "code": "raczej dobra", "is_open": False, "value_emoji": "🙂"},
+                {"label": "powodzi mi się bardzo dobrze", "code": "bardzo dobra", "is_open": False, "value_emoji": "😄"},
+                {"label": "odmawiam udzielenia odpowiedzi", "code": "odmowa", "is_open": False, "value_emoji": "🤐"},
             ],
         },
     }
@@ -288,6 +288,62 @@ def _safe_bool(value: Any, fallback: bool) -> bool:
 def _looks_like_open_label(text: str) -> bool:
     t = str(text or "").strip().lower()
     return "inna (jaka?)" in t or "inne (jakie?)" in t
+
+
+def _canonical_core_option_code(field: str, raw_code: Any, raw_label: Any) -> str:
+    field_u = str(field or "").strip().upper()
+    source = _safe_text(raw_code) or _safe_text(raw_label)
+    if not source:
+        return ""
+    n = _norm_icon_token(source)
+    if field_u == "M_PLEC":
+        if "kobiet" in n:
+            return "kobieta"
+        if "mezczyzn" in n:
+            return "mężczyzna"
+    elif field_u == "M_WIEK":
+        if re.search(r"15\D*39", n):
+            return "15-39"
+        if re.search(r"40\D*59", n):
+            return "40-59"
+        if "60" in n:
+            return "60+"
+    elif field_u == "M_WYKSZT":
+        if "wyzsze" in n:
+            return "wyższe"
+        if "srednie" in n:
+            return "średnie"
+        if any(k in n for k in ("podstaw", "gimnaz", "zawod", "podst./gim./zaw")):
+            return "podst./gim./zaw."
+    elif field_u == "M_ZAWOD":
+        if "umysl" in n:
+            return "prac. umysłowy"
+        if "fizycz" in n:
+            return "prac. fizyczny"
+        if "wlasn" in n and "firm" in n:
+            return "własna firma"
+        if "student" in n or "uczen" in n:
+            return "student/uczeń"
+        if "bezrobot" in n:
+            return "bezrobotny"
+        if "renc" in n or "emery" in n:
+            return "rencista/emeryt"
+        if "inna" in n or "jaka" in n:
+            return "inna"
+    elif field_u == "M_MATERIAL":
+        if "odmaw" in n:
+            return "odmowa"
+        if "bardzo dobrze" in n or "bardzo dobra" in n:
+            return "bardzo dobra"
+        if "raczej dobrze" in n or "raczej dobra" in n:
+            return "raczej dobra"
+        if "przeciet" in n or "srednio" in n:
+            return "przeciętna"
+        if "raczej zle" in n or "raczej zla" in n:
+            return "raczej zła"
+        if "bardzo zle" in n or "bardzo zla" in n or "ciezk" in n:
+            return "bardzo zła"
+    return source
 
 
 def _normalize_options(raw_options: Any, *, fallback: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -494,15 +550,15 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
         }
         for opt in core_opts:
             label = _safe_text(opt.get("label"))
+            canon_code = _canonical_core_option_code(qid, _safe_text(opt.get("code")), label)
             key = label.lower()
-            if not label or key in seen_labels:
+            if not label or not canon_code or key in seen_labels:
                 continue
             seen_labels.add(key)
-            # Zgodność historyczna: dla 5 stałych pytań kodowanie odpowiedzi = tekst odpowiedzi.
             normalized_core_opts.append(
                 {
                     "label": label,
-                    "code": label,
+                    "code": canon_code,
                     "is_open": _safe_bool(opt.get("is_open"), _looks_like_open_label(label)),
                     "lock_randomization": _safe_bool(opt.get("lock_randomization"), False),
                     "value_emoji": _safe_text(
@@ -515,7 +571,7 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
             normalized_core_opts = [
                 {
                     "label": _safe_text(o.get("label")),
-                    "code": _safe_text(o.get("label")),
+                    "code": _canonical_core_option_code(qid, _safe_text(o.get("code")), _safe_text(o.get("label"))),
                     "is_open": _safe_bool(o.get("is_open"), _looks_like_open_label(_safe_text(o.get("label")))),
                     "lock_randomization": _safe_bool(o.get("lock_randomization"), False),
                     "value_emoji": _safe_text(o.get("value_emoji"), guess_metry_value_emoji(base.get("table_label"), _safe_text(o.get("label")), qid)),

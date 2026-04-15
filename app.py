@@ -2545,7 +2545,8 @@ _METRY_ICON_LIBRARY: List[Tuple[str, str]] = [
     ("👫", "płeć"),
     ("👩", "kobieta"),
     ("👨", "mężczyzna"),
-    ("🧭", "wiek / orientacja"),
+    ("⌛", "wiek"),
+    ("🧭", "orientacja / poglądy"),
     ("🧑", "wiek 15-39"),
     ("🧑‍💼", "wiek 40-59"),
     ("🧓", "wiek 60+"),
@@ -2704,14 +2705,76 @@ def _metryczka_options_to_df(
 
 def _metryczka_data_editor_height(df: Any, *, min_rows: int = 4, max_rows: int = 60) -> int:
     row_count = int(len(df.index)) if isinstance(df, pd.DataFrame) else 0
-    visible_rows = min(max(row_count + 1, int(min_rows)), int(max_rows))
+    visible_rows = min(max(row_count + 2, int(min_rows)), int(max_rows))
     # Nagłówek + zapas na dolną kontrolkę dodawania wierszy.
     return int(70 + visible_rows * 35)
+
+
+def _metryczka_editor_df_clean(df: Any) -> pd.DataFrame:
+    cols = ["Odpowiedź", "Kodowanie", "Otwarta", "Blokuj losowanie", "Ikona"]
+    if not isinstance(df, pd.DataFrame):
+        return pd.DataFrame(columns=cols)
+    out = df.copy()
+    for col in cols:
+        if col not in out.columns:
+            out[col] = "" if col not in {"Otwarta", "Blokuj losowanie"} else False
+    def _is_blank_row(row: pd.Series) -> bool:
+        ans = str(row.get("Odpowiedź") or "").strip()
+        code = str(row.get("Kodowanie") or "").strip()
+        icon = str(row.get("Ikona") or "").strip()
+        is_open = bool(row.get("Otwarta") is True)
+        lock = bool(row.get("Blokuj losowanie") is True)
+        return (not ans) and (not code) and (not icon) and (not is_open) and (not lock)
+    if not out.empty:
+        mask = out.apply(_is_blank_row, axis=1)
+        nonblank_count = int((~mask).sum())
+        if nonblank_count > 0:
+            out = out.loc[~mask].copy()
+        else:
+            out = out.iloc[:1].copy()
+    if out.empty:
+        return pd.DataFrame(columns=cols)
+    return out[cols].reset_index(drop=True)
+
+
+def _metryczka_reorder_df(df: pd.DataFrame, index: int, delta: int) -> pd.DataFrame:
+    out = _metryczka_editor_df_clean(df)
+    if out.empty:
+        return out
+    i = int(index)
+    j = i + int(delta)
+    if i < 0 or i >= len(out.index) or j < 0 or j >= len(out.index):
+        return out
+    rows = out.to_dict("records")
+    rows[i], rows[j] = rows[j], rows[i]
+    return pd.DataFrame(rows, columns=list(out.columns))
+
+
+def _metryczka_append_empty_row(df: Any) -> pd.DataFrame:
+    out = _metryczka_editor_df_clean(df)
+    if not out.empty:
+        only_blank = True
+        for _, row in out.iterrows():
+            if str(row.get("Odpowiedź") or "").strip() or str(row.get("Kodowanie") or "").strip() or str(row.get("Ikona") or "").strip() or bool(row.get("Otwarta") is True) or bool(row.get("Blokuj losowanie") is True):
+                only_blank = False
+                break
+        if only_blank:
+            return out
+    empty_row = {
+        "Odpowiedź": "",
+        "Kodowanie": "",
+        "Otwarta": False,
+        "Blokuj losowanie": False,
+        "Ikona": "",
+    }
+    out = pd.concat([out, pd.DataFrame([empty_row])], ignore_index=True)
+    return out
 
 
 def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
     if not isinstance(df, pd.DataFrame):
         return []
+    df = _metryczka_editor_df_clean(df)
     out: List[Dict[str, Any]] = []
     seen_codes: set[str] = set()
     for _, row in df.iterrows():
@@ -3048,8 +3111,6 @@ def _metryczka_merge_question_from_template(
         code = str(opt.get("code") or label).strip()
         if not label:
             continue
-        if db_column in _METRY_CORE_IDS:
-            code = label
         if not code:
             continue
         code_key = code.lower()
@@ -3193,6 +3254,70 @@ def _propagate_template_question_globally(
     return stats
 
 
+def _stable_json_repr(value: Any) -> str:
+    try:
+        return json.dumps(value if value is not None else {}, ensure_ascii=False, sort_keys=True)
+    except Exception:
+        return str(value)
+
+
+def _fetch_rows_paged_raw(table_name: str, columns: str, *, batch_size: int = 500) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    start = 0
+    while True:
+        end = start + max(1, int(batch_size)) - 1
+        res = sb.table(table_name).select(columns).range(start, end).execute()
+        chunk = list(res.data or [])
+        if not chunk:
+            break
+        out.extend([dict(r) for r in chunk if isinstance(r, dict)])
+        if len(chunk) < batch_size:
+            break
+        start += batch_size
+    return out
+
+
+def _run_metryczka_backfill_once() -> None:
+    done_key = "_metryczka_backfill_done_v2"
+    if bool(st.session_state.get(done_key)):
+        return
+    stats = {"jst_updated": 0, "personal_updated": 0, "errors": 0}
+    try:
+        jst_rows = _fetch_rows_paged_raw("jst_studies", "id,metryczka_config")
+        for row in jst_rows:
+            sid = str(row.get("id") or "").strip()
+            if not sid:
+                continue
+            raw_cfg = row.get("metryczka_config")
+            norm_cfg = normalize_jst_metryczka_config(raw_cfg)
+            if _stable_json_repr(raw_cfg) == _stable_json_repr(norm_cfg):
+                continue
+            try:
+                update_jst_study(sb, sid, {"metryczka_config": norm_cfg})
+                stats["jst_updated"] += 1
+            except Exception:
+                stats["errors"] += 1
+
+        personal_rows = _fetch_rows_paged_raw("studies", "id,metryczka_config")
+        for row in personal_rows:
+            sid = str(row.get("id") or "").strip()
+            if not sid:
+                continue
+            raw_cfg = row.get("metryczka_config")
+            norm_cfg = normalize_personal_metryczka_config(raw_cfg)
+            if _stable_json_repr(raw_cfg) == _stable_json_repr(norm_cfg):
+                continue
+            try:
+                update_study(sb, sid, {"metryczka_config": norm_cfg})
+                stats["personal_updated"] += 1
+            except Exception:
+                stats["errors"] += 1
+    except Exception:
+        stats["errors"] += 1
+    st.session_state[done_key] = True
+    st.session_state["_metryczka_backfill_stats_v2"] = stats
+
+
 def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, Any]) -> Dict[str, Any]:
     state_key = _metryczka_editor_state_key(kind, study_key)
     scroll_target_key = _metryczka_scroll_target_key(kind, study_key)
@@ -3327,12 +3452,13 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         table_label=str(st.session_state.get(edit_table_label_key) or ""),
                         db_column=str(st.session_state.get(edit_code_key) or ""),
                     )
+                tpl_opts_df = _metryczka_editor_df_clean(tpl_opts_df)
                 tpl_opts_df = st.data_editor(
                     tpl_opts_df,
                     height=_metryczka_data_editor_height(tpl_opts_df),
                     use_container_width=True,
                     hide_index=True,
-                    num_rows="dynamic",
+                    num_rows="fixed",
                     key=f"{edit_opts_key}_editor_{picked_id}",
                     column_config={
                         "Odpowiedź": st.column_config.TextColumn(
@@ -3357,15 +3483,55 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             default=False,
                             width="small",
                         ),
-                        "Ikona": st.column_config.SelectboxColumn(
+                        "Ikona": st.column_config.TextColumn(
                             "Ikona",
-                            help="Ikona kategorii do tabel demograficznych.",
-                            options=_metry_icon_options_for_df(tpl_opts_df),
+                            help="Wklej emoji (np. 🗳️) lub pozostaw puste, aby użyć automatycznej ikonki.",
                             width="small",
                         ),
                     },
                 )
+                tpl_opts_df = _metryczka_editor_df_clean(tpl_opts_df)
                 st.session_state[edit_opts_key] = tpl_opts_df
+
+                move_key = f"{widget_prefix}tpl_move_idx_{picked_id}"
+                row_count = int(len(tpl_opts_df.index))
+                if row_count > 0:
+                    if move_key not in st.session_state or int(st.session_state.get(move_key, 0) or 0) >= row_count:
+                        st.session_state[move_key] = 0
+                    r1, r2, r3, r4 = st.columns([0.52, 0.16, 0.16, 0.16], gap="small")
+                    with r1:
+                        st.selectbox(
+                            "Kolejność odpowiedzi",
+                            options=list(range(row_count)),
+                            key=move_key,
+                            format_func=lambda i: f"{int(i)+1}. {str(tpl_opts_df.iloc[int(i)].get('Odpowiedź') or '(pusta odpowiedź)').strip()}",
+                        )
+                    with r2:
+                        if st.button("↑ Do góry", key=f"{widget_prefix}tpl_move_up_{picked_id}", use_container_width=True):
+                            idx_move = int(st.session_state.get(move_key, 0) or 0)
+                            if idx_move > 0:
+                                st.session_state[edit_opts_key] = _metryczka_reorder_df(tpl_opts_df, idx_move, -1)
+                                st.session_state[move_key] = idx_move - 1
+                                st.rerun()
+                    with r3:
+                        if st.button("↓ W dół", key=f"{widget_prefix}tpl_move_down_{picked_id}", use_container_width=True):
+                            idx_move = int(st.session_state.get(move_key, 0) or 0)
+                            if idx_move < row_count - 1:
+                                st.session_state[edit_opts_key] = _metryczka_reorder_df(tpl_opts_df, idx_move, +1)
+                                st.session_state[move_key] = idx_move + 1
+                                st.rerun()
+                    with r4:
+                        if st.button("🗑 Usuń", key=f"{widget_prefix}tpl_row_del_{picked_id}", use_container_width=True):
+                            idx_move = int(st.session_state.get(move_key, 0) or 0)
+                            if 0 <= idx_move < row_count:
+                                st.session_state[edit_opts_key] = tpl_opts_df.drop(index=idx_move).reset_index(drop=True)
+                                st.session_state[move_key] = max(0, min(idx_move, row_count - 2))
+                                st.rerun()
+                add_col, _ = st.columns([0.26, 0.74], gap="small")
+                with add_col:
+                    if st.button("➕ Dodaj odpowiedź", key=f"{widget_prefix}tpl_row_add_{picked_id}", use_container_width=True):
+                        st.session_state[edit_opts_key] = _metryczka_append_empty_row(tpl_opts_df)
+                        st.rerun()
 
                 live_tpl_question = {
                     "id": str(st.session_state.get(edit_code_key) or "").strip().upper(),
@@ -3564,19 +3730,23 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 st.caption("Kodowanie rdzenia jest zgodne z historyczną bazą (tekst odpowiedzi).")
 
         st.markdown("**Odpowiedzi**")
-        options_df = _metryczka_options_to_df(
+        options_df_seed = _metryczka_options_to_df(
             options_default,
             randomize_options=bool(q_dict.get("randomize_options") is True),
             legacy_exclude_last=bool(q_dict.get("randomize_exclude_last") is True),
             table_label=table_label_default,
             db_column=db_column,
         )
+        options_df_state_key = f"{widget_prefix}opts_df_state_{ui_key}"
+        if options_df_state_key not in st.session_state:
+            st.session_state[options_df_state_key] = _metryczka_editor_df_clean(options_df_seed)
+        options_df = _metryczka_editor_df_clean(st.session_state.get(options_df_state_key))
         edited_options_df = st.data_editor(
             options_df,
             height=_metryczka_data_editor_height(options_df),
             use_container_width=True,
             hide_index=True,
-            num_rows="dynamic",
+            num_rows="fixed",
             key=f"{widget_prefix}opts_{ui_key}",
             column_config={
                 "Odpowiedź": st.column_config.TextColumn(
@@ -3601,15 +3771,65 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     default=False,
                     width="small",
                 ),
-                "Ikona": st.column_config.SelectboxColumn(
+                "Ikona": st.column_config.TextColumn(
                     "Ikona",
-                    help="Ikona kategorii do tabel demograficznych.",
-                    options=_metry_icon_options_for_df(options_df),
+                    help="Wklej emoji (np. 🗳️) lub pozostaw puste, aby użyć automatycznej ikonki.",
                     width="small",
                 ),
             },
         )
-        options = _metryczka_options_from_df(edited_options_df)
+        edited_options_df = _metryczka_editor_df_clean(edited_options_df)
+        st.session_state[options_df_state_key] = edited_options_df
+
+        move_key = f"{widget_prefix}opts_move_idx_{ui_key}"
+        row_count = int(len(edited_options_df.index))
+        if row_count > 0:
+            if move_key not in st.session_state or int(st.session_state.get(move_key, 0) or 0) >= row_count:
+                st.session_state[move_key] = 0
+            r1, r2, r3, r4 = st.columns([0.52, 0.16, 0.16, 0.16], gap="small")
+            with r1:
+                st.selectbox(
+                    "Kolejność odpowiedzi",
+                    options=list(range(row_count)),
+                    key=move_key,
+                    format_func=lambda i: f"{int(i)+1}. {str(edited_options_df.iloc[int(i)].get('Odpowiedź') or '(pusta odpowiedź)').strip()}",
+                )
+            with r2:
+                if st.button("↑ Do góry", key=f"{widget_prefix}opts_move_up_{ui_key}", use_container_width=True):
+                    idx_move = int(st.session_state.get(move_key, 0) or 0)
+                    if idx_move > 0:
+                        st.session_state[options_df_state_key] = _metryczka_reorder_df(edited_options_df, idx_move, -1)
+                        st.session_state[move_key] = idx_move - 1
+                        st.session_state[scroll_target_key] = anchor_id
+                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                        st.rerun()
+            with r3:
+                if st.button("↓ W dół", key=f"{widget_prefix}opts_move_down_{ui_key}", use_container_width=True):
+                    idx_move = int(st.session_state.get(move_key, 0) or 0)
+                    if idx_move < row_count - 1:
+                        st.session_state[options_df_state_key] = _metryczka_reorder_df(edited_options_df, idx_move, +1)
+                        st.session_state[move_key] = idx_move + 1
+                        st.session_state[scroll_target_key] = anchor_id
+                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                        st.rerun()
+            with r4:
+                if st.button("🗑 Usuń", key=f"{widget_prefix}opts_row_del_{ui_key}", use_container_width=True):
+                    idx_move = int(st.session_state.get(move_key, 0) or 0)
+                    if 0 <= idx_move < row_count:
+                        st.session_state[options_df_state_key] = edited_options_df.drop(index=idx_move).reset_index(drop=True)
+                        st.session_state[move_key] = max(0, min(idx_move, row_count - 2))
+                        st.session_state[scroll_target_key] = anchor_id
+                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                        st.rerun()
+        add_col, _ = st.columns([0.26, 0.74], gap="small")
+        with add_col:
+            if st.button("➕ Dodaj odpowiedź", key=f"{widget_prefix}opts_row_add_{ui_key}", use_container_width=True):
+                st.session_state[options_df_state_key] = _metryczka_append_empty_row(edited_options_df)
+                st.session_state[scroll_target_key] = anchor_id
+                st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                st.rerun()
+
+        options = _metryczka_options_from_df(st.session_state.get(options_df_state_key))
 
         paste_toggle_key = f"{widget_prefix}paste_open_{ui_key}"
         paste_text_key = f"{widget_prefix}paste_text_{ui_key}"
@@ -3759,17 +3979,18 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             for i, ans in enumerate(parsed_answers):
                                 if q_scope == "core":
                                     ans_key = str(ans).strip().lower()
+                                    code_core = str(old_codes_by_label.get(ans_key) or "").strip() or ans
                                     new_options.append(
                                         {
                                             "label": ans,
-                                            "code": ans,
+                                            "code": code_core,
                                             "is_open": bool(old_open_by_label.get(ans_key, False)),
                                             "lock_randomization": bool(old_lock_by_label.get(ans_key, False)),
                                             "value_emoji": str(
                                                 old_icon_by_label.get(ans_key, "")
                                                 or guess_metry_value_emoji(
                                                     str(q_item.get("table_label") or q_item.get("prompt") or ""),
-                                                    ans,
+                                                    code_core,
                                                     str(q_item.get("db_column") or ""),
                                                 )
                                             ).strip(),
@@ -3808,6 +4029,15 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                     }
                                 )
                             q_item["options"] = new_options
+                            st.session_state[options_df_state_key] = _metryczka_editor_df_clean(
+                                _metryczka_options_to_df(
+                                    new_options,
+                                    randomize_options=bool(q_item.get("randomize_options") is True),
+                                    legacy_exclude_last=bool(q_item.get("randomize_exclude_last") is True),
+                                    table_label=str(q_item.get("table_label") or q_item.get("prompt") or ""),
+                                    db_column=str(q_item.get("db_column") or ""),
+                                )
+                            )
                             break
                         working["questions"] = q_list
                         st.session_state[state_key] = working
@@ -5869,6 +6099,8 @@ def _norm_demo_token(value: Any) -> str:
 
 def _matching_guess_variable_emoji(field: str, label: str) -> str:
     key = _norm_demo_token(f"{field} {label}")
+    if "wiek" in key:
+        return "⌛"
     if any(k in key for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
         return "🏘️"
     if any(k in key for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
@@ -5979,7 +6211,7 @@ _MATCHING_CORE_DEMO_META: Dict[str, Dict[str, Any]] = {
     "M_WIEK": {
         "label": "Wiek",
         "order": ["15-39", "40-59", "60+"],
-        "variable_emoji": "🧭",
+        "variable_emoji": "⌛",
         "value_emoji": {"15-39": "🧑", "40-59": "🧑‍💼", "60+": "🧓"},
     },
     "M_WYKSZT": {
@@ -10415,6 +10647,8 @@ public_token = _get_query_token()
 if public_token:
     public_report_view(public_token)
 else:
+    if logged_in():
+        _run_metryczka_backfill_once()
     view = st.session_state["view"]
     _set_view_scope(view)
     if view == "login":
