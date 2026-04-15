@@ -154,6 +154,52 @@ ARCHETYPES = [
     "Twórca", "Odkrywca", "Czarodziej", "Towarzysz", "Niewinny", "Buntownik"
 ]
 
+ARCHETYPE_FEMININE_MAP: Dict[str, str] = {
+    "Władca": "Władczyni",
+    "Bohater": "Bohaterka",
+    "Mędrzec": "Mędrczyni",
+    "Opiekun": "Opiekunka",
+    "Kochanek": "Kochanka",
+    "Błazen": "Komiczka",
+    "Twórca": "Twórczyni",
+    "Odkrywca": "Odkrywczyni",
+    "Czarodziej": "Czarodziejka",
+    "Towarzysz": "Towarzyszka",
+    "Niewinny": "Niewinna",
+    "Buntownik": "Buntowniczka",
+}
+ARCHETYPE_MASC_FROM_FEMININE: Dict[str, str] = {v: k for k, v in ARCHETYPE_FEMININE_MAP.items()}
+ARCHETYPE_LABEL_MODE: str = "male"
+
+
+def _normalize_archetype_label_mode(raw: Any) -> str:
+    txt = str(raw or "").strip().lower()
+    if txt.startswith("fem") or "żeń" in txt or txt in {"k", "kobieta", "female", "f"}:
+        return "female"
+    return "male"
+
+
+def configure_archetype_label_mode(raw: Any) -> None:
+    global ARCHETYPE_LABEL_MODE
+    ARCHETYPE_LABEL_MODE = _normalize_archetype_label_mode(raw)
+
+
+def _display_archetype_label(label: Any) -> str:
+    s = str(label or "")
+    if ARCHETYPE_LABEL_MODE != "female":
+        return s
+    return str(ARCHETYPE_FEMININE_MAP.get(s, s))
+
+
+def _display_archetype_labels(labels: Any) -> List[str]:
+    if labels is None:
+        return []
+    try:
+        seq = list(labels)
+    except Exception:
+        seq = [labels]
+    return [_display_archetype_label(x) for x in seq]
+
 # Stałe osie potrzeb: kolory zgodne z wykresem "Profil liniowy wartości (18 par)".
 NEED_AXIS_COLORS: Dict[str, str] = {
     "zmiana": "#d94841",
@@ -695,6 +741,8 @@ class Settings:
     metryczka_config: Dict[str, Any] = field(default_factory=dict)
     # styl obrysu segmentu na mapie: "classic" (domyślny, opływowy) albo "smooth" (plamowy/concave)
     segment_outline_style: str = "classic"
+    # tryb podpisów archetypów na wykresach/tabelach (male|female)
+    archetype_label_mode: str = "male"
 
 SEG_FORBIDDEN_ARCHETYPE_PAIRS: Tuple[Tuple[str, str], ...] = (
     ("Buntownik", "Władca"),
@@ -5690,7 +5738,7 @@ def bar_chart(values: pd.Series, outpath: Path, title: str, xlabel: str = "", co
 
     ax.set_title(title, fontsize=PLOT_TITLE_FONTSIZE, fontweight="bold", pad=PLOT_TITLE_PAD)
     ax.set_xticks(x)
-    ax.set_xticklabels(s.index, rotation=rotate, ha="right")
+    ax.set_xticklabels(_display_archetype_labels(s.index.tolist()), rotation=rotate, ha="right")
     ax.tick_params(axis="x", labelsize=PLOT_X_TICK_FONTSIZE)
     ax.tick_params(axis="y", labelsize=PLOT_Y_TICK_FONTSIZE)
 
@@ -5788,7 +5836,7 @@ def plot_horizontal_metric_chart(
 
     y = np.arange(len(s))
     vals = s.to_numpy(dtype=float)
-    labels = [str(x) for x in s.index.tolist()]
+    labels = _display_archetype_labels([str(x) for x in s.index.tolist()])
     bars = ax.barh(y, vals, color="#2b6cb0", edgecolor="white", linewidth=0.9, height=0.72)
 
     ax.set_yticks(y)
@@ -5861,7 +5909,7 @@ def plot_expectation_balance_stacked(
     ax.set_facecolor("#fbfcfe")
 
     y = np.arange(n)
-    labels = [str(x) for x in d["archetype"].astype(str).tolist()]
+    labels = _display_archetype_labels([str(x) for x in d["archetype"].astype(str).tolist()])
     exp = pd.to_numeric(d["expected_pct"], errors="coerce").to_numpy(dtype=float)
     neu = pd.to_numeric(d["neutral_pct"], errors="coerce").to_numpy(dtype=float)
     not_exp = pd.to_numeric(d["not_expected_pct"], errors="coerce").to_numpy(dtype=float)
@@ -5949,7 +5997,7 @@ def plot_pair_outcome_balance(values: pd.Series, outpath: Path, title: str, xlab
 
     ax.set_title(title, fontsize=PLOT_TITLE_FONTSIZE, fontweight="bold", pad=PLOT_TITLE_PAD)
     ax.set_xticks(x)
-    ax.set_xticklabels(s.index, rotation=rotate, ha="right")
+    ax.set_xticklabels(_display_archetype_labels(s.index.tolist()), rotation=rotate, ha="right")
     ax.tick_params(axis="x", labelsize=PLOT_X_TICK_FONTSIZE)
     ax.tick_params(axis="y", labelsize=PLOT_Y_TICK_FONTSIZE)
     ax.set_xlabel(xlabel, fontsize=PLOT_AXIS_LABEL_FONTSIZE, labelpad=PLOT_XLABEL_PAD)
@@ -6043,8 +6091,16 @@ def plot_A_versus_profile_line(
         left_raw = str(row.get("lewy", ""))
         right_raw = str(row.get("prawy", ""))
 
-        left_label = brand_values.get(left_raw, left_raw) if isinstance(brand_values, dict) else left_raw
-        right_label = brand_values.get(right_raw, right_raw) if isinstance(brand_values, dict) else right_raw
+        left_label = (
+            brand_values.get(left_raw, left_raw)
+            if isinstance(brand_values, dict)
+            else _display_archetype_label(left_raw)
+        )
+        right_label = (
+            brand_values.get(right_raw, right_raw)
+            if isinstance(brand_values, dict)
+            else _display_archetype_label(right_raw)
+        )
 
         mean_sign = _safe_float(row.get("mean_sign", 0.0))
         mean_val = float(np.clip(A_SCALE_CENTER + mean_sign, 1.0, 7.0))
@@ -6557,28 +6613,40 @@ def top5_blocks_table(
     a_top = df_A_total.head(5)
     rows.append({
         "pytanie": "A (łącznie)",
-        **{f"TOP{i + 1}": f"{r.archetyp} ({r['%']:.1f}%)" for i, r in enumerate(a_top.itertuples(index=False))}
+        **{
+            f"TOP{i + 1}": f"{_display_archetype_label(r.archetyp)} ({r['%']:.1f}%)"
+            for i, r in enumerate(a_top.itertuples(index=False))
+        }
     })
 
     # B1: TOP5 po %
     b1 = df_B1.sort_values("%", ascending=False).head(5)
     rows.append({
         "pytanie": "B1 (w trójce)",
-        **{f"TOP{i + 1}": f"{r.archetyp} ({r['%']:.1f}%)" for i, r in enumerate(b1.itertuples(index=False))}
+        **{
+            f"TOP{i + 1}": f"{_display_archetype_label(r.archetyp)} ({r['%']:.1f}%)"
+            for i, r in enumerate(b1.itertuples(index=False))
+        }
     })
 
     # B2: TOP5 po %
     b2 = df_B2.sort_values("%", ascending=False).head(5)
     rows.append({
         "pytanie": "B2 (TOP1)",
-        **{f"TOP{i + 1}": f"{r.archetyp} ({r['%']:.1f}%)" for i, r in enumerate(b2.itertuples(index=False))}
+        **{
+            f"TOP{i + 1}": f"{_display_archetype_label(r.archetyp)} ({r['%']:.1f}%)"
+            for i, r in enumerate(b2.itertuples(index=False))
+        }
     })
 
     # D13: TOP5 po %
     d13 = df_D13.sort_values("%", ascending=False).head(5)
     rows.append({
         "pytanie": "D13 (TOP1)",
-        **{f"TOP{i + 1}": f"{r.archetyp} ({r['%']:.1f}%)" for i, r in enumerate(d13.itertuples(index=False))}
+        **{
+            f"TOP{i + 1}": f"{_display_archetype_label(r.archetyp)} ({r['%']:.1f}%)"
+            for i, r in enumerate(d13.itertuples(index=False))
+        }
     })
 
     # uzupełnij brakujące TOP-y pustymi stringami
@@ -6628,7 +6696,8 @@ def plot_corr_heatmap_clustered(
         pass
 
     order = _cluster_order_avg_linkage_from_corr(corr)
-    labels = [archetypes[i] for i in order]
+    labels = [str(archetypes[i]) for i in order]
+    labels_display = _display_archetype_labels(labels)
     corr_ord = corr[np.ix_(order, order)]
 
     label_colors: List[str] = []
@@ -6642,8 +6711,8 @@ def plot_corr_heatmap_clustered(
     ax.set_title(title, fontsize=14, fontweight="bold", pad=10)
     ax.set_xticks(range(len(labels)))
     ax.set_yticks(range(len(labels)))
-    ax.set_xticklabels(labels, rotation=40, ha="right", fontsize=11.5, fontweight="600")
-    ax.set_yticklabels(labels, fontsize=11.5, fontweight="600")
+    ax.set_xticklabels(labels_display, rotation=40, ha="right", fontsize=11.5, fontweight="600")
+    ax.set_yticklabels(labels_display, fontsize=11.5, fontweight="600")
     ax.tick_params(axis="both", which="major", pad=2)
 
     for lbl, col in zip(ax.get_xticklabels(), label_colors):
@@ -6652,7 +6721,7 @@ def plot_corr_heatmap_clustered(
         lbl.set_color(col)
 
     # siatka komórek
-    n = len(labels)
+    n = len(labels_display)
     ax.set_xticks(np.arange(-0.5, n, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, n, 1), minor=True)
     ax.grid(which="minor", color="white", linewidth=1)
@@ -6714,7 +6783,7 @@ def plot_D13_top1(df_D13: pd.DataFrame, out_png: Path | str) -> None:
     plus_abs = total * plus_share
     minus_abs = total * minus_share
 
-    labels = d["archetyp"].astype(str).to_list()
+    labels = _display_archetype_labels(d["archetyp"].astype(str).to_list())
     y = np.arange(len(labels))
 
     # Dynamiczna wysokość figury (łatwiej pomieścić więcej wierszy)
@@ -6834,7 +6903,7 @@ def diverging_plus_minus_chart(df_D: pd.DataFrame, out_png: Path | str,
 
     plus = d[col_plus].astype(float).to_numpy()
     minus = -d[col_minus].astype(float).to_numpy()  # ujemne do lewego ramienia
-    labels = d["archetyp"].astype(str).to_list()
+    labels = _display_archetype_labels(d["archetyp"].astype(str).to_list())
 
     y = np.arange(len(labels))
 
@@ -6927,6 +6996,7 @@ def wheel_plus_minus_chart(
     step = 360.0 / n
 
     for i, name in enumerate(order):
+        name_disp = _display_archetype_label(name)
         a0 = start_angle - i * step
         a1 = a0 - step
 
@@ -6985,7 +7055,7 @@ def wheel_plus_minus_chart(
         ax.text(
             x_lab,
             y_lab,
-            name,
+            name_disp,
             ha=ha,
             va="center",
             fontsize=10,
@@ -7354,6 +7424,8 @@ def _resolve_archetype_for_need_axis(label: Any, index_hint: Optional[int] = Non
     s = str(label or "")
     if s in ARCHETYPE_NEED_AXIS:
         return s
+    if s in ARCHETYPE_MASC_FROM_FEMININE:
+        return str(ARCHETYPE_MASC_FROM_FEMININE[s])
 
     rev = _brand_values_reverse_map()
     if s in rev:
@@ -7653,7 +7725,7 @@ def plot_value_map(outpath, title, coords, respondent_xy, seg_centroids, seg_nam
         if lab_s in ARCH_LABEL_CUSTOM_OFFSETS:
             offsets = [ARCH_LABEL_CUSTOM_OFFSETS[lab_s]] + offsets
 
-        _place_label(x, y, lab_s, offsets, fontsize=12, fontweight="bold", zorder=5)
+        _place_label(x, y, _display_archetype_label(lab_s), offsets, fontsize=12, fontweight="bold", zorder=5)
 
     # --- segmenty: normalizacja do listy (sid, x, y)
     seg_points = []
@@ -7877,7 +7949,7 @@ def plot_segment_bubble_matrix(
     ax.set_xticklabels(xlabels, fontsize=10, fontweight="bold")
 
     ax.set_yticks(range(len(arch)))
-    ax.set_yticklabels(arch, fontsize=10)
+    ax.set_yticklabels(_display_archetype_labels(arch), fontsize=10)
 
     # Marginesy osi, żeby duże bąbelki nie były obcinane
     ax.set_xlim(-0.5, len(segs) - 0.5)
@@ -8078,6 +8150,10 @@ def save_report(outdir: Path, settings: Settings,
     _filter_blocks_json = _js_json(["A", "B1", "B2", "D13"])
     _filter_pct_json = _js_json(filters_pct)
     _brand_values_json = _js_json(brand_values)
+    _feminine_labels_json = _js_json(ARCHETYPE_FEMININE_MAP)
+    _archetype_label_mode_json = _js_json(
+        _normalize_archetype_label_mode(getattr(settings, "archetype_label_mode", "male"))
+    )
 
     def _slug_ascii_local(s: str) -> str:
         tr = str.maketrans({
@@ -8489,6 +8565,8 @@ body[data-label-mode="values"] .mode-values { display:inline; }
     const FILTER_PCT = __FILTER_PCT__;
     const BRAND_VALUES = __BRAND_VALUES__;
     const FILTER_ICONS = __FILTER_ICONS__;
+    const FEMININE_LABELS = __FEMININE_LABELS__;
+    const ARCHETYPE_LABEL_MODE = __ARCHETYPE_LABEL_MODE__;
 
     document.addEventListener("DOMContentLoaded", function() {
       /* ---------- localStorage (file:// bywa blokowane) ---------- */
@@ -8513,6 +8591,7 @@ body[data-label-mode="values"] .mode-values { display:inline; }
       }
       function labelForArche(a){
         if (getMode() === "values") return (BRAND_VALUES[a] || a);
+        if (ARCHETYPE_LABEL_MODE === "female") return (FEMININE_LABELS[a] || a);
         return a;
       }
 
@@ -9108,6 +9187,8 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         .replace("__FILTER_PCT__", _filter_pct_json) \
         .replace("__FILTER_ICONS__", _filter_icons_json) \
         .replace("__BRAND_VALUES__", _brand_values_json) \
+        .replace("__FEMININE_LABELS__", _feminine_labels_json) \
+        .replace("__ARCHETYPE_LABEL_MODE__", _archetype_label_mode_json) \
         .replace("__SEG_PACKS__", _seg_packs_json) \
         .replace("__CLUSTER_PACK__", _cluster_pack_json)
 
@@ -16081,7 +16162,11 @@ def _plot_segment_profile_wheel(outpath: Path,
             )
         )
 
-        ring_label = str(brand_values.get(arch, value_label)) if mode_norm == "values" else str(arch)
+        ring_label = (
+            str(brand_values.get(arch, value_label))
+            if mode_norm == "values"
+            else _display_archetype_label(arch)
+        )
         _draw_text_on_arc(
             ax=ax,
             text=ring_label,
@@ -16663,6 +16748,7 @@ def plot_values_map_data(E: np.ndarray, w: np.ndarray, outdir: Path, fname_base:
 def main() -> None:
     root = Path(__file__).resolve().parent
     settings = load_settings(root / "settings.json")
+    configure_archetype_label_mode(settings.archetype_label_mode)
     brand_values = load_brand_values(root)
     value_labels = [brand_values[a] for a in ARCHETYPES]
 

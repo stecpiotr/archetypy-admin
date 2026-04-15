@@ -5506,6 +5506,9 @@ def jst_analysis_view() -> None:
         out_df = jst_response_rows_to_dataframe(rows, metryczka_config=(study or {}).get("metryczka_config"))
         study_for_report = dict(study or {})
         study_for_report["segment_hit_threshold_overrides"] = active_overrides
+        study_for_report["archetype_label_mode"] = (
+            "female" if str(label_mode_choice or "").strip().lower().endswith("żeńskie") else "male"
+        )
         with st.spinner("Generujemy raport dla tego badania. Prosimy o chwilę cierpliwości."):
             try:
                 report_path = generate_jst_report(
