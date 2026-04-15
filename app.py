@@ -2726,6 +2726,10 @@ def _metryczka_editor_df_clean(df: Any) -> pd.DataFrame:
     for col in cols:
         if col not in out.columns:
             out[col] = "" if col not in {"Otwarta", "Blokuj losowanie"} else False
+    for txt_col in ("Odpowiedź", "Kodowanie", "Ikona"):
+        out[txt_col] = out[txt_col].map(lambda v: "" if pd.isna(v) else str(v))
+    for bool_col in ("Otwarta", "Blokuj losowanie"):
+        out[bool_col] = out[bool_col].map(lambda v: _bool_from_any(v, False)).astype(bool)
     def _is_blank_row(row: pd.Series) -> bool:
         ans = str(row.get("Odpowiedź") or "").strip()
         code = str(row.get("Kodowanie") or "").strip()
@@ -2785,7 +2789,8 @@ def _metryczka_attach_move_marker(df: Any, selected_index: int, marker_col: str 
     if marker_col in out.columns:
         out = out.drop(columns=[marker_col], errors="ignore")
     sel = int(selected_index) if isinstance(selected_index, int) else -1
-    out.insert(0, marker_col, [i == sel for i in range(len(out.index))])
+    marker_vals = [i == sel for i in range(len(out.index))]
+    out.insert(0, marker_col, pd.Series(marker_vals, index=out.index, dtype="bool"))
     return out
 
 
@@ -2795,10 +2800,15 @@ def _metryczka_extract_move_marker(df: Any, marker_col: str = "Przesuń") -> Tup
     out = df.copy()
     selected_idx = -1
     if marker_col in out.columns:
-        picked = [i for i, v in enumerate(list(out[marker_col])) if bool(v)]
+        marker_series = out[marker_col].map(lambda v: _bool_from_any(v, False)).astype(bool)
+        picked = [i for i, v in enumerate(list(marker_series)) if bool(v)]
         if picked:
             selected_idx = int(picked[-1])
-            out[marker_col] = [i == selected_idx for i in range(len(out.index))]
+            out[marker_col] = pd.Series(
+                [i == selected_idx for i in range(len(out.index))],
+                index=out.index,
+                dtype="bool",
+            )
         out = out.drop(columns=[marker_col], errors="ignore")
     out = _metryczka_editor_df_clean(out)
     if selected_idx >= len(out.index):

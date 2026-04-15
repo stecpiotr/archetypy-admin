@@ -3057,3 +3057,16 @@ Wynik:
   - normalizacja nie nadpisuje już pustej ikonki odpowiedzi automatycznym fallbackiem.
 - Smoke-check:
   - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK).
+
+### Hotfix H-112 [DONE]
+Temat: Naprawa błędu `ColumnDataKind.FLOAT` dla kolumny `Przesuń` w `st.data_editor`.
+Kryteria ukończenia:
+1. Kolumna `Przesuń` ma zawsze typ bool (także przy 0 wierszach).
+2. Brak wyjątku `StreamlitAPIException` o niezgodnym typie kolumny checkbox.
+Wynik:
+- `archetypy-admin/app.py`:
+  - `_metryczka_attach_move_marker(...)` wstawia `Przesuń` jako `pd.Series(..., dtype=\"bool\")`,
+  - `_metryczka_extract_move_marker(...)` normalizuje `Przesuń` przez `_bool_from_any(...).astype(bool)`,
+  - `_metryczka_editor_df_clean(...)` dodatkowo normalizuje kolumny tekstowe/boolean po rerunach.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

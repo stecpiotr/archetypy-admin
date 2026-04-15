@@ -2272,3 +2272,10 @@ Decyzja:
 - Dodajemy panel zmiany kolejności pytań custom (góra/dół) bez usuwania i ponownego dodawania.
 Uzasadnienie:
 - Usprawnia iteracyjne układanie metryczki i zmniejsza ryzyko utraty konfiguracji pytań.
+
+### D-250: Kolumna pomocnicza `Przesuń` w `st.data_editor` jest utrzymywana jako typ boolean
+Decyzja:
+- W helperach metryczki (`_metryczka_attach_move_marker`, `_metryczka_extract_move_marker`) kolumna `Przesuń` jest jawnie mapowana do `bool`.
+- Dodatkowo normalizacja edytora (`_metryczka_editor_df_clean`) wymusza stabilne typy kolumn tekstowych i checkboxów.
+Uzasadnienie:
+- Streamlit checkbox nie akceptuje kolumny o typie float (`ColumnDataKind.FLOAT`), co powodowało wyjątek przy renderze metryczki.

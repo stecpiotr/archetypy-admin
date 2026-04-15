@@ -2419,3 +2419,11 @@
   - normalizacja respektuje pustą ikonkę odpowiedzi zamiast wymuszać domyślną.
 - Test techniczny:
   - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK).
+
+### Zrobione w Hotfix H-112 (2026-04-15, fix typu kolumny `Przesuń` w tabeli odpowiedzi)
+- `archetypy-admin/app.py`:
+  - usunięto źródło błędu `ColumnDataKind.FLOAT` dla checkboxa `Przesuń`,
+  - kolumna `Przesuń` jest jawnie utrzymywana jako boolean (również dla pustych tabel),
+  - dodatkowo uszczelniono normalizację typów w `_metryczka_editor_df_clean(...)`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
