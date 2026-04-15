@@ -1247,6 +1247,8 @@ def parse_metryczka(
         src_upper = src_name.upper()
         if not src_upper.startswith("M_"):
             continue
+        if _is_aux_metry_column(src_upper):
+            continue
         if src_upper in out.columns:
             continue
         if src_name in used_src_cols:
@@ -12252,6 +12254,36 @@ _DYN_METRY_CAT_ORDER_BY_COL: Dict[str, List[str]] = {}
 _DYN_METRY_CAT_ORDER_BY_VAR_NK: Dict[str, List[str]] = {}
 _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK: Dict[Tuple[str, str], str] = {}
 
+_METRY_AUX_SUFFIX_TOKENS: set[str] = {
+    "OTHER",
+    "INNA",
+    "INNE",
+    "OTWARTA",
+    "OPEN",
+    "OPEN_TEXT",
+    "TEXT",
+    "TXT",
+    "COMMENT",
+    "KOMENTARZ",
+    "DESC",
+    "OPIS",
+    "JAKA",
+}
+
+
+def _is_aux_metry_column(col_name: Any) -> bool:
+    cu = str(col_name or "").strip().upper()
+    if not cu.startswith("M_"):
+        return False
+    # Kolumny jawnie skonfigurowane w metryczce traktujemy jako docelowe.
+    if cu in _DYN_METRY_COL_ORDER:
+        return False
+    parts = [p for p in cu.split("_") if p]
+    if len(parts) <= 2:
+        return False
+    suffix_tokens = set(parts[2:])
+    return bool(suffix_tokens & _METRY_AUX_SUFFIX_TOKENS)
+
 
 def _set_dynamic_metry_schema_from_config(raw_cfg: Any) -> None:
     global _DYN_METRY_COL_ORDER
@@ -12342,8 +12374,8 @@ def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
     nk_cat = _demo_nk(cat_label)
     nk_var = _demo_nk(var_label)
     dyn_icon = _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK.get((nk_var, nk_cat))
-    if dyn_icon is not None:
-        return str(dyn_icon or "")
+    if dyn_icon:
+        return str(dyn_icon)
     icon = _DEMO_CAT_ICON_MAP.get(nk_cat)
     if icon:
         return icon

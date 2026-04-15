@@ -2574,3 +2574,17 @@
 
 ### RYZYKO / do domknięcia
 - Do potwierdzenia manualnego na UI: scenariusz „edycja pola + natychmiastowe kliknięcie Cofnij” dla metryczki i ustawień (JST + personal).
+
+### Zrobione w Hotfix H-120 (2026-04-15, demografia bez `*_OTHER` + fallback ikon)
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - odfiltrowano techniczne kolumny metryczki (`M_*_OTHER`, `M_*_OPEN`, `M_*_TEXT`, itp.) z dynamicznego dokładania zmiennych do demografii,
+  - dzięki temu znikają artefakty typu `Plec Other`, `Wiek Other`, `Material Other`,
+  - poprawiono logikę ikon kategorii: pusta ikona z configu nie blokuje fallbacku (mapa/heurystyka nadal działa).
+- Synchronizacja:
+  - zaktualizowano kopię generatora: `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Test techniczny:
+  - `python -m py_compile JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do potwierdzenia manualnego na świeżo wygenerowanym raporcie: brak sekcji `* Other` w demografii segmentów i poprawne ikony kategorii.

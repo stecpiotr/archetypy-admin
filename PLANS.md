@@ -3238,3 +3238,22 @@ Wynik:
   - `jst_settings_view` i `personal_settings_view` również renderują guard w górnym placeholderze.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-120 [DONE]
+Temat: Usunięcie technicznych kolumn `M_*_OTHER` z demografii raportu + przywrócenie fallbacku ikon kategorii.
+Kryteria ukończenia:
+1. W sekcjach demografii nie pojawiają się sztuczne zmienne typu `Plec Other`, `Wiek Other`, `Material Other`, `Obszar Other`.
+2. Pomocnicze kolumny metryczki (np. `M_*_OTHER`, `M_*_TEXT`, `M_*_OPEN`) nie są traktowane jak osobne pytania demograficzne, chyba że są jawnie zdefiniowane w `metryczka_config`.
+3. Puste `value_emoji` w konfiguracji odpowiedzi nie wyłącza fallbacku ikon (heurystyki/mapy).
+Pierwszy krok wykonawczy:
+- dodać filtr kolumn pomocniczych na etapie `parse_metryczka(...)` oraz skorygować wybór ikony kategorii w `analyze_poznan_archetypes.py`.
+Wynik:
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dodano `_is_aux_metry_column(...)` + listę sufiksów technicznych (`OTHER`, `INNE`, `OPEN`, `TEXT`, `TXT`, ...),
+  - `parse_metryczka(...)` pomija kolumny pomocnicze `M_*` przy dynamicznym dokładaniu zmiennych demograficznych,
+  - `_demo_pick_cat_icon(...)` używa ikony dynamicznej tylko, gdy jest niepusta; przy pustej wraca do fallbacku.
+- Synchronizacja:
+  - skopiowano aktualny generator do `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Smoke-check:
+  - `python -m py_compile JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

@@ -2441,3 +2441,10 @@ Decyzja:
 - Render przycisku `Cofnij` realizujemy przez placeholder (`st.empty()`) osadzony wysoko w widoku, ale wypełniany dopiero po obliczeniu finalnego `dirty`.
 Uzasadnienie:
 - W Streamlit przy scenariuszu „edytuję pole i od razu klikam Cofnij” wcześniejszy snapshot mógł nie zawierać bieżącej zmiany z tego samego reruna, co skutkowało brakiem potwierdzenia wyjścia.
+
+### D-272: Kolumny pomocnicze `M_*_OTHER` nie są traktowane jako osobne zmienne demograficzne
+Decyzja:
+- W `parse_metryczka(...)` dynamicznie przepuszczamy dodatkowe `M_*` tylko jeśli nie są kolumnami pomocniczymi (`OTHER`, `OPEN`, `TEXT`, `TXT`, itp.), chyba że kolumna jest jawnie zdefiniowana w `metryczka_config`.
+- W doborze ikon kategorii pusta ikona z konfiguracji nie nadpisuje fallbacku (mapa + heurystyki).
+Uzasadnienie:
+- Pomocnicze pola tekstowe „inna/jaka” były błędnie prezentowane jako pełne zmienne demograficzne (`Plec Other`, `Wiek Other`), co zaśmiecało raport i psuło czytelność kart/tabel.
