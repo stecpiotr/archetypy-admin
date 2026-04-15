@@ -17,59 +17,60 @@ CANVAS_W = 1024
 CANVAS_H = 335
 BASELINE_Y = 240
 MAX_PEAK = 205  # 100% -> 205 px (stała skala dla wszystkich kart)
-CHART_X0 = 308
+CHART_X0 = 356
 CHART_X1 = 960
+BAR_SIGMA_PX = 39.0
 
-METRICS = ("Empatia", "Umiejętności", "Niezależność", "Mądrość", "Kreatywność")
+METRICS = ("Empatia", "Sprawczość", "Niezależność", "Racjonalność", "Kreatywność")
 
 ARCHETYPES: dict[str, dict[str, object]] = {
     "Opiekun": {
-        "values": (95, 50, 20, 65, 25),
-        "color": "#1E88E5",
+        "values": (95, 60, 20, 60, 25),
+        "color": "#42A5F5",
     },
     "Kochanek": {
-        "values": (85, 45, 25, 35, 60),
-        "color": "#81D4FA",
+        "values": (85, 45, 25, 30, 60),
+        "color": "#90CAF9",
     },
     "Błazen": {
-        "values": (50, 50, 45, 25, 90),
-        "color": "#FB8C00",
+        "values": (50, 45, 45, 20, 90),
+        "color": "#EF5350",
     },
     "Buntownik": {
-        "values": (20, 55, 95, 30, 85),
+        "values": (20, 60, 95, 25, 85),
         "color": "#C62828",
     },
     "Odkrywca": {
-        "values": (30, 60, 90, 45, 80),
-        "color": "#2E7D32",
+        "values": (30, 55, 90, 45, 80),
+        "color": "#8E0000",
     },
     "Twórca": {
-        "values": (35, 80, 80, 40, 95),
-        "color": "#AB47BC",
+        "values": (35, 75, 80, 40, 95),
+        "color": "#5E35B1",
     },
     "Bohater": {
-        "values": (30, 95, 75, 45, 40),
-        "color": "#EF5350",
+        "values": (30, 95, 75, 40, 40),
+        "color": "#7E57C2",
     },
     "Czarodziej": {
         "values": (45, 65, 70, 80, 90),
-        "color": "#1565C0",
+        "color": "#B39DDB",
     },
     "Mędrzec": {
-        "values": (20, 80, 80, 95, 30),
-        "color": "#7B1FA2",
+        "values": (20, 70, 80, 95, 30),
+        "color": "#1B5E20",
     },
     "Władca": {
-        "values": (25, 85, 70, 75, 25),
-        "color": "#E53935",
+        "values": (25, 90, 70, 75, 25),
+        "color": "#43A047",
     },
     "Niewinny": {
-        "values": (75, 25, 30, 20, 50),
-        "color": "#66BB6A",
+        "values": (75, 30, 30, 50, 50),
+        "color": "#81C784",
     },
     "Towarzysz": {
         "values": (85, 60, 25, 45, 20),
-        "color": "#42A5F5",
+        "color": "#1565C0",
     },
 }
 
@@ -298,8 +299,8 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
     canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     color_rgb = hex_to_rgb(color_hex)
-    fill_rgb = darken(color_rgb, 0.18)
-    stroke_rgb = darken(color_rgb, 0.31)
+    fill_rgb = color_rgb
+    stroke_rgb = darken(color_rgb, 0.22)
 
     # Portret po lewej
     face = prepare_face(FACES_DIR / f"{name}.png")
@@ -308,7 +309,7 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
     ratio = min(max_face_w / face.width, max_face_h / face.height)
     face = face.resize((int(face.width * ratio), int(face.height * ratio)), Image.Resampling.LANCZOS)
     fx = 160 - face.width // 2
-    fy = 6 + max(0, (max_face_h - face.height) // 3)
+    fy = 14 + max(0, (max_face_h - face.height) // 3)
     canvas.alpha_composite(face, (fx, fy))
 
     # Nazwa archetypu
@@ -317,18 +318,22 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
             FONTS_DIR / "LibreBaskerville-SemiBold.ttf",
             ROOT / "DejaVuSans-Bold.ttf",
         ],
-        size=47,
+        size=42,
     )
     title_bbox = draw.textbbox((0, 0), name, font=title_font)
     title_w = title_bbox[2] - title_bbox[0]
-    draw.text((160 - title_w // 2, 250), name, fill=(20, 20, 20, 255), font=title_font)
+    title_h = title_bbox[3] - title_bbox[1]
+    face_bottom = fy + face.height
+    # Nazwa zawsze pod portretem, z wyraźnym odstępem i bez obcinania dołu.
+    title_y = min(CANVAS_H - title_h - 6, face_bottom + 0)
+    draw.text((160 - title_w // 2, int(title_y)), name, fill=(20, 20, 20, 255), font=title_font)
 
     # Delikatna linia bazowa wykresu
     draw.line((CHART_X0 - 8, BASELINE_Y, CHART_X1 + 8, BASELINE_Y), fill=(*stroke_rgb, 92), width=2)
 
     chart_width = CHART_X1 - CHART_X0
     step = chart_width / len(values)
-    sigma = step * 0.30
+    sigma = BAR_SIGMA_PX
     gradient = gradient_fill(
         (CANVAS_W, CANVAS_H),
         fill_rgb,

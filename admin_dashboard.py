@@ -8433,7 +8433,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 if not items:
                     return
                 st.markdown(
-                    "<div style='font-size:1.03em;font-weight:700;color:#334155;margin-top:2px;margin-bottom:10px;'>"
+                    "<div style='font-size:1.03em;font-weight:700;color:#334155;margin-top:4px;margin-bottom:14px;'>"
                     "TOP2/TOP3 – profile archetypów"
                     "</div>",
                     unsafe_allow_html=True,
@@ -8442,22 +8442,23 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.markdown(
                         (
                             "<div style='font-size:.9em;font-weight:700;color:#475569;"
-                            "margin-top:8px;margin-bottom:6px;'>"
+                            "margin-top:14px;margin-bottom:10px;'>"
                             f"TOP{rank}: {html.escape(title)}"
                             "</div>"
                         ),
                         unsafe_allow_html=True,
                     )
                     st.image(str(card_path), use_column_width=True)
+                    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
 
             if is_mobile:
                 st.image(segment_profile_png_path, use_column_width=True)
                 _render_top_profile_cards(profile_cards_for_top)
             else:
                 if profile_cards_for_top:
-                    profile_col, cards_col = st.columns([0.63, 0.37], gap="large")
+                    profile_col, cards_col = st.columns([0.52, 0.48], gap="large")
                     with profile_col:
-                        st.image(segment_profile_png_path, width=segment_profile_width)
+                        st.image(segment_profile_png_path, width=int(segment_profile_width * 0.88))
                     with cards_col:
                         _render_top_profile_cards(profile_cards_for_top)
                 else:
