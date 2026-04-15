@@ -12338,6 +12338,8 @@ def _set_dynamic_metry_schema_from_config(raw_cfg: Any) -> None:
             seen_codes.add(ckey)
             ordered_codes.append(code)
             icon = str(opt.get("value_emoji") or "").strip()
+            if icon in {"🏙️", "🏙", "🌆"}:
+                icon = "🏬"
             if var_nk:
                 _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK[(var_nk, ckey)] = icon
         if ordered_codes:
@@ -12375,7 +12377,10 @@ def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
     nk_var = _demo_nk(var_label)
     dyn_icon = _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK.get((nk_var, nk_cat))
     if dyn_icon is not None:
-        return str(dyn_icon or "")
+        dyn_txt = str(dyn_icon or "")
+        if dyn_txt in {"🏙️", "🏙", "🌆"}:
+            return "🏬"
+        return dyn_txt
     icon = _DEMO_CAT_ICON_MAP.get(nk_cat)
     if icon:
         return icon

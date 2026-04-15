@@ -2455,3 +2455,31 @@ Decyzja:
 - Dla kategorii `miasto` fallback jest standaryzowany do `🏬`.
 Uzasadnienie:
 - Użytkownik musi mieć możliwość celowego usunięcia ikon z wybranych odpowiedzi; fallback nie może ich „odradzać” automatycznie.
+
+### D-274: Maksimum w tabelach demografii oznacza realny max `%` (z remisami), nie „pierwszy wiersz”
+Decyzja:
+- Pogrubienie kategorii i mocniejszy pasek w tabelach demografii jest liczone po wartości maksymalnej `%` w obrębie zmiennej.
+- W przypadku remisów wyróżniane są wszystkie kategorie z tym samym maksimum.
+Uzasadnienie:
+- Dotychczasowy skrót (`idx == 0`) dawał fałszywe wyróżnienia po samym porządku listy.
+
+### D-275: Import JST ma stały szablon per badanie + alias `C1..C13` do `D1..D13`
+Decyzja:
+- W `💾 Import i eksport baz danych` generujemy szablon CSV/XLSX na podstawie aktualnej metryczki badania.
+- Normalizacja importu traktuje `C1..C13` i `D1..D13` jako równoważne aliasy.
+Uzasadnienie:
+- Ogranicza błędy kompatybilności między różnymi historycznymi wariantami plików i eliminuje ręczne zgadywanie struktury importu.
+
+### D-276: Kolumny pomocnicze `M_*_OTHER/...` nie wchodzą do eksportu/podglądu bazy JST
+Decyzja:
+- Dodatkowe kolumny `M_*` są eksportowane tylko wtedy, gdy nie są technicznymi suffixami pomocniczymi (`_OTHER`, `_OPEN`, `_TEXT`, ...), chyba że są jawnie częścią metryczki.
+Uzasadnienie:
+- Użytkownik oczekuje czystej, analitycznej struktury tabel bez artefaktów technicznych.
+
+### D-277: Nazewnictwo profili i układ sekcji w raporcie personalnym
+Decyzja:
+- Nazwy sekcji z frazą `Profil archetypowy ... (siła archetypu, skala: 0-100)` przechodzą na `Profil siły archetypów ... (skala: 0-100)`.
+- `Koło archetypów (pragnienia i wartości)` zmieniono na `Koło pragnień i wartości`.
+- Sekcje `Koło`, `Rozkład`, `Profile działania archetypów ...` są renderowane pionowo w jednej kolumnie.
+Uzasadnienie:
+- Zapewnia spójność nazewniczą i lepszą czytelność analityczną raportu.

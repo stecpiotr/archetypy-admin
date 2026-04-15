@@ -3432,7 +3432,10 @@ def _personal_metry_cat_icon(
     if isinstance(option_icon_map, dict):
         map_key = str(code or "").strip()
         if map_key in option_icon_map:
-            return str(option_icon_map.get(map_key) or "").strip()
+            mapped_icon = str(option_icon_map.get(map_key) or "").strip()
+            if mapped_icon in {"🏙️", "🏙", "🌆"}:
+                return "🏬"
+            return mapped_icon
     field = str(db_column or "").strip().upper()
     canon = _personal_demo_code(field, code, table_label)
     core_meta = PERSONAL_CORE_DEMO_META.get(field) or {}
@@ -3512,7 +3515,10 @@ def _collect_personal_metry_available(
                 continue
             canon_code = _personal_demo_code(db_col, str(opt.get("code") or "").strip(), table_label)
             if canon_code and canon_code not in option_icons:
-                option_icons[canon_code] = str(opt.get("value_emoji") or "").strip()
+                icon_val = str(opt.get("value_emoji") or "").strip()
+                if icon_val in {"🏙️", "🏙", "🌆"}:
+                    icon_val = "🏬"
+                option_icons[canon_code] = icon_val
         ordered_codes = [c for c in ordered_codes if c]
         seen_codes: set[str] = set()
         ordered_codes = [c for c in ordered_codes if not (c in seen_codes or seen_codes.add(c))]
@@ -3928,6 +3934,7 @@ def _render_personal_demography_subpage(
 
     cards_html_parts: list[str] = []
     table_rows_html: list[str] = []
+    has_demography_answers = False
     for item in available:
         mq = item["question"]
         col_name = str(item["col_name"])
@@ -3966,8 +3973,12 @@ def _render_personal_demography_subpage(
             code_txt = str(code or "").strip()
             if not code_txt:
                 continue
-            pct_all = 100.0 * float((q_all == code_txt).sum()) / max(1, int(q_all.ne("").sum()))
-            pct_sub = 100.0 * float((q_sub == code_txt).sum()) / max(1, int(q_sub.ne("").sum()))
+            all_nonempty = int(q_all.ne("").sum())
+            sub_nonempty = int(q_sub.ne("").sum())
+            if all_nonempty > 0 or sub_nonempty > 0:
+                has_demography_answers = True
+            pct_all = 100.0 * float((q_all == code_txt).sum()) / max(1, all_nonempty)
+            pct_sub = 100.0 * float((q_sub == code_txt).sum()) / max(1, sub_nonempty)
             categories.append(
                 {
                     "code": code_txt,
@@ -3995,11 +4006,12 @@ def _render_personal_demography_subpage(
         )
 
         rowspan = len(categories)
+        top_pct_sub = max(float(c.get("pct_sub") or 0.0) for c in categories)
         for idx, cat in enumerate(categories):
             pct_sub = float(cat["pct_sub"])
             pct_all = float(cat["pct_all"])
             diff = float(cat["diff"])
-            is_top = idx == 0
+            is_top = abs(pct_sub - top_pct_sub) <= 1e-9
             bar_w = max(0.0, min(100.0, pct_sub))
             fill_color = "#8ecae6" if is_top else "#d8e5f1"
             top_border = "border-top:3px solid #b8c2cc;"
@@ -4064,6 +4076,10 @@ def _render_personal_demography_subpage(
             + "</tbody></table></div></div>"
         )
         st.markdown(table_html, unsafe_allow_html=True)
+
+    if not has_demography_answers:
+        st.info("Brak odpowiedzi metryczkowych w próbie: pomijam wykres radarowy i profile 0-100 dla podgrupy.")
+        return
 
     def _demo_match_summary(profile_all_20: dict[str, float], profile_sub_20: dict[str, float]) -> dict[str, object]:
         all_100 = {a: max(0.0, min(100.0, float(profile_all_20.get(a, 0.0)) * 5.0)) for a in archetype_names}
@@ -4331,7 +4347,7 @@ def _render_personal_demography_subpage(
     )
 
     st.markdown("<div class='pdemo-wheel-sep'></div>", unsafe_allow_html=True)
-    st.markdown("<div class='pdemo-wheel-title'>Profile archetypowe 0-100 (siła archetypu, skala: 0-100)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='pdemo-wheel-title'>Profile siły archetypów 0-100 (skala: 0-100)</div>", unsafe_allow_html=True)
     wheels_col1, wheels_col2 = st.columns(2, gap="large")
     try:
         safe_study = re.sub(r"[^A-Za-z0-9_-]+", "_", str(study_id or "study"))
@@ -4370,10 +4386,10 @@ def _render_personal_demography_subpage(
                     st.image(img_path, use_column_width=True)
 
         with wheels_col1:
-            st.markdown("<div class='pdemo-profile-title'>Profil archetypowy całej próby</div>", unsafe_allow_html=True)
+            st.markdown("<div class='pdemo-profile-title'>Profil siły archetypów całej próby</div>", unsafe_allow_html=True)
             _show_image_compat(wheel_all, max_width_px=520)
         with wheels_col2:
-            st.markdown("<div class='pdemo-profile-title'>Profil archetypowy podgrupy filtrowanej</div>", unsafe_allow_html=True)
+            st.markdown("<div class='pdemo-profile-title'>Profil siły archetypów podgrupy filtrowanej</div>", unsafe_allow_html=True)
             _show_image_compat(wheel_sub, max_width_px=520)
         st.markdown(
             """
@@ -5162,7 +5178,7 @@ def _append_segment_profile_page(doc_tpl, segment_profile_img_path: str | None, 
         return
     doc_obj = doc_tpl.docx
     doc_obj.add_page_break()
-    title = re.sub(r"\s{2,}", " ", f"Profil archetypowy {subject_gen} (siła archetypu, skala: 0-100)").strip()
+    title = re.sub(r"\s{2,}", " ", f"Profil siły archetypów {subject_gen} (skala: 0-100)").strip()
     _doc_add_paragraph(doc_obj, title, "Heading 1")
     p = doc_obj.add_paragraph()
     add_image(p, segment_profile_img_path, width=Mm(170))
@@ -7833,21 +7849,18 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 # 3) MultiIndex → powstaje nagłówek dwupoziomowy z 2 „podkolumnami”
                 _cols = pd.MultiIndex.from_tuples([
                     ("", "Archetyp"),
-                    ("", "Główny<br/>archetyp"),
-                    ("", "Wspierający<br/>archetyp"),
-                    ("", "Poboczny<br/>archetyp"),
+                    ("", "Główny"),
+                    ("", "Wspierający"),
+                    ("", "Poboczny"),
                     (NAT_GRP, "%"),
                     (NAT_GRP, "opis"),
                 ])
 
                 archetype_table = pd.DataFrame({
                     ("", "Archetyp"): [f"{get_emoji(n)} {disp_name(n)}" for n in ordered_names],
-                    ("", "Główny<br/>archetyp"): [zero_to_dash(counts_main.get(normalize(n), 0)) for
-                                                  n in ordered_names],
-                    ("", "Wspierający<br/>archetyp"): [zero_to_dash(counts_aux.get(normalize(n), 0))
-                                                       for n in ordered_names],
-                    ("", "Poboczny<br/>archetyp"): [zero_to_dash(counts_supp.get(normalize(n), 0))
-                                                    for n in ordered_names],
+                    ("", "Główny"): [zero_to_dash(counts_main.get(normalize(n), 0)) for n in ordered_names],
+                    ("", "Wspierający"): [zero_to_dash(counts_aux.get(normalize(n), 0)) for n in ordered_names],
+                    ("", "Poboczny"): [zero_to_dash(counts_supp.get(normalize(n), 0)) for n in ordered_names],
                     (NAT_GRP, "%"): _pct_strs,
                     (NAT_GRP, "opis"): _labels_ico,
                 }, columns=_cols)
@@ -7877,9 +7890,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 <thead>
                   <tr>
                     <th rowspan="2" style="width:{COL_W['c1']}">Archetyp</th>
-                    <th rowspan="2" style="width:{COL_W['c2']}">Główny archetyp</th>
-                    <th rowspan="2" style="width:{COL_W['c3']}">Wspierający archetyp</th>
-                    <th rowspan="2" style="width:{COL_W['c4']}">Poboczny archetyp</th>
+                    <th rowspan="2" class="ap-vert-head" style="width:{COL_W['c2']}"><span class="ap-vert-col">Główny</span></th>
+                    <th rowspan="2" class="ap-vert-head" style="width:{COL_W['c3']}"><span class="ap-vert-col">Wspierający</span></th>
+                    <th rowspan="2" class="ap-vert-head" style="width:{COL_W['c4']}"><span class="ap-vert-col">Poboczny</span></th>
                     <th colspan="2" style="width:calc({COL_W['c5']} + {COL_W['c6']})">
                       % natężenie archetypu&nbsp;{NAT_GRP}
                     </th>
@@ -7906,6 +7919,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     vertical-align: middle; line-height: 1.22; text-align: center;
                   }}
                   .ap-table thead th {{ font-weight: 700; }}
+                  .ap-table thead th.ap-vert-head {{ padding:6px 4px; }}
+                  .ap-table .ap-vert-col {{
+                    display:inline-block;
+                    writing-mode:vertical-rl;
+                    transform:rotate(180deg);
+                    white-space:nowrap;
+                    letter-spacing:.02em;
+                    line-height:1;
+                    min-height:78px;
+                  }}
 
                   /* Wyrównania tylko dla WIERZY (tbody) w kolumnach 1 i 6 */
                   .ap-table tbody td:nth-child(1),
@@ -7948,6 +7971,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     vertical-align: middle; line-height: 1.22; text-align: center;
                   }}
                   .ap-table thead th {{ font-weight: 700; }}
+                  .ap-table thead th.ap-vert-head {{ padding:6px 4px; }}
+                  .ap-table .ap-vert-col {{
+                    display:inline-block;
+                    writing-mode:vertical-rl;
+                    transform:rotate(180deg);
+                    white-space:nowrap;
+                    letter-spacing:.02em;
+                    line-height:1;
+                    min-height:78px;
+                  }}
                   .ap-table tbody td:nth-child(1),
                   .ap-table tbody td:nth-child(6) {{ text-align: left !important; }}
 
@@ -8286,12 +8319,35 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 )
                 st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
 
-            # prawa kolumna — wykres archetypów
+            # prawa kolumna w tej sekcji zostaje pusta; wykresy przeniesione do wspólnej kolumny obok.
             with right_col:
+                st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+            # tylko dominujący kolor
+            dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
+
+            color_pcts = calc_color_percentages_from_df(data)
+
+
+            # Dane opisowe dominującego koloru do Worda
+            dom_meta = COLOR_LONG[dom_name]  # masz już COLOR_LONG w pliku
+            dom_color = {
+                "name": dom_name,
+                "pct": dom_pct,
+                "emoji": COLOR_EMOJI[dom_name],
+                "title": dom_meta["title"],
+                "orient": dom_meta["orient"],
+                "body": dom_meta["body"],
+                "politics": dom_meta["politics"],
+                "hex": dom_meta["hex"],
+            }
+
+
+            with col3:
                 if is_mobile:
                     st.markdown(
                         ap_section_heading(
-                            "Koło archetypów (pragnienia i wartości)",
+                            "Koło pragnień i wartości",
                             center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
@@ -8325,10 +8381,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     with p_c:
                         st.markdown(
                             ap_section_heading(
-                                "Koło archetypów (pragnienia i wartości)",
+                                "Koło pragnień i wartości",
                                 center=True,
                                 margin_bottom_px=8,
-                                shift_x_px=-32,
+                                shift_x_px=-10,
                             ),
                             unsafe_allow_html=True,
                         )
@@ -8355,27 +8411,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 width=wheel_img_width
                             )
 
-            # tylko dominujący kolor
-            dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
-
-            color_pcts = calc_color_percentages_from_df(data)
-
-
-            # Dane opisowe dominującego koloru do Worda
-            dom_meta = COLOR_LONG[dom_name]  # masz już COLOR_LONG w pliku
-            dom_color = {
-                "name": dom_name,
-                "pct": dom_pct,
-                "emoji": COLOR_EMOJI[dom_name],
-                "title": dom_meta["title"],
-                "orient": dom_meta["orient"],
-                "body": dom_meta["body"],
-                "politics": dom_meta["politics"],
-                "hex": dom_meta["hex"],
-            }
-
-
-            with col3:
                 if is_mobile:
                     st.markdown(
                         ap_section_heading(
@@ -8415,7 +8450,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
             st.markdown(
                 ap_section_heading(
-                    f"Profil archetypowy {personGen} (siła archetypu, skala: 0-100)",
+                    f"Profil siły archetypów {personGen} (skala: 0-100)",
                     center=False,
                     margin_bottom_px=12,
                     margin_top_px=6,
@@ -8439,9 +8474,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 if not items:
                     return
                 st.markdown(
-                    "<div style='font-size:1.03em;font-weight:700;color:#334155;margin-top:4px;margin-bottom:14px;'>"
-                    "TOP2/TOP3 – profile archetypów"
-                    "</div>",
+                    ap_section_heading(
+                        f"Profile działania archetypów {personGen}",
+                        center=False,
+                        margin_bottom_px=12,
+                        margin_top_px=6,
+                    ),
                     unsafe_allow_html=True,
                 )
                 for rank, title, card_path in items:
@@ -8457,18 +8495,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.image(str(card_path), use_column_width=True)
                     st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
 
+            with col3:
+                _render_top_profile_cards(profile_cards_for_top)
+
             if is_mobile:
                 st.image(segment_profile_png_path, use_column_width=True)
-                _render_top_profile_cards(profile_cards_for_top)
             else:
-                if profile_cards_for_top:
-                    profile_col, cards_col = st.columns([0.52, 0.48], gap="large")
-                    with profile_col:
-                        st.image(segment_profile_png_path, width=int(segment_profile_width * 0.88))
-                    with cards_col:
-                        _render_top_profile_cards(profile_cards_for_top)
-                else:
-                    st.image(segment_profile_png_path, width=segment_profile_width)
+                st.image(segment_profile_png_path, width=segment_profile_width)
             st.markdown(
                 """
                 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">

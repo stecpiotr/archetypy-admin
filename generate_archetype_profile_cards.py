@@ -459,10 +459,10 @@ def draw_archetype_panel(
     # Nazwa archetypu
     title_font = font(
         [
-            FONTS_DIR / "LibreBaskerville-SemiBold.ttf",
+            FONTS_DIR / "LibreBaskerville-Bold.ttf",
             ROOT / "DejaVuSans-Bold.ttf",
         ],
-        size=42,
+        size=38,
     )
     shown_name = str(display_name or name)
     title_bbox = draw.textbbox((0, 0), shown_name, font=title_font)
@@ -470,7 +470,7 @@ def draw_archetype_panel(
     title_h = title_bbox[3] - title_bbox[1]
     face_bottom = fy + face.height
     # Nazwa zawsze pod portretem, z wyraźnym odstępem i bez obcinania dołu.
-    title_y = min(CANVAS_H - title_h - 6, face_bottom + 0)
+    title_y = min(CANVAS_H - title_h - 6, face_bottom + -1)
     draw.text((160 - title_w // 2, int(title_y)), shown_name, fill=(20, 20, 20, 255), font=title_font)
 
     # Delikatna linia bazowa wykresu
@@ -569,10 +569,10 @@ def main() -> None:
     parser.add_argument("--only", type=str, default="", help="Generate only one archetype by exact name.")
     parser.add_argument(
         "--gender",
-        type=str,
-        default="M",
-        choices=["M", "K", "m", "k"],
-        help="M = męskie twarze (arche_cartoon), K = żeńskie twarze (arche_cartoon)",
+        type=str.upper,
+        default="BOTH",
+        choices=["M", "K", "BOTH"],
+        help="M = męskie, K = żeńskie, BOTH = generuj oba zestawy jednym uruchomieniem (domyślnie BOTH)",
     )
     parser.add_argument(
         "--out-dir",
@@ -587,12 +587,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    gender_code = args.gender.upper()
-    if args.rebuild_female_faces:
-        ensure_female_faces(force=True)
+    gender_codes = ["M", "K"] if args.gender == "BOTH" else [args.gender]
 
-    out_dir = Path(args.out_dir) if args.out_dir else (OUT_DIR_FEMALE if gender_code == "K" else OUT_DIR_MALE)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    if args.rebuild_female_faces and "K" in gender_codes:
+        ensure_female_faces(force=True)
 
     items = list(ARCHETYPES.items())
     if args.only:
@@ -600,21 +598,29 @@ def main() -> None:
         if not items:
             raise ValueError(f"Nie znaleziono archetypu: {args.only}")
 
-    for arche_name, config in items:
-        values = config["values"]  # type: ignore[assignment]
-        color = str(config["color"])
-        face_path = face_path_for_archetype(arche_name, gender_code=gender_code)
-        display_name = FEMININE_TITLES.get(arche_name, arche_name) if gender_code == "K" else arche_name
-        panel = draw_archetype_panel(
-            arche_name,
-            values,
-            color,
-            face_path=face_path,
-            display_name=display_name,
-        )
-        out = out_dir / f"{arche_name}.png"
-        panel.save(out, "PNG", optimize=True)
-        print(f"[OK] {out}")
+    for gender_code in gender_codes:
+        if args.out_dir:
+            base = Path(args.out_dir)
+            out_dir = base if len(gender_codes) == 1 else (base / ("male" if gender_code == "M" else "female"))
+        else:
+            out_dir = OUT_DIR_FEMALE if gender_code == "K" else OUT_DIR_MALE
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        for arche_name, config in items:
+            values = config["values"]  # type: ignore[assignment]
+            color = str(config["color"])
+            face_path = face_path_for_archetype(arche_name, gender_code=gender_code)
+            display_name = FEMININE_TITLES.get(arche_name, arche_name) if gender_code == "K" else arche_name
+            panel = draw_archetype_panel(
+                arche_name,
+                values,
+                color,
+                face_path=face_path,
+                display_name=display_name,
+            )
+            out = out_dir / f"{arche_name}.png"
+            panel.save(out, "PNG", optimize=True)
+            print(f"[OK] [{gender_code}] {out}")
 
 
 if __name__ == "__main__":

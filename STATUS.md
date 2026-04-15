@@ -2605,3 +2605,36 @@
 
 ### RYZYKO / do domknięcia
 - Do potwierdzenia manualnego na świeżo wygenerowanych raportach: brak niechcianych ikon przy celowo pustych `value_emoji` (np. `M_PREFERENCJE_POLITYCZNE`, `M_POGLADY`) i `miasto` jako `🏬`.
+
+### Zrobione w Hotfix H-122 (2026-04-16, demografia/import-template/nazwy i układ sekcji)
+- `archetypy-admin/admin_dashboard.py`:
+  - naprawiono błąd pogrubiania kategorii w tabeli demografii personalnej (`is_top` jest liczone po maksymalnym `% podgrupa`, z obsługą remisów),
+  - dodano warunek: gdy brak realnych odpowiedzi metryczkowych (same zera), pomijany jest radar i profile 0-100 na podstronie demografii,
+  - zmieniono nazewnictwo sekcji:
+    - `Profil siły archetypów ... (skala: 0-100)`,
+    - `Koło pragnień i wartości`,
+    - `Profile działania archetypów ...`,
+  - wykresy `Koło` + `Rozkład` + `Profile działania` są renderowane pionowo w jednej kolumnie,
+  - w tabeli `Podsumowanie archetypów (liczebność i natężenie)` nagłówki `Główny / Wspierający / Poboczny` są skrócone i stylizowane pionowo.
+- `archetypy-admin/app.py`:
+  - w `💾 Import i eksport baz danych` dodano generowanie szablonu importu (`Wygeneruj szablon CSV/XLSX`) na podstawie aktualnej metryczki badania,
+  - dodano jasną notę o akceptacji aliasów `C1-C13` dla `D1-D13`,
+  - w tabelach demografii `🧭 Matching` i `🧭 Matching / Segmenty` pogrubienie maksimum działa teraz z obsługą remisów,
+  - nazwy sekcji profili 0-100 zostały ujednolicone do wariantu `Profil siły ...`.
+- `archetypy-admin/db_jst_utils.py`:
+  - dodano `import_template_dataframe(...)`,
+  - import normalizuje `C1..C13` <-> `D1..D13`,
+  - eksport/podgląd nie dociąga technicznych kolumn pomocniczych `M_*_OTHER/...`.
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - znormalizowano historyczne ikony `🏙️/🌆` do `🏬` dla kategorii `miasto`.
+- Synchronizacja:
+  - zaktualizowano także: `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do manualnego potwierdzenia na UI:
+  - nowy układ kolumnowy sekcji `Koło / Rozkład / Profile działania`,
+  - oczekiwany wygląd pionowych nagłówków `Główny / Wspierający / Poboczny`,
+  - brak radaru/profili 0-100 przy braku odpowiedzi metryczkowych.

@@ -47,6 +47,7 @@ from db_jst_utils import (
     fetch_jst_study_by_id,
     fetch_jst_studies,
     insert_jst_response,
+    import_template_dataframe as jst_import_template_dataframe,
     insert_jst_study,
     list_jst_responses,
     make_payload_from_row as jst_make_payload_from_row,
@@ -5208,6 +5209,31 @@ def jst_io_view() -> None:
     study_id = str(study["id"])
     study_fresh = fetch_jst_study_by_id(sb, study_id) or study
     metry_cfg = (study_fresh or {}).get("metryczka_config")
+    slug = str(study.get("slug") or "jst")
+    safe_name = slugify(str(study.get("jst_full_nom") or slug)) or slug
+
+    st.markdown("### Szablon importu")
+    template_df = jst_import_template_dataframe(metry_cfg)
+    tpl_col1, tpl_col2 = st.columns(2)
+    with tpl_col1:
+        _download_button_compat(
+            "Wygeneruj szablon CSV",
+            data=template_df.to_csv(index=False, encoding="utf-8-sig"),
+            file_name=f"szablon-importu-{safe_name}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with tpl_col2:
+        _download_button_compat(
+            "Wygeneruj szablon XLSX",
+            data=_xlsx_bytes_from_df(template_df, sheet_name="Szablon"),
+            file_name=f"szablon-importu-{safe_name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    st.caption(
+        "Szablon jest generowany z aktualnej metryczki badania; import akceptuje też kolumny C1-C13 jako alias D1-D13."
+    )
 
     st.markdown("### Import odpowiedzi (CSV / XLSX)")
     uploaded = st.file_uploader("Wybierz plik", type=["csv", "xlsx"])
@@ -5287,8 +5313,6 @@ def jst_io_view() -> None:
         st.info("Brak odpowiedzi do eksportu.")
         return
     out_df = jst_response_rows_to_dataframe(rows, metryczka_config=metry_cfg)
-    slug = str(study.get("slug") or "jst")
-    safe_name = slugify(str(study.get("jst_full_nom") or slug)) or slug
 
     c1, c2 = st.columns(2)
     with c1:
@@ -8559,9 +8583,9 @@ def matching_view() -> None:
         )
 
         profile_title = (
-            "Profile archetypowe 0-100 (siła archetypu, skala: 0-100)"
+            "Profile siły archetypów 0-100 (skala: 0-100)"
             if current_axis_label == "Archetyp"
-            else "Profile wartości 0-100 (siła wartości, skala: 0-100)"
+            else "Profile siły wartości 0-100 (skala: 0-100)"
         )
         st.markdown(f"<div class='match-section-header match-profile-header'><h3>{html.escape(profile_title)}</h3></div>", unsafe_allow_html=True)
         left_profile_col, right_profile_col = st.columns(2, gap="large")
@@ -8591,7 +8615,7 @@ def matching_view() -> None:
             with left_profile_col:
                 st.markdown(
                     f"<div class='match-profile-title'>"
-                    f"{'Profil archetypowy' if current_axis_label == 'Archetyp' else 'Profil wartości'} {html.escape(str(person_name_gen or ''))}"
+                    f"{'Profil siły archetypów' if current_axis_label == 'Archetyp' else 'Profil siły wartości'} {html.escape(str(person_name_gen or ''))}"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -8599,7 +8623,7 @@ def matching_view() -> None:
             with right_profile_col:
                 st.markdown(
                     f"<div class='match-profile-title'>"
-                    f"{'Profil archetypowy mieszkańców' if current_axis_label == 'Archetyp' else 'Profil wartości mieszkańców'} {html.escape(str(jst_name_gen or ''))}"
+                    f"{'Profil siły archetypów mieszkańców' if current_axis_label == 'Archetyp' else 'Profil siły wartości mieszkańców'} {html.escape(str(jst_name_gen or ''))}"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -8766,7 +8790,7 @@ def matching_view() -> None:
                     if isinstance(spec.get("value_emoji"), dict)
                     else {}
                 )
-                top_idx = part["% grupa dopasowana"].idxmax()
+                top_pct = float(part["% grupa dopasowana"].max())
                 rowspan = len(part.index)
                 for idx, (_, row) in enumerate(part.iterrows()):
                     cat = str(row["Kategoria"])
@@ -8774,7 +8798,7 @@ def matching_view() -> None:
                     pct_sub = float(row["% grupa dopasowana"])
                     pct_all = float(row["% ogół mieszkańców (ważony)"])
                     diff = float(row["Róznica (w pp.)"])
-                    is_top = bool(row.name == top_idx)
+                    is_top = abs(pct_sub - top_pct) <= 1e-9
                     bar_w = max(0.0, min(100.0, pct_sub))
                     var_icon = variable_emoji.get(var_name, "📌")
                     cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")
@@ -9498,9 +9522,9 @@ def matching_view() -> None:
                 )
 
                 profile_title = (
-                    "Profile archetypowe 0-100 (siła archetypu, skala: 0-100)"
+                    "Profile siły archetypów 0-100 (skala: 0-100)"
                     if current_axis_label == "Archetyp"
-                    else "Profile wartości 0-100 (siła wartości, skala: 0-100)"
+                    else "Profile siły wartości 0-100 (skala: 0-100)"
                 )
                 st.markdown(
                     f"<div class='match-section-header match-profile-header'><h3>{html.escape(profile_title)}</h3></div>",
@@ -9534,7 +9558,7 @@ def matching_view() -> None:
                     with seg_left_profile_col:
                         st.markdown(
                             f"<div class='match-profile-title'>"
-                            f"{'Profil archetypowy' if current_axis_label == 'Archetyp' else 'Profil wartości'} {html.escape(str(person_name_seg or ''))}"
+                            f"{'Profil siły archetypów' if current_axis_label == 'Archetyp' else 'Profil siły wartości'} {html.escape(str(person_name_seg or ''))}"
                             f"</div>",
                             unsafe_allow_html=True,
                         )
@@ -9542,7 +9566,7 @@ def matching_view() -> None:
                     with seg_right_profile_col:
                         st.markdown(
                             f"<div class='match-profile-title'>"
-                            f"{'Profil archetypowy segmentu' if current_axis_label == 'Archetyp' else 'Profil wartości segmentu'} {html.escape(str(segment_name_seg or ''))}"
+                            f"{'Profil siły archetypów segmentu' if current_axis_label == 'Archetyp' else 'Profil siły wartości segmentu'} {html.escape(str(segment_name_seg or ''))}"
                             f"</div>",
                             unsafe_allow_html=True,
                         )
@@ -9763,7 +9787,7 @@ def matching_view() -> None:
                                         if isinstance(spec.get("value_emoji"), dict)
                                         else {}
                                     )
-                                    top_idx = part["% segment"].idxmax()
+                                    top_pct = float(part["% segment"].max())
                                     rowspan = len(part.index)
                                     for idx, (_, row) in enumerate(part.iterrows()):
                                         cat = str(row["Kategoria"])
@@ -9771,7 +9795,7 @@ def matching_view() -> None:
                                         pct_sub = float(row["% segment"])
                                         pct_all = float(row["% ogół mieszkańców (ważony)"])
                                         diff = float(row["Róznica (w pp.)"])
-                                        is_top = bool(row.name == top_idx)
+                                        is_top = abs(pct_sub - top_pct) <= 1e-9
                                         bar_w = max(0.0, min(100.0, pct_sub))
                                         var_icon = seg_variable_emoji.get(var_name, "📌")
                                         cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")

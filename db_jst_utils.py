@@ -70,6 +70,23 @@ M_MATERIAL_VALUES = [
     "odmowa",
 ]
 _CUSTOM_METRY_COL_RE = re.compile(r"^M_[A-Z0-9_]{2,40}$")
+_AUX_METRY_SUFFIXES: tuple[str, ...] = (
+    "_OTHER",
+    "_INNE",
+    "_OPEN",
+    "_TEXT",
+    "_TXT",
+    "_FREE",
+    "_DESC",
+    "_COMMENT",
+)
+
+
+def _is_aux_metry_column(col: Any) -> bool:
+    key = str(col or "").strip().upper()
+    if not key.startswith("M_"):
+        return False
+    return any(key.endswith(sfx) for sfx in _AUX_METRY_SUFFIXES)
 
 
 def response_columns(metryczka_config: Any = None) -> List[str]:
@@ -1719,6 +1736,18 @@ def _to_flag(value: Any) -> int:
     return 0
 
 
+def _paired_c_or_d_column(col: Any) -> str:
+    txt = str(col or "").strip().upper()
+    if not txt:
+        return ""
+    m = re.fullmatch(r"([CD])([1-9]|1[0-3])", txt)
+    if not m:
+        return ""
+    pref = str(m.group(1))
+    num = str(m.group(2))
+    return f"{'D' if pref == 'C' else 'C'}{num}"
+
+
 def _norm_choice(value: Any, allowed: List[str]) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -1787,6 +1816,13 @@ def normalize_response_row(raw: Dict[str, Any], respondent_id_fallback: str = ""
             nk = _norm(txt)
             if nk and nk in norm_key_map:
                 return norm_key_map[nk]
+            paired = _paired_c_or_d_column(txt)
+            if paired:
+                if paired in raw:
+                    return raw.get(paired)
+                paired_nk = _norm(paired)
+                if paired_nk and paired_nk in norm_key_map:
+                    return norm_key_map[paired_nk]
         return None
 
     def q_options(col: str, fallback_values: List[str]) -> List[Dict[str, str]]:
@@ -1826,9 +1862,9 @@ def normalize_response_row(raw: Dict[str, Any], respondent_id_fallback: str = ""
     row["B2"] = canonical_archetype(pick("B2"))
 
     for col in D_COLUMNS:
-        row[col] = _to_ab(pick(col))
+        row[col] = _to_ab(pick(col, _paired_c_or_d_column(col)))
 
-    row["D13"] = canonical_archetype(pick("D13"))
+    row["D13"] = canonical_archetype(pick("D13", "C13"))
 
     for col in cols:
         if col in CANONICAL_COLUMNS:
@@ -1860,6 +1896,7 @@ def response_rows_to_dataframe(rows: Iterable[Dict[str, Any]], metryczka_config:
                 key_up
                 and key_up not in cols
                 and _CUSTOM_METRY_COL_RE.fullmatch(key_up)
+                and not _is_aux_metry_column(key_up)
             ):
                 extra_cols.append(key_up)
     cols_all: List[str] = list(cols)
@@ -1904,7 +1941,13 @@ def make_payload_from_row(row: Dict[str, Any], metryczka_config: Any = None) -> 
             and key_up not in all_cols
             and key_up not in CANONICAL_COLUMNS
             and _CUSTOM_METRY_COL_RE.fullmatch(key_up)
+            and not _is_aux_metry_column(key_up)
         ):
             all_cols.append(key_up)
     payload = {k: row.get(k, "") for k in all_cols if k != "respondent_id"}
     return payload
+
+
+def import_template_dataframe(metryczka_config: Any = None) -> pd.DataFrame:
+    cols = [c for c in response_columns(metryczka_config) if not _is_aux_metry_column(c)]
+    return pd.DataFrame(columns=cols)

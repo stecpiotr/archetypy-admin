@@ -3278,3 +3278,37 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-122 [DONE]
+Temat: Demografia (bold max), import-template per badanie, C↔D w imporcie, układ/nazwy sekcji profili.
+Kryteria ukończenia:
+1. W tabelach demograficznych pogrubienie działa dla realnego maksimum `%` w ramach zmiennej (z obsługą remisów), a nie dla pierwszego wiersza.
+2. `💾 Import i eksport baz danych` ma generator szablonu importu oparty o bieżącą metryczkę badania.
+3. Import akceptuje `C1..C13` jako alias `D1..D13`.
+4. Podgląd/eksport nie pokazuje technicznych kolumn pomocniczych typu `M_*_OTHER`.
+5. W raporcie personalnym:
+   - nazewnictwo `Profil archetypowy ... (siła archetypu, skala: 0-100)` zostało zastąpione `Profil siły archetypów ... (skala: 0-100)`,
+   - `Koło archetypów (pragnienia i wartości)` zostało zastąpione `Koło pragnień i wartości`,
+   - sekcje `Koło` + `Rozkład` + `Profile działania archetypów ...` są ułożone pionowo w jednej kolumnie.
+6. Gdy brak realnych odpowiedzi metryczkowych (same 0%), radar i profile 0-100 w podstronie demografii personalnej nie są renderowane.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - fix boldowania max kategorii (`is_top` po wartości `%`, obsługa remisów),
+  - blokada renderu radaru/profili 0-100 przy braku odpowiedzi metryczkowych,
+  - nowy układ i nazwy sekcji (`Koło pragnień i wartości`, `Profile działania archetypów ...`, `Profil siły archetypów ...`),
+  - tabela podsumowania archetypów: nagłówki `Główny / Wspierający / Poboczny` w stylu pionowym.
+- `archetypy-admin/app.py`:
+  - dodano `Wygeneruj szablon CSV/XLSX` (per badanie, z aktualnej metryczki),
+  - poprawiono podświetlanie najwyższej kategorii w tabelach demografii Matchingu (z remisami),
+  - ujednolicono nazwy sekcji profili 0-100 do wariantu `Profil siły ...`.
+- `archetypy-admin/db_jst_utils.py`:
+  - dodano `import_template_dataframe(...)`,
+  - import obsługuje aliasy `C1..C13` <-> `D1..D13`,
+  - odfiltrowano techniczne kolumny pomocnicze `M_*_OTHER/...` z podglądu/eksportu.
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - normalizacja historycznej ikony `🏙️` -> `🏬` dla kategorii `miasto`.
+- Synchronizacja:
+  - generator skopiowano także do `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
