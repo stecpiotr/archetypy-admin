@@ -461,6 +461,45 @@ def _card_file_for(archetype_name: str):
         return None
     return None
 
+
+def _profile_card_file_for(archetype_name: str):
+    """
+    Zwraca ścieżkę do profilowej grafiki archetypu z assets/archetype_profile_cards_male.
+    Dopasowanie odporne na brak polskich znaków i warianty nazw.
+    """
+    try:
+        base_masc = base_masc_from_any(str(archetype_name or "").strip())
+        if not base_masc or not ARCHETYPE_PROFILE_CARD_DIR.exists():
+            return None
+
+        direct = ARCHETYPE_PROFILE_CARD_DIR / f"{base_masc}.png"
+        if direct.exists():
+            return direct
+
+        def _norm(v: str) -> str:
+            return re.sub(r"[^a-z0-9]+", "", _slug_pl(v or ""))
+
+        target_keys = {_norm(base_masc), _norm(ARCHETYPE_BASE_SLUGS.get(base_masc, base_masc))}
+        target_keys = {k for k in target_keys if k}
+        if not target_keys:
+            return None
+
+        files = sorted(
+            [
+                p
+                for p in ARCHETYPE_PROFILE_CARD_DIR.iterdir()
+                if p.is_file() and p.suffix.lower() == ".png"
+            ],
+            key=lambda p: p.name.lower(),
+        )
+        for path in files:
+            stem_norm = _norm(path.stem)
+            if stem_norm and stem_norm in target_keys:
+                return path
+    except Exception:
+        return None
+    return None
+
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
     """
     Zwraca InlineImage do docxtpl dla danego archetypu.
@@ -1014,6 +1053,8 @@ import base64
 ARCHETYPE_ICON_DIR = Path(__file__).with_name("assets") / "person_icons"
 # Karty archetypów (PNG/JPG) pokazywane m.in. przy "5.1.2. Zestawy praktyczne"
 ARCHETYPE_CARD_DIR = Path(__file__).with_name("assets") / "card"
+# Karty profilowe archetypów (PNG) używane przy TOP2/TOP3
+ARCHETYPE_PROFILE_CARD_DIR = Path(__file__).with_name("assets") / "archetype_profile_cards_male"
 # Ikony do etykiet wykresu skumulowanego (nie mylić z person_icons)
 ARCHE_STACKED_ICON_DIR = Path(__file__).with_name("assets") / "arche_icons"
 
@@ -3394,7 +3435,7 @@ def _personal_metry_cat_icon(
     nk_sp = nk.replace("-", " ")
     if any(k in nk_var for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
         if "miasto" in nk:
-            return "🏙️"
+            return "🏬"
         if "wies" in nk:
             return "🌾"
         return "📍"
@@ -8375,10 +8416,52 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 ),
                 unsafe_allow_html=True,
             )
+
+            top_profile_archetypes: list[str] = [main_avg]
+            if aux_avg and aux_avg != main_avg:
+                top_profile_archetypes.append(aux_avg)
+            if supp_avg and supp_avg not in [main_avg, aux_avg]:
+                top_profile_archetypes.append(supp_avg)
+
+            profile_cards_for_top: list[tuple[int, str, Path]] = []
+            for rank, arch_name in enumerate(top_profile_archetypes, start=1):
+                profile_path = _profile_card_file_for(arch_name)
+                if profile_path and Path(profile_path).exists():
+                    profile_cards_for_top.append((rank, disp_name(arch_name), Path(profile_path)))
+
+            def _render_top_profile_cards(items: list[tuple[int, str, Path]]) -> None:
+                if not items:
+                    return
+                st.markdown(
+                    "<div style='font-size:1.03em;font-weight:700;color:#334155;margin-top:2px;margin-bottom:10px;'>"
+                    "TOP2/TOP3 – profile archetypów"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                for rank, title, card_path in items:
+                    st.markdown(
+                        (
+                            "<div style='font-size:.9em;font-weight:700;color:#475569;"
+                            "margin-top:8px;margin-bottom:6px;'>"
+                            f"TOP{rank}: {html.escape(title)}"
+                            "</div>"
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.image(str(card_path), use_column_width=True)
+
             if is_mobile:
                 st.image(segment_profile_png_path, use_column_width=True)
+                _render_top_profile_cards(profile_cards_for_top)
             else:
-                st.image(segment_profile_png_path, width=segment_profile_width)
+                if profile_cards_for_top:
+                    profile_col, cards_col = st.columns([0.63, 0.37], gap="large")
+                    with profile_col:
+                        st.image(segment_profile_png_path, width=segment_profile_width)
+                    with cards_col:
+                        _render_top_profile_cards(profile_cards_for_top)
+                else:
+                    st.image(segment_profile_png_path, width=segment_profile_width)
             st.markdown(
                 """
                 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">

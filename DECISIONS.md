@@ -2377,3 +2377,60 @@ Decyzja:
   - `nieważny ⭕`.
 Uzasadnienie:
 - Użytkownik wymagał precyzyjnego, powtarzalnego słownika ikon dla najczęściej używanych zmiennych i kategorii.
+
+### D-263: W odpowiedziach metryczki ikona jest polem tekstowym emoji
+Decyzja:
+- Kolumna `Ikona` dla odpowiedzi metryczki (zarówno w pytaniach ankiety, jak i w predefiniowanych) działa jako edytowalne pole tekstowe, a nie dropdown.
+- Własna ikonka jest wklejana bezpośrednio w komórkę; puste pole oznacza brak ikony i pozwala na fallback heurystyczny.
+Uzasadnienie:
+- To najprostszy i najbardziej stabilny sposób na wsparcie „własnej ikonki” per odpowiedź bez dodatkowych klików i bez blokad UX komponentu `SelectboxColumn`.
+
+### D-264: Antyduplikat działa także dla szybkiego `📥 Wstaw z zapisanych`
+Decyzja:
+- Szybkie wstawianie pytania z zapisanych (`quick insert`) używa tej samej walidacji duplikatu i potwierdzenia `Tak/Nie` co panel predefiniowanych.
+- Duplikat wykrywamy po rdzeniu kodowania (`M_X`), nie tylko po identycznym pełnym kodzie.
+Uzasadnienie:
+- Eliminuje scenariusz przypadkowego dokładania `M_X_2` bez ostrzeżenia, który był zgłaszany jako źródło bałaganu.
+
+### D-265: Globalna propagacja predefiniowanego pytania aktualizuje też warianty `_N`
+Decyzja:
+- Przy `Predefiniowane metryczki -> Zapisz zmiany` aktualizacja jest wykonywana dla pytań o tym samym rdzeniu kodu (`M_POGLADY`, `M_POGLADY_2`, ...), a nie tylko dla idealnie równego `db_column`.
+Uzasadnienie:
+- W realnych ankietach pojawiały się duplikaty z sufiksem numerycznym; bez tej reguły globalna zmiana mogła nie dojść do faktycznie używanego pytania.
+
+### D-266: Import/eksport odpowiedzi ma fallback na historyczne kolumny `M_*`
+Decyzja:
+- `response_rows_to_dataframe(...)` i `make_payload_from_row(...)` uwzględniają dodatkowe kolumny `M_*` znalezione w payloadach, nawet gdy nie są obecne w bieżącym `metryczka_config`.
+Uzasadnienie:
+- Zapewnia spójność podglądu i eksportu przy starszych rekordach oraz podczas migracji dynamicznej metryczki.
+
+### D-267: Po wysyłce wiadomości czyścimy pole `Odbiorcy` i robimy rerun z flash-komunikatem
+Decyzja:
+- W modułach wysyłki personalnej i JST po wykonaniu akcji `Wyślij`:
+  - pole `Odbiorcy` jest zerowane,
+  - wynik wysyłki pokazywany jest jako flash po rerunie.
+Uzasadnienie:
+- Ogranicza ryzyko przypadkowej ponownej wysyłki (koszt/spam) i czyści jednoznacznie stan formularza po wykonanej akcji.
+
+### D-268: Ikona kategorii `miasto` jest standaryzowana do `🏬`
+Decyzja:
+- W pickerze i heurystykach metryczki/raportów kategoria `miasto` używa ikony `🏬`.
+Uzasadnienie:
+- Ujednolicenie ikonografii z aktualnym wymaganiem użytkownika i pełna spójność między edytorem, ankietą i raportami.
+
+### D-269: Wyjście `Cofnij` z niezapisanymi zmianami wymaga jawnej decyzji użytkownika
+Decyzja:
+- Dla widoków `Metryczka` i `Ustawienia ankiety` (JST + personal) przy aktywnych zmianach `Cofnij` nie przełącza od razu widoku.
+- Pokazujemy trzy akcje:
+  - `Tak (bez zapisu)` -> opuszcza widok i odrzuca zmiany,
+  - `Nie (zapisz i opuść)` -> zapisuje bieżący stan i dopiero wychodzi,
+  - `Anuluj` -> pozostaje w widoku bez zmiany stanu.
+Uzasadnienie:
+- Minimalizuje ryzyko utraty pracy i jednocześnie eliminuje przypadkowe wyjścia bez świadomej decyzji użytkownika.
+
+### D-270: Żeńskie etykiety archetypów są nakładane już na etapie renderu raportu (HTML + PNG), nie tylko przez post-process
+Decyzja:
+- W krytycznych sekcjach raportu (`Segmenty`, `Skupienia`, `Matryca segmentów`, `Mapa przewag`) etykiety archetypów są renderowane z `_display_archetype_label(...)` / `_display_archetype_labels(...)`.
+- Nie polegamy wyłącznie na późniejszej podmianie tekstu regexem po wygenerowaniu HTML.
+Uzasadnienie:
+- Część artefaktów (szczególnie grafiki PNG) nie podlega wiarygodnej podmianie post-process, co powodowało mieszanie form męskich i żeńskich w jednym raporcie.

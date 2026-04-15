@@ -113,7 +113,7 @@ def guess_metry_value_emoji(variable_label: Any, code: Any, db_column: Any = "")
             return "😟"
     if any(k in var_token for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
         if "miasto" in code_token:
-            return "🏙️"
+            return "🏬"
         if "wies" in code_token:
             return "🌾"
         return "📍"

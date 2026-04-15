@@ -5050,7 +5050,7 @@ def plot_segment_quadrant_map_fixed(segs: List[Dict[str, Any]],
 
         return _finalize_outline_polygon(best_poly)
     def _draw(mode: str, fname: str) -> None:
-        labels = list(ARCHETYPES) if mode == "arche" else [str(brand_values.get(a, a)) for a in ARCHETYPES]
+        labels = _display_archetype_labels(ARCHETYPES) if mode == "arche" else [str(brand_values.get(a, a)) for a in ARCHETYPES]
 
         map_scale = 0.80
 
@@ -5296,7 +5296,15 @@ def plot_segment_quadrant_map_fixed(segs: List[Dict[str, Any]],
                     (-0.018 * xr, 0.004 * yr, "right", "center"),
                     (-0.020 * xr, 0.010 * yr, "right", "bottom"),
                 ],
+                "Twórczyni": [
+                    (-0.018 * xr, 0.004 * yr, "right", "center"),
+                    (-0.020 * xr, 0.010 * yr, "right", "bottom"),
+                ],
                 "Odkrywca": [
+                    (0.012 * xr, 0.016 * yr, "left", "bottom"),
+                    (0.016 * xr, 0.012 * yr, "left", "bottom"),
+                ],
+                "Odkrywczyni": [
                     (0.012 * xr, 0.016 * yr, "left", "bottom"),
                     (0.016 * xr, 0.012 * yr, "left", "bottom"),
                 ],
@@ -5629,6 +5637,8 @@ def make_segment_profile(top_archs: List[str], bottom_archs: List[str]) -> Tuple
 
     t1, t2, t3 = top[0], top[1], top[2]
     b1, b2 = bottom[0], bottom[1]
+    dt1, dt2, dt3 = _display_archetype_label(t1), _display_archetype_label(t2), _display_archetype_label(t3)
+    db1, db2 = _display_archetype_label(b1), _display_archetype_label(b2)
 
     def _need(a: str) -> str:
         return str(SEG_DESCRIPT.get(a, ("czytelny kierunek", "prostą komunikację", "chaos"))[0])
@@ -5640,9 +5650,9 @@ def make_segment_profile(top_archs: List[str], bottom_archs: List[str]) -> Tuple
         return str(SEG_DESCRIPT.get(a, ("czytelny kierunek", "prostą komunikację", "chaos"))[2])
 
     desc = [
-        f"Rdzeń segmentu tworzą: {t1} i {t2}. To one najmocniej porządkują oczekiwania tej grupy.",
+        f"Rdzeń segmentu tworzą: {dt1} i {dt2}. To one najmocniej porządkują oczekiwania tej grupy.",
         f"Najsilniej działa na nich obietnica związana z: {_need(t1)} oraz {_need(t2)}.",
-        f"Trzeci akcent ({t3}) wzmacnia wrażliwość segmentu i dopowiada, czego ta grupa szuka w mieście oraz władzy.",
+        f"Trzeci akcent ({dt3}) wzmacnia wrażliwość segmentu i dopowiada, czego ta grupa szuka w mieście oraz władzy.",
     ]
 
     msg = [
@@ -5654,7 +5664,7 @@ def make_segment_profile(top_archs: List[str], bottom_archs: List[str]) -> Tuple
     risks = [
         f"Pierwsze ryzyko oporu: {_risk(t1)}.",
         f"Drugie ryzyko oporu: {_risk(t2)}.",
-        f"Silnie zniechęca też deficyt po stronie {b1} / {b2}: {_risk(b1)}; {_risk(b2)}.",
+        f"Silnie zniechęca też deficyt po stronie {db1} / {db2}: {_risk(b1)}; {_risk(b2)}.",
     ]
 
     return desc, msg, risks
@@ -9516,7 +9526,9 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         mat = pd.DataFrame(rows)[col_order]
 
         mat_arche = mat.copy()
-        mat_arche["archetyp"] = mat_arche["archetyp"].astype(str).apply(lambda a: _icon_cell(a, a))
+        mat_arche["archetyp"] = mat_arche["archetyp"].astype(str).apply(
+            lambda a: _icon_cell(a, _display_archetype_label(a))
+        )
         html_arche = mat_arche.to_html(index=False, border=0, classes="tbl dotmat", escape=False)
 
         mat_val = mat.copy()
@@ -9624,7 +9636,9 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
 
         # wersja archetypy
         mat_arche = mat.copy()
-        mat_arche["archetyp"] = mat_arche["archetyp"].astype(str).apply(lambda a: _icon_cell(a, a))
+        mat_arche["archetyp"] = mat_arche["archetyp"].astype(str).apply(
+            lambda a: _icon_cell(a, _display_archetype_label(a))
+        )
 
         # podświetlenie #1/#2/#3 realizujemy klasami na <td> (CSS), ale tu dodajemy znacznik ranku:
         def _wrap_rank_cell(v: Any) -> Any:
@@ -13266,8 +13280,8 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
 
         # Nazwa segmentu ma być stała (jak w trybie archetypów), niezależnie od radio-buttona.
         title_txt = name_arche
-        top3 = top3_values if mode_values else top3_arche
-        bottom = bottom_values if mode_values else bottom_arche
+        top3 = top3_values if mode_values else [_display_archetype_label(x) for x in top3_arche]
+        bottom = bottom_values if mode_values else [_display_archetype_label(x) for x in bottom_arche]
 
         title_html = html.escape(str(title_txt))
 
@@ -13566,7 +13580,7 @@ def _render_segment_smart_group_matrix_html(
     body_rows: List[str] = []
 
     for a_idx, arch in enumerate(ARCHETYPES):
-        row_label = brand_values.get(arch, arch) if mode_values else arch
+        row_label = brand_values.get(arch, arch) if mode_values else _display_archetype_label(arch)
 
         row_cells: List[str] = [
             "<tr>",
@@ -13753,7 +13767,7 @@ def _render_segment_matrix_html(segs: List[Dict[str, Any]],
 
     body_rows: List[str] = []
     for a_idx, arch in enumerate(ARCHETYPES):
-        row_label = brand_values.get(arch, arch) if mode_values else arch
+        row_label = brand_values.get(arch, arch) if mode_values else _display_archetype_label(arch)
 
         row_cells = [
             "<tr>",

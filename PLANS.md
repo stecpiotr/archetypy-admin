@@ -3161,3 +3161,64 @@ Wynik:
   - dolna legenda TOP2/TOP3 ma większe odstępy i czytelniejszy układ.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).
+
+### Hotfix H-117 [DONE]
+Temat: Metryczka i wysyłka — custom ikony odpowiedzi, antyduplikaty, propagacja root `M_*`, czyszczenie odbiorców i fallback import/eksport.
+Kryteria ukończenia:
+1. W odpowiedziach metryczki można wpisać/wkleić własną ikonę (nie tylko wybór z listy).
+2. `📥 Wstaw z zapisanych` respektuje kontrolę duplikatów jak panel predefiniowanych (`Tak/Nie`).
+3. Globalna propagacja z predefiniowanych aktualizuje też pytania o kodach pochodnych (`M_X` oraz `M_X_2`, `M_X_3`).
+4. Po wysyłce SMS/e-mail pole `Odbiorcy` czyści się automatycznie (personal + JST).
+5. `Import/eksport` nie gubi custom kolumn metryczki `M_*` przy starszych payloadach.
+Pierwszy krok wykonawczy:
+- poprawić `app.py` (edytor metryczki + quick insert + propagacja), następnie `send_link*.py` i fallback warstwy danych (`db_jst_utils.py`).
+Wynik:
+- `archetypy-admin/app.py`:
+  - `Ikona` w tabeli odpowiedzi (metryczka + predefiniowane) działa jako pole tekstowe emoji (obsługa własnych ikonek),
+  - dodano kontrolę duplikatów również dla szybkiego `📥 Wstaw z zapisanych` z potwierdzeniem `Tak/Nie`,
+  - propagacja predefiniowanego pytania działa po rdzeniu kodowania (`M_KOD` + sufiksy numeryczne, np. `M_KOD_2`),
+  - stabilizacja live-edytora: obsługa `edited_cells` i twardsza normalizacja kolumny `Przesuń` do `bool`,
+  - `jst_io_view` pobiera świeżą konfigurację metryczki badania przed importem/eksportem.
+- `archetypy-admin/db_jst_utils.py`:
+  - eksport DataFrame i payload importu uwzględniają dodatkowe kolumny `M_*` wykryte w historycznych payloadach (fallback).
+- `archetypy-admin/metryczka_config.py` + fallbacki raportowe:
+  - ikona `miasto` ustawiona na `🏬` (spójnie w heurystykach i pickerze).
+- `archetypy-admin/send_link.py`, `archetypy-admin/send_link_jst.py`:
+  - po wysyłce pole `Odbiorcy` jest czyszczone,
+  - dodano flash-komunikat po rerunie.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py send_link.py send_link_jst.py` (OK).
+
+### Hotfix H-118 [DONE]
+Temat: Domknięcie „Cofnij bez zapisu” + pełna żeńska forma archetypów w segmentach/klastrach/mapie.
+Kryteria ukończenia:
+1. W `Metryczka` (JST + personal) przy `← Powrót` pojawia się potwierdzenie dla niezapisanych zmian:
+   - `Tak (bez zapisu)`,
+   - `Nie (zapisz i opuść)`,
+   - `Anuluj`.
+2. Taki sam mechanizm działa w `⚙️ Ustawienia ankiety` (JST + personal).
+3. W raporcie żeńskim nazwy archetypów są spójnie żeńskie w:
+   - opisach segmentów (`Co ten segment ceni`, `Dominujące motywy`, `Deficyty`),
+   - tabelach `Matryca segmentów` i `Segmenty - przewagi naprawdę istotne`,
+   - sekcjach `Skupienia (k-średnich)` i mapach przewag.
+Pierwszy krok wykonawczy:
+- dodać wspólny guard wyjścia z widoku w `app.py`, następnie podpiąć żeńskie etykiety w krytycznych rendererach HTML/PNG w `analyze_poznan_archetypes.py`.
+Wynik:
+- `archetypy-admin/app.py`:
+  - dodano `guarded_back_button(...)` z 3 akcjami (`Tak/Nie/Anuluj`),
+  - podpięto guard dla:
+    - `jst_metryczka_view`,
+    - `personal_metryczka_view`,
+    - `jst_settings_view`,
+    - `personal_settings_view`,
+  - `Nie (zapisz i opuść)` zapisuje zmiany tym samym torem co główny przycisk `💾` i dopiero potem wychodzi.
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - opisy segmentów używają `_display_archetype_label(...)` dla nazw archetypów w tekście,
+  - `Matryca segmentów` i `Segmenty - przewagi naprawdę istotne` renderują żeńskie etykiety w trybie żeńskim,
+  - tabele TOP5 w sekcji skupień używają żeńskich etykiet archetypów,
+  - mapa przewag segmentów (`SEGMENTY_META_MAPA_STALA*`) renderuje żeńskie etykiety punktów archetypów.
+- Synchronizacja:
+  - skopiowano generator także do `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Smoke-check:
+  - `python -m py_compile app.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

@@ -2515,3 +2515,47 @@
   - pliki kodowe (`app.py`, `admin_dashboard.py`, `metryczka_config.py`, `db_jst_utils.py`, `assets/...`) nie są ignorowane.
 - Test techniczny:
   - `python -m py_compile app.py admin_dashboard.py metryczka_config.py db_jst_utils.py` (OK).
+
+### Zrobione w Hotfix H-117 (2026-04-15, metryczka/wysyłka/import)
+- `archetypy-admin/app.py`:
+  - `Ikona` odpowiedzi w metryczce i predefiniowanych pytaniach jest edytowana jako pole tekstowe emoji (działa wklejanie własnej ikonki),
+  - szybkie `📥 Wstaw z zapisanych` dostało ten sam mechanizm antyduplikatu co panel predefiniowanych (`Masz już to pytanie... Tak/Nie`),
+  - globalna propagacja predefiniowanych pytań działa po rdzeniu kodu (`M_X` + jego warianty `_2`, `_3`, ...),
+  - `_editor_live_df(...)` obsługuje dodatkowo `edited_cells` i wymusza bool dla `Przesuń`, co stabilizuje pierwszą edycję komórki,
+  - `jst_io_view` używa świeżego `metryczka_config` z DB przy imporcie i eksporcie.
+- `archetypy-admin/db_jst_utils.py`:
+  - eksport/podgląd odpowiedzi oraz payload importu mają fallback dla dodatkowych kolumn `M_*` wykrytych w historycznych payloadach (nawet gdy konfiguracja metryczki była niepełna/starsza).
+- `archetypy-admin/metryczka_config.py`, `app.py`, `admin_dashboard.py`:
+  - ikonka `miasto` ustawiona na `🏬` (spójnie w pickerze i heurystykach renderu).
+- `archetypy-admin/send_link.py` + `send_link_jst.py`:
+  - po wysyłce SMS/e-mail pole `Odbiorcy` jest czyszczone,
+  - wysyłka pokazuje flash-komunikat po rerunie.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py send_link.py send_link_jst.py` (OK).
+
+### Zrobione w Hotfix H-118 (2026-04-15, domknięcie „Cofnij” + żeńskie etykiety raportu)
+- `archetypy-admin/app.py`:
+  - dodano wspólny guard na wyjście z widoku: `guarded_back_button(...)`,
+  - wdrożono potwierdzenie wyjścia z trzema akcjami:
+    - `Tak (bez zapisu)`,
+    - `Nie (zapisz i opuść)`,
+    - `Anuluj`,
+  - mechanizm działa w:
+    - `jst_metryczka_view`,
+    - `personal_metryczka_view`,
+    - `jst_settings_view`,
+    - `personal_settings_view`,
+  - opcja `Nie (zapisz i opuść)` korzysta z tej samej logiki zapisu co główny przycisk `💾`.
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - opisy segmentów (`Co ten segment ceni`, `Na co uważać`) używają wyświetlanych nazw archetypów zgodnie z trybem żeńskim,
+  - `Matryca segmentów` i `Segmenty - przewagi naprawdę istotne` renderują żeńskie etykiety archetypów,
+  - sekcja `Skupienia (k-średnich)` (tabele TOP5) renderuje żeńskie etykiety archetypów,
+  - mapa przewag segmentów (`SEGMENTY_META_MAPA_STALA*`) renderuje żeńskie etykiety punktów archetypów.
+- Synchronizacja:
+  - zaktualizowano także kopię generatora: `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Test techniczny:
+  - `python -m py_compile app.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### RYZYKO / do domknięcia
+- Brak otwartych ryzyk krytycznych po H-118; do potwierdzenia pozostaje test manualny UX i raportu na deployu.

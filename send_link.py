@@ -711,6 +711,11 @@ def render(back_btn: Callable[[], None]) -> None:
     )
     study = options[label]
 
+    flash_key = "sendlink_flash_message"
+    flash_msg = st.session_state.pop(flash_key, None)
+    if flash_msg:
+        st.success(str(flash_msg))
+
 
     # ── Metoda i odbiorcy ─────────────────────────────────────────────────────
     st.markdown(
@@ -723,7 +728,14 @@ def render(back_btn: Callable[[], None]) -> None:
 
     st.markdown('<div class="field-label">Odbiorcy</div>', unsafe_allow_html=True)
     placeholder = "48500123456, 48600111222" if method == "SMS" else "jan@firma.pl, ola@urzad.gov.pl"
-    recipients = st.text_area("Odbiorcy", placeholder=placeholder, height=100, label_visibility="collapsed")
+    recipients_key = "sendlink_recipients"
+    recipients = st.text_area(
+        "Odbiorcy",
+        key=recipients_key,
+        placeholder=placeholder,
+        height=100,
+        label_visibility="collapsed",
+    )
 
 
     # ── Treść (podgląd) ───────────────────────────────────────────────────────
@@ -1124,7 +1136,9 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano do {ph}: {err or 'unknown error'}")
-            st.success(f"Wysłano {sent_ok} / {len(phones)}.")
+            st.session_state[recipients_key] = ""
+            st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(phones)}."
+            st.rerun()
 
         else:  # E-MAIL
             try:
@@ -1194,7 +1208,9 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano do {em}: {err or 'unknown error'}")
-            st.success(f"Wysłano {sent_ok} / {len(emails)}.")
+            st.session_state[recipients_key] = ""
+            st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(emails)}."
+            st.rerun()
 
     # ── Statusy w tej samej sekcji ────────────────────────────────────────────
     st.markdown('<hr class="hr-thin status-top-tight">', unsafe_allow_html=True)

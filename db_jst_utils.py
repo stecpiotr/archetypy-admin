@@ -69,14 +69,25 @@ M_MATERIAL_VALUES = [
     "bardzo dobra",
     "odmowa",
 ]
+_CUSTOM_METRY_COL_RE = re.compile(r"^M_[A-Z0-9_]{2,40}$")
 
 
 def response_columns(metryczka_config: Any = None) -> List[str]:
-    cols: List[str] = list(CANONICAL_COLUMNS)
+    core_prefix: List[str] = [
+        "respondent_id",
+        "M_PLEC",
+        "M_WIEK",
+        "M_WYKSZT",
+        "M_ZAWOD",
+        "M_MATERIAL",
+    ]
+    tail_cols: List[str] = [c for c in CANONICAL_COLUMNS if c not in core_prefix]
+    cols: List[str] = list(core_prefix)
     for col in metryczka_custom_columns(metryczka_config):
         txt = str(col or "").strip().upper()
         if txt and txt not in cols:
             cols.append(txt)
+    cols.extend([c for c in tail_cols if c not in cols])
     return cols
 
 
@@ -1837,8 +1848,26 @@ def normalize_response_row(raw: Dict[str, Any], respondent_id_fallback: str = ""
 
 def response_rows_to_dataframe(rows: Iterable[Dict[str, Any]], metryczka_config: Any = None) -> pd.DataFrame:
     cols = response_columns(metryczka_config)
+    extra_cols: List[str] = []
+    rows_list = list(rows or [])
+    for rec in rows_list:
+        payload = rec.get("payload") if isinstance(rec, dict) else {}
+        if not isinstance(payload, dict):
+            continue
+        for key in payload.keys():
+            key_up = str(key or "").strip().upper()
+            if (
+                key_up
+                and key_up not in cols
+                and _CUSTOM_METRY_COL_RE.fullmatch(key_up)
+            ):
+                extra_cols.append(key_up)
+    cols_all: List[str] = list(cols)
+    for col in extra_cols:
+        if col not in cols_all:
+            cols_all.append(col)
     out_rows: List[Dict[str, Any]] = []
-    for idx, rec in enumerate(rows, start=1):
+    for idx, rec in enumerate(rows_list, start=1):
         payload = rec.get("payload") or {}
         if not isinstance(payload, dict):
             payload = {}
@@ -1847,16 +1876,35 @@ def response_rows_to_dataframe(rows: Iterable[Dict[str, Any]], metryczka_config:
         norm = normalize_response_row(merged, respondent_id_fallback=f"R{idx:04d}", metryczka_config=metryczka_config)
         if not norm.get("respondent_id"):
             norm["respondent_id"] = f"R{idx:04d}"
+        if extra_cols:
+            norm_key_map: Dict[str, Any] = {}
+            for k, v in merged.items():
+                nk = _norm(k)
+                if nk and nk not in norm_key_map:
+                    norm_key_map[nk] = v
+            for col in extra_cols:
+                raw_val = merged.get(col, norm_key_map.get(_norm(col)))
+                norm[col] = str(raw_val or "").strip()
         out_rows.append(norm)
 
     df = pd.DataFrame(out_rows)
-    for c in cols:
+    for c in cols_all:
         if c not in df.columns:
             df[c] = ""
-    return df[cols].copy()
+    return df[cols_all].copy()
 
 
 def make_payload_from_row(row: Dict[str, Any], metryczka_config: Any = None) -> Dict[str, Any]:
     cols = response_columns(metryczka_config)
-    payload = {k: row.get(k, "") for k in cols if k != "respondent_id"}
+    all_cols: List[str] = list(cols)
+    for key in list((row or {}).keys()):
+        key_up = str(key or "").strip().upper()
+        if (
+            key_up
+            and key_up not in all_cols
+            and key_up not in CANONICAL_COLUMNS
+            and _CUSTOM_METRY_COL_RE.fullmatch(key_up)
+        ):
+            all_cols.append(key_up)
+    payload = {k: row.get(k, "") for k in all_cols if k != "respondent_id"}
     return payload

@@ -13,6 +13,7 @@ import json
 import inspect
 import base64
 import subprocess
+import uuid
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse, quote
@@ -1998,6 +1999,66 @@ def back_button(dest: str = "home_personal", label: str = "← Cofnij") -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def guarded_back_button(
+    *,
+    dest: str,
+    label: str,
+    dirty: bool,
+    key_prefix: str,
+    on_save_and_leave: Optional[Callable[[], bool]] = None,
+) -> None:
+    confirm_key = f"{key_prefix}_leave_confirm"
+    back_key = f"{key_prefix}_leave_back"
+
+    st.markdown('<div class="top-back-wrap">', unsafe_allow_html=True)
+    if st.button(label, type="secondary", key=back_key):
+        if bool(dirty):
+            st.session_state[confirm_key] = True
+            st.rerun()
+        goto(dest)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if not bool(st.session_state.get(confirm_key)):
+        return
+
+    st.warning("Wykryto niezapisane zmiany. Opuścić ten widok bez zapisywania?")
+    c1, c2, c3 = st.columns([0.33, 0.33, 0.24], gap="small")
+    with c1:
+        if st.button(
+            "Tak (bez zapisu)",
+            key=f"{key_prefix}_leave_yes",
+            use_container_width=True,
+        ):
+            st.session_state.pop(confirm_key, None)
+            goto(dest)
+    with c2:
+        if st.button(
+            "Nie (zapisz i opuść)",
+            key=f"{key_prefix}_leave_save",
+            type="primary",
+            use_container_width=True,
+            disabled=(on_save_and_leave is None),
+        ):
+            if on_save_and_leave is not None:
+                ok = False
+                try:
+                    ok = bool(on_save_and_leave())
+                except Exception as exc:
+                    st.error(f"Nie udało się zapisać zmian: {exc}")
+                if ok:
+                    st.session_state.pop(confirm_key, None)
+                    goto(dest)
+    with c3:
+        if st.button(
+            "Anuluj",
+            key=f"{key_prefix}_leave_cancel",
+            type="secondary",
+            use_container_width=True,
+        ):
+            st.session_state.pop(confirm_key, None)
+            st.rerun()
+
+
 def _set_view_scope(view_name: str) -> None:
     safe = re.sub(r"[^a-z0-9_-]", "", str(view_name or "").lower())
     if not safe:
@@ -2569,7 +2630,7 @@ _METRY_ICON_LIBRARY: List[Tuple[str, str]] = [
     ("😟", "bardzo zła"),
     ("🤐", "odmowa"),
     ("📍", "miejsce / obszar"),
-    ("🏙️", "miasto"),
+    ("🏬", "miasto"),
     ("🌾", "wieś"),
     ("🗳️", "preferencje polityczne"),
     ("➡️", "prawicowe"),
@@ -2591,6 +2652,31 @@ _METRY_ICON_VALUE_TO_LABEL: Dict[str, str] = {
     icon: (f"{icon} {name}".strip() if icon else name) for icon, name in _METRY_ICON_LIBRARY
 }
 _METRY_ICON_PICK_VALUES: List[str] = [icon for icon, _ in _METRY_ICON_LIBRARY]
+
+
+def _metry_code_root(value: Any) -> str:
+    code = str(value or "").strip().upper()
+    if not code:
+        return ""
+    return re.sub(r"_\d+$", "", code)
+
+
+def _metry_question_duplicate_info(questions: List[Dict[str, Any]], desired_code: Any) -> Tuple[bool, str]:
+    desired = str(desired_code or "").strip().upper()
+    desired_root = _metry_code_root(desired)
+    if not desired:
+        return False, ""
+    for q in list(questions or []):
+        if not isinstance(q, dict):
+            continue
+        q_code = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not q_code:
+            continue
+        if q_code == desired:
+            return True, q_code
+        if desired_root and _metry_code_root(q_code) == desired_root:
+            return True, q_code
+    return False, ""
 
 
 def _metry_icon_picker(
@@ -2672,6 +2758,7 @@ def _metryczka_anchor_id(kind: str, study_key: str, ui_key: str) -> str:
 
 def _option_value_emoji_or_guess(opt: Dict[str, Any], *, table_label: str, code: str, db_column: str) -> str:
     if isinstance(opt, dict) and "value_emoji" in opt:
+        # Jawnie pusta ikonka jest poprawnym stanem (nie nadpisujemy fallbackiem).
         return str(opt.get("value_emoji") or "").strip()
     return str(guess_metry_value_emoji(table_label, code, db_column) or "").strip()
 
@@ -2729,8 +2816,13 @@ def _metryczka_editor_df_clean(df: Any) -> pd.DataFrame:
     for col in cols:
         if col not in out.columns:
             out[col] = "" if col not in {"Otwarta", "Blokuj losowanie"} else False
+    def _txt_clean(v: Any) -> str:
+        if pd.isna(v):
+            return ""
+        txt = str(v or "").strip()
+        return "" if txt.lower() in {"none", "nan", "null"} else txt
     for txt_col in ("Odpowiedź", "Kodowanie", "Ikona"):
-        out[txt_col] = out[txt_col].map(lambda v: "" if pd.isna(v) else str(v))
+        out[txt_col] = out[txt_col].map(_txt_clean)
     for bool_col in ("Otwarta", "Blokuj losowanie"):
         out[bool_col] = out[bool_col].map(lambda v: _bool_from_any(v, False)).astype(bool)
     def _is_blank_row(row: pd.Series) -> bool:
@@ -2877,6 +2969,47 @@ def _editor_live_df(returned_df: Any, widget_state: Any) -> pd.DataFrame:
                     if col not in work.columns:
                         work[col] = None
                     work.at[idx, col] = val
+        edited_cells = widget_state.get("edited_cells") if isinstance(widget_state.get("edited_cells"), dict) else {}
+        for raw_key, payload in edited_cells.items():
+            idx: Optional[int] = None
+            col_name: str = ""
+            if isinstance(raw_key, (tuple, list)) and len(raw_key) >= 2:
+                try:
+                    idx = int(raw_key[0])
+                except Exception:
+                    idx = None
+                col_name = str(raw_key[1] or "")
+            elif isinstance(raw_key, str):
+                m = re.match(r"^\s*(\d+)\s*[:|,]\s*(.+?)\s*$", raw_key)
+                if m:
+                    try:
+                        idx = int(m.group(1))
+                    except Exception:
+                        idx = None
+                    col_name = str(m.group(2) or "")
+            if idx is None or idx < 0:
+                continue
+            if isinstance(payload, dict):
+                for col, val in payload.items():
+                    col_now = str(col or "").strip() or col_name
+                    if not col_now:
+                        continue
+                    while idx >= len(work.index):
+                        work = pd.concat([work, pd.DataFrame([default_row])], ignore_index=True)
+                    if col_now not in work.columns:
+                        work[col_now] = None
+                    work.at[idx, col_now] = val
+            else:
+                col_now = str(col_name or "").strip()
+                if not col_now:
+                    continue
+                while idx >= len(work.index):
+                    work = pd.concat([work, pd.DataFrame([default_row])], ignore_index=True)
+                if col_now not in work.columns:
+                    work[col_now] = None
+                work.at[idx, col_now] = payload
+        if "Przesuń" in work.columns:
+            work["Przesuń"] = work["Przesuń"].map(lambda v: _bool_from_any(v, False)).astype(bool)
         return work
     if isinstance(returned_df, pd.DataFrame):
         return returned_df
@@ -3270,13 +3403,15 @@ def _apply_template_question_to_config(
     target_code = str(template_question.get("db_column") or template_question.get("id") or "").strip().upper()
     if not target_code:
         return cfg, 0
+    target_root = _metry_code_root(target_code)
     changed = 0
     new_questions: List[Dict[str, Any]] = []
     for q in list(cfg.get("questions") or []):
         if not isinstance(q, dict):
             continue
         q_code = str(q.get("db_column") or q.get("id") or "").strip().upper()
-        if q_code != target_code:
+        q_root = _metry_code_root(q_code)
+        if q_code != target_code and (not target_root or q_root != target_root):
             new_questions.append(q)
             continue
         merged = _metryczka_merge_question_from_template(
@@ -3616,10 +3751,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             default=False,
                             width="small",
                         ),
-                        "Ikona": st.column_config.SelectboxColumn(
+                        "Ikona": st.column_config.TextColumn(
                             "Ikona",
-                            help="Wybierz ikonę z listy lub zostaw puste (auto-ikonka).",
-                            options=tpl_icon_options,
+                            help="Wpisz lub wklej emoji. Puste pole = auto-ikonka.",
+                            max_chars=8,
                             width="small",
                         ),
                     },
@@ -3651,6 +3786,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                                 st.session_state[move_key] = idx_move + 1
                                 st.rerun()
                     st.caption("Dodawanie/usuwanie odpowiedzi: bezpośrednio w tabeli. Przesuwanie: zaznacz checkbox „Przesuń”.")
+                    st.caption("Kolumna „Ikona”: możesz wpisać/wkleić dowolne emoji (np. 🏬, ⚖️, 🤷) albo zostawić puste.")
 
                 live_tpl_question = {
                     "id": str(st.session_state.get(edit_code_key) or "").strip().upper(),
@@ -3727,15 +3863,11 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         desired_code = str(
                             live_tpl_question.get("db_column") or live_tpl_question.get("id") or ""
                         ).strip().upper()
-                        existing_codes: set[str] = set()
-                        for q in q_list:
-                            if not isinstance(q, dict):
-                                continue
-                            existing_codes.add(str(q.get("db_column") or "").strip().upper())
-                            existing_codes.add(str(q.get("id") or "").strip().upper())
-                        if desired_code and desired_code in existing_codes:
+                        q_list_check = q_list + list((cfg_state or {}).get("questions") or [])
+                        has_dup, dup_code = _metry_question_duplicate_info(q_list_check, desired_code)
+                        if desired_code and has_dup:
                             st.session_state[tpl_insert_pending_key] = deepcopy(live_tpl_question)
-                            st.session_state[tpl_insert_conflict_code_key] = desired_code
+                            st.session_state[tpl_insert_conflict_code_key] = dup_code or desired_code
                             st.rerun()
                         st.session_state.pop(tpl_insert_pending_key, None)
                         st.session_state.pop(tpl_insert_conflict_code_key, None)
@@ -3908,10 +4040,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     default=False,
                     width="small",
                 ),
-                "Ikona": st.column_config.SelectboxColumn(
+                "Ikona": st.column_config.TextColumn(
                     "Ikona",
-                    help="Wybierz ikonę z listy lub zostaw puste (auto-ikonka).",
-                    options=options_icon_options,
+                    help="Wpisz lub wklej emoji. Puste pole = auto-ikonka.",
+                    max_chars=8,
                     width="small",
                 ),
             },
@@ -3946,6 +4078,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
                         st.rerun()
             st.caption("Dodawanie/usuwanie odpowiedzi: bezpośrednio w tabeli. Przesuwanie: zaznacz checkbox „Przesuń”.")
+            st.caption("Kolumna „Ikona”: możesz wpisać/wkleić dowolne emoji (np. 🏬, ⚖️, 🤷) albo zostawić puste.")
 
         options = _metryczka_options_from_df(st.session_state.get(options_df_state_key))
         # Bezpiecznik: jeśli edytor chwilowo zwróci pusty stan (np. niestabilny rerun),
@@ -4252,7 +4385,33 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             kind="both",
                         )
                         saved_name = str(saved_tpl.get("name") or tpl_name or code_for_template).strip()
-                        st.success(f"Zapisano pytanie w bibliotece: {saved_name}")
+                        saved_tpl_question = (
+                            saved_tpl.get("question")
+                            if isinstance(saved_tpl, dict) and isinstance(saved_tpl.get("question"), dict)
+                            else template_question
+                        )
+                        apply_kind = str(saved_tpl.get("kind") or "both").strip().lower()
+                        apply_stats = _propagate_template_question_globally(
+                            template_question=dict(saved_tpl_question or {}),
+                            kind_scope=apply_kind,
+                        )
+                        cfg_local_after, changed_local = _apply_template_question_to_config(
+                            kind=kind,
+                            config=st.session_state.get(state_key) or cfg_state,
+                            template_question=dict(saved_tpl_question or {}),
+                        )
+                        if changed_local > 0:
+                            st.session_state[state_key] = deepcopy(cfg_local_after)
+                            _bump_metryczka_editor_nonce(kind, study_key)
+                        st.success(
+                            f"Zapisano pytanie w bibliotece: {saved_name}. "
+                            f"Globalnie zaktualizowano: JST {int(apply_stats.get('jst_updated', 0))}, "
+                            f"personalne {int(apply_stats.get('personal_updated', 0))}."
+                        )
+                        if int(apply_stats.get("errors", 0)) > 0:
+                            st.warning(
+                                f"Nie udało się zaktualizować części badań: {int(apply_stats.get('errors', 0))}."
+                            )
                     except Exception as e:
                         st.error(f"Nie udało się zapisać pytania w bibliotece: {e}")
                 st.caption("Zapis lokalnych zmian w metryczce następuje dopiero po kliknięciu „💾 Zapisz metryczkę”.")
@@ -4352,6 +4511,17 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     if tpl_q:
                         working = deepcopy(st.session_state.get(state_key) or cfg_out)
                         q_list = list(working.get("questions") or [])
+                        desired_code = str(tpl_q.get("db_column") or tpl_q.get("id") or "").strip().upper()
+                        q_list_check = q_list + list((cfg_out or {}).get("questions") or [])
+                        has_dup, dup_code = _metry_question_duplicate_info(q_list_check, desired_code)
+                        quick_pending_key = f"{widget_prefix}quick_tpl_insert_pending"
+                        quick_conflict_key = f"{widget_prefix}quick_tpl_insert_conflict"
+                        if desired_code and has_dup:
+                            st.session_state[quick_pending_key] = deepcopy(tpl_q)
+                            st.session_state[quick_conflict_key] = dup_code or desired_code
+                            st.rerun()
+                        st.session_state.pop(quick_pending_key, None)
+                        st.session_state.pop(quick_conflict_key, None)
                         new_q = _question_from_template_payload(tpl_q, q_list)
                         q_list.append(new_q)
                         working["questions"] = q_list
@@ -4363,6 +4533,36 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         st.rerun()
         else:
             st.caption("Brak zapisanych pytań do szybkiego wstawienia.")
+
+    quick_pending_key = f"{widget_prefix}quick_tpl_insert_pending"
+    quick_conflict_key = f"{widget_prefix}quick_tpl_insert_conflict"
+    pending_quick_insert = st.session_state.get(quick_pending_key)
+    if isinstance(pending_quick_insert, dict):
+        conflict_code = str(st.session_state.get(quick_conflict_key) or "").strip().upper()
+        st.warning("Masz już to pytanie w metryczce. Czy chcesz na pewno je wstawić?")
+        if conflict_code:
+            st.caption(f"Wykryte kodowanie: {conflict_code}")
+        q1, q2 = st.columns([0.14, 0.14], gap="small")
+        with q1:
+            if st.button("Tak", key=f"{widget_prefix}quick_tpl_insert_yes", type="primary", use_container_width=True):
+                working = deepcopy(st.session_state.get(state_key) or cfg_out)
+                q_list = list(working.get("questions") or [])
+                new_q = _question_from_template_payload(pending_quick_insert, q_list)
+                q_list.append(new_q)
+                working["questions"] = q_list
+                st.session_state[state_key] = working
+                st.session_state.pop(quick_pending_key, None)
+                st.session_state.pop(quick_conflict_key, None)
+                st.session_state[scroll_target_key] = _metryczka_anchor_id(
+                    kind, study_key, str(new_q.get("_ui_key") or "")
+                )
+                st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
+                st.rerun()
+        with q2:
+            if st.button("Nie", key=f"{widget_prefix}quick_tpl_insert_no", type="secondary", use_container_width=True):
+                st.session_state.pop(quick_pending_key, None)
+                st.session_state.pop(quick_conflict_key, None)
+                st.rerun()
 
     q_list_live = list((st.session_state.get(state_key) or cfg_out).get("questions") or [])
     custom_positions = [
@@ -4564,7 +4764,6 @@ def jst_metryczka_view() -> None:
         return
     header("🧾 Metryczka ankiety")
     render_titlebar(["Panel", "Badania mieszkańców", "Metryczka"])
-    back_button("home_jst", "← Powrót do panelu mieszkańców")
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
 
     studies = fetch_jst_studies(sb)
@@ -4594,6 +4793,52 @@ def jst_metryczka_view() -> None:
     sid = str(study.get("id") or "").strip()
     study_row = fetch_jst_study_by_id(sb, sid) or study
     study_row = _apply_scheduled_survey_transitions(study_row, kind="jst")
+    base_cfg = normalize_jst_metryczka_config(study_row.get("metryczka_config"))
+    editor_state_key = _metryczka_editor_state_key("jst", sid)
+
+    def _current_cfg() -> Dict[str, Any]:
+        return _metryczka_normalize_config(
+            "jst",
+            st.session_state.get(editor_state_key) or base_cfg,
+        )
+
+    def _save_jst_metryczka(
+        cfg_candidate: Optional[Dict[str, Any]] = None,
+        *,
+        rerun_after: bool = False,
+    ) -> bool:
+        cfg_work = _metryczka_normalize_config("jst", cfg_candidate or _current_cfg())
+        valid, msg = _validate_metryczka_before_save(cfg_work)
+        if not valid:
+            st.error(msg)
+            return False
+        cfg_norm = normalize_jst_metryczka_config(cfg_work)
+        try:
+            update_jst_study(
+                sb,
+                sid,
+                {
+                    "metryczka_config": cfg_norm,
+                    "metryczka_config_version": int(cfg_norm.get("version") or 1),
+                },
+            )
+            st.session_state[editor_state_key] = deepcopy(cfg_norm)
+            st.success("Zapisano konfigurację metryczki.")
+            if rerun_after:
+                st.rerun()
+            return True
+        except Exception as exc:
+            st.error(f"Nie udało się zapisać metryczki: {exc}")
+            return False
+
+    is_dirty = (_stable_json_repr(_current_cfg()) != _stable_json_repr(base_cfg))
+    guarded_back_button(
+        dest="home_jst",
+        label="← Powrót do panelu mieszkańców",
+        dirty=is_dirty,
+        key_prefix=f"jst_metryczka_{sid}",
+        on_save_and_leave=lambda: _save_jst_metryczka(rerun_after=False),
+    )
     status_meta = _study_status_meta(study_row, kind="jst")
     slug = str(study_row.get("slug") or "").strip()
     survey_base = str(st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
@@ -4615,7 +4860,7 @@ def jst_metryczka_view() -> None:
     edited_cfg = _render_metryczka_editor(
         "jst",
         sid,
-        normalize_jst_metryczka_config(study_row.get("metryczka_config")),
+        base_cfg,
     )
 
     _, save_col = st.columns([0.66, 0.34], gap="small")
@@ -4627,25 +4872,7 @@ def jst_metryczka_view() -> None:
             use_container_width=True,
         )
     if save_clicked:
-        valid, msg = _validate_metryczka_before_save(edited_cfg)
-        if not valid:
-            st.error(msg)
-        else:
-            cfg_norm = normalize_jst_metryczka_config(edited_cfg)
-            try:
-                update_jst_study(
-                    sb,
-                    sid,
-                    {
-                        "metryczka_config": cfg_norm,
-                        "metryczka_config_version": int(cfg_norm.get("version") or 1),
-                    },
-                )
-                st.session_state[_metryczka_editor_state_key("jst", sid)] = deepcopy(cfg_norm)
-                st.success("Zapisano konfigurację metryczki.")
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Nie udało się zapisać metryczki: {exc}")
+        _save_jst_metryczka(edited_cfg, rerun_after=True)
 
 
 def jst_settings_view() -> None:
@@ -4654,7 +4881,6 @@ def jst_settings_view() -> None:
         return
     header("⚙️ Ustawienia ankiety")
     render_titlebar(["Panel", "Badania mieszkańców", "Ustawienia ankiety"])
-    back_button("home_jst", "← Powrót do panelu mieszkańców")
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
 
     studies = fetch_jst_studies(sb)
@@ -4789,26 +5015,63 @@ def jst_settings_view() -> None:
             label_visibility="collapsed",
         )
 
-    if st.button("💾 Zapisz parametry ankiety", type="primary", key=f"jst_settings_save_params_{sid}"):
+    def _date_txt(v: Any) -> str:
+        return str(v.isoformat() if hasattr(v, "isoformat") else (v or ""))
+
+    def _time_txt(v: Any) -> str:
+        if hasattr(v, "strftime"):
+            try:
+                return str(v.strftime("%H:%M:%S"))
+            except Exception:
+                pass
+        return str(v or "")
+
+    baseline_snapshot = {
+        "show_progress": bool(cfg.get("show_progress")),
+        "allow_back": bool(cfg.get("allow_back")),
+        "notify_on_response": bool(cfg.get("notify_on_response")),
+        "notify_email": str(cfg.get("notify_email") or "").strip().lower(),
+        "start_enabled": bool(cfg.get("auto_start_enabled")),
+        "start_date": _date_txt(start_def_date),
+        "start_time": _time_txt(start_def_time),
+        "end_enabled": bool(cfg.get("auto_end_enabled")),
+        "end_date": _date_txt(end_def_date),
+        "end_time": _time_txt(end_def_time),
+    }
+    current_snapshot = {
+        "show_progress": bool(show_progress),
+        "allow_back": bool(allow_back),
+        "notify_on_response": bool(notify_on_response),
+        "notify_email": str(notify_email or "").strip().lower(),
+        "start_enabled": bool(start_enabled),
+        "start_date": _date_txt(start_date),
+        "start_time": _time_txt(start_time),
+        "end_enabled": bool(end_enabled),
+        "end_date": _date_txt(end_date),
+        "end_time": _time_txt(end_time),
+    }
+    settings_dirty = (_stable_json_repr(current_snapshot) != _stable_json_repr(baseline_snapshot))
+
+    def _save_jst_settings(*, rerun_after: bool = False) -> bool:
         notify_email_clean = str(notify_email or "").strip().lower()
         notify_email_valid = _normalize_notify_email(notify_email_clean)
         if notify_on_response and not notify_email_valid:
             st.error("Podaj poprawny adres e-mail do powiadomień.")
-            return
+            return False
 
         start_iso = _local_date_time_to_utc_iso(start_date, start_time) if start_enabled else None
         end_iso = _local_date_time_to_utc_iso(end_date, end_time) if end_enabled else None
         if start_enabled and not start_iso:
             st.error("Nie udało się odczytać daty/godziny startu ankiety.")
-            return
+            return False
         if end_enabled and not end_iso:
             st.error("Nie udało się odczytać daty/godziny zakończenia ankiety.")
-            return
+            return False
         start_dt = _parse_utc_dt(start_iso)
         end_dt = _parse_utc_dt(end_iso)
         if start_enabled and end_enabled and start_dt and end_dt and start_dt >= end_dt:
             st.error("Data i godzina zakończenia muszą być późniejsze niż data i godzina startu.")
-            return
+            return False
 
         updates: Dict[str, Any] = {
             "survey_show_progress": bool(show_progress),
@@ -4848,9 +5111,23 @@ def jst_settings_view() -> None:
         try:
             update_jst_study(sb, sid, updates)
             st.session_state[save_flash_key] = "Zapisano parametry ankiety."
-            st.rerun()
+            if rerun_after:
+                st.rerun()
+            return True
         except Exception as exc:
             st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")
+            return False
+
+    guarded_back_button(
+        dest="home_jst",
+        label="← Powrót do panelu mieszkańców",
+        dirty=settings_dirty,
+        key_prefix=f"jst_settings_{sid}",
+        on_save_and_leave=lambda: _save_jst_settings(rerun_after=False),
+    )
+
+    if st.button("💾 Zapisz parametry ankiety", type="primary", key=f"jst_settings_save_params_{sid}"):
+        _save_jst_settings(rerun_after=True)
 
     def _do_suspend_jst() -> None:
         try:
@@ -4922,6 +5199,8 @@ def jst_io_view() -> None:
     chosen = st.selectbox("Wybierz badanie", list(options.keys()))
     study = options[chosen]
     study_id = str(study["id"])
+    study_fresh = fetch_jst_study_by_id(sb, study_id) or study
+    metry_cfg = (study_fresh or {}).get("metryczka_config")
 
     st.markdown("### Import odpowiedzi (CSV / XLSX)")
     uploaded = st.file_uploader("Wybierz plik", type=["csv", "xlsx"])
@@ -4959,7 +5238,7 @@ def jst_io_view() -> None:
                         norm = jst_normalize_response_row(
                             raw,
                             respondent_id_fallback=rid,
-                            metryczka_config=study.get("metryczka_config"),
+                            metryczka_config=metry_cfg,
                         )
                         if not norm.get("respondent_id"):
                             norm["respondent_id"] = rid
@@ -4971,7 +5250,7 @@ def jst_io_view() -> None:
                                 sb,
                                 study_id=study_id,
                                 respondent_id=str(norm["respondent_id"]),
-                                payload=jst_make_payload_from_row(norm, metryczka_config=study.get("metryczka_config")),
+                                payload=jst_make_payload_from_row(norm, metryczka_config=metry_cfg),
                                 source="import",
                                 skip_if_exists=True,
                             )
@@ -5000,7 +5279,7 @@ def jst_io_view() -> None:
     if not rows:
         st.info("Brak odpowiedzi do eksportu.")
         return
-    out_df = jst_response_rows_to_dataframe(rows, metryczka_config=study.get("metryczka_config"))
+    out_df = jst_response_rows_to_dataframe(rows, metryczka_config=metry_cfg)
     slug = str(study.get("slug") or "jst")
     safe_name = slugify(str(study.get("jst_full_nom") or slug)) or slug
 
@@ -6457,7 +6736,7 @@ def _matching_guess_value_emoji(var_label: str, code: str) -> str:
         return "❔"
     if any(k in nk_var for k in ("obszar", "miejsce", "zamiesz", "lokaliz", "wies", "miasto")):
         if "miasto" in nk:
-            return "🏙️"
+            return "🏬"
         if "wies" in nk:
             return "🌾"
     if any(k in nk_var for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
@@ -9688,7 +9967,6 @@ def personal_metryczka_view() -> None:
         return
     header("🧾 Metryczka ankiety")
     render_titlebar(["Panel", "Badania personalne", "Metryczka"])
-    back_button("home_personal", "← Powrót do panelu personalnego")
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
 
     studies = fetch_studies(sb)
@@ -9738,8 +10016,59 @@ def personal_metryczka_view() -> None:
             pass
 
     study = _apply_scheduled_survey_transitions(study, kind="personal")
+    current_slug = str(study.get("slug") or "").strip()
+    base_cfg = _metryczka_normalize_config("personal", study.get("metryczka_config"))
+    editor_state_key = _metryczka_editor_state_key("personal", study_id or current_slug)
+
+    def _current_cfg() -> Dict[str, Any]:
+        return _metryczka_normalize_config(
+            "personal",
+            st.session_state.get(editor_state_key) or base_cfg,
+        )
+
+    def _save_personal_metryczka(
+        cfg_candidate: Optional[Dict[str, Any]] = None,
+        *,
+        rerun_after: bool = False,
+    ) -> bool:
+        if not study_id:
+            st.error("Brak identyfikatora badania.")
+            return False
+        cfg_work = _metryczka_normalize_config("personal", cfg_candidate or _current_cfg())
+        valid, msg = _validate_metryczka_before_save(cfg_work)
+        if not valid:
+            st.error(msg)
+            return False
+        cfg_norm = normalize_personal_metryczka_config(cfg_work)
+        try:
+            update_study(
+                sb,
+                study_id,
+                {
+                    "metryczka_config": cfg_norm,
+                    "metryczka_config_version": int(cfg_norm.get("version") or 1),
+                },
+            )
+            st.session_state[editor_state_key] = deepcopy(cfg_norm)
+            st.success("Zapisano konfigurację metryczki.")
+            if rerun_after:
+                st.rerun()
+            return True
+        except Exception as exc:
+            st.error(f"Nie udało się zapisać metryczki: {exc}")
+            return False
+
+    is_dirty = (_stable_json_repr(_current_cfg()) != _stable_json_repr(base_cfg))
+    guarded_back_button(
+        dest="home_personal",
+        label="← Powrót do panelu personalnego",
+        dirty=is_dirty,
+        key_prefix=f"personal_metryczka_{study_id or current_slug}",
+        on_save_and_leave=lambda: _save_personal_metryczka(rerun_after=False),
+    )
+
     status_meta = _study_status_meta(study, kind="personal")
-    slug = str(study.get("slug") or "").strip()
+    slug = current_slug
     survey_base = str(st.secrets.get("SURVEY_BASE_URL", "https://archetypy.badania.pro") or "").rstrip("/")
     survey_url = f"{survey_base}/{slug}" if slug else "—"
 
@@ -9760,7 +10089,7 @@ def personal_metryczka_view() -> None:
     edited_cfg = _render_metryczka_editor(
         "personal",
         study_id or slug,
-        _metryczka_normalize_config("personal", study.get("metryczka_config")),
+        base_cfg,
     )
 
     _, save_col = st.columns([0.66, 0.34], gap="small")
@@ -9772,28 +10101,7 @@ def personal_metryczka_view() -> None:
             use_container_width=True,
         )
     if save_clicked:
-        if not study_id:
-            st.error("Brak identyfikatora badania.")
-        else:
-            valid, msg = _validate_metryczka_before_save(edited_cfg)
-            if not valid:
-                st.error(msg)
-            else:
-                cfg_norm = normalize_personal_metryczka_config(edited_cfg)
-                try:
-                    update_study(
-                        sb,
-                        study_id,
-                        {
-                            "metryczka_config": cfg_norm,
-                            "metryczka_config_version": int(cfg_norm.get("version") or 1),
-                        },
-                    )
-                    st.session_state[_metryczka_editor_state_key("personal", study_id or slug)] = deepcopy(cfg_norm)
-                    st.success("Zapisano konfigurację metryczki.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Nie udało się zapisać metryczki: {exc}")
+        _save_personal_metryczka(edited_cfg, rerun_after=True)
 
 
 def personal_settings_view() -> None:
@@ -9802,7 +10110,6 @@ def personal_settings_view() -> None:
         st.warning("Nie udało się potwierdzić schematu parametrów ankiety. Część ustawień może być chwilowo niedostępna.")
     header("⚙️ Ustawienia ankiety")
     render_titlebar(["Panel", "Badania personalne", "Ustawienia ankiety"])
-    back_button("home_personal", "← Powrót do panelu personalnego")
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
 
     studies = fetch_studies(sb)
@@ -9969,30 +10276,67 @@ def personal_settings_view() -> None:
             label_visibility="collapsed",
         )
 
-    if st.button(
-        "💾 Zapisz parametry ankiety",
-        type="primary",
-        key=f"personal_settings_save_params_{study_id or slug}",
-    ):
+    def _date_txt(v: Any) -> str:
+        return str(v.isoformat() if hasattr(v, "isoformat") else (v or ""))
+
+    def _time_txt(v: Any) -> str:
+        if hasattr(v, "strftime"):
+            try:
+                return str(v.strftime("%H:%M:%S"))
+            except Exception:
+                pass
+        return str(v or "")
+
+    baseline_snapshot = {
+        "mode_ui": "Pojedyncze ekrany" if str(cfg.get("display_mode")) == "single" else "Macierz",
+        "randomize_questions": bool(cfg.get("randomize_questions")),
+        "show_progress": bool(cfg.get("show_progress")),
+        "allow_back": bool(cfg.get("allow_back")),
+        "notify_on_response": bool(cfg.get("notify_on_response")),
+        "notify_email": str(cfg.get("notify_email") or "").strip().lower(),
+        "start_enabled": bool(cfg.get("auto_start_enabled")),
+        "start_date": _date_txt(start_def_date),
+        "start_time": _time_txt(start_def_time),
+        "end_enabled": bool(cfg.get("auto_end_enabled")),
+        "end_date": _date_txt(end_def_date),
+        "end_time": _time_txt(end_def_time),
+    }
+    current_snapshot = {
+        "mode_ui": str(mode_ui),
+        "randomize_questions": bool(randomize_questions),
+        "show_progress": bool(show_progress),
+        "allow_back": bool(allow_back),
+        "notify_on_response": bool(notify_on_response),
+        "notify_email": str(notify_email or "").strip().lower(),
+        "start_enabled": bool(start_enabled),
+        "start_date": _date_txt(start_date),
+        "start_time": _time_txt(start_time),
+        "end_enabled": bool(end_enabled),
+        "end_date": _date_txt(end_date),
+        "end_time": _time_txt(end_time),
+    }
+    settings_dirty = (_stable_json_repr(current_snapshot) != _stable_json_repr(baseline_snapshot))
+
+    def _save_personal_settings(*, rerun_after: bool = False) -> bool:
         notify_email_clean = str(notify_email or "").strip().lower()
         notify_email_valid = _normalize_notify_email(notify_email_clean)
         if notify_on_response and not notify_email_valid:
             st.error("Podaj poprawny adres e-mail do powiadomień.")
-            return
+            return False
 
         start_iso = _local_date_time_to_utc_iso(start_date, start_time) if start_enabled else None
         end_iso = _local_date_time_to_utc_iso(end_date, end_time) if end_enabled else None
         if start_enabled and not start_iso:
             st.error("Nie udało się odczytać daty/godziny startu ankiety.")
-            return
+            return False
         if end_enabled and not end_iso:
             st.error("Nie udało się odczytać daty/godziny zakończenia ankiety.")
-            return
+            return False
         start_dt = _parse_utc_dt(start_iso)
         end_dt = _parse_utc_dt(end_iso)
         if start_enabled and end_enabled and start_dt and end_dt and start_dt >= end_dt:
             st.error("Data i godzina zakończenia muszą być późniejsze niż data i godzina startu.")
-            return
+            return False
 
         mode_value = "single" if mode_ui == "Pojedyncze ekrany" else "matrix"
         updates: Dict[str, Any] = {
@@ -10035,9 +10379,27 @@ def personal_settings_view() -> None:
         try:
             update_study(sb, study_id, updates)
             st.session_state[save_flash_key] = "Zapisano parametry ankiety."
-            st.rerun()
+            if rerun_after:
+                st.rerun()
+            return True
         except Exception as exc:
             st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")
+            return False
+
+    guarded_back_button(
+        dest="home_personal",
+        label="← Powrót do panelu personalnego",
+        dirty=settings_dirty,
+        key_prefix=f"personal_settings_{study_id or slug}",
+        on_save_and_leave=lambda: _save_personal_settings(rerun_after=False),
+    )
+
+    if st.button(
+        "💾 Zapisz parametry ankiety",
+        type="primary",
+        key=f"personal_settings_save_params_{study_id or slug}",
+    ):
+        _save_personal_settings(rerun_after=True)
 
     def _do_suspend_personal() -> None:
         try:

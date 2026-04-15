@@ -609,12 +609,19 @@ def render(back_btn: Callable[[], None]) -> None:
     )
     study = options[label]
 
+    flash_key = "jst_send_flash_message"
+    flash_msg = st.session_state.pop(flash_key, None)
+    if flash_msg:
+        st.success(str(flash_msg))
+
     st.markdown('<div style="font-size:16px; font-weight:600; margin-top:35px; margin-bottom:5px;">Metoda wysyłki</div>', unsafe_allow_html=True)
     method = st.radio("Metoda wysyłki", ["SMS", "E-mail"], horizontal=True, index=0, label_visibility="collapsed")
 
     st.markdown('<div class="field-label">Odbiorcy</div>', unsafe_allow_html=True)
+    recipients_key = "jst_send_recipients"
     recipients = st.text_area(
         "Odbiorcy",
+        key=recipients_key,
         placeholder=("48500123456, 48600111222" if method == "SMS" else "jan@firma.pl, ola@urzad.gov.pl"),
         height=100,
         label_visibility="collapsed",
@@ -1001,7 +1008,9 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano SMS do {phone}: {err or 'unknown error'}")
-            st.success(f"Wysłano {sent_ok} / {len(recipients_list)}.")
+            st.session_state[recipients_key] = ""
+            st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(recipients_list)}."
+            st.rerun()
         else:
             host, port, user, pwd, secure, from_email, from_name, base = _email_env()
             subject_tpl = str(st.session_state.get("jst_send_subject") or "").strip() or _default_email_subject(jst_full_gen)
@@ -1054,7 +1063,9 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano e-maila do {email}: {err or 'unknown error'}")
-            st.success(f"Wysłano {sent_ok} / {len(recipients_list)}.")
+            st.session_state[recipients_key] = ""
+            st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(recipients_list)}."
+            st.rerun()
 
     st.markdown('<hr class="hr-thin status-top-tight">', unsafe_allow_html=True)
     mode = "sms" if method == "SMS" else "email"
