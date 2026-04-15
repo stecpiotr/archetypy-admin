@@ -2427,3 +2427,13 @@
   - dodatkowo uszczelniono normalizację typów w `_metryczka_editor_df_clean(...)`.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-113 (2026-04-15, fix utraty odpowiedzi po przesuwaniu pytań)
+- `archetypy-admin/app.py`:
+  - usunięto scenariusz, w którym po zmianie kolejności pytań odpowiedzi mogły zostać nadpisane pustym stanem,
+  - dodano bezpieczny odczyt danych z `st.data_editor` (`_editor_live_df`),
+  - dodano fallback na poprzednie odpowiedzi pytania, gdy bieżący odczyt opcji jest pusty.
+- Efekt:
+  - przesuwanie pytań `↑/↓` nie powinno już czyścić odpowiedzi w metryczce.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).

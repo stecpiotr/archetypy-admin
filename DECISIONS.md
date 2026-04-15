@@ -2279,3 +2279,12 @@ Decyzja:
 - Dodatkowo normalizacja edytora (`_metryczka_editor_df_clean`) wymusza stabilne typy kolumn tekstowych i checkboxów.
 Uzasadnienie:
 - Streamlit checkbox nie akceptuje kolumny o typie float (`ColumnDataKind.FLOAT`), co powodowało wyjątek przy renderze metryczki.
+
+### D-251: Pusty odczyt opcji z edytora nie może nadpisywać istniejących odpowiedzi pytania
+Decyzja:
+- Dane z `st.data_editor` są przyjmowane tylko wtedy, gdy pochodzą z rzeczywistego `DataFrame`.
+- Jeśli widget-state zwróci nie-DataFrame lub chwilowo pusty odczyt, stosujemy fallback:
+  - najpierw wartość zwrócona przez widget,
+  - następnie poprzednie odpowiedzi z pytania.
+Uzasadnienie:
+- Chroni metryczkę przed przypadkowym „wyzerowaniem” odpowiedzi przy rerunach i zmianie kolejności pytań.

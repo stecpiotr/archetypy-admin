@@ -2816,6 +2816,19 @@ def _metryczka_extract_move_marker(df: Any, marker_col: str = "Przesuń") -> Tup
     return out, selected_idx
 
 
+def _editor_live_df(returned_df: Any, widget_state: Any) -> pd.DataFrame:
+    """
+    Streamlit bywa niespójny: `st.data_editor` zwraca DataFrame, ale session_state
+    pod kluczem widgetu czasem przechowuje obiekt stanu (dict), nie tabelę.
+    Nigdy nie traktujemy takiego dict jako źródła danych do zapisu.
+    """
+    if isinstance(widget_state, pd.DataFrame):
+        return widget_state
+    if isinstance(returned_df, pd.DataFrame):
+        return returned_df
+    return _metryczka_editor_df_clean(returned_df)
+
+
 def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
     if not isinstance(df, pd.DataFrame):
         return []
@@ -3557,7 +3570,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 )
                 # W praktyce st.data_editor bywa "o 1 rerun do tyłu" na wartości zwracanej.
                 # Źródłem prawdy jest stan widgetu pod jego kluczem.
-                tpl_editor_live = st.session_state.get(tpl_editor_widget_key, tpl_editor_df)
+                tpl_editor_live = _editor_live_df(
+                    tpl_editor_df,
+                    st.session_state.get(tpl_editor_widget_key),
+                )
                 tpl_opts_df, move_idx = _metryczka_extract_move_marker(tpl_editor_live)
                 st.session_state[edit_opts_key] = tpl_opts_df
                 st.session_state[move_key] = move_idx
@@ -3843,7 +3859,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             },
         )
         # Odczytujemy "live" dane z session_state, żeby nie gubić pierwszej edycji komórki.
-        options_editor_live = st.session_state.get(options_editor_widget_key, options_editor_df)
+        options_editor_live = _editor_live_df(
+            options_editor_df,
+            st.session_state.get(options_editor_widget_key),
+        )
         edited_options_df, move_idx = _metryczka_extract_move_marker(options_editor_live)
         st.session_state[options_df_state_key] = edited_options_df
         st.session_state[move_key] = move_idx
@@ -3871,6 +3890,28 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
             st.caption("Dodawanie/usuwanie odpowiedzi: bezpośrednio w tabeli. Przesuwanie: zaznacz checkbox „Przesuń”.")
 
         options = _metryczka_options_from_df(st.session_state.get(options_df_state_key))
+        # Bezpiecznik: jeśli edytor chwilowo zwróci pusty stan (np. niestabilny rerun),
+        # nie kasujemy istniejących odpowiedzi pytania.
+        if not options and isinstance(q_dict.get("options"), list):
+            prev_options: List[Dict[str, Any]] = []
+            for opt_prev in list(q_dict.get("options") or []):
+                if not isinstance(opt_prev, dict):
+                    continue
+                lbl_prev = str(opt_prev.get("label") or "").strip()
+                code_prev = str(opt_prev.get("code") or "").strip()
+                if not lbl_prev or not code_prev:
+                    continue
+                prev_options.append(
+                    {
+                        "label": lbl_prev,
+                        "code": code_prev,
+                        "is_open": bool(opt_prev.get("is_open") is True),
+                        "lock_randomization": bool(opt_prev.get("lock_randomization") is True),
+                        "value_emoji": str(opt_prev.get("value_emoji") or "").strip(),
+                    }
+                )
+            if prev_options:
+                options = prev_options
 
         paste_toggle_key = f"{widget_prefix}paste_open_{ui_key}"
         paste_text_key = f"{widget_prefix}paste_text_{ui_key}"

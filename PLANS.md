@@ -3070,3 +3070,16 @@ Wynik:
   - `_metryczka_editor_df_clean(...)` dodatkowo normalizuje kolumny tekstowe/boolean po rerunach.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-113 [DONE]
+Temat: Krytyczny fix utraty odpowiedzi po zmianie kolejności pytań metryczki.
+Kryteria ukończenia:
+1. Przesuwanie pytania (`↑/↓`) nie może kasować odpowiedzi w innych pytaniach.
+2. Edytor odpowiedzi nie może zapisywać pustego stanu po niestabilnym rerunie widgetu.
+Wynik:
+- `archetypy-admin/app.py`:
+  - dodano helper `_editor_live_df(...)`, który ignoruje nie-DataFrame ze stanu widgetu `st.data_editor`,
+  - odczyt danych tabeli odpowiedzi oparty o bezpieczny fallback (widget-state DataFrame -> returned DataFrame -> clean),
+  - dodano bezpiecznik: jeśli bieżący odczyt opcji jest pusty, zachowujemy poprzednie odpowiedzi pytania zamiast je nadpisać.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
