@@ -1163,9 +1163,11 @@ def _normalize_template_question_payload(raw: Any) -> Dict[str, Any]:
                 "code": code,
                 "is_open": bool(is_open),
                 "lock_randomization": bool(lock_randomization),
-                "value_emoji": str(
-                    opt.get("value_emoji") or guess_metry_value_emoji(table_label, code, db_column)
-                ).strip(),
+                "value_emoji": (
+                    str(opt.get("value_emoji") or "").strip()
+                    if "value_emoji" in opt
+                    else str(guess_metry_value_emoji(table_label, code, db_column) or "").strip()
+                ),
             }
         )
     if randomize_options and legacy_exclude_last and options_out and not has_locked:

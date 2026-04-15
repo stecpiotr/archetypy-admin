@@ -2244,3 +2244,31 @@ Decyzja:
 - W `admin_dashboard.py` (sekcja liczenia dopasowania podgrupy) stosujemy natywne adnotacje `dict/list/tuple` zamiast `Dict/List/Tuple`.
 Uzasadnienie:
 - Plik nie importuje modułu `typing`; użycie `Dict/List/Tuple` wewnątrz wykonywanego bloku mogło powodować `NameError` podczas renderu raportu.
+
+### D-246: Wstawianie pytań metryczkowych z zapisanych jest oddzielone od tworzenia pustego pytania
+Decyzja:
+- W edytorze metryczki rozdzielamy dwa działania:
+  - `➕ Dodaj puste pytanie`,
+  - `📥 Wstaw z zapisanych`.
+- Wstawienie z zapisanych nie może automatycznie tworzyć dodatkowego pustego `M_CUSTOM_*`.
+Uzasadnienie:
+- Minimalizuje ryzyko bałaganu i przypadkowych pustych pytań podczas szybkiej pracy na szablonach.
+
+### D-247: Stan `st.data_editor` jest odczytywany z `session_state` jako źródło prawdy
+Decyzja:
+- Po renderze `st.data_editor` dane do dalszego przetwarzania pobieramy z `st.session_state[widget_key]` (z fallbackiem do wartości zwracanej).
+Uzasadnienie:
+- W praktyce wartość zwracana przez `st.data_editor` bywa opóźniona o jeden rerun; odczyt z `session_state` eliminuje efekt „muszę wpisać dwa razy”.
+
+### D-248: Pusta ikonka odpowiedzi jest prawidłowym stanem i nie jest auto-uzupełniana fallbackiem
+Decyzja:
+- Jeśli w rekordzie odpowiedzi pole `value_emoji` istnieje i jest puste, traktujemy to jako świadome „brak ikony”.
+- Automatyczne zgadywanie ikon działa tylko wtedy, gdy pole `value_emoji` nie istnieje.
+Uzasadnienie:
+- Użytkownik musi mieć możliwość celowego usunięcia ikony bez jej „odrastania” po zapisie/normalizacji.
+
+### D-249: Zmiana kolejności pytań metryczki (custom) jest obsługiwana w edytorze
+Decyzja:
+- Dodajemy panel zmiany kolejności pytań custom (góra/dół) bez usuwania i ponownego dodawania.
+Uzasadnienie:
+- Usprawnia iteracyjne układanie metryczki i zmniejsza ryzyko utraty konfiguracji pytań.

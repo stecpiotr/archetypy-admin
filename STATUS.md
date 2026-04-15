@@ -2406,3 +2406,16 @@
   - usunięte ryzyko `NameError` przy renderowaniu sekcji `Poziom dopasowania podgrupy do całej próby`.
 - Test techniczny:
   - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### Zrobione w Hotfix H-111 (2026-04-15, Etap 1 metryczki: stabilizacja edytora i wstawiania)
+- `archetypy-admin/app.py`:
+  - `Dodaj pytanie` nie miesza się już ze wstawianiem z zapisanych: dodano szybki insert szablonu (`📥 Wstaw z zapisanych`) bez automatycznego pustego `M_CUSTOM_*`,
+  - dodano zmianę kolejności pytań custom (`↕️ Zmień kolejność pytań metryczkowych`),
+  - stabilizacja tabel odpowiedzi: odczyt danych „live” z `st.session_state` po `st.data_editor` (eliminuje znikanie pierwszej edycji),
+  - po globalnym `Zapisz zmiany` w predefiniowanych bieżąca metryczka odświeża się lokalnie w tej samej sesji.
+- Ikony odpowiedzi:
+  - jawnie pusta ikonka (brak emoji) jest utrzymywana i nie wraca automatycznie do fallbacku.
+- `archetypy-admin/metryczka_config.py`, `archetypy-admin/db_jst_utils.py`:
+  - normalizacja respektuje pustą ikonkę odpowiedzi zamiast wymuszać domyślną.
+- Test techniczny:
+  - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK).

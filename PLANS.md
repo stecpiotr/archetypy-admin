@@ -3035,3 +3035,25 @@ Wynik:
   - zamieniono lokalne adnotacje `Dict/List/Tuple` na natywne `dict/list/tuple`.
 - Smoke-check:
   - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### Hotfix H-111 [DONE]
+Temat: Etap 1 (metryczka) — stabilizacja dodawania pytań, zapisu tabel i propagacji szablonów.
+Kryteria ukończenia:
+1. `Dodaj pytanie metryczkowe` nie powoduje już automatycznego dokładania pustego `M_CUSTOM_*` podczas wstawiania z zapisanych.
+2. Edycje w tabeli odpowiedzi (kodowanie/ikony) nie wymagają podwójnego wpisywania.
+3. Po globalnym `Predefiniowane metryczki -> Zapisz zmiany` bieżący edytor metryczki od razu widzi zaktualizowane pola (np. `Kodowanie do tabel`).
+4. Dodana zmiana kolejności pytań metryczkowych (custom) bez kasowania i dodawania od nowa.
+5. Pusta ikonka odpowiedzi (brak emoji) jest trwałym stanem i nie wraca automatycznie do fallbacku.
+Wynik:
+- `archetypy-admin/app.py`:
+  - dolny panel rozdzielony na:
+    - `➕ Dodaj puste pytanie`,
+    - szybkie `📥 Wstaw z zapisanych` (bez dorzucania pustego pytania),
+  - dodano moduł `↕️ Zmień kolejność pytań metryczkowych` (przesuwanie custom pytań góra/dół),
+  - data-editory odpowiedzi czytają stan „live” z `st.session_state` (eliminuje efekt utraty pierwszej edycji),
+  - po globalnym zapisie predefiniowanego pytania aktualizowany jest też bieżący stan edytora w sesji,
+  - logika ikon odpowiedzi respektuje jawnie pustą wartość.
+- `archetypy-admin/metryczka_config.py` + `archetypy-admin/db_jst_utils.py`:
+  - normalizacja nie nadpisuje już pustej ikonki odpowiedzi automatycznym fallbackiem.
+- Smoke-check:
+  - `python -m py_compile app.py metryczka_config.py db_jst_utils.py` (OK).

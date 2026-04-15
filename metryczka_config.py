@@ -285,6 +285,12 @@ def _safe_bool(value: Any, fallback: bool) -> bool:
     return bool(fallback)
 
 
+def _safe_value_emoji(raw_opt: Any, fallback: str = "") -> str:
+    if isinstance(raw_opt, dict) and "value_emoji" in raw_opt:
+        return _safe_text(raw_opt.get("value_emoji"), "")
+    return _safe_text(fallback, "")
+
+
 def _looks_like_open_label(text: str) -> bool:
     t = str(text or "").strip().lower()
     return "inna (jaka?)" in t or "inne (jakie?)" in t
@@ -470,8 +476,8 @@ def _normalize_custom_question(raw: Dict[str, Any], used_columns: set[str]) -> D
         code = _safe_text(opt_copy.get("code"), _safe_text(opt_copy.get("label")))
         if not code:
             continue
-        opt_copy["value_emoji"] = _safe_text(
-            opt_copy.get("value_emoji"),
+        opt_copy["value_emoji"] = _safe_value_emoji(
+            opt_copy,
             guess_metry_value_emoji(table_label, code, db_column),
         )
         normalized_opts.append(opt_copy)
@@ -561,8 +567,8 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
                     "code": canon_code,
                     "is_open": _safe_bool(opt.get("is_open"), _looks_like_open_label(label)),
                     "lock_randomization": _safe_bool(opt.get("lock_randomization"), False),
-                    "value_emoji": _safe_text(
-                        opt.get("value_emoji"),
+                    "value_emoji": _safe_value_emoji(
+                        opt,
                         base_emoji_by_label.get(key, guess_metry_value_emoji(base.get("table_label"), label, qid)),
                     ),
                 }
@@ -574,7 +580,10 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
                     "code": _canonical_core_option_code(qid, _safe_text(o.get("code")), _safe_text(o.get("label"))),
                     "is_open": _safe_bool(o.get("is_open"), _looks_like_open_label(_safe_text(o.get("label")))),
                     "lock_randomization": _safe_bool(o.get("lock_randomization"), False),
-                    "value_emoji": _safe_text(o.get("value_emoji"), guess_metry_value_emoji(base.get("table_label"), _safe_text(o.get("label")), qid)),
+                    "value_emoji": _safe_value_emoji(
+                        o,
+                        guess_metry_value_emoji(base.get("table_label"), _safe_text(o.get("label")), qid),
+                    ),
                 }
                 for o in base["options"]
             ]
