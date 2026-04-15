@@ -2363,3 +2363,46 @@
 - Testy techniczne:
   - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py db_utils.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Zrobione w Hotfix H-108 (2026-04-15, metryczka dynamiczna: kategorie 0%, kolejność odpowiedzi, własne ikony i backfill)
+- `archetypy-admin/admin_dashboard.py`:
+  - `Profile demograficzne archetypu` pokazuje wszystkie zmienne i kategorie z konfiguracji metryczki, także kategorie z wynikiem 0%,
+  - kolejność kategorii w tabeli demograficznej odpowiada kolejności w metryczce; randomizacja dotyczy wyłącznie ankiety respondenta,
+  - brakujące historyczne kolumny `METRY_*` nie blokują raportu, tylko są traktowane jako puste dane,
+  - dopieszczono radar podgrupy: węższa dolna legenda TOP2/TOP3, mniejszy dystans do wykresu, separator przed kołami 0-100, wycentrowane koła i większe tytuły,
+  - dodano kartę `Poziom dopasowania podgrupy do całej próby` liczoną na pełnym profilu 12 archetypów.
+- `archetypy-admin/app.py`:
+  - odpowiedzi w edytorze metryczki i predefiniowanych można przesuwać w górę/dół, usuwać i dodawać osobnymi przyciskami,
+  - kolumna `Ikona` odpowiedzi jest edytowalnym polem tekstowym, więc działa własna ikona odpowiedzi,
+  - usunięto problem pustego, nieedytowalnego wiersza w tabeli predefiniowanych odpowiedzi,
+  - dodano jednorazowy backfill po zalogowaniu, który uzupełnia starsze metryczki o nowe kody, ikonki i etykiety.
+- `archetypy-admin/metryczka_config.py`, `archetypy-admin/db_jst_utils.py`, `archetypy-ankieta/src/lib/metryczka.ts`:
+  - finalne kodowanie rdzenia metryczki jest spójne w adminie, raportach i runtime ankiet:
+    - `M_WIEK`: `60+`, ikona zmiennej `⌛`,
+    - `M_WYKSZT`: `podst./gim./zaw.`,
+    - `M_ZAWOD`: `własna firma`, `inna`,
+    - `M_MATERIAL`: `bardzo zła`, `raczej zła`, `przeciętna`, `raczej dobra`, `bardzo dobra`, `odmowa`.
+- Testy techniczne:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK; Vite zgłasza tylko ostrzeżenie o CJS Node API).
+
+### Zrobione w Hotfix H-109 (2026-04-15, UX tabel odpowiedzi metryczki)
+- `archetypy-admin/app.py`:
+  - cofnięto „cięższy” model ręcznego zarządzania wierszami (oddzielne `Dodaj/Usuń`),
+  - przywrócono natywne dodawanie/usuwanie odpowiedzi bezpośrednio w `st.data_editor` (`num_rows=\"dynamic\"`),
+  - dodano prosty mechanizm przesuwania odpowiedzi `↑/↓` po zaznaczeniu checkboxa `Przesuń` w wierszu,
+  - zmniejszono wysokość tabeli odpowiedzi tak, aby nie renderować kilku pustych „martwych” rzędów na dole.
+- Efekt UX:
+  - edycja wróciła do wcześniejszego, lżejszego sposobu pracy,
+  - zachowaliśmy nową funkcję przesuwania kolejności odpowiedzi.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-110 (2026-04-15, runtime fix adnotacji typów w demografii personalnej)
+- `archetypy-admin/admin_dashboard.py`:
+  - poprawiono adnotacje typów w lokalnym bloku liczenia zgodności podgrupy:
+    - `Dict/List/Tuple` -> `dict/list/tuple`.
+- Efekt:
+  - usunięte ryzyko `NameError` przy renderowaniu sekcji `Poziom dopasowania podgrupy do całej próby`.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).

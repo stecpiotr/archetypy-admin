@@ -2984,3 +2984,54 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py db_utils.py` (OK),
   - `npm run build` w `archetypy-ankieta` (OK).
+
+### Hotfix H-108 [DONE]
+Temat: Domknięcie metryczki dynamicznej: pełne kategorie 0%, krótkie kody rdzenia, własne ikony odpowiedzi, kolejność odpowiedzi i backfill.
+Kryteria ukończenia:
+1. `Profile demograficzne archetypu` pokazuje wszystkie zmienne i kategorie z `metryczka_config`, także te z wynikiem 0%, w kolejności konfiguracji.
+2. Rdzeń metryczki ma finalne krótkie kody analityczne (`60+`, `podst./gim./zaw.`, `własna firma`, `inna`, skrócone wartości sytuacji materialnej) oraz ikonę wieku `⌛`.
+3. Edytor metryczki pozwala wpisać własną ikonę także dla odpowiedzi i przesuwać odpowiedzi góra/dół bez pustego, nieedytowalnego wiersza.
+4. Raport personalny ma ciaśniejszą legendę TOP2/TOP3, separator przed kołami 0-100, wycentrowane koła i kartę zgodności podgrupy z całą próbą.
+5. Backfill uzupełnia historyczne konfiguracje o nowe kody/ikonki/etykiety bez ręcznej migracji.
+Wynik:
+- `admin_dashboard.py`:
+  - demografia personalna buduje listę kategorii z konfiguracji metryczki, a nie wyłącznie z występujących danych,
+  - kategorie 0% pozostają w tabelach,
+  - brakujące historyczne kolumny `METRY_*` są traktowane jako puste serie,
+  - dodano wizualizację poziomu dopasowania podgrupy do całej próby oraz dopieszczono radar/legendy/koła 0-100.
+- `app.py`:
+  - tabela odpowiedzi w edytorze i predefiniowanych ma stałą kontrolowaną liczbę wierszy,
+  - dodano przyciski przesuwania/usuwania/dodawania odpowiedzi,
+  - kolumna `Ikona` przy odpowiedziach jest polem tekstowym, więc można wpisać własną ikonę,
+  - dodano jednorazowy backfill metryczek po zalogowaniu.
+- `metryczka_config.py`, `db_jst_utils.py`, `archetypy-ankieta/src/lib/metryczka.ts`:
+  - ujednolicono finalne kody rdzenia i ikonę wieku `⌛` po stronie admina, raportów i runtime ankiet.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py metryczka_config.py` (OK),
+  - `npm run build` w `archetypy-ankieta` (OK; tylko ostrzeżenie Vite o CJS Node API).
+
+### Hotfix H-109 [DONE]
+Temat: Korekta UX tabeli odpowiedzi metryczki (powrót do wygodnej edycji + przesuwanie checkboxem).
+Kryteria ukończenia:
+1. Dodawanie/usuwanie odpowiedzi wraca do natywnej edycji tabeli (bez osobnych przycisków „Dodaj/Usuń”).
+2. Przesuwanie odpowiedzi działa po zaznaczeniu checkboxa w wierszu (`Przesuń`) i kliknięciu `↑/↓`.
+3. Znikają sztuczne puste „martwe” wiersze wynikające z zawyżonej wysokości komponentu.
+Wynik:
+- `archetypy-admin/app.py`:
+  - oba edytory (metryczka i predefiniowane) używają `st.data_editor(..., num_rows=\"dynamic\")`,
+  - dodano kolumnę pomocniczą `Przesuń` do wyboru wiersza do ruchu,
+  - usunięto osobne przyciski `Dodaj odpowiedź` i `Usuń` (wrót do prostszej edycji jak wcześniej),
+  - wysokość tabeli liczona bez sztucznego zapasu pustych rzędów.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).
+
+### Hotfix H-110 [DONE]
+Temat: Stabilizacja adnotacji typów w demografii personalnej (`admin_dashboard.py`).
+Kryteria ukończenia:
+1. Brak adnotacji `typing.Dict/List/Tuple` bez importu `typing` w krytycznym bloku liczenia zgodności podgrupy.
+2. Brak ryzyka `NameError` podczas renderu raportu demograficznego personalnego.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - zamieniono lokalne adnotacje `Dict/List/Tuple` na natywne `dict/list/tuple`.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).

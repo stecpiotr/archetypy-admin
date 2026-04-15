@@ -2492,16 +2492,22 @@ def get_archetype_payload_for_gender(archetype_name: str, gender_code: str = "M"
     display_name = display_name_for_gender(base_name, gender)
 
     if gender == "K":
-        payload = archetype_extended.get(display_name) or archetype_extended.get(base_name) or {}
-    else:
-        payload = archetype_extended.get(base_name) or archetype_extended.get(display_name) or {}
+        # Priorytet: gotowy żeński opis z DOCX (bez dodatkowej, destrukcyjnej feminizacji runtime).
+        payload_female = archetype_extended.get(display_name)
+        if isinstance(payload_female, dict) and payload_female:
+            out = dict(payload_female)
+            out["name"] = display_name
+            return out
 
-    out = dict(payload)
-    if gender == "K":
-        out = _feminize_payload_runtime(out)
+        # Fallback bezpieczeństwa: jeśli żeńskiego pliku brak, feminizuj męski payload.
+        payload_male = archetype_extended.get(base_name) or {}
+        out = _feminize_payload_runtime(dict(payload_male))
         out["name"] = display_name
-    else:
-        out["name"] = base_name or out.get("name", "")
+        return out
+
+    payload = archetype_extended.get(base_name) or archetype_extended.get(display_name) or {}
+    out = dict(payload)
+    out["name"] = base_name or out.get("name", "")
     return out
 
 
@@ -3785,13 +3791,16 @@ def _render_personal_demography_subpage(
         option_icon_map = item.get("option_icons") if isinstance(item.get("option_icons"), dict) else {}
         demo_col = f"{col_name}__DEMO"
         if demo_col not in filt_df.columns:
-            filt_df[demo_col] = (
-                results_df[col_name]
-                .fillna("")
-                .astype(str)
-                .str.strip()
-                .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
-            )
+            if col_name in results_df.columns:
+                filt_df[demo_col] = (
+                    results_df[col_name]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                    .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
+                )
+            else:
+                filt_df[demo_col] = pd.Series([""] * len(filt_df.index), index=filt_df.index, dtype=object)
         select_options = [all_token] + [str(code) for code in list(item["codes"])]
         col_ctx = filter_cols[idx % len(filter_cols)]
         with col_ctx:
@@ -3856,15 +3865,20 @@ def _render_personal_demography_subpage(
         option_icon_map = item.get("option_icons") if isinstance(item.get("option_icons"), dict) else {}
         icon = _personal_metry_var_icon(db_col, table_label, var_icon_pref)
         demo_col = f"{col_name}__DEMO"
-        q_all = (
-            results_df[col_name]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-            .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
-        )
+        if col_name in results_df.columns:
+            q_all = (
+                results_df[col_name]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
+            )
+        else:
+            q_all = pd.Series([""] * len(results_df.index), index=results_df.index, dtype=object)
         if demo_col in filt_df.columns:
             q_sub = filt_df[demo_col].fillna("").astype(str).str.strip()
+        elif col_name not in filt_df.columns:
+            q_sub = pd.Series([""] * len(filt_df.index), index=filt_df.index, dtype=object)
         else:
             q_sub = (
                 filt_df[col_name]
@@ -3873,8 +3887,6 @@ def _render_personal_demography_subpage(
                 .str.strip()
                 .map(lambda v, dbc=db_col, tbl=table_label: _personal_demo_code(dbc, v, tbl))
             )
-        if not bool(q_all.ne("").any()):
-            continue
 
         categories: list[dict[str, object]] = []
         for code in list(item["codes"]):
@@ -3990,7 +4002,7 @@ def _render_personal_demography_subpage(
         sorted_gaps_desc = sorted(diff_vals, reverse=True)
         top3_gap_mae = float(sum(sorted_gaps_desc[:3]) / max(1, min(3, len(sorted_gaps_desc))))
 
-        def _key_priority_pool(profile_100: Dict[str, float]) -> List[str]:
+        def _key_priority_pool(profile_100: dict[str, float]) -> list[str]:
             ordered = sorted(
                 archetype_names,
                 key=lambda a: (-float(profile_100.get(a, 0.0)), archetype_names.index(a)),
@@ -4002,7 +4014,7 @@ def _render_personal_demography_subpage(
 
         all_top = _key_priority_pool(all_100)
         sub_top = _key_priority_pool(sub_100)
-        key_archetypes: List[str] = []
+        key_archetypes: list[str] = []
         for arche in all_top + sub_top:
             if arche not in key_archetypes:
                 key_archetypes.append(arche)
@@ -4025,7 +4037,7 @@ def _render_personal_demography_subpage(
             + main_priority_mismatch_penalty
         )
         match_score = max(0.0, min(100.0, base_score - key_penalty))
-        match_bands: List[Tuple[str, str]] = [
+        match_bands: list[tuple[str, str]] = [
             ("Marginalne dopasowanie", "Profile są w dużej mierze rozbieżne; potrzebna gruntowna korekta przekazu i priorytetów."),
             ("Bardzo niskie dopasowanie", "Dopasowanie jest słabe i niestabilne; dominują rozjazdy strategiczne."),
             ("Niskie dopasowanie", "Widać pojedyncze punkty wspólne, ale profil nadal wyraźnie się rozjeżdża."),

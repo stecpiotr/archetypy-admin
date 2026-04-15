@@ -2703,10 +2703,10 @@ def _metryczka_options_to_df(
     return pd.DataFrame(rows)
 
 
-def _metryczka_data_editor_height(df: Any, *, min_rows: int = 4, max_rows: int = 60) -> int:
+def _metryczka_data_editor_height(df: Any, *, min_rows: int = 1, max_rows: int = 60) -> int:
     row_count = int(len(df.index)) if isinstance(df, pd.DataFrame) else 0
-    visible_rows = min(max(row_count + 2, int(min_rows)), int(max_rows))
-    # Nagłówek + zapas na dolną kontrolkę dodawania wierszy.
+    visible_rows = min(max(row_count, int(min_rows)), int(max_rows))
+    # Nagłówek + wiersze danych; bez sztucznego "dopompowania" pustych rzędów.
     return int(70 + visible_rows * 35)
 
 
@@ -2769,6 +2769,33 @@ def _metryczka_append_empty_row(df: Any) -> pd.DataFrame:
     }
     out = pd.concat([out, pd.DataFrame([empty_row])], ignore_index=True)
     return out
+
+
+def _metryczka_attach_move_marker(df: Any, selected_index: int, marker_col: str = "Przesuń") -> pd.DataFrame:
+    base = _metryczka_editor_df_clean(df)
+    out = base.copy()
+    if marker_col in out.columns:
+        out = out.drop(columns=[marker_col], errors="ignore")
+    sel = int(selected_index) if isinstance(selected_index, int) else -1
+    out.insert(0, marker_col, [i == sel for i in range(len(out.index))])
+    return out
+
+
+def _metryczka_extract_move_marker(df: Any, marker_col: str = "Przesuń") -> Tuple[pd.DataFrame, int]:
+    if not isinstance(df, pd.DataFrame):
+        return _metryczka_editor_df_clean(df), -1
+    out = df.copy()
+    selected_idx = -1
+    if marker_col in out.columns:
+        picked = [i for i, v in enumerate(list(out[marker_col])) if bool(v)]
+        if picked:
+            selected_idx = int(picked[-1])
+            out[marker_col] = [i == selected_idx for i in range(len(out.index))]
+        out = out.drop(columns=[marker_col], errors="ignore")
+    out = _metryczka_editor_df_clean(out)
+    if selected_idx >= len(out.index):
+        selected_idx = -1
+    return out, selected_idx
 
 
 def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
@@ -3453,14 +3480,23 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         db_column=str(st.session_state.get(edit_code_key) or ""),
                     )
                 tpl_opts_df = _metryczka_editor_df_clean(tpl_opts_df)
-                tpl_opts_df = st.data_editor(
-                    tpl_opts_df,
+                move_key = f"{widget_prefix}tpl_move_idx_{picked_id}"
+                move_idx = int(st.session_state.get(move_key, -1) or -1)
+                tpl_editor_df = _metryczka_attach_move_marker(tpl_opts_df, move_idx)
+                tpl_editor_df = st.data_editor(
+                    tpl_editor_df,
                     height=_metryczka_data_editor_height(tpl_opts_df),
                     use_container_width=True,
                     hide_index=True,
-                    num_rows="fixed",
+                    num_rows="dynamic",
                     key=f"{edit_opts_key}_editor_{picked_id}",
                     column_config={
+                        "Przesuń": st.column_config.CheckboxColumn(
+                            "Przesuń",
+                            help="Zaznacz jeden wiersz, aby przesunąć go w górę lub w dół.",
+                            default=False,
+                            width="small",
+                        ),
                         "Odpowiedź": st.column_config.TextColumn(
                             "Odpowiedź",
                             help="Tekst widoczny dla respondenta.",
@@ -3490,48 +3526,27 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                         ),
                     },
                 )
-                tpl_opts_df = _metryczka_editor_df_clean(tpl_opts_df)
+                tpl_opts_df, move_idx = _metryczka_extract_move_marker(tpl_editor_df)
                 st.session_state[edit_opts_key] = tpl_opts_df
-
-                move_key = f"{widget_prefix}tpl_move_idx_{picked_id}"
+                st.session_state[move_key] = move_idx
                 row_count = int(len(tpl_opts_df.index))
                 if row_count > 0:
-                    if move_key not in st.session_state or int(st.session_state.get(move_key, 0) or 0) >= row_count:
-                        st.session_state[move_key] = 0
-                    r1, r2, r3, r4 = st.columns([0.52, 0.16, 0.16, 0.16], gap="small")
+                    r1, r2 = st.columns([0.16, 0.16], gap="small")
                     with r1:
-                        st.selectbox(
-                            "Kolejność odpowiedzi",
-                            options=list(range(row_count)),
-                            key=move_key,
-                            format_func=lambda i: f"{int(i)+1}. {str(tpl_opts_df.iloc[int(i)].get('Odpowiedź') or '(pusta odpowiedź)').strip()}",
-                        )
-                    with r2:
                         if st.button("↑ Do góry", key=f"{widget_prefix}tpl_move_up_{picked_id}", use_container_width=True):
-                            idx_move = int(st.session_state.get(move_key, 0) or 0)
+                            idx_move = int(st.session_state.get(move_key, -1) or -1)
                             if idx_move > 0:
                                 st.session_state[edit_opts_key] = _metryczka_reorder_df(tpl_opts_df, idx_move, -1)
                                 st.session_state[move_key] = idx_move - 1
                                 st.rerun()
-                    with r3:
+                    with r2:
                         if st.button("↓ W dół", key=f"{widget_prefix}tpl_move_down_{picked_id}", use_container_width=True):
-                            idx_move = int(st.session_state.get(move_key, 0) or 0)
+                            idx_move = int(st.session_state.get(move_key, -1) or -1)
                             if idx_move < row_count - 1:
                                 st.session_state[edit_opts_key] = _metryczka_reorder_df(tpl_opts_df, idx_move, +1)
                                 st.session_state[move_key] = idx_move + 1
                                 st.rerun()
-                    with r4:
-                        if st.button("🗑 Usuń", key=f"{widget_prefix}tpl_row_del_{picked_id}", use_container_width=True):
-                            idx_move = int(st.session_state.get(move_key, 0) or 0)
-                            if 0 <= idx_move < row_count:
-                                st.session_state[edit_opts_key] = tpl_opts_df.drop(index=idx_move).reset_index(drop=True)
-                                st.session_state[move_key] = max(0, min(idx_move, row_count - 2))
-                                st.rerun()
-                add_col, _ = st.columns([0.26, 0.74], gap="small")
-                with add_col:
-                    if st.button("➕ Dodaj odpowiedź", key=f"{widget_prefix}tpl_row_add_{picked_id}", use_container_width=True):
-                        st.session_state[edit_opts_key] = _metryczka_append_empty_row(tpl_opts_df)
-                        st.rerun()
+                    st.caption("Dodawanie/usuwanie odpowiedzi: bezpośrednio w tabeli. Przesuwanie: zaznacz checkbox „Przesuń”.")
 
                 live_tpl_question = {
                     "id": str(st.session_state.get(edit_code_key) or "").strip().upper(),
@@ -3741,14 +3756,23 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         if options_df_state_key not in st.session_state:
             st.session_state[options_df_state_key] = _metryczka_editor_df_clean(options_df_seed)
         options_df = _metryczka_editor_df_clean(st.session_state.get(options_df_state_key))
-        edited_options_df = st.data_editor(
-            options_df,
+        move_key = f"{widget_prefix}opts_move_idx_{ui_key}"
+        move_idx = int(st.session_state.get(move_key, -1) or -1)
+        options_editor_df = _metryczka_attach_move_marker(options_df, move_idx)
+        options_editor_df = st.data_editor(
+            options_editor_df,
             height=_metryczka_data_editor_height(options_df),
             use_container_width=True,
             hide_index=True,
-            num_rows="fixed",
+            num_rows="dynamic",
             key=f"{widget_prefix}opts_{ui_key}",
             column_config={
+                "Przesuń": st.column_config.CheckboxColumn(
+                    "Przesuń",
+                    help="Zaznacz jeden wiersz, aby przesunąć go w górę lub w dół.",
+                    default=False,
+                    width="small",
+                ),
                 "Odpowiedź": st.column_config.TextColumn(
                     "Odpowiedź",
                     help="Tekst widoczny dla respondenta.",
@@ -3778,56 +3802,31 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 ),
             },
         )
-        edited_options_df = _metryczka_editor_df_clean(edited_options_df)
+        edited_options_df, move_idx = _metryczka_extract_move_marker(options_editor_df)
         st.session_state[options_df_state_key] = edited_options_df
-
-        move_key = f"{widget_prefix}opts_move_idx_{ui_key}"
+        st.session_state[move_key] = move_idx
         row_count = int(len(edited_options_df.index))
         if row_count > 0:
-            if move_key not in st.session_state or int(st.session_state.get(move_key, 0) or 0) >= row_count:
-                st.session_state[move_key] = 0
-            r1, r2, r3, r4 = st.columns([0.52, 0.16, 0.16, 0.16], gap="small")
+            r1, r2 = st.columns([0.16, 0.16], gap="small")
             with r1:
-                st.selectbox(
-                    "Kolejność odpowiedzi",
-                    options=list(range(row_count)),
-                    key=move_key,
-                    format_func=lambda i: f"{int(i)+1}. {str(edited_options_df.iloc[int(i)].get('Odpowiedź') or '(pusta odpowiedź)').strip()}",
-                )
-            with r2:
                 if st.button("↑ Do góry", key=f"{widget_prefix}opts_move_up_{ui_key}", use_container_width=True):
-                    idx_move = int(st.session_state.get(move_key, 0) or 0)
+                    idx_move = int(st.session_state.get(move_key, -1) or -1)
                     if idx_move > 0:
                         st.session_state[options_df_state_key] = _metryczka_reorder_df(edited_options_df, idx_move, -1)
                         st.session_state[move_key] = idx_move - 1
                         st.session_state[scroll_target_key] = anchor_id
                         st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
                         st.rerun()
-            with r3:
+            with r2:
                 if st.button("↓ W dół", key=f"{widget_prefix}opts_move_down_{ui_key}", use_container_width=True):
-                    idx_move = int(st.session_state.get(move_key, 0) or 0)
+                    idx_move = int(st.session_state.get(move_key, -1) or -1)
                     if idx_move < row_count - 1:
                         st.session_state[options_df_state_key] = _metryczka_reorder_df(edited_options_df, idx_move, +1)
                         st.session_state[move_key] = idx_move + 1
                         st.session_state[scroll_target_key] = anchor_id
                         st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
                         st.rerun()
-            with r4:
-                if st.button("🗑 Usuń", key=f"{widget_prefix}opts_row_del_{ui_key}", use_container_width=True):
-                    idx_move = int(st.session_state.get(move_key, 0) or 0)
-                    if 0 <= idx_move < row_count:
-                        st.session_state[options_df_state_key] = edited_options_df.drop(index=idx_move).reset_index(drop=True)
-                        st.session_state[move_key] = max(0, min(idx_move, row_count - 2))
-                        st.session_state[scroll_target_key] = anchor_id
-                        st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
-                        st.rerun()
-        add_col, _ = st.columns([0.26, 0.74], gap="small")
-        with add_col:
-            if st.button("➕ Dodaj odpowiedź", key=f"{widget_prefix}opts_row_add_{ui_key}", use_container_width=True):
-                st.session_state[options_df_state_key] = _metryczka_append_empty_row(edited_options_df)
-                st.session_state[scroll_target_key] = anchor_id
-                st.session_state[scroll_nonce_key] = int(time.time() * 1_000_000)
-                st.rerun()
+            st.caption("Dodawanie/usuwanie odpowiedzi: bezpośrednio w tabeli. Przesuwanie: zaznacz checkbox „Przesuń”.")
 
         options = _metryczka_options_from_df(st.session_state.get(options_df_state_key))
 
@@ -4942,6 +4941,44 @@ html, body {
     return html_text + autosize_js
 
 
+def _normalize_archetype_label_mode(raw: Any) -> str:
+    txt = str(raw or "").strip().lower()
+    if txt.startswith("wart"):
+        return "values"
+    if "żeń" in txt or "fem" in txt:
+        return "female"
+    return "male"
+
+
+def _apply_archetype_label_mode_to_html(html_text: str, mode_choice: Any) -> str:
+    source = str(html_text or "")
+    if not source:
+        return source
+    mode = _normalize_archetype_label_mode(mode_choice)
+    if mode == "male":
+        return source
+
+    if mode == "female":
+        base_map: Dict[str, str] = dict(_MATCHING_FEMININE_MAP)
+    else:
+        base_map = {str(k): str(v) for k, v in JST_VALUE_BY_ARCH.items()}
+    if not base_map:
+        return source
+
+    variant_map: Dict[str, str] = {}
+    for src, dst in base_map.items():
+        s = str(src)
+        d = str(dst)
+        variant_map[s] = d
+        variant_map[s.upper()] = d.upper()
+        variant_map[s.lower()] = d.lower()
+
+    keys = sorted(variant_map.keys(), key=len, reverse=True)
+    boundary = r"(?<![\wĄąĆćĘęŁłŃńÓóŚśŹźŻż])({})(?![\wĄąĆćĘęŁłŃńÓóŚśŹźŻż])"
+    pattern = re.compile(boundary.format("|".join(re.escape(k) for k in keys)))
+    return pattern.sub(lambda m: variant_map.get(m.group(1), m.group(1)), source)
+
+
 def _fmt_bytes_compact(size_bytes: int) -> str:
     n = max(0, int(size_bytes or 0))
     if n < 1024:
@@ -5148,6 +5185,13 @@ def jst_analysis_view() -> None:
         st.info("Wybierz badanie z listy i kliknij „Generuj raport”.")
         return
 
+    label_mode_choice = st.radio(
+        "Wybierz formę archetypów",
+        ["Archetypy męskie", "Archetypy żeńskie", "Wartości"],
+        horizontal=True,
+        key=f"jst_report_label_mode_{sid}",
+    )
+
     overrides_editor_key = f"jst_segment_threshold_editor_{sid}"
     overrides_editor_pending_key = f"{overrides_editor_key}__pending_value"
     overrides_editor_notice_key = f"{overrides_editor_key}__notice"
@@ -5284,7 +5328,10 @@ def jst_analysis_view() -> None:
 
     if report_path and report_path.exists():
         report_slug = slugify(str((study or {}).get("jst_full_nom") or (study or {}).get("slug") or "raport-jst")) or "raport-jst"
-        raw_report = report_path.read_text(encoding="utf-8", errors="ignore")
+        raw_report = _apply_archetype_label_mode_to_html(
+            report_path.read_text(encoding="utf-8", errors="ignore"),
+            label_mode_choice,
+        )
         raw_report_for_preview = raw_report
         full_report = ""
         full_report_bytes = 0
@@ -5292,7 +5339,7 @@ def jst_analysis_view() -> None:
         full_report_available = False
         # Nie osadzamy ponownie całego raportu przy każdym rerunie: to potrafi mocno wydłużyć UI.
         if rendered and rendered != "__report_path_only__" and inlined_used:
-            full_report = str(rendered)
+            full_report = _apply_archetype_label_mode_to_html(str(rendered), label_mode_choice)
             full_report_bytes = len(full_report.encode("utf-8", errors="ignore"))
             full_report_available = bool(full_report and full_report_bytes <= standalone_limit)
             if not full_report_available:
@@ -5351,7 +5398,7 @@ def jst_analysis_view() -> None:
         report_slug = slugify(str((study or {}).get("jst_full_nom") or (study or {}).get("slug") or "raport-jst")) or "raport-jst"
         cached_html = ""
         if isinstance(rendered, str) and rendered not in {"", "__report_path_only__", "__inline_error__"}:
-            cached_html = rendered
+            cached_html = _apply_archetype_label_mode_to_html(rendered, label_mode_choice)
         st.warning(
             "Raport został policzony, ale panel nie odnalazł pliku `raport.html` w katalogu runa. "
             "Najczęściej pomaga kliknięcie „Przelicz od nowa”."
@@ -5480,6 +5527,7 @@ def jst_analysis_view() -> None:
                 st.info("Włącz „Tryb lekki renderowania” albo pobierz raport ZIP (WYNIKI) i otwórz lokalnie.")
                 return
 
+    to_render = _apply_archetype_label_mode_to_html(to_render, label_mode_choice)
     render_size = len(to_render.encode("utf-8", errors="ignore"))
     if render_size > hard_limit:
         st.error(
@@ -5661,10 +5709,37 @@ def _matching_mode_labels(mode_choice: str) -> Tuple[str, str, str]:
     )
 
 
-def _matching_entity_name(entity: str, axis_label: str) -> str:
+_MATCHING_FEMININE_MAP: Dict[str, str] = {
+    "Władca": "Władczyni",
+    "Bohater": "Bohaterka",
+    "Mędrzec": "Mędrczyni",
+    "Opiekun": "Opiekunka",
+    "Kochanek": "Kochanka",
+    "Błazen": "Komiczka",
+    "Twórca": "Twórczyni",
+    "Odkrywca": "Odkrywczyni",
+    "Czarodziej": "Czarodziejka",
+    "Towarzysz": "Towarzyszka",
+    "Niewinny": "Niewinna",
+    "Buntownik": "Buntowniczka",
+}
+_MATCHING_MASC_FROM_FEM: Dict[str, str] = {v: k for k, v in _MATCHING_FEMININE_MAP.items()}
+
+
+def _normalize_matching_gender_code(raw: Any) -> str:
+    txt = str(raw or "").strip().lower()
+    if txt in {"k", "kobieta", "kob", "female", "f"}:
+        return "K"
+    return "M"
+
+
+def _matching_entity_name(entity: str, axis_label: str, gender_code: str = "M") -> str:
     if str(axis_label) == "Wartość":
         return str(JST_VALUE_BY_ARCH.get(str(entity), str(entity)))
-    return str(entity)
+    base = str(_MATCHING_MASC_FROM_FEM.get(str(entity), str(entity)))
+    if _normalize_matching_gender_code(gender_code) == "K":
+        return str(_MATCHING_FEMININE_MAP.get(base, base))
+    return base
 
 
 _JST_ARCH_BY_VALUE: Dict[str, str] = {str(v): str(k) for k, v in JST_VALUE_BY_ARCH.items()}
@@ -5703,6 +5778,7 @@ def _matching_entity_icon(entity: str, axis_label: str) -> str:
     ent = str(entity)
     if str(axis_label) == "Wartość":
         ent = str(_JST_ARCH_BY_VALUE.get(ent, ent))
+    ent = str(_MATCHING_MASC_FROM_FEM.get(ent, ent))
     return str(_MATCHING_ICON_BY_ARCH.get(ent, "•"))
 
 
@@ -5710,6 +5786,7 @@ def _matching_entity_icon_html(entity: str, axis_label: str) -> str:
     ent = str(entity)
     if str(axis_label) == "Wartość":
         ent = str(_JST_ARCH_BY_VALUE.get(ent, ent))
+    ent = str(_MATCHING_MASC_FROM_FEM.get(ent, ent))
     icon_file = str(_MATCHING_ICON_FILE_BY_ARCH.get(ent, "")).strip()
     if icon_file:
         icon_path = Path(__file__).with_name("ikony") / icon_file
@@ -6760,6 +6837,8 @@ def matching_view() -> None:
         if st.button("Połącz i policz matching", type="primary"):
             person = p_options[pick_personal]
             jst_study = j_options[pick_jst]
+            person_gender_code = _normalize_matching_gender_code(person.get("gender"))
+            person_role_gen_calc = "polityczki" if person_gender_code == "K" else "polityka"
 
             p_profile, p_n = _load_personal_profile_pct(str(person.get("id")))
             j_rows = list_jst_responses(sb, str(jst_study.get("id")))
@@ -6959,6 +7038,7 @@ def matching_view() -> None:
                 "jst_study_id": str(jst_study.get("id") or ""),
                 "person_name_nom": f"{(person.get('first_name_nom') or person.get('first_name') or '').strip()} {(person.get('last_name_nom') or person.get('last_name') or '').strip()}".strip(),
                 "person_name_gen": person_name_gen,
+                "person_gender_code": person_gender_code,
                 "jst_name_nom": jst_name_nom,
                 "jst_name_gen": jst_name_gen,
                 "match_score": round(match_score, 1),
@@ -7015,11 +7095,11 @@ def matching_view() -> None:
                     "kara_kluczowa = 0.56*KEY_MAE + 0.26*max(0, KEY_MAX - 10) + kara_wspolnych_priorytetow + kara_roznicy_priorytetu_glownego; "
                     "match = clamp(0,100, base - kara_kluczowa); "
                     "gdzie MAE = średnia |Δ| dla 12 archetypów, RMSE = pierwiastek ze średniej kwadratów |Δ|, "
-                    "TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii priorytetów polityka i mieszkańców "
+                    f"TOP3_MAE = średnia z 3 największych |Δ|, KEY_MAE = średnia |Δ| dla unii priorytetów {person_role_gen_calc} i mieszkańców "
                     "(TOP3, ale jeśli 3. pozycja ma <70, do puli kluczowej wchodzi tylko TOP2), "
                     "KEY_MAX = największa |Δ| w tej samej puli kluczowej; "
                     "kara_wspolnych_priorytetow = 5.5 gdy brak części wspólnej TOP, 2.0 gdy wspólna jest tylko 1 pozycja, inaczej 0; "
-                    "kara_roznicy_priorytetu_glownego = 2.5 gdy TOP1 polityka i mieszkańców są różne. "
+                    f"kara_roznicy_priorytetu_glownego = 2.5 gdy TOP1 {person_role_gen_calc} i mieszkańców są różne. "
                     "To równanie dotyczy wyłącznie wskaźnika Poziom dopasowania. "
                     "Model nie dodaje osobnej premii dodatniej za zgodność - niższa luka poprawia wynik tylko przez mniejszą karę."
                 ),
@@ -7040,6 +7120,11 @@ def matching_view() -> None:
         with tab_strategy:
             st.info("Najpierw wybierz badania w zakładce „Wybierz badania”.")
         return
+
+    person_gender_code = _normalize_matching_gender_code(result.get("person_gender_code"))
+    person_role_nom = "polityczka" if person_gender_code == "K" else "polityk"
+    person_role_gen = "polityczki" if person_gender_code == "K" else "polityka"
+    person_role_nom_cap = "Polityczka" if person_gender_code == "K" else "Polityk"
 
     with tab_summary:
         st.markdown(
@@ -7140,8 +7225,8 @@ def matching_view() -> None:
             diff = abs(pol - ocz)
             cmp_rows.append(
                 {
-                    current_axis_label: _matching_entity_name(a, current_axis_label),
-                    "Profil polityka": round(pol, 1),
+                    current_axis_label: _matching_entity_name(a, current_axis_label, person_gender_code),
+                    f"Profil {person_role_gen}": round(pol, 1),
                     f"Oczekiwania mieszkańców ({sei_short})": round(ocz, 1),
                     "Różnica |Δ|": round(diff, 1),
                     "__sort_diff": diff,
@@ -7151,8 +7236,9 @@ def matching_view() -> None:
         cmp_rows_n = len(df_cmp.index)
         cmp_height = max(92, min(760, 40 + cmp_rows_n * 35))
         ocz_col = f"Oczekiwania mieszkańców ({sei_short})"
+        person_profile_col = f"Profil {person_role_gen}"
         cmp_col_config = {
-            "Profil polityka": st.column_config.NumberColumn("Profil polityka", format="%.1f"),
+            person_profile_col: st.column_config.NumberColumn(person_profile_col, format="%.1f"),
             ocz_col: st.column_config.NumberColumn(ocz_col, format="%.1f"),
             "Różnica |Δ|": st.column_config.NumberColumn("Różnica |Δ|", format="%.1f"),
         }
@@ -7180,7 +7266,7 @@ def matching_view() -> None:
             )
             st.markdown(
                 "Metryka celowo mocniej karze strategiczne rozjazdy: oprócz MAE, RMSE i średniej 3 największych luk "
-                "uwzględnia też luki na archetypach kluczowych (unia priorytetów polityka i mieszkańców) "
+                f"uwzględnia też luki na archetypach kluczowych (unia priorytetów {person_role_gen} i mieszkańców) "
                 "oraz dodatkowe kary za skrajny rozjazd w tej puli, brak wspólnych priorytetów i różny priorytet główny."
             )
             st.markdown(
@@ -7195,7 +7281,7 @@ def matching_view() -> None:
             if metrics:
                 key_list = metrics.get("key_archetypes") or []
                 key_list_txt = ", ".join(
-                    [_matching_entity_name(str(a), current_axis_label) for a in key_list]
+                    [_matching_entity_name(str(a), current_axis_label, person_gender_code) for a in key_list]
                 ) if isinstance(key_list, list) and key_list else "brak"
                 st.markdown(
                     f"**Składowe dla tego porównania:** "
@@ -7252,7 +7338,7 @@ def matching_view() -> None:
                         row = comp.get(a) or {}
                         comp_rows.append(
                             {
-                                current_axis_label: _matching_entity_name(a, current_axis_label),
+                                current_axis_label: _matching_entity_name(a, current_axis_label, person_gender_code),
                                 "A (% oczekujących)": _fmt_cell(row.get("A"), 1),
                                 "B1: TOP3 (%)": _fmt_cell(row.get("B1"), 1),
                                 "B2: TOP1 (%)": _fmt_cell(row.get("B2"), 1),
@@ -7291,14 +7377,14 @@ def matching_view() -> None:
         gaps_rows = result.get("gaps_rows") or []
         strength_items_html = "".join(
             [
-                f"<span class='match-chip good'>{html.escape(_matching_entity_name(str(r.get('archetyp') or ''), current_axis_label))} "
+                f"<span class='match-chip good'>{html.escape(_matching_entity_name(str(r.get('archetyp') or ''), current_axis_label, person_gender_code))} "
                 f"<small>|Δ| {float(r.get('diff', 0.0)):.1f} pp</small></span>"
                 for r in strengths_rows
             ]
         )
         gap_items_html = "".join(
             [
-                f"<span class='match-chip gap'>{html.escape(_matching_entity_name(str(r.get('archetyp') or ''), current_axis_label))} "
+                f"<span class='match-chip gap'>{html.escape(_matching_entity_name(str(r.get('archetyp') or ''), current_axis_label, person_gender_code))} "
                 f"<small>|Δ| {float(r.get('diff', 0.0)):.1f} pp</small></span>"
                 for r in gaps_rows
             ]
@@ -7531,7 +7617,7 @@ def matching_view() -> None:
             """,
             unsafe_allow_html=True,
         )
-        person_name = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
+        person_name = str(result.get("person_name_nom") or result.get("person_label") or person_role_nom_cap)
         jst_name = str(result.get("jst_name_nom") or result.get("jst_label") or "JST")
         person_name_gen = str(result.get("person_name_gen") or "").strip() or person_name
         jst_name_gen = str(result.get("jst_name_gen") or "").strip() or jst_name
@@ -7545,7 +7631,7 @@ def matching_view() -> None:
             "Buntownik", "Błazen", "Kochanek", "Opiekun", "Towarzysz", "Niewinny",
             "Władca", "Mędrzec", "Czarodziej", "Bohater", "Twórca", "Odkrywca",
         ]
-        radar_tick_labels: List[str] = [_matching_entity_name(a, current_axis_label) for a in radar_order]
+        radar_tick_labels: List[str] = [_matching_entity_name(a, current_axis_label, person_gender_code) for a in radar_order]
         person_profile_20 = {a: float(person_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
         jst_profile_20 = {a: float(jst_profile_100.get(a, 0.0)) / 5.0 for a in radar_order}
 
@@ -7565,7 +7651,7 @@ def matching_view() -> None:
             radar_tick_text.append(f"<b>{safe_lbl}</b>" if arche in radar_top_union else safe_lbl)
         entity_gen = "archetypów" if current_axis_label == "Archetyp" else "wartości"
         rank_names = ["Główny", "Wspierający", "Poboczny"]
-        p_top_label = f"TOP{max(1, len(p_top))} polityka"
+        p_top_label = f"TOP{max(1, len(p_top))} {person_role_gen}"
         j_top_label = f"TOP{max(1, len(j_top))} mieszkańców"
         person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
         jst_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
@@ -7587,7 +7673,7 @@ def matching_view() -> None:
         def _top3_compare_card(title: str, items: List[str]) -> str:
             rows: List[str] = []
             for idx, item in enumerate(items[:3]):
-                item_label = _matching_entity_name(str(item), current_axis_label)
+                item_label = _matching_entity_name(str(item), current_axis_label, person_gender_code)
                 item_icon_html = _matching_entity_icon_html(str(item), current_axis_label)
                 rank_class = "match-r-main" if idx == 0 else ("match-r-aux" if idx == 1 else "match-r-supp")
                 rows.append(
@@ -7667,19 +7753,19 @@ def matching_view() -> None:
         axis_gen = "archetypach" if current_axis_label == "Archetyp" else "wartościach"
 
         if p_top and j_top and p_top[0] == j_top[0]:
-            main_name = _matching_entity_name(p_top[0], current_axis_label)
+            main_name = _matching_entity_name(p_top[0], current_axis_label, person_gender_code)
             advantages.append(f"Zgodny priorytet główny: {main_name}.")
         elif p_top and j_top:
-            p_main = _matching_entity_name(p_top[0], current_axis_label)
-            j_main = _matching_entity_name(j_top[0], current_axis_label)
-            problems.append(f"Różny priorytet główny: polityk stawia na {p_main}, mieszkańcy na {j_main}.")
+            p_main = _matching_entity_name(p_top[0], current_axis_label, person_gender_code)
+            j_main = _matching_entity_name(j_top[0], current_axis_label, person_gender_code)
+            problems.append(f"Różny priorytet główny: {person_role_nom} stawia na {p_main}, mieszkańcy na {j_main}.")
 
         if overlap_top:
-            overlap_txt = ", ".join(_matching_entity_name(a, current_axis_label) for a in overlap_top)
+            overlap_txt = ", ".join(_matching_entity_name(a, current_axis_label, person_gender_code) for a in overlap_top)
             overlap_total = max(1, min(len(p_top), len(j_top)))
             advantages.append(f"Wspólne priorytety ({len(overlap_top)}/{overlap_total}): {overlap_txt}.")
         else:
-            problems.append("Brak wspólnych pozycji w priorytetach polityka i mieszkańców.")
+            problems.append(f"Brak wspólnych pozycji w priorytetach {person_role_gen} i mieszkańców.")
 
         # Jeśli priorytety (TOP2/TOP3) pokrywają się z najlepszymi / największymi lukami,
         # pokazujemy to jawnie w sekcji zalet/problemów.
@@ -7687,6 +7773,7 @@ def matching_view() -> None:
             raw_name = str(name or "").strip()
             if str(current_axis_label) == "Wartość":
                 raw_name = str(_JST_ARCH_BY_VALUE.get(raw_name, raw_name))
+            raw_name = str(_MATCHING_MASC_FROM_FEM.get(raw_name, raw_name))
             return slugify(raw_name).lower()
 
         priority_for_checks: List[str] = []
@@ -7714,14 +7801,14 @@ def matching_view() -> None:
 
         if priority_in_best:
             best_priority_txt = ", ".join(
-                f"{_matching_entity_name(a, current_axis_label)} {_delta_nbsp(diff_by_entity.get(a, 0.0))}"
+                f"{_matching_entity_name(a, current_axis_label, person_gender_code)} {_delta_nbsp(diff_by_entity.get(a, 0.0))}"
                 for a in priority_in_best
             )
             advantages.insert(0, f"Priorytetowe pozycje są też wśród najlepszych dopasowań: {best_priority_txt}.")
 
         if priority_in_gaps:
             gap_priority_txt = ", ".join(
-                f"{_matching_entity_name(a, current_axis_label)} {_delta_nbsp(diff_by_entity.get(a, 0.0))}"
+                f"{_matching_entity_name(a, current_axis_label, person_gender_code)} {_delta_nbsp(diff_by_entity.get(a, 0.0))}"
                 for a in priority_in_gaps
             )
             problems.insert(0, f"Priorytetowe pozycje są też wśród największych luk: {gap_priority_txt}.")
@@ -7732,10 +7819,10 @@ def matching_view() -> None:
             problems.append(f"Średnia luka na kluczowych {axis_gen} jest wysoka ({key_gap_mae_live:.1f} pp).")
 
         if key_max_gap_live >= 20.0:
-            key_max_name = _matching_entity_name(key_max_entity, current_axis_label)
+            key_max_name = _matching_entity_name(key_max_entity, current_axis_label, person_gender_code)
             problems.append(f"Największa luka kluczowa: {key_max_name} {_delta_nbsp(key_max_gap_live)}.")
 
-        best_name = _matching_entity_name(best_entity, current_axis_label)
+        best_name = _matching_entity_name(best_entity, current_axis_label, person_gender_code)
         advantages.append(f"Najlepsza zgodność dotyczy pozycji {best_name} {_delta_nbsp(best_gap_live)}.")
 
         if not advantages:
@@ -7805,7 +7892,7 @@ def matching_view() -> None:
         j_marker_r, j_marker_c = _marker_series(jst_profile_20, j_top, jst_top_colors)
         person_vals = [float(person_profile_20.get(a, 0.0)) for a in radar_order]
         jst_vals = [float(jst_profile_20.get(a, 0.0)) for a in radar_order]
-        legend_person_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil polityka ({person_name})\u00a0\u00a0\u00a0"
+        legend_person_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil {person_role_gen} ({person_name})\u00a0\u00a0\u00a0"
         legend_jst_label = f"\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0profil mieszkańców ({jst_name})\u00a0\u00a0\u00a0"
 
         fig_cmp = go.Figure(
@@ -7819,7 +7906,7 @@ def matching_view() -> None:
                     marker=dict(size=5, symbol="circle"),
                     name=legend_person_label,
                     showlegend=True,
-                    hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
+                    hovertemplate=f"<b>%{{theta}}</b><br>{person_role_nom_cap}: %{{r:.2f}}<extra></extra>",
                 ),
                 go.Scatterpolar(
                     r=jst_vals + [jst_vals[0]],
@@ -7922,11 +8009,13 @@ def matching_view() -> None:
                 mean_scores=person_profile_100,
                 out_path=f"matching_profile_person_{p_key}_{j_key}.png",
                 label_mode=("values" if current_axis_label == "Wartość" else "arche"),
+                gender_code=person_gender_code,
             )
             jst_profile_img = AD.make_segment_profile_wheel_png(
                 mean_scores=jst_profile_100,
                 out_path=f"matching_profile_jst_{j_key}_{p_key}.png",
                 label_mode=("values" if current_axis_label == "Wartość" else "arche"),
+                gender_code=person_gender_code,
             )
 
             def _show_image_compat(img_path: str, max_width_px: int = 560) -> None:
@@ -8011,14 +8100,14 @@ def matching_view() -> None:
                 f"""
                 <div class="match-demo-context">
                   <span class="match-demo-context-label">Kontekst</span>
-                  <span class="match-demo-context-item">Polityk: {html.escape(demo_person_name or "—")}</span>
+                  <span class="match-demo-context-item">{person_role_nom_cap}: {html.escape(demo_person_name or "—")}</span>
                   <span class="match-demo-context-sep">•</span>
                   <span class="match-demo-context-item">JST: {html.escape(demo_jst_name or "—")}</span>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-        st.markdown("Demografia grupy mieszkańców najbardziej dopasowanej do profilu polityka (top 25% podobieństwa).")
+        st.markdown(f"Demografia grupy mieszkańców najbardziej dopasowanej do profilu {person_role_gen} (top 25% podobieństwa).")
         st.markdown(
             """
             <style>
@@ -8207,7 +8296,7 @@ def matching_view() -> None:
         st.markdown(
             "Porównanie działa wyłącznie na wspólnej skali 12 archetypów (0-100): "
             "dla każdego segmentu liczona jest zgodność strategiczna z naciskiem na kluczowe archetypy "
-            "(TOP6 polityka + TOP6 segmentu, 100% bazy wyniku z puli kluczowej; analiza TOP3/TOP2, luki i kary za rozjazdy priorytetów)."
+            f"(TOP6 {person_role_gen} + TOP6 segmentu, 100% bazy wyniku z puli kluczowej; analiza TOP3/TOP2, luki i kary za rozjazdy priorytetów)."
         )
         if segment_err:
             st.warning(segment_err)
@@ -8461,7 +8550,7 @@ def matching_view() -> None:
 
                 if selected_score >= 90:
                     seg_band_label = "Ekstremalnie wysokie dopasowanie"
-                    seg_band_desc = "Profil segmentu i profil polityka są niemal zbieżne także na osiach kluczowych."
+                    seg_band_desc = f"Profil segmentu i profil {person_role_gen} są niemal zbieżne także na osiach kluczowych."
                     score_color = "#0f766e"
                     score_bg = "#ecfeff"
                 elif selected_score >= 80:
@@ -8491,12 +8580,12 @@ def matching_view() -> None:
                     score_bg = "#fff7ed"
                 elif selected_score >= 30:
                     seg_band_label = "Bardzo niskie dopasowanie"
-                    seg_band_desc = "Dominują rozjazdy strategiczne między politykiem a segmentem."
+                    seg_band_desc = f"Dominują rozjazdy strategiczne między {person_role_nom} a segmentem."
                     score_color = "#be123c"
                     score_bg = "#fff1f2"
                 else:
                     seg_band_label = "Marginalne dopasowanie"
-                    seg_band_desc = "Segment i polityk są silnie rozbieżni na osiach kluczowych."
+                    seg_band_desc = f"Segment i {person_role_nom} są silnie rozbieżni na osiach kluczowych."
                     score_color = "#7f1d1d"
                     score_bg = "#fef2f2"
 
@@ -8670,7 +8759,7 @@ def matching_view() -> None:
                     "Buntownik", "Błazen", "Kochanek", "Opiekun", "Towarzysz", "Niewinny",
                     "Władca", "Mędrzec", "Czarodziej", "Bohater", "Twórca", "Odkrywca",
                 ]
-                radar_tick_labels = [_matching_entity_name(a, current_axis_label) for a in radar_order]
+                radar_tick_labels = [_matching_entity_name(a, current_axis_label, person_gender_code) for a in radar_order]
                 seg_profile = {a: float((selected_seg.get("profile") or {}).get(a, 0.0)) for a in radar_order}
                 person_profile_20 = {a: float(person_profile_match.get(a, 0.0)) / 5.0 for a in radar_order}
                 seg_profile_20 = {a: float(seg_profile.get(a, 0.0)) / 5.0 for a in radar_order}
@@ -8692,7 +8781,7 @@ def matching_view() -> None:
 
                 person_top_colors = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
                 seg_top_colors = {"main": "#2563eb", "aux": "#a855f7", "supp": "#f97316"}
-                p_top_label = f"TOP{max(1, len(p_top))} polityka"
+                p_top_label = f"TOP{max(1, len(p_top))} {person_role_gen}"
                 seg_top_label = f"TOP{max(1, len(seg_top))} segmentu"
 
                 def _marker_series_seg(profile: Dict[str, float], top3: List[str], palette: Dict[str, str]) -> Tuple[List[Optional[float]], List[str]]:
@@ -8732,9 +8821,9 @@ def matching_view() -> None:
                 seg_marker_r, seg_marker_c = _marker_series_seg(seg_profile_20, seg_top, seg_top_colors)
                 person_vals_20 = [float(person_profile_20.get(a, 0.0)) for a in radar_order]
                 seg_vals_20 = [float(seg_profile_20.get(a, 0.0)) for a in radar_order]
-                person_name_seg = str(result.get("person_name_nom") or result.get("person_label") or "Polityk")
+                person_name_seg = str(result.get("person_name_nom") or result.get("person_label") or person_role_nom_cap)
                 segment_name_seg = str(selected_seg.get("segment_name") or selected_seg.get("segment") or "segment")
-                legend_person_label = f"profil polityka ({person_name_seg})"
+                legend_person_label = f"profil {person_role_gen} ({person_name_seg})"
                 legend_segment_label = f"profil segmentu ({segment_name_seg})"
                 st.markdown(
                     f"""
@@ -8757,7 +8846,7 @@ def matching_view() -> None:
                             marker=dict(size=5, symbol="circle"),
                             name=legend_person_label,
                             showlegend=False,
-                            hovertemplate="<b>%{theta}</b><br>Polityk: %{r:.2f}<extra></extra>",
+                            hovertemplate=f"<b>%{{theta}}</b><br>{person_role_nom_cap}: %{{r:.2f}}<extra></extra>",
                         ),
                         go.Scatterpolar(
                             r=seg_vals_20 + [seg_vals_20[0]],
@@ -8835,7 +8924,7 @@ def matching_view() -> None:
                 )
                 st.caption(
                     f"Metoda porównania strategicznego (key-focused): 100% bazy wyniku liczone jest z puli kluczowej "
-                    f"(TOP6 polityka + TOP6 segmentu); dodatkowo działa kara za luki priorytetów TOP3/TOP2. "
+                    f"(TOP6 {person_role_gen} + TOP6 segmentu); dodatkowo działa kara za luki priorytetów TOP3/TOP2. "
                     f"Aktualna siła kar: {penalty_strength}."
                 )
 
@@ -8858,11 +8947,13 @@ def matching_view() -> None:
                         mean_scores=person_profile_match,
                         out_path=f"matching_segment_profile_person_{p_key}_{s_key}.png",
                         label_mode=("values" if current_axis_label == "Wartość" else "arche"),
+                        gender_code=person_gender_code,
                     )
                     segment_profile_img = AD.make_segment_profile_wheel_png(
                         mean_scores=seg_profile,
                         out_path=f"matching_segment_profile_segment_{s_key}_{p_key}.png",
                         label_mode=("values" if current_axis_label == "Wartość" else "arche"),
+                        gender_code=person_gender_code,
                     )
 
                     def _show_image_compat_segment(img_path: str, max_width_px: int = 560) -> None:
@@ -9188,8 +9279,8 @@ def matching_view() -> None:
                                 )
 
     with tab_strategy:
-        strengths = [str(_matching_entity_name(x, current_axis_label)) for x in (result.get("strengths") or [])[:3]]
-        gaps = [str(_matching_entity_name(x, current_axis_label)) for x in (result.get("gaps") or [])[:3]]
+        strengths = [str(_matching_entity_name(x, current_axis_label, person_gender_code)) for x in (result.get("strengths") or [])[:3]]
+        gaps = [str(_matching_entity_name(x, current_axis_label, person_gender_code)) for x in (result.get("gaps") or [])[:3]]
         demo_cards = list(result.get("demo_cards") or [])
         target_cards = demo_cards[:2]
         target_group_txt = ", ".join([str(c.get("top") or "").strip() for c in target_cards if str(c.get("top") or "").strip()]) or "najmocniej dopasowane segmenty demograficzne"

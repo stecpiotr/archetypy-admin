@@ -2188,3 +2188,59 @@ Uzasadnienie:
   - lokalnego (edycja konkretnej ankiety),
   - globalnego (zmiana wzorca/pytania predefiniowanego dla całego systemu).
 - Propagacja po kodowaniu `M_*` spełnia oczekiwanie „wszędzie tam, gdzie jest np. `M_OBSZAR`”.
+
+### D-240: Tabele demograficzne personalne renderują pełną konfigurację metryczki, także 0%
+Decyzja:
+- `Profile demograficzne archetypu` buduje zmienne i kategorie z `metryczka_config`, nie tylko z wartości obecnych w danych.
+- Kategorie niewystępujące w próbie/podgrupie pozostają w tabeli z wynikiem 0%.
+- Kolejność pytań i odpowiedzi w tabelach odpowiada konfiguracji metryczki; randomizacja nie zmienia kolejności raportowej.
+Uzasadnienie:
+- Raport ma być stabilnym odzwierciedleniem zaprojektowanej metryczki, a nie tylko przypadkowym przekrojem wartości już zebranych.
+- Dzięki temu kategorie 0% są widoczne i nie znikają z interpretacji.
+
+### D-241: Finalne kody rdzenia metryczki są krótkimi kodami tabelarycznymi
+Decyzja:
+- Rdzeń metryczki ma kanoniczne kody tabelaryczne:
+  - `M_WIEK`: `60+`, ikona zmiennej `⌛`,
+  - `M_WYKSZT`: `podst./gim./zaw.`,
+  - `M_ZAWOD`: `własna firma`, `inna`,
+  - `M_MATERIAL`: `bardzo zła`, `raczej zła`, `przeciętna`, `raczej dobra`, `bardzo dobra`, `odmowa`.
+- Długie etykiety respondentowe pozostają treścią ankiety, ale tabele i raporty używają krótkich kodów.
+Uzasadnienie:
+- Krótkie kody są czytelniejsze w raportach, stabilne w imporcie i spójne z dotychczasowymi bazami.
+
+### D-242: Odpowiedzi metryczki są zarządzane jawnie zamiast przez pusty wiersz dynamiczny
+Decyzja:
+- Edytory odpowiedzi metryczki używają kontrolowanej tabeli (`num_rows=fixed`) oraz osobnych przycisków:
+  - dodaj odpowiedź,
+  - usuń odpowiedź,
+  - przesuń w górę,
+  - przesuń w dół.
+- Kolumna `Ikona` odpowiedzi jest polem tekstowym, żeby obsłużyć własne ikonki, nie tylko listę z biblioteki.
+Uzasadnienie:
+- Pusty wiersz dynamiczny był mylący i nie zawsze edytowalny.
+- Jawne sterowanie kolejnością jest bezpieczniejsze przy długich listach odpowiedzi, np. partiach politycznych.
+
+### D-243: Backfill metryczki działa jako lekka migracja po zalogowaniu admina
+Decyzja:
+- Po zalogowaniu admina uruchamiany jest jednorazowy backfill w sesji:
+  - normalizuje konfiguracje JST i personalne,
+  - uzupełnia domyślne kody, ikonki i etykiety,
+  - nie wymaga ręcznego klikania w każdej ankiecie.
+Uzasadnienie:
+- Starsze rekordy powinny natychmiast wyglądać spójnie w raportach bez ręcznej migracji użytkownika.
+
+### D-244: UX edytora odpowiedzi metryczki wraca do natywnej edycji tabeli, a przesuwanie jest dodatkiem
+Decyzja:
+- Dodawanie/usuwanie odpowiedzi odbywa się natywnie w `st.data_editor` (`num_rows="dynamic"`), bez osobnych globalnych przycisków `Dodaj/Usuń`.
+- Przesuwanie odpowiedzi pozostaje jako dodatkowa funkcja: zaznaczenie checkboxa `Przesuń` + przyciski `↑/↓`.
+- Wysokość tabeli nie zawiera sztucznego zapasu pustych wierszy.
+Uzasadnienie:
+- Poprzedni, „manualny” model był mniej ergonomiczny i tworzył wizualny bałagan (puste rzędy).
+- Użytkownik oczekuje prostego flow jak wcześniej, z jedną nową funkcją: zmiana kolejności odpowiedzi.
+
+### D-245: W adnotacjach typu w krytycznych blokach runtime używamy natywnych generyków `dict/list/tuple`
+Decyzja:
+- W `admin_dashboard.py` (sekcja liczenia dopasowania podgrupy) stosujemy natywne adnotacje `dict/list/tuple` zamiast `Dict/List/Tuple`.
+Uzasadnienie:
+- Plik nie importuje modułu `typing`; użycie `Dict/List/Tuple` wewnątrz wykonywanego bloku mogło powodować `NameError` podczas renderu raportu.
