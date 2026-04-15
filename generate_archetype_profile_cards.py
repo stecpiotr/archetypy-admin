@@ -15,10 +15,10 @@ OUT_DIR = ROOT / "assets" / "archetype_profile_cards_male"
 
 CANVAS_W = 1024
 CANVAS_H = 335
-BASELINE_Y = 232
-MAX_PEAK = 190  # 100% -> 190 px (stała skala dla wszystkich kart)
-CHART_X0 = 350
-CHART_X1 = 990
+BASELINE_Y = 240
+MAX_PEAK = 205  # 100% -> 205 px (stała skala dla wszystkich kart)
+CHART_X0 = 308
+CHART_X1 = 960
 
 METRICS = ("Empatia", "Umiejętności", "Niezależność", "Mądrość", "Kreatywność")
 
@@ -101,6 +101,40 @@ def font(path_candidates: list[Path], size: int) -> ImageFont.ImageFont:
         if candidate.exists():
             return ImageFont.truetype(str(candidate), size=size)
     return ImageFont.load_default()
+
+
+def text_width_with_tracking(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font_obj: ImageFont.ImageFont,
+    tracking_px: float = 0.0,
+) -> float:
+    if not text:
+        return 0.0
+    total = 0.0
+    for idx, ch in enumerate(text):
+        bb = draw.textbbox((0, 0), ch, font=font_obj)
+        total += float(bb[2] - bb[0])
+        if idx < len(text) - 1:
+            total += tracking_px
+    return total
+
+
+def draw_text_with_tracking(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[float, float],
+    text: str,
+    font_obj: ImageFont.ImageFont,
+    fill: tuple[int, int, int, int],
+    tracking_px: float = 0.0,
+) -> None:
+    x, y = xy
+    for idx, ch in enumerate(text):
+        draw.text((x, y), ch, font=font_obj, fill=fill)
+        bb = draw.textbbox((0, 0), ch, font=font_obj)
+        x += float(bb[2] - bb[0])
+        if idx < len(text) - 1:
+            x += tracking_px
 
 
 def detect_checker_colors(rgb_arr: np.ndarray) -> list[tuple[int, int, int]]:
@@ -290,11 +324,11 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
     draw.text((160 - title_w // 2, 250), name, fill=(20, 20, 20, 255), font=title_font)
 
     # Delikatna linia bazowa wykresu
-    draw.line((CHART_X0, BASELINE_Y, CHART_X1, BASELINE_Y), fill=(*stroke_rgb, 92), width=2)
+    draw.line((CHART_X0 - 8, BASELINE_Y, CHART_X1 + 8, BASELINE_Y), fill=(*stroke_rgb, 92), width=2)
 
     chart_width = CHART_X1 - CHART_X0
     step = chart_width / len(values)
-    sigma = step * 0.24
+    sigma = step * 0.30
     gradient = gradient_fill(
         (CANVAS_W, CANVAS_H),
         fill_rgb,
@@ -306,18 +340,29 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
 
     label_font = font(
         [
+            FONTS_DIR / "BarlowCondensed-Medium.ttf",
+            FONTS_DIR / "BarlowCondensed-Regular.ttf",
+            FONTS_DIR / "BarlowCondensed-Bold.ttf",
+            FONTS_DIR / "RobotoCondensed-Bold.ttf",
+            FONTS_DIR / "PTSans-Bold.ttf",
             FONTS_DIR / "solitas-normal-medium.otf",
             ROOT / "DejaVuSans.ttf",
         ],
-        size=21,
+        size=22,
     )
     value_font = font(
         [
+            FONTS_DIR / "BarlowCondensed-Medium.ttf",
+            FONTS_DIR / "BarlowCondensed-Regular.ttf",
+            FONTS_DIR / "BarlowCondensed-Bold.ttf",
+            FONTS_DIR / "RobotoCondensed-Bold.ttf",
+            FONTS_DIR / "PTSans-Bold.ttf",
             FONTS_DIR / "solitas-normal-medium.otf",
             ROOT / "DejaVuSans.ttf",
         ],
         size=28,
     )
+    tracking = 0.0
 
     for i, value in enumerate(values):
         cx = CHART_X0 + step * (i + 0.5)
@@ -338,18 +383,33 @@ def draw_archetype_panel(name: str, values: tuple[int, ...], color_hex: str) -> 
 
         # Subtelny kontur górnej krawędzi fali
         draw.line(curve, fill=(*stroke_rgb, 125), width=2)
+        draw.line([(curve[0][0] - 7, BASELINE_Y), (curve[0][0], BASELINE_Y)], fill=(*stroke_rgb, 100), width=2)
+        draw.line([(curve[-1][0], BASELINE_Y), (curve[-1][0] + 7, BASELINE_Y)], fill=(*stroke_rgb, 100), width=2)
 
         value_txt = f"{int(value)}%"
         vb = draw.textbbox((0, 0), value_txt, font=value_font)
-        vw = vb[2] - vb[0]
+        vw = text_width_with_tracking(draw, value_txt, value_font, tracking_px=tracking)
         vh = vb[3] - vb[1]
         vy = int(BASELINE_Y - peak - vh - 18)
-        draw.text((int(cx - vw / 2), vy), value_txt, fill=(28, 28, 28, 255), font=value_font)
+        draw_text_with_tracking(
+            draw,
+            (float(cx - vw / 2), float(vy)),
+            value_txt,
+            value_font,
+            (28, 28, 28, 255),
+            tracking_px=tracking,
+        )
 
         metric = METRICS[i]
-        mb = draw.textbbox((0, 0), metric, font=label_font)
-        mw = mb[2] - mb[0]
-        draw.text((int(cx - mw / 2), BASELINE_Y + 9), metric, fill=(40, 40, 40, 255), font=label_font)
+        mw = text_width_with_tracking(draw, metric, label_font, tracking_px=tracking)
+        draw_text_with_tracking(
+            draw,
+            (float(cx - mw / 2), float(BASELINE_Y + 9)),
+            metric,
+            label_font,
+            (40, 40, 40, 255),
+            tracking_px=tracking,
+        )
 
     return canvas
 

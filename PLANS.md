@@ -3222,3 +3222,19 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-119 [DONE]
+Temat: Domknięcie guarda `Cofnij` dla przypadku „edytuję i od razu klikam wyjście”.
+Kryteria ukończenia:
+1. W `Metryczka` (JST + personal) wykrywanie `dirty` opiera się na aktualnym stanie live-edytora w tym samym rerunie.
+2. `Cofnij` jest renderowane na górze widoku także w `Ustawienia ankiety` (JST + personal), bez zmiany logiki zapisu.
+3. Brak regresji składni (`py_compile`).
+Pierwszy krok wykonawczy:
+- przepiąć obliczanie `dirty` po zebraniu `edited_cfg` oraz przenieść render `guarded_back_button(...)` do placeholdera osadzonego wyżej.
+Wynik:
+- `archetypy-admin/app.py`:
+  - `jst_metryczka_view` i `personal_metryczka_view` liczą `dirty` po `_render_metryczka_editor(...)` z `edited_cfg` (ten sam klik),
+  - guard `Cofnij` renderowany jest przez `st.empty()` osadzone wyżej (spójne miejsce przy długich formularzach),
+  - `jst_settings_view` i `personal_settings_view` również renderują guard w górnym placeholderze.
+- Smoke-check:
+  - `python -m py_compile app.py` (OK).

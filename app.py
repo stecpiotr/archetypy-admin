@@ -4795,6 +4795,7 @@ def jst_metryczka_view() -> None:
     study_row = _apply_scheduled_survey_transitions(study_row, kind="jst")
     base_cfg = normalize_jst_metryczka_config(study_row.get("metryczka_config"))
     editor_state_key = _metryczka_editor_state_key("jst", sid)
+    back_slot = st.empty()
 
     def _current_cfg() -> Dict[str, Any]:
         return _metryczka_normalize_config(
@@ -4831,14 +4832,6 @@ def jst_metryczka_view() -> None:
             st.error(f"Nie udało się zapisać metryczki: {exc}")
             return False
 
-    is_dirty = (_stable_json_repr(_current_cfg()) != _stable_json_repr(base_cfg))
-    guarded_back_button(
-        dest="home_jst",
-        label="← Powrót do panelu mieszkańców",
-        dirty=is_dirty,
-        key_prefix=f"jst_metryczka_{sid}",
-        on_save_and_leave=lambda: _save_jst_metryczka(rerun_after=False),
-    )
     status_meta = _study_status_meta(study_row, kind="jst")
     slug = str(study_row.get("slug") or "").strip()
     survey_base = str(st.secrets.get("JST_SURVEY_BASE_URL", "https://jst.badania.pro") or "").rstrip("/")
@@ -4862,6 +4855,18 @@ def jst_metryczka_view() -> None:
         sid,
         base_cfg,
     )
+    is_dirty = (
+        _stable_json_repr(_metryczka_normalize_config("jst", edited_cfg))
+        != _stable_json_repr(base_cfg)
+    )
+    with back_slot.container():
+        guarded_back_button(
+            dest="home_jst",
+            label="← Powrót do panelu mieszkańców",
+            dirty=is_dirty,
+            key_prefix=f"jst_metryczka_{sid}",
+            on_save_and_leave=lambda: _save_jst_metryczka(rerun_after=False),
+        )
 
     _, save_col = st.columns([0.66, 0.34], gap="small")
     with save_col:
@@ -4917,6 +4922,7 @@ def jst_settings_view() -> None:
     flash_msg = st.session_state.pop(save_flash_key, None)
     if flash_msg:
         _toast_success_compat(str(flash_msg))
+    back_slot = st.empty()
 
     info_rows = pd.DataFrame(
         [
@@ -5118,13 +5124,14 @@ def jst_settings_view() -> None:
             st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")
             return False
 
-    guarded_back_button(
-        dest="home_jst",
-        label="← Powrót do panelu mieszkańców",
-        dirty=settings_dirty,
-        key_prefix=f"jst_settings_{sid}",
-        on_save_and_leave=lambda: _save_jst_settings(rerun_after=False),
-    )
+    with back_slot.container():
+        guarded_back_button(
+            dest="home_jst",
+            label="← Powrót do panelu mieszkańców",
+            dirty=settings_dirty,
+            key_prefix=f"jst_settings_{sid}",
+            on_save_and_leave=lambda: _save_jst_settings(rerun_after=False),
+        )
 
     if st.button("💾 Zapisz parametry ankiety", type="primary", key=f"jst_settings_save_params_{sid}"):
         _save_jst_settings(rerun_after=True)
@@ -10019,6 +10026,7 @@ def personal_metryczka_view() -> None:
     current_slug = str(study.get("slug") or "").strip()
     base_cfg = _metryczka_normalize_config("personal", study.get("metryczka_config"))
     editor_state_key = _metryczka_editor_state_key("personal", study_id or current_slug)
+    back_slot = st.empty()
 
     def _current_cfg() -> Dict[str, Any]:
         return _metryczka_normalize_config(
@@ -10058,15 +10066,6 @@ def personal_metryczka_view() -> None:
             st.error(f"Nie udało się zapisać metryczki: {exc}")
             return False
 
-    is_dirty = (_stable_json_repr(_current_cfg()) != _stable_json_repr(base_cfg))
-    guarded_back_button(
-        dest="home_personal",
-        label="← Powrót do panelu personalnego",
-        dirty=is_dirty,
-        key_prefix=f"personal_metryczka_{study_id or current_slug}",
-        on_save_and_leave=lambda: _save_personal_metryczka(rerun_after=False),
-    )
-
     status_meta = _study_status_meta(study, kind="personal")
     slug = current_slug
     survey_base = str(st.secrets.get("SURVEY_BASE_URL", "https://archetypy.badania.pro") or "").rstrip("/")
@@ -10091,6 +10090,18 @@ def personal_metryczka_view() -> None:
         study_id or slug,
         base_cfg,
     )
+    is_dirty = (
+        _stable_json_repr(_metryczka_normalize_config("personal", edited_cfg))
+        != _stable_json_repr(base_cfg)
+    )
+    with back_slot.container():
+        guarded_back_button(
+            dest="home_personal",
+            label="← Powrót do panelu personalnego",
+            dirty=is_dirty,
+            key_prefix=f"personal_metryczka_{study_id or current_slug}",
+            on_save_and_leave=lambda: _save_personal_metryczka(rerun_after=False),
+        )
 
     _, save_col = st.columns([0.66, 0.34], gap="small")
     with save_col:
@@ -10163,6 +10174,7 @@ def personal_settings_view() -> None:
     flash_msg = st.session_state.pop(save_flash_key, None)
     if flash_msg:
         _toast_success_compat(str(flash_msg))
+    back_slot = st.empty()
 
     info_rows = pd.DataFrame(
         [
@@ -10386,13 +10398,14 @@ def personal_settings_view() -> None:
             st.error(f"Nie udało się zapisać parametrów ankiety: {exc}")
             return False
 
-    guarded_back_button(
-        dest="home_personal",
-        label="← Powrót do panelu personalnego",
-        dirty=settings_dirty,
-        key_prefix=f"personal_settings_{study_id or slug}",
-        on_save_and_leave=lambda: _save_personal_settings(rerun_after=False),
-    )
+    with back_slot.container():
+        guarded_back_button(
+            dest="home_personal",
+            label="← Powrót do panelu personalnego",
+            dirty=settings_dirty,
+            key_prefix=f"personal_settings_{study_id or slug}",
+            on_save_and_leave=lambda: _save_personal_settings(rerun_after=False),
+        )
 
     if st.button(
         "💾 Zapisz parametry ankiety",

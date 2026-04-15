@@ -2434,3 +2434,10 @@ Decyzja:
 - Nie polegamy wyłącznie na późniejszej podmianie tekstu regexem po wygenerowaniu HTML.
 Uzasadnienie:
 - Część artefaktów (szczególnie grafiki PNG) nie podlega wiarygodnej podmianie post-process, co powodowało mieszanie form męskich i żeńskich w jednym raporcie.
+
+### D-271: Guard `Cofnij` sprawdza stan live-edytora po zebraniu aktualnych wartości widoku
+Decyzja:
+- Dla widoków metryczki (`jst_metryczka_view`, `personal_metryczka_view`) `dirty` jest liczone z `edited_cfg` po `_render_metryczka_editor(...)`, a nie z wcześniejszego snapshotu stanu.
+- Render przycisku `Cofnij` realizujemy przez placeholder (`st.empty()`) osadzony wysoko w widoku, ale wypełniany dopiero po obliczeniu finalnego `dirty`.
+Uzasadnienie:
+- W Streamlit przy scenariuszu „edytuję pole i od razu klikam Cofnij” wcześniejszy snapshot mógł nie zawierać bieżącej zmiany z tego samego reruna, co skutkowało brakiem potwierdzenia wyjścia.

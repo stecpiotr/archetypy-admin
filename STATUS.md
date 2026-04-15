@@ -2559,3 +2559,18 @@
 
 ### RYZYKO / do domknięcia
 - Brak otwartych ryzyk krytycznych po H-118; do potwierdzenia pozostaje test manualny UX i raportu na deployu.
+
+### Zrobione w Hotfix H-119 (2026-04-15, guard `Cofnij` dla tego samego kliku)
+- `archetypy-admin/app.py`:
+  - w `jst_metryczka_view` i `personal_metryczka_view` stan niezapisanych zmian (`dirty`) liczony jest po `_render_metryczka_editor(...)`, z aktualnego `edited_cfg`,
+  - eliminuje to scenariusz „zmiana + od razu Cofnij” bez potwierdzenia,
+  - render `guarded_back_button(...)` przeniesiony do górnego placeholdera (`st.empty()`) w:
+    - `jst_metryczka_view`,
+    - `personal_metryczka_view`,
+    - `jst_settings_view`,
+    - `personal_settings_view`.
+- Test techniczny:
+  - `python -m py_compile app.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do potwierdzenia manualnego na UI: scenariusz „edycja pola + natychmiastowe kliknięcie Cofnij” dla metryczki i ustawień (JST + personal).
