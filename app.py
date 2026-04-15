@@ -2546,7 +2546,7 @@ _METRY_ICON_LIBRARY: List[Tuple[str, str]] = [
     ("👩", "kobieta"),
     ("👨", "mężczyzna"),
     ("⌛", "wiek"),
-    ("🧭", "orientacja / poglądy"),
+    ("⚖️", "orientacja / poglądy"),
     ("🧑", "wiek 15-39"),
     ("🧑‍💼", "wiek 40-59"),
     ("🧓", "wiek 60+"),
@@ -3524,6 +3524,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 move_key = f"{widget_prefix}tpl_move_idx_{picked_id}"
                 move_idx = int(st.session_state.get(move_key, -1) or -1)
                 tpl_editor_df = _metryczka_attach_move_marker(tpl_opts_df, move_idx)
+                tpl_icon_options = [""] + _metry_icon_options_for_df(tpl_opts_df)
                 tpl_editor_widget_key = f"{edit_opts_key}_editor_{picked_id}"
                 tpl_editor_df = st.data_editor(
                     tpl_editor_df,
@@ -3561,9 +3562,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                             default=False,
                             width="small",
                         ),
-                        "Ikona": st.column_config.TextColumn(
+                        "Ikona": st.column_config.SelectboxColumn(
                             "Ikona",
-                            help="Wklej emoji (np. 🗳️) lub pozostaw puste, aby użyć automatycznej ikonki.",
+                            help="Wybierz ikonę z listy lub zostaw puste (auto-ikonka).",
+                            options=tpl_icon_options,
                             width="small",
                         ),
                     },
@@ -3814,6 +3816,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         move_key = f"{widget_prefix}opts_move_idx_{ui_key}"
         move_idx = int(st.session_state.get(move_key, -1) or -1)
         options_editor_df = _metryczka_attach_move_marker(options_df, move_idx)
+        options_icon_options = [""] + _metry_icon_options_for_df(options_df)
         options_editor_widget_key = f"{widget_prefix}opts_{ui_key}"
         options_editor_df = st.data_editor(
             options_editor_df,
@@ -3851,9 +3854,10 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                     default=False,
                     width="small",
                 ),
-                "Ikona": st.column_config.TextColumn(
+                "Ikona": st.column_config.SelectboxColumn(
                     "Ikona",
-                    help="Wklej emoji (np. 🗳️) lub pozostaw puste, aby użyć automatycznej ikonki.",
+                    help="Wybierz ikonę z listy lub zostaw puste (auto-ikonka).",
+                    options=options_icon_options,
                     width="small",
                 ),
             },
@@ -5143,6 +5147,18 @@ def _apply_archetype_label_mode_to_html(html_text: str, mode_choice: Any) -> str
     if not base_map:
         return source
 
+    def _ascii_pl(txt: str) -> str:
+        out = str(txt or "")
+        repl = (
+            ("ą", "a"), ("ć", "c"), ("ę", "e"), ("ł", "l"), ("ń", "n"),
+            ("ó", "o"), ("ś", "s"), ("ż", "z"), ("ź", "z"),
+            ("Ą", "A"), ("Ć", "C"), ("Ę", "E"), ("Ł", "L"), ("Ń", "N"),
+            ("Ó", "O"), ("Ś", "S"), ("Ż", "Z"), ("Ź", "Z"),
+        )
+        for src_ch, dst_ch in repl:
+            out = out.replace(src_ch, dst_ch)
+        return out
+
     variant_map: Dict[str, str] = {}
     for src, dst in base_map.items():
         s = str(src)
@@ -5150,6 +5166,11 @@ def _apply_archetype_label_mode_to_html(html_text: str, mode_choice: Any) -> str
         variant_map[s] = d
         variant_map[s.upper()] = d.upper()
         variant_map[s.lower()] = d.lower()
+        s_ascii = _ascii_pl(s)
+        if s_ascii and s_ascii not in variant_map:
+            variant_map[s_ascii] = d
+            variant_map[s_ascii.upper()] = d.upper()
+            variant_map[s_ascii.lower()] = d.lower()
 
     keys = sorted(variant_map.keys(), key=len, reverse=True)
     boundary = r"(?<![\wĄąĆćĘęŁłŃńÓóŚśŹźŻż])({})(?![\wĄąĆćĘęŁłŃńÓóŚśŹźŻż])"
@@ -5363,11 +5384,15 @@ def jst_analysis_view() -> None:
         st.info("Wybierz badanie z listy i kliknij „Generuj raport”.")
         return
 
+    label_mode_options = ["Archetypy męskie", "Archetypy żeńskie"]
+    label_mode_key = f"jst_report_label_mode_{sid}"
+    if str(st.session_state.get(label_mode_key) or "") not in label_mode_options:
+        st.session_state[label_mode_key] = label_mode_options[0]
     label_mode_choice = st.radio(
         "Wybierz formę archetypów",
-        ["Archetypy męskie", "Archetypy żeńskie", "Wartości"],
+        label_mode_options,
         horizontal=True,
-        key=f"jst_report_label_mode_{sid}",
+        key=label_mode_key,
     )
 
     overrides_editor_key = f"jst_segment_threshold_editor_{sid}"
@@ -6361,7 +6386,7 @@ def _matching_guess_variable_emoji(field: str, label: str) -> str:
     if any(k in key for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
         return "🗳️"
     if any(k in key for k in ("orientac", "poglad", "politycz", "ideolog")):
-        return "🧭"
+        return "⚖️"
     return "📌"
 
 
@@ -6379,7 +6404,9 @@ def _matching_guess_value_emoji(var_label: str, code: str) -> str:
     if any(k in nk_var for k in ("preferencj", "komitet", "wybor", "glos", "parti", "sejm")):
         if "odmow" in nk:
             return "🤐"
-        if "nie wiem" in nk or "niezdecyd" in nk or "trudno" in nk:
+        if "trudno" in nk:
+            return "🤷"
+        if "nie wiem" in nk or "niezdecyd" in nk:
             return "❓"
         return "🗳️"
     if any(k in nk_var for k in ("orientac", "poglad", "politycz", "ideolog")):
@@ -6395,7 +6422,9 @@ def _matching_guess_value_emoji(var_label: str, code: str) -> str:
             return "⚖️"
         if "odmow" in nk:
             return "🤐"
-        if "nie wiem" in nk or "trudno" in nk:
+        if "trudno" in nk:
+            return "🤷"
+        if "nie wiem" in nk:
             return "❓"
         return "🧭"
     return "📌"
@@ -9011,15 +9040,6 @@ def matching_view() -> None:
                 segment_name_seg = str(selected_seg.get("segment_name") or selected_seg.get("segment") or "segment")
                 legend_person_label = f"profil {person_role_gen} ({person_name_seg})"
                 legend_segment_label = f"profil segmentu ({segment_name_seg})"
-                st.markdown(
-                    f"""
-                    <div class="match-seg-radar-legend">
-                      <span class="match-seg-radar-pill"><span class="match-seg-radar-line"></span>{html.escape(legend_person_label)}</span>
-                      <span class="match-seg-radar-pill"><span class="match-seg-radar-line dashed"></span>{html.escape(legend_segment_label)}</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
 
                 fig_seg = go.Figure(
                     data=[
@@ -9031,7 +9051,7 @@ def matching_view() -> None:
                             line=dict(color="#2563eb", width=3),
                             marker=dict(size=5, symbol="circle"),
                             name=legend_person_label,
-                            showlegend=False,
+                            showlegend=True,
                             hovertemplate=f"<b>%{{theta}}</b><br>{person_role_nom_cap}: %{{r:.2f}}<extra></extra>",
                         ),
                         go.Scatterpolar(
@@ -9042,7 +9062,7 @@ def matching_view() -> None:
                             line=dict(color="#0f766e", width=3, dash="dot"),
                             marker=dict(size=6, symbol="square"),
                             name=legend_segment_label,
-                            showlegend=False,
+                            showlegend=True,
                             hovertemplate="<b>%{theta}</b><br>Segment: %{r:.2f}<extra></extra>",
                         ),
                         go.Scatterpolar(
@@ -9080,7 +9100,21 @@ def matching_view() -> None:
                         ),
                     ),
                     margin=dict(l=24, r=24, t=66, b=90),
-                    showlegend=False,
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.16,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=13.5),
+                        bgcolor="rgba(255,255,255,0.94)",
+                        bordercolor="#cfd9e8",
+                        borderwidth=1,
+                        entrywidthmode="pixels",
+                        entrywidth=420,
+                        tracegroupgap=18,
+                    ),
                 )
                 seg_key_safe = re.sub(
                     r"[^a-zA-Z0-9_-]+",

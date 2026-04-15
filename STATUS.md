@@ -2437,3 +2437,29 @@
   - przesuwanie pytań `↑/↓` nie powinno już czyścić odpowiedzi w metryczce.
 - Test techniczny:
   - `python -m py_compile app.py` (OK).
+
+### Zrobione w Hotfix H-114 (2026-04-15, etapy 2-5 jednocześnie)
+- `archetypy-admin/app.py`:
+  - kolumna `Ikona` w tabelach odpowiedzi metryczki i predefiniowanych działa jako dropdown (lista emoji),
+  - `🧭 Matching > Segmenty`: górna legenda radaru wróciła do natywnej legendy Plotly (można włączać/wyłączać profile),
+  - `Badania mieszkańców - panel`: usunięto opcję `Wartości` z wyboru formy raportu (pozostają męskie/żeńskie),
+  - rozszerzono podmianę nazw archetypów o warianty bez polskich znaków (mniej regresji w żeńskich podpisach raportu).
+- `archetypy-admin/admin_dashboard.py` (`Profile demograficzne archetypu`):
+  - poprawiono render paska dopasowania podgrupy (`width: xx%` bezpośrednio na fill),
+  - radar podgrupy ma pogrubione etykiety archetypów TOP (ticktext),
+  - usunięto podpis techniczny pod radarem,
+  - dopieszczono dolną legendę TOP2/TOP3 (font/spacing i mniejszy dystans od radaru).
+- `archetypy-admin/jst_analysis.py`:
+  - do `settings.json` przekazywana jest pełna `metryczka_config`,
+  - hash payloadu raportu uwzględnia `metryczka_config` (zmiana metryczki wymusza przeliczenie raportu).
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - dynamiczna metryczka jest ładowana z `settings.metryczka_config`,
+  - kolejność zmiennych i etykiety w demografii biorą się z konfiguracji metryczki,
+  - tabele demograficzne obejmują pełne kategorie z konfiguracji (w tym 0%),
+  - ikony zmiennych i kategorii respektują konfigurację (fallback heurystyczny),
+  - poprawiono heurystyki ikon (`Wiek -> ⌛`, `trudno powiedzieć -> 🤷`, `poglądy/orientacja -> ⚖️`).
+- Synchronizacja wersji:
+  - ten sam plik generatora skopiowano do `C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py`.
+- Testy techniczne:
+  - `python -m py_compile app.py admin_dashboard.py metryczka_config.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

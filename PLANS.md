@@ -3083,3 +3083,45 @@ Wynik:
   - dodano bezpiecznik: jeśli bieżący odczyt opcji jest pusty, zachowujemy poprzednie odpowiedzi pytania zamiast je nadpisać.
 - Smoke-check:
   - `python -m py_compile app.py` (OK).
+
+### Hotfix H-114 [DONE]
+Temat: Etapy 2-5 równolegle — ikony metryczki, radar personalny, legenda Segmentów i domknięcie JST.
+Kryteria ukończenia:
+1. W tabelach odpowiedzi metryczki kolumna `Ikona` działa jako lista rozwijana emoji (jak dla ikony zmiennej).
+2. W `Profile demograficzne archetypu`:
+   - radar ma pogrubione etykiety TOP,
+   - usunięty opis techniczny pod radarem,
+   - dolna legenda ma ciaśniejszy, czytelniejszy układ,
+   - pasek zgodności podgrupy renderuje poprawną szerokość.
+3. W `🧭 Matching > Segmenty` górna legenda radaru jest natywna/interaktywna (włącz/wyłącz serie).
+4. W `Badania mieszkańców - panel` wybór formy raportu usuwa opcję `Wartości` (zostają męskie/żeńskie).
+5. Generator JST respektuje dynamiczną metryczkę z `metryczka_config`:
+   - kolejność zmiennych jak w konfiguracji,
+   - wszystkie kategorie z konfiguracji (także 0%),
+   - etykiety i ikony z konfiguracji,
+   - synchronizacja pliku generatora do `C:\Poznan_Archetypy_Analiza`.
+Pierwszy krok wykonawczy:
+- wdrożyć dropdown ikon w `app.py`, następnie podpiąć dynamiczną metryczkę do `settings.json -> analyze_poznan_archetypes.py` i domknąć warstwę wizualną radarów.
+Wynik:
+- `app.py`:
+  - `Ikona` w edytorze odpowiedzi (metryczka + predefiniowane) działa jako `SelectboxColumn`,
+  - `Segmenty` radar używa natywnej legendy Plotly (interaktywne show/hide),
+  - w panelu generowania raportu JST usunięto opcję `Wartości` (pozostają: `Archetypy męskie`, `Archetypy żeńskie`),
+  - poprawiono mapowanie label-mode dla fallbacków ASCII (lepsze podmiany nazw w HTML raportu).
+- `admin_dashboard.py`:
+  - radar podgrupy ma pogrubiane etykiety TOP,
+  - usunięto podpis „Radar pokazuje średnią siłę…”,
+  - dopieszczono dolną legendę TOP2/TOP3 (spacing/font),
+  - pasek zgodności podgrupy używa bezpośredniego `width: xx%` (stabilny rendering).
+- `jst_analysis.py`:
+  - `settings.json` dostaje pełne `metryczka_config`,
+  - hash źródła raportu uwzględnia `metryczka_config` (wymusza przeliczenie przy zmianach metryczki).
+- `JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (+ kopia w `C:\Poznan_Archetypy_Analiza`):
+  - dynamiczna metryczka ładowana z `settings.metryczka_config`,
+  - kolejność i etykiety zmiennych metryczki idą z konfiguracji,
+  - kategorie w tabelach demograficznych zawierają pełną listę z konfiguracji (w tym 0%),
+  - ikony zmiennych/kategorii respektują konfigurację (z fallbackiem heurystycznym),
+  - korekta ikon domyślnych (`Wiek -> ⌛`, `trudno powiedzieć -> 🤷`, `poglądy/orientacja -> ⚖️`).
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py metryczka_config.py jst_analysis.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
+  - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).

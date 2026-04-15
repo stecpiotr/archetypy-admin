@@ -3623,7 +3623,7 @@ def _render_personal_demography_subpage(
             justify-content:center;
             align-items:stretch;
             gap:12px;
-            margin:2px 0 0 0;
+            margin:-6px 0 0 0;
             flex-wrap:wrap;
           }
           .pdemo-top2-card{
@@ -3642,9 +3642,11 @@ def _render_personal_demography_subpage(
             margin-bottom:6px;
           }
           .pdemo-top2-line{
-            font-size:13px;
-            font-weight:700;
+            font-size:14px;
+            font-weight:800;
             color:#334155;
+            line-height:1.28;
+            letter-spacing:.01em;
           }
           .pdemo-wheel-title{
             margin-top:28px;
@@ -3677,7 +3679,7 @@ def _render_personal_demography_subpage(
           .pdemo-score-badge{display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid var(--pdemo-score-color,#0ea5e9);background:var(--pdemo-score-bg,#eff6ff);color:var(--pdemo-score-color,#0ea5e9);font-weight:900;font-size:15px;}
           .pdemo-score-desc{margin:8px 0 10px 0;color:#475569;font-size:14px;font-weight:600;}
           .pdemo-score-track{height:14px;border-radius:999px;background:#d5dde8;border:1px solid #aebfd3;overflow:hidden;}
-          .pdemo-score-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb 0%,#22c55e 100%);width:var(--pdemo-score-width,0%);}
+          .pdemo-score-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb 0%,#22c55e 100%);}
           .pdemo-score-scale{display:flex;justify-content:space-between;color:#64748b;font-size:11px;margin-top:6px;font-weight:700;}
           .pdemo-wheel-legend-wrap{
             display:flex;
@@ -4095,12 +4097,12 @@ def _render_personal_demography_subpage(
         score_color, score_bg = "#7f1d1d", "#fef2f2"
     st.markdown(
         f"""
-        <div class="pdemo-score-card" style="--pdemo-score-color:{score_color}; --pdemo-score-bg:{score_bg}; --pdemo-score-width:{score_pct:.1f}%;">
+        <div class="pdemo-score-card" style="--pdemo-score-color:{score_color}; --pdemo-score-bg:{score_bg};">
           <div class="pdemo-score-title">Poziom dopasowania podgrupy do całej próby</div>
           <div class="pdemo-score-value">{score_pct:.1f}%</div>
           <div class="pdemo-score-badge">Ocena: {html.escape(str(demo_match.get('band_label') or ''))}</div>
           <div class="pdemo-score-desc">{html.escape(str(demo_match.get('band_desc') or ''))}</div>
-          <div class="pdemo-score-track"><div class="pdemo-score-fill"></div></div>
+          <div class="pdemo-score-track"><div class="pdemo-score-fill" style="width:{score_pct:.1f}%;"></div></div>
           <div class="pdemo-score-scale"><span>0%</span><span>100%</span></div>
         </div>
         """,
@@ -4116,7 +4118,13 @@ def _render_personal_demography_subpage(
 
     all_top = _priority_top_for_ui_demo(means_20_all, archetype_names)
     sub_top = _priority_top_for_ui_demo(filtered_means_20, archetype_names)
-    theta = [disp_name_fn(n) for n in archetype_names]
+    theta_labels = [disp_name_fn(n) for n in archetype_names]
+    theta_display = list(range(len(archetype_names)))
+    radar_top_union = set(all_top + sub_top)
+    radar_tick_text = [
+        (f"<b>{html.escape(str(lbl))}</b>" if arch in radar_top_union else html.escape(str(lbl)))
+        for arch, lbl in zip(archetype_names, theta_labels)
+    ]
     all_vals = [float(means_20_all.get(n, 0.0)) for n in archetype_names]
     filt_vals = [float(filtered_means_20.get(n, 0.0)) for n in archetype_names]
 
@@ -4148,7 +4156,7 @@ def _render_personal_demography_subpage(
         data=[
             go.Scatterpolar(
                 r=all_vals + [all_vals[0]],
-                theta=theta + [theta[0]],
+                theta=theta_display + [theta_display[0]],
                 fill="toself",
                 fillcolor="rgba(37,99,235,0.18)",
                 line=dict(color="#2563eb", width=3),
@@ -4158,7 +4166,7 @@ def _render_personal_demography_subpage(
             ),
             go.Scatterpolar(
                 r=filt_vals + [filt_vals[0]],
-                theta=theta + [theta[0]],
+                theta=theta_display + [theta_display[0]],
                 fill="toself",
                 fillcolor="rgba(15,118,110,0.16)",
                 line=dict(color="#0f766e", width=3, dash="dot"),
@@ -4168,7 +4176,7 @@ def _render_personal_demography_subpage(
             ),
             go.Scatterpolar(
                 r=all_marker_r,
-                theta=theta,
+                theta=theta_display,
                 mode="markers",
                 marker=dict(size=16, symbol="circle", color=all_marker_c, opacity=0.92, line=dict(color="black", width=2.4)),
                 showlegend=False,
@@ -4176,7 +4184,7 @@ def _render_personal_demography_subpage(
             ),
             go.Scatterpolar(
                 r=sub_marker_r,
-                theta=theta,
+                theta=theta_display,
                 mode="markers",
                 marker=dict(size=14, symbol="square", color=sub_marker_c, opacity=0.94, line=dict(color="#0f172a", width=1.9)),
                 showlegend=False,
@@ -4194,6 +4202,8 @@ def _render_personal_demography_subpage(
                 rotation=90,
                 direction="clockwise",
                 tickfont=dict(size=16 if not is_mobile else 10.5),
+                tickvals=theta_display,
+                ticktext=radar_tick_text,
             ),
         ),
         margin=dict(l=24, r=24, t=66, b=90),
@@ -4230,7 +4240,7 @@ def _render_personal_demography_subpage(
             items.append(
                 f"<span><span style=\"color:{palette[role_key]};\">{marker}</span> {label}</span>"
             )
-        return "".join(items)
+        return " ".join(items)
 
     st.markdown(
         f"""
@@ -4247,7 +4257,6 @@ def _render_personal_demography_subpage(
         """,
         unsafe_allow_html=True,
     )
-    st.caption("Radar pokazuje średnią siłę archetypu w skali 0-20 dla całej próby oraz filtrowanej podgrupy.")
 
     st.markdown("<div class='pdemo-wheel-sep'></div>", unsafe_allow_html=True)
     st.markdown("<div class='pdemo-wheel-title'>Profile archetypowe 0-100 (siła archetypu, skala: 0-100)</div>", unsafe_allow_html=True)

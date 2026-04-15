@@ -691,6 +691,8 @@ class Settings:
     # format klucza: "X z Y · #R" (np. "2 z 2 · #1") albo "Y|X|R"
     # gdzie: X = liczba pokonanych segmentów, Y = liczba innych segmentów, R = pozycja w wierszu
     segment_hit_threshold_overrides: Dict[str, float] = field(default_factory=dict)
+    # dynamiczna metryczka (pełna konfiguracja pytań M_*) przekazywana z panelu
+    metryczka_config: Dict[str, Any] = field(default_factory=dict)
     # styl obrysu segmentu na mapie: "classic" (domyślny, opływowy) albo "smooth" (plamowy/concave)
     segment_outline_style: str = "classic"
 
@@ -1161,7 +1163,11 @@ def _parse_material(x: Any) -> int:
     return 0
 
 
-def parse_metryczka(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Dict[int, str]]]:
+def parse_metryczka(
+        df: pd.DataFrame,
+        metryczka_config: Optional[Dict[str, Any]] = None
+) -> Tuple[pd.DataFrame, Dict[str, Dict[int, str]]]:
+    _set_dynamic_metry_schema_from_config(metryczka_config)
     col_map: Dict[str, str] = {}
     missing: List[str] = []
     for key, aliases in METRY_ALIASES.items():
@@ -12102,7 +12108,7 @@ _DEMO_CORE_CAT_ORDER: Dict[str, List[str]] = {
 }
 _DEMO_VAR_ICON_MAP: Dict[str, str] = {
     "płeć": "👫",
-    "wiek": "🧭",
+    "wiek": "⌛",
     "wykształcenie": "🎓",
     "status zawodowy": "💼",
     "sytuacja materialna": "💰",
@@ -12143,6 +12149,75 @@ _DEMO_CAT_ICON_MAP: Dict[str, str] = {
     "odmawiam udzielenia odpowiedzi": "🤐",
 }
 
+# Dynamiczna metryczka z settings.json (gdy dostępna).
+_DYN_METRY_COL_ORDER: List[str] = []
+_DYN_METRY_VAR_LABEL_BY_COL: Dict[str, str] = {}
+_DYN_METRY_VAR_ICON_BY_VAR_NK: Dict[str, str] = {}
+_DYN_METRY_CAT_ORDER_BY_COL: Dict[str, List[str]] = {}
+_DYN_METRY_CAT_ORDER_BY_VAR_NK: Dict[str, List[str]] = {}
+_DYN_METRY_CAT_ICON_BY_VAR_CAT_NK: Dict[Tuple[str, str], str] = {}
+
+
+def _set_dynamic_metry_schema_from_config(raw_cfg: Any) -> None:
+    global _DYN_METRY_COL_ORDER
+    global _DYN_METRY_VAR_LABEL_BY_COL
+    global _DYN_METRY_VAR_ICON_BY_VAR_NK
+    global _DYN_METRY_CAT_ORDER_BY_COL
+    global _DYN_METRY_CAT_ORDER_BY_VAR_NK
+    global _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK
+
+    _DYN_METRY_COL_ORDER = []
+    _DYN_METRY_VAR_LABEL_BY_COL = {}
+    _DYN_METRY_VAR_ICON_BY_VAR_NK = {}
+    _DYN_METRY_CAT_ORDER_BY_COL = {}
+    _DYN_METRY_CAT_ORDER_BY_VAR_NK = {}
+    _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK = {}
+
+    cfg = dict(raw_cfg or {}) if isinstance(raw_cfg, dict) else {}
+    questions = cfg.get("questions")
+    if not isinstance(questions, list):
+        return
+
+    def _nk(v: Any) -> str:
+        return " ".join(str(v or "").split()).strip().lower()
+
+    for q in list(questions):
+        if not isinstance(q, dict):
+            continue
+        col = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not col.startswith("M_"):
+            continue
+        if col not in _DYN_METRY_COL_ORDER:
+            _DYN_METRY_COL_ORDER.append(col)
+        prompt = str(q.get("prompt") or "").strip()
+        table_label = str(q.get("table_label") or prompt or col).strip()
+        _DYN_METRY_VAR_LABEL_BY_COL[col] = table_label
+        var_nk = _nk(table_label)
+        if var_nk:
+            _DYN_METRY_VAR_ICON_BY_VAR_NK[var_nk] = str(q.get("variable_emoji") or "").strip()
+
+        opts = q.get("options") if isinstance(q.get("options"), list) else []
+        seen_codes: set[str] = set()
+        ordered_codes: List[str] = []
+        for opt in opts:
+            if not isinstance(opt, dict):
+                continue
+            code = str(opt.get("code") or opt.get("label") or "").strip()
+            if not code:
+                continue
+            ckey = _nk(code)
+            if ckey in seen_codes:
+                continue
+            seen_codes.add(ckey)
+            ordered_codes.append(code)
+            icon = str(opt.get("value_emoji") or "").strip()
+            if var_nk:
+                _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK[(var_nk, ckey)] = icon
+        if ordered_codes:
+            _DYN_METRY_CAT_ORDER_BY_COL[col] = list(ordered_codes)
+            if var_nk:
+                _DYN_METRY_CAT_ORDER_BY_VAR_NK[var_nk] = list(ordered_codes)
+
 
 def _demo_nk(x: Any) -> str:
     return " ".join(str(x or "").split()).strip().lower()
@@ -12150,13 +12225,15 @@ def _demo_nk(x: Any) -> str:
 
 def _demo_pick_var_icon(var_label: str) -> str:
     nk = _demo_nk(var_label)
+    if nk in _DYN_METRY_VAR_ICON_BY_VAR_NK:
+        return str(_DYN_METRY_VAR_ICON_BY_VAR_NK.get(nk) or "")
     icon = _DEMO_VAR_ICON_MAP.get(nk)
     if icon:
         return icon
     if any(k in nk for k in ["obszar", "miejsce", "lokaliz", "zamiesz", "wieś", "wies", "miasto"]):
         return "🗺️"
-    if any(k in nk for k in ["pogląd", "pogl", "orientac", "ideolog", "politycz"]):
-        return "🗳️"
+    if any(k in nk for k in ["pogląd", "poglad", "pogl", "orientac", "ideolog", "politycz"]):
+        return "⚖️"
     if any(k in nk for k in ["relig", "wiar"]):
         return "⛪"
     if any(k in nk for k in ["doch", "zarob", "przych", "material"]):
@@ -12168,6 +12245,10 @@ def _demo_pick_var_icon(var_label: str) -> str:
 
 def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
     nk_cat = _demo_nk(cat_label)
+    nk_var = _demo_nk(var_label)
+    dyn_icon = _DYN_METRY_CAT_ICON_BY_VAR_CAT_NK.get((nk_var, nk_cat))
+    if dyn_icon is not None:
+        return str(dyn_icon or "")
     icon = _DEMO_CAT_ICON_MAP.get(nk_cat)
     if icon:
         return icon
@@ -12175,9 +12256,10 @@ def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
         return "✅"
     if nk_cat in {"nie", "zdecydowanie nie", "raczej nie"}:
         return "❌"
-    if "nie wiem" in nk_cat or "trudno powiedzieć" in nk_cat:
+    if "trudno powiedzieć" in nk_cat:
+        return "🤷"
+    if "nie wiem" in nk_cat:
         return "❓"
-    nk_var = _demo_nk(var_label)
     if any(k in nk_var for k in ["obszar", "miejsce", "zamiesz", "lokaliz"]):
         if "miast" in nk_cat:
             return "🏙️"
@@ -12196,6 +12278,14 @@ def _demo_pick_cat_icon(var_label: str, cat_label: str) -> str:
 def _demo_merge_category_order(var_label: str, cats_present: List[str]) -> List[str]:
     ordered: List[str] = []
     seen: set[str] = set()
+    var_nk = _demo_nk(var_label)
+    for cat in list(_DYN_METRY_CAT_ORDER_BY_VAR_NK.get(var_nk, [])):
+        nk = _demo_nk(cat)
+        if nk in seen:
+            continue
+        if any(_demo_nk(c) == nk for c in cats_present):
+            ordered.append(str(cat))
+            seen.add(nk)
     for cat in list(_DEMO_CORE_CAT_ORDER.get(str(var_label), [])):
         nk = _demo_nk(cat)
         if nk in seen:
@@ -12270,8 +12360,17 @@ def _build_demo_schema_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def _build_metry_demo_schema(metry: Optional[pd.DataFrame]) -> Dict[str, Any]:
     if metry is None or len(metry) == 0:
-        var_order = list(_DEMO_CORE_VAR_ORDER)
-        cat_order = {k: list(v) for k, v in _DEMO_CORE_CAT_ORDER.items()}
+        if _DYN_METRY_COL_ORDER:
+            var_order = []
+            cat_order: Dict[str, List[str]] = {}
+            for col in _DYN_METRY_COL_ORDER:
+                label = _metry_var_label(col)
+                if label not in var_order:
+                    var_order.append(label)
+                cat_order[label] = list(_DYN_METRY_CAT_ORDER_BY_COL.get(col, []))
+        else:
+            var_order = list(_DEMO_CORE_VAR_ORDER)
+            cat_order = {k: list(v) for k, v in _DEMO_CORE_CAT_ORDER.items()}
     else:
         var_order = []
         cat_order: Dict[str, List[str]] = {}
@@ -12320,7 +12419,13 @@ def _ordered_metry_columns(metry: pd.DataFrame) -> List[str]:
         if cu not in by_upper:
             by_upper[cu] = c
             encounter_order.append(cu)
-    ordered_upper = [c for c in _CORE_METRY_COL_ORDER if c in by_upper]
+    ordered_upper: List[str] = []
+    for c in _DYN_METRY_COL_ORDER:
+        if c in by_upper and c not in ordered_upper:
+            ordered_upper.append(c)
+    for c in _CORE_METRY_COL_ORDER:
+        if c in by_upper and c not in ordered_upper:
+            ordered_upper.append(c)
     extras = [c for c in encounter_order if c not in ordered_upper]
     ordered_upper.extend(extras)
     return [by_upper[c] for c in ordered_upper]
@@ -12328,6 +12433,9 @@ def _ordered_metry_columns(metry: pd.DataFrame) -> List[str]:
 
 def _metry_var_label(col_name: str) -> str:
     cu = str(col_name or "").strip().upper()
+    dyn_lbl = str(_DYN_METRY_VAR_LABEL_BY_COL.get(cu) or "").strip()
+    if dyn_lbl:
+        return dyn_lbl
     if cu in _CORE_METRY_VAR_LABELS:
         return _CORE_METRY_VAR_LABELS[cu]
     txt = cu[2:] if cu.startswith("M_") else cu
@@ -12346,7 +12454,17 @@ def _metry_column_categories(metry: pd.DataFrame, col_name: str) -> List[Tuple[A
     if defs and int(series_num.notna().sum()) > 0:
         x = series_num.to_numpy(dtype=float)
         m_x = np.isfinite(x)
-        cats = sorted({int(v) for v in x[m_x]})
+        cats: List[int] = []
+        for k in defs.keys():
+            try:
+                kv = int(k)
+            except Exception:
+                continue
+            if kv == 0:
+                continue
+            cats.append(kv)
+        if int(np.sum(m_x & (x == 0.0))) > 0 and 0 in defs:
+            cats = [0] + cats
         out_num: List[Tuple[Any, str, np.ndarray]] = []
         for cat in cats:
             mask = m_x & (x == float(cat))
@@ -12356,13 +12474,39 @@ def _metry_column_categories(metry: pd.DataFrame, col_name: str) -> List[Tuple[A
     s = series.fillna("").astype(str).map(lambda x: " ".join(str(x).split()).strip())
     arr = s.to_numpy(dtype=object)
     is_missing = np.array([len(str(v).strip()) == 0 for v in arr], dtype=bool)
-    values = sorted({str(v).strip() for v in arr if str(v).strip()})
+    values_present: List[str] = []
+    seen_vals: set[str] = set()
+    for raw_v in arr:
+        txt = str(raw_v).strip()
+        if not txt:
+            continue
+        nk = _demo_nk(txt)
+        if nk in seen_vals:
+            continue
+        seen_vals.add(nk)
+        values_present.append(txt)
+
+    values_ordered: List[str] = []
+    seen_order: set[str] = set()
+    for txt in list(_DYN_METRY_CAT_ORDER_BY_COL.get(cu, [])):
+        nk = _demo_nk(txt)
+        if nk in seen_order:
+            continue
+        seen_order.add(nk)
+        values_ordered.append(str(txt))
+    for txt in values_present:
+        nk = _demo_nk(txt)
+        if nk in seen_order:
+            continue
+        seen_order.add(nk)
+        values_ordered.append(txt)
     out_txt: List[Tuple[Any, str, np.ndarray]] = []
     if bool(is_missing.any()):
         out_txt.append(("__MISSING__", "brak danych", is_missing))
-    for val in values:
-        mask = np.array([str(v).strip() == val for v in arr], dtype=bool)
-        out_txt.append((val, val, mask))
+    for val in values_ordered:
+        nk = _demo_nk(val)
+        mask = np.array([_demo_nk(v) == nk for v in arr], dtype=bool)
+        out_txt.append((val, str(val), mask))
     return out_txt
 
 
@@ -16529,7 +16673,7 @@ def main() -> None:
     df = read_data_csv(data_path)
 
     # metryczka (profilowe zmienne)
-    metry, metry_defs = parse_metryczka(df)
+    metry, metry_defs = parse_metryczka(df, settings.metryczka_config)
 
     base_weights = get_weights(df, settings.weight_column)
     poststrat_error = ""

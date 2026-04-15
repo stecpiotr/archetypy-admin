@@ -95,6 +95,7 @@ def _write_settings(path: Path, study: Dict[str, Any]) -> None:
         "require_metry": True,
         "random_seed": 2026,
         "segment_hit_threshold_overrides": segment_overrides,
+        "metryczka_config": study.get("metryczka_config") or {},
         "segment_outline_style": "classic",
         "silhouette_sample_max": 1800,
     }
@@ -393,14 +394,15 @@ def _file_sha256(path: Path) -> str:
 def _hash_payload(df: pd.DataFrame, study: Dict[str, Any], template_root: Path) -> str:
     poststrat = study.get("poststrat_targets")
     poststrat_serialized = json.dumps(poststrat, ensure_ascii=False, sort_keys=True, default=str)
+    metryczka_serialized = json.dumps(study.get("metryczka_config") or {}, ensure_ascii=False, sort_keys=True, default=str)
     population_15_plus = study.get("population_15_plus")
     segment_overrides = _normalize_segment_threshold_overrides(study.get("segment_hit_threshold_overrides"))
     overrides_serialized = json.dumps(segment_overrides, ensure_ascii=False, sort_keys=True, default=str)
     engine_sha = _file_sha256(template_root / "analyze_poznan_archetypes.py")
-    jst_analysis_schema = "jst_analysis_hash_v5"
+    jst_analysis_schema = "jst_analysis_hash_v6"
     raw = (
         f"{jst_analysis_schema}|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|"
-        f"{poststrat_serialized}|{population_15_plus}|{overrides_serialized}|{engine_sha}\n"
+        f"{poststrat_serialized}|{metryczka_serialized}|{population_15_plus}|{overrides_serialized}|{engine_sha}\n"
         + df.to_csv(index=False)
     )
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()

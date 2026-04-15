@@ -2288,3 +2288,42 @@ Decyzja:
   - następnie poprzednie odpowiedzi z pytania.
 Uzasadnienie:
 - Chroni metryczkę przed przypadkowym „wyzerowaniem” odpowiedzi przy rerunach i zmianie kolejności pytań.
+
+### D-252: Ikony odpowiedzi metryczki wybierane z dropdownu
+Decyzja:
+- Kolumna `Ikona` w tabelach odpowiedzi metryczki i predefiniowanych pytań działa jako lista rozwijana (`SelectboxColumn`) oparta o bibliotekę emoji + wartości już użyte w pytaniu.
+Uzasadnienie:
+- Ujednolica UX z pickerem ikony zmiennej i eliminuje literówki przy ręcznym wpisywaniu emoji.
+
+### D-253: Radar Segmentów ma używać natywnej legendy Plotly (interaktywnej)
+Decyzja:
+- W `🧭 Matching > Segmenty > Podgląd radarowy segmentu` rezygnujemy z pseudo-legendy HTML.
+- Legenda dwóch głównych serii (`profil polityka`, `profil segmentu`) jest renderowana natywnie przez Plotly z możliwością show/hide.
+Uzasadnienie:
+- Użytkownik potrzebuje sterowania widocznością serii bez dodatkowych kontrolek i bez rozjazdu stylu.
+
+### D-254: W panelu generatora JST zostają tylko tryby męski/żeński
+Decyzja:
+- `Badania mieszkańców - panel / Analiza badania mieszkańców` nie pokazuje już opcji `Wartości` w wyborze formy podpisów.
+Uzasadnienie:
+- Wartości są traktowane jako stała warstwa raportu; wybór w tym miejscu ma sterować wyłącznie formą archetypów (męska/żeńska).
+
+### D-255: Generator JST dostaje dynamiczną metryczkę z panelu przez `settings.json`
+Decyzja:
+- `jst_analysis.py` zapisuje pełne `metryczka_config` do `settings.json`.
+- Silnik raportu (`analyze_poznan_archetypes.py`) odczytuje tę konfigurację i używa jej jako źródła:
+  - kolejności zmiennych,
+  - etykiet zmiennych,
+  - listy kategorii (również tych z udziałem 0%),
+  - ikon zmiennej i kategorii.
+- Hash payloadu raportu uwzględnia `metryczka_config`.
+Uzasadnienie:
+- Bez jawnego przekazania konfiguracji silnik widział tylko kategorie obecne w danych i tracił spójność z edytorem metryczki.
+
+### D-256: Wspólna wersja silnika JST w dwóch lokalizacjach
+Decyzja:
+- Po zmianach silnika raportu JST utrzymujemy identyczny plik `analyze_poznan_archetypes.py` w:
+  - `archetypy-admin/JST_Archetypy_Analiza`,
+  - `C:\Poznan_Archetypy_Analiza`.
+Uzasadnienie:
+- Zapobiega rozjazdom obliczeń i renderu między środowiskami roboczymi.
