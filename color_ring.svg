@@ -5,13 +5,13 @@
         <circle cx="300.0" cy="300.0" r="276.0" fill="none"
                 stroke="#FFFFFF" stroke-width="48" stroke-linecap="round"/>
         <circle cx="300.0" cy="300.0" r="276.0" fill="none"
-            stroke="#7ED321" stroke-width="48" stroke-linecap="round"
-            stroke-dasharray="943.3825747611719 790.7765700203939"/>
+            stroke="#FFC107" stroke-width="48" stroke-linecap="round"
+            stroke-dasharray="856.6746175220935 877.4845272594723"/>
       </g>
       <g>
         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
               style="font-family: 'Segoe UI', system-ui, -apple-system, Arial; font-size:168px; font-weight:800; fill:#333;">
-          54%
+          49%
         </text>
       </g>
     </svg>
