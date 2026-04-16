@@ -8155,13 +8155,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 }
 
             def _render_auto_description(text: str) -> None:
-                if not text:
+                safe_text = str(text or "").strip()
+                if not safe_text or safe_text in {"0", "0.0"}:
                     return
                 st.markdown(
                     (
                         "<div style='margin-top:10px;margin-bottom:16px;"
                         "font-size:0.92em;line-height:1.58;color:var(--text-color,#334155);'>"
-                        f"{html.escape(text)}"
+                        f"{html.escape(safe_text)}"
                         "</div>"
                     ),
                     unsafe_allow_html=True,

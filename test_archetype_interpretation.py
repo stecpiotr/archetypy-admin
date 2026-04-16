@@ -69,6 +69,9 @@ def test_2_kolo_pragnien_i_wartosci_bohater_wladca_odkrywca():
     assert "Odwaga" in txt
     assert "Porządek" in txt
     assert "Wolność" in txt
+    assert "potrzebą działania" in txt
+    assert "potrzebę ładu" in txt
+    assert "o potrzebę autonomii" in txt
     assert "mistrzostwo" not in txt.lower()
     assert "kontrola" not in txt.lower()
 
@@ -101,6 +104,9 @@ def test_4_profil_dzialania_bohater_wladca_odkrywca():
     txt = out["actionProfileDescription"].lower()
     assert "sprawczości" in txt
     assert "niezależności" in txt
+    assert "racjonalności" in txt
+    assert "wspólnie dominujących" not in txt
+    assert "obniżonej empatii" in txt
     assert "umiarkowanej racjonalności" not in txt
     assert "bardzo niskiej kreatywności" not in txt
 
@@ -140,6 +146,22 @@ def test_6_opiekunka_niewinna_odkrywczyni():
     assert "zdecydowanie po stronie stabilności" not in needs
     assert "empatii" in action
     assert "niskiej sprawczości" not in action
+
+
+def test_6b_odkrywczyni_tworczyni_nie_zawyza_racjonalnosci():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Odkrywczyni", 90.0),
+            _result("Twórczyni", 80.0),
+            None,
+            subject_forms={"fullGen": "Januszy Kowalskiej"},
+        )
+    )
+    action = out["actionProfileDescription"].lower()
+    assert "kreatywności" in action
+    assert "niezależności" in action
+    assert "obniżonej empatii i racjonalności" in action or "obniżonej empatii oraz racjonalności" in action
+    assert "umiarkowanej racjonalności" not in action
 
 
 def test_7_personalizacja_pojawia_sie_maksymalnie_raz_w_opisie():
@@ -193,3 +215,30 @@ def test_9_wykres_preferencji_wartosci_publiczne_etykiety():
     assert "Porządek" in PREFERENCES_P_LABEL_ORDER
     assert "Racjonalność" not in PREFERENCES_P_LABEL_ORDER
     assert "Skuteczność" not in PREFERENCES_P_LABEL_ORDER
+
+
+def test_10_clear_dominant_wartosci_uzywa_wnosi_i_poprawnego_przypadku():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Odkrywca", 90.0),
+            _result("Opiekun", 70.0),
+            None,
+            subject_forms={"fullGen": "Mściwoja Złego"},
+        )
+    )
+    txt = out["valuesWheelDescription"]
+    assert "Archetyp wspierający wnosi tu Troskę" in txt
+    assert "dodaje tu Troska" not in txt
+
+
+def test_11_needs_balanced_x_ma_czasownik_pozostaje():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Odkrywca", 90.0),
+            _result("Opiekun", 70.0),
+            None,
+            subject_forms={"fullGen": "Mściwoja Złego"},
+        )
+    )
+    txt = out["needsWheelDescription"]
+    assert "pozostaje bez wyraźnego przechyłu między niezależnością a przynależnością" in txt

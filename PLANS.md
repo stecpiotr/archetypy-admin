@@ -3604,3 +3604,14 @@ Kryteria ukonczenia:
 Wynik:
 - `archetype_interpretation.py`: wygładzona składnia + helper odmiany dopełniaczowej + neutralne frazy interpretacyjne.
 - `test_archetype_interpretation.py`: asercje dostosowane do nowych form fleksyjnych.
+
+### Hotfix H-134 [DONE]
+Temat: Doprecyzowanie stylu i fleksji opisów na podstawie recenzji screenów 3222-3231.
+Kryteria ukonczenia:
+1. W opisie `Koło pragnień i wartości` poprawna fleksja fraz `potrzeba...` (`potrzebą` / `potrzebę` / `potrzebie`).
+2. W `Koło potrzeb` skrócona i lżejsza składnia w części porównawczej (`bardziej na ... niż na ...`), bez zbyt ostrych konstrukcji.
+3. W `Profilu działania` brak zawyżania racjonalności dla układu Odkrywczyni+Twórczyni i łagodniejszy opis niskich wymiarów.
+4. Dodane asercje testowe dla nowych reguł językowych i jakościowych.
+Wynik:
+- `archetype_interpretation.py`: nowe helpery fleksji fraz wartości + korekta słownika niskich wymiarów i progu 3. komponentu.
+- `test_archetype_interpretation.py`: nowe asercje i scenariusz Odkrywczyni+Twórczyni.

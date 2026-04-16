@@ -2683,3 +2683,21 @@ Decyzja:
 - W banku `PAIR_INTERPRETATION` używamy form neutralnych (`obraz przywództwa ...`) zamiast form zależnych od płci (`obraz lidera ...`).
 Uzasadnienie:
 - Zapobiega błędom rodzaju gramatycznego w opisach dla etykiet żeńskich i mieszanych.
+
+### D-300: Frazy wartości są odmieniane kontekstowo przez helper fleksyjny
+Decyzja:
+- W generatorze `Koło pragnień i wartości` frazy z metadanych (`publicValuePhrase`) przechodzą przez helper `_phrase_case(...)`, który dobiera odmianę (`potrzebą`, `potrzebę`, `potrzebie`) do konstrukcji zdania.
+Uzasadnienie:
+- Eliminuje to błędy językowe widoczne na screenach (`przede wszystkim potrzeba ...`) bez zmiany logiki merytorycznej.
+
+### D-301: W opisie koła potrzeb preferujemy krótsze przeciwstawienia zamiast długich konstrukcji normatywnych
+Decyzja:
+- Część porównawcza `Koło potrzeb` używa prostszych form `bardziej na ... niż na ...`, z lżejszym słownictwem przeciwnych biegunów osi.
+Uzasadnienie:
+- Poprawia czytelność raportową i zmniejsza „ciężar” zdań bez utraty informacji o kierunku osi.
+
+### D-302: Przy blended 50+ trzeci wymiar może być nazwany dodatkowym ważnym komponentem
+Decyzja:
+- W `Profilu działania` wzmianka o 3. komponencie pojawia się od `>= 50` jako `dodatkowy ważny komponent`; od `>= 60` pozostaje `solidne wsparcie`.
+Uzasadnienie:
+- Lepiej oddaje układy, gdzie trzeci wymiar jest istotny praktycznie (np. racjonalność w układzie Bohater+Władca+Odkrywca), bez zawyżania siły opisu.

@@ -414,12 +414,12 @@ def getDimensionPhrase(value: float, role: Literal["top", "middle", "low"]) -> s
             "low": "marginalnym komponencie",
         }[band]
     return {
-        "very_high": "obecnej w wyraźnym stopniu",
-        "high": "obecnej w wyraźnym stopniu",
-        "mid_high": "obecnej w wyraźnym stopniu",
-        "mid": "obecnej w wyraźnym stopniu",
-        "low_mid": "umiarkowanej" if value >= 40 else "obniżonej",
-        "low": "niskiej",
+        "very_high": "wyraźnej",
+        "high": "wyraźnej",
+        "mid_high": "wyraźnej",
+        "mid": "wyraźnej",
+        "low_mid": "obniżonej",
+        "low": "obniżonej",
     }[band]
 
 
@@ -536,7 +536,7 @@ def _axis_strength(value: float) -> str:
 def _x_description(x: float) -> str:
     strength = _axis_strength(x)
     if strength == "balanced":
-        return "bez wyraźnego przechyłu między niezależnością a przynależnością"
+        return "pozostaje bez wyraźnego przechyłu między niezależnością a przynależnością"
     if x < 0:
         return {
             "soft": "lekko ciąży ku niezależności",
@@ -587,16 +587,16 @@ def _x_opposite_meaning(x: float) -> str:
     if _axis_strength(x) == "balanced":
         return "jednostronnym forsowaniu tylko jednej strony osi"
     if x < 0:
-        return "silnym dostrajaniu się do otoczenia i podporządkowaniu wspólnocie za wszelką cenę"
-    return "działaniu w pełnej autonomii i bez szerokiego dostrajania się do ludzi"
+        return "silnym dostrajaniu się do otoczenia"
+    return "działaniu w pełnej autonomii i bez szerszego kontaktu z ludźmi"
 
 
 def _y_opposite_meaning(y: float) -> str:
     if _axis_strength(y) == "balanced":
         return "szukaniu skrajności zamiast równowagi"
     if y < 0:
-        return "utrzymywaniu status quo i unikaniu ruchu"
-    return "sztywnym trzymaniu się rutyny i przewidywalności"
+        return "utrzymywaniu status quo i unikaniu zmiany"
+    return "trzymaniu się rutyny i przewidywalności"
 
 
 def _is_female_label(label: str) -> bool:
@@ -609,6 +609,18 @@ def _label_accusative(label: str) -> str:
 
 def _label_genitive(label: str) -> str:
     return LABEL_GENITIVE.get(label, label)
+
+
+def _phrase_case(value_phrase: str, case: Literal["instrumental", "accusative", "locative"]) -> str:
+    phrase = str(value_phrase or "").strip()
+    if phrase.startswith("potrzeba "):
+        tail = phrase[len("potrzeba ") :]
+        if case == "instrumental":
+            return f"potrzebą {tail}"
+        if case == "accusative":
+            return f"potrzebę {tail}"
+        return f"potrzebie {tail}"
+    return phrase
 
 
 PUBLIC_VALUE_LOCATIVE: dict[str, str] = {
@@ -626,6 +638,21 @@ PUBLIC_VALUE_LOCATIVE: dict[str, str] = {
     "Rozwój": "Rozwoju",
 }
 
+PUBLIC_VALUE_ACCUSATIVE: dict[str, str] = {
+    "Przejrzystość": "Przejrzystość",
+    "Rozsądek": "Rozsądek",
+    "Wolność": "Wolność",
+    "Odnowa": "Odnowę",
+    "Wizja": "Wizję",
+    "Odwaga": "Odwagę",
+    "Relacje": "Relacje",
+    "Otwartość": "Otwartość",
+    "Współpraca": "Współpracę",
+    "Troska": "Troskę",
+    "Porządek": "Porządek",
+    "Rozwój": "Rozwój",
+}
+
 PUBLIC_VALUE_PRONOUN: dict[str, str] = {
     "Przejrzystość": "która",
     "Rozsądek": "który",
@@ -640,6 +667,9 @@ PUBLIC_VALUE_PRONOUN: dict[str, str] = {
     "Porządek": "który",
     "Rozwój": "który",
 }
+
+def _public_value_accusative(value: str) -> str:
+    return PUBLIC_VALUE_ACCUSATIVE.get(value, value)
 
 
 def _support_participle(primary_label: str) -> str:
@@ -673,24 +703,27 @@ def _generate_values_description(
     if dominance_type == "co_dominant":
         text = (
             f"{opening} tworzy niemal równorzędny duet: {primary_meta['publicValue']} i {supporting_meta['publicValue']}. "
-            f"Oznacza to przywództwo napędzane przede wszystkim {primary_meta['publicValuePhrase']}, "
-            f"wzmacniane przez {supporting_meta['publicValuePhrase']}."
+            f"Oznacza to przywództwo napędzane przede wszystkim {_phrase_case(primary_meta['publicValuePhrase'], 'instrumental')}, "
+            f"wzmacniane przez {_phrase_case(supporting_meta['publicValuePhrase'], 'accusative')}."
         )
     elif dominance_type == "dominant_with_strong_support":
         primary_value = str(primary_meta["publicValue"])
         supporting_value = str(supporting_meta["publicValue"])
         primary_loc = PUBLIC_VALUE_LOCATIVE.get(primary_value, primary_value)
+        supporting_acc = _public_value_accusative(supporting_value)
         text = (
             f"{opening} opiera się przede wszystkim na {primary_loc}, "
-            f"wyraźnie wzmacnianej przez {supporting_value}. "
-            f"W praktyce oznacza to styl budowany na {primary_meta['publicValuePhrase']}, "
-            f"z dodatkowym akcentem na {supporting_meta['publicValuePhrase']}."
+            f"wyraźnie wzmacnianej przez {supporting_acc}. "
+            f"W praktyce oznacza to styl budowany na {_phrase_case(primary_meta['publicValuePhrase'], 'locative')}, "
+            f"z dodatkowym akcentem na {_phrase_case(supporting_meta['publicValuePhrase'], 'accusative')}."
         )
     else:
+        supporting_acc = _public_value_accusative(str(supporting_meta["publicValue"]))
         text = (
             f"Najsilniejszą motywacją {subject} jest {primary_meta['publicValue']}. "
-            f"Archetyp wspierający dodaje tu {supporting_meta['publicValue']}, "
-            f"ale to {primary_meta['publicValue']} pozostaje głównym źródłem energii i kierunku działania."
+            f"Archetyp wspierający wnosi tu {supporting_acc}, "
+            f"ale to {primary_meta['publicValue']} pozostaje głównym źródłem energii i kierunku działania, "
+            f"wzmacniając {_phrase_case(primary_meta['publicValuePhrase'], 'accusative')}."
         )
 
     if tertiary is not None:
@@ -699,7 +732,7 @@ def _generate_values_description(
         pronoun = PUBLIC_VALUE_PRONOUN.get(tertiary_value, "która")
         text += (
             f" Dodatkowy ton wnosi tu także {tertiary_value}, "
-            f"{pronoun} poszerza ten układ o {tertiary_meta['publicValuePhrase']}."
+            f"{pronoun} poszerza ten układ o {_phrase_case(tertiary_meta['publicValuePhrase'], 'accusative')}."
         )
     return text
 
@@ -791,9 +824,9 @@ def _generate_action_description(
     joint_dominance = abs(top1[1] - top2[1]) <= 7
     if joint_dominance:
         sentence2 = (
-            f"W praktyce daje to układ oparty na wspólnie dominujących {DIM_LABELS[top1[0]]} i {DIM_LABELS[top2[0]]}"
+            f"W praktyce daje to układ oparty przede wszystkim na {DIM_LABELS[top1[0]]} i {DIM_LABELS[top2[0]]}"
         )
-        used_top_phrase = "wspólnie dominujące"
+        used_top_phrase = "dominujące"
     else:
         sentence2 = (
             f"W praktyce daje to układ oparty przede wszystkim na {top1_phrase} {DIM_LABELS[top1[0]]} "
@@ -805,12 +838,21 @@ def _generate_action_description(
     if third[1] >= 60:
         sentence2 += f", przy solidnym wsparciu {DIM_LABELS[third[0]]}"
         third_support_used = True
-    elif third[1] >= 55:
+    elif third[1] >= 50:
         sentence2 += f", z dodatkowym ważnym komponentem {DIM_LABELS[third[0]]}"
         third_support_used = True
 
     if low1[1] >= 45 and low2[1] >= 45:
-        sentence2 += ", przy pozostałych wymiarach obecnych w wyraźnym, ale niedominującym stopniu."
+        if low1_phrase == low2_phrase:
+            sentence2 += (
+                f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]}, "
+                "pozostających ważnymi, ale niedominującymi wymiarami działania."
+            )
+        else:
+            sentence2 += (
+                f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}, "
+                "pozostających ważnymi, ale niedominującymi wymiarami działania."
+            )
     else:
         sentence2 += f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}."
 

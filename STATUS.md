@@ -2849,3 +2849,13 @@
   - rozdzielono semantykę osi potrzeb na bardziej naturalne porównania (`bardziej na ... niż na ...`) bez frazy `na przeciwnej logice`.
 - `archetypy-admin/test_archetype_interpretation.py`:
   - zaktualizowano asercje pod nowe formy fleksyjne (`Bohatera i Władcy`, `Kochanki i Buntowniczki`).
+
+### Zrobione w Hotfix H-134 (2026-04-16, recenzja screenów 3222-3231)
+- `archetypy-admin/archetype_interpretation.py`:
+  - dodano helper `_phrase_case(...)` i zastosowano go w generatorze wartości, aby eliminować błędy typu `potrzeba` zamiast `potrzebą/potrzebę/potrzebie`,
+  - uproszczono składnię opisu koła potrzeb przez lżejsze frazy przeciwstawne (`bardziej na ... niż na ...`),
+  - złagodzono opis niskich wymiarów działania (`obniżona` zamiast `niskiej` w zdaniu końcowym),
+  - rozszerzono wzmiankę o 3. komponencie działania do progu `>= 50` (dla pełniejszego opisu układu Bohater+Władca+Odkrywca).
+- `archetypy-admin/test_archetype_interpretation.py`:
+  - dopisano asercje dla poprawnej fleksji (`potrzebą działania`, `potrzebę ładu`, `o potrzebę autonomii`),
+  - dopisano scenariusz dla układu `Odkrywczyni + Twórczyni`, aby nie zawyżać racjonalności.
