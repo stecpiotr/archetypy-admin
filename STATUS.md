@@ -2638,3 +2638,22 @@
   - nowy układ kolumnowy sekcji `Koło / Rozkład / Profile działania`,
   - oczekiwany wygląd pionowych nagłówków `Główny / Wspierający / Poboczny`,
   - brak radaru/profili 0-100 przy braku odpowiedzi metryczkowych.
+
+### Zrobione w Hotfix H-123 (2026-04-16, opisy interpretacyjne pod 3 wizualizacjami)
+- Dodano deterministyczny generator opisów w `archetype_interpretation.py`.
+- Generator korzysta wyłącznie z istniejących wyników (TOP1/TOP2/TOP3>=70), bez AI i bez wywołań zewnętrznych.
+- W `admin_dashboard.py` opisy są renderowane bezpośrednio pod sekcjami:
+  - `Koło pragnień i wartości`,
+  - `Koło potrzeb`,
+  - `Profil działania archetypu`.
+- Nazewnictwo sekcji zostało ujednolicone do wymaganego zestawu.
+- Dodano testy jednostkowe generatora (`test_archetype_interpretation.py`) obejmujące:
+  - scenariusz co-dominacji,
+  - scenariusz z TOP3 >= 70,
+  - brak wzmianki o TOP3 dla wyniku < 70,
+  - przypadek osi z `bez wyraźnego przechyłu`.
+
+### Zrobione w Hotfix H-124 (2026-04-16, korekta językowa opisów)
+- Poprawiono odmianę i składnię opisów w generatorze interpretacji.
+- Usunięto konstrukcje nienaturalne gramatycznie (`przede wszystkim potrzeba ...`).
+- Utrzymano bez zmian logikę scoringu i reguły deterministyczne generatora.

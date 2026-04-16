@@ -59,6 +59,7 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
 from archetype_docx_loader import load_archetype_extended
+from archetype_interpretation import generate_archetype_descriptions
 from metryczka_config import normalize_personal_metryczka_config
 
 import sys
@@ -7784,6 +7785,61 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             col1, col2, col3 = st.columns([0.28, 0.36, 0.36], gap="small")
             means_pct = mean_pct_by_archetype_from_df(data)
 
+            def _make_desc_result(arche_name: str | None) -> dict[str, object] | None:
+                if not arche_name:
+                    return None
+                return {
+                    "label": disp_name(arche_name),
+                    "score": float(means_pct.get(arche_name, 0.0) or 0.0),
+                }
+
+            primary_name_for_desc = main_avg or ARCHE_NAMES_ORDER[0]
+            supporting_name_for_desc = aux_avg or next(
+                (name for name in ARCHE_NAMES_ORDER if name != primary_name_for_desc),
+                primary_name_for_desc,
+            )
+
+            all_archetypes_for_desc = [
+                {
+                    "label": disp_name(name),
+                    "score": float(means_pct.get(name, 0.0) or 0.0),
+                }
+                for name in ARCHE_NAMES_ORDER
+            ]
+
+            primary_for_desc = _make_desc_result(primary_name_for_desc) or {"label": "", "score": 0.0}
+            supporting_for_desc = _make_desc_result(supporting_name_for_desc) or {"label": "", "score": 0.0}
+            tertiary_for_desc = _make_desc_result(supp_avg)
+
+            try:
+                generated_descriptions = generate_archetype_descriptions(
+                    {
+                        "allArchetypes": all_archetypes_for_desc,
+                        "primary": primary_for_desc,
+                        "supporting": supporting_for_desc,
+                        "tertiary": tertiary_for_desc,
+                    }
+                )
+            except Exception:
+                generated_descriptions = {
+                    "valuesWheelDescription": "",
+                    "needsWheelDescription": "",
+                    "actionProfileDescription": "",
+                }
+
+            def _render_auto_description(text: str) -> None:
+                if not text:
+                    return
+                st.markdown(
+                    (
+                        "<div style='margin-top:10px;margin-bottom:16px;"
+                        "font-size:0.97em;line-height:1.58;color:#334155;'>"
+                        f"{html.escape(text)}"
+                        "</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (
                 results_df['Główny archetyp'].map(normalize)
@@ -8376,6 +8432,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
                             use_column_width=True,
                         )
+                        _render_auto_description(generated_descriptions["valuesWheelDescription"])
                 else:
                     p_l, p_c, p_r = st.columns([0.10, 0.84, 0.06], gap="small")
                     with p_c:
@@ -8410,11 +8467,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 caption="Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony",
                                 width=wheel_img_width
                             )
+                            _render_auto_description(generated_descriptions["valuesWheelDescription"])
 
                 if is_mobile:
                     st.markdown(
                         ap_section_heading(
-                            "Rozkład archetypów na osiach potrzeb",
+                            "Koło potrzeb",
                             center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
@@ -8425,12 +8483,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
                     kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
                     st.image(kolo_axes_img, use_column_width=True)
+                    _render_auto_description(generated_descriptions["needsWheelDescription"])
                 else:
                     k_pad_l, k_mid, k_pad_r = st.columns([0.09, 0.88, 0.03], gap="small")
                     with k_mid:
                         st.markdown(
                             ap_section_heading(
-                                "Rozkład archetypów na osiach potrzeb",
+                                "Koło potrzeb",
                                 center=True,
                                 margin_bottom_px=8,
                                 shift_x_px=-10,
@@ -8441,6 +8500,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
                         kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
                         st.image(kolo_axes_img, width=axes_img_width)
+                        _render_auto_description(generated_descriptions["needsWheelDescription"])
 
             segment_profile_png_path = make_segment_profile_wheel_png(
                 mean_scores=means_pct,
@@ -8475,13 +8535,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     return
                 st.markdown(
                     ap_section_heading(
-                        f"Profile działania archetypów {personGen}",
+                        "Profil działania archetypu",
                         center=False,
                         margin_bottom_px=12,
                         margin_top_px=6,
                     ),
                     unsafe_allow_html=True,
                 )
+                _render_auto_description(generated_descriptions["actionProfileDescription"])
                 for rank, title, card_path in items:
                     st.markdown(
                         (

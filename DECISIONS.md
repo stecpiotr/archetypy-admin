@@ -2483,3 +2483,28 @@ Decyzja:
 - Sekcje `Koło`, `Rozkład`, `Profile działania archetypów ...` są renderowane pionowo w jednej kolumnie.
 Uzasadnienie:
 - Zapewnia spójność nazewniczą i lepszą czytelność analityczną raportu.
+
+### D-278: Warstwa interpretacyjna archetypów jest deterministycznym modułem opartym o stały słownik metadanych
+Decyzja:
+- Teksty pod wykresami archetypów są generowane przez dedykowany moduł `archetype_interpretation.py`.
+- Moduł opiera się na stałych metadanych 12 archetypów (`ARCHETYPE_META`) oraz adapterze etykiet męskich/żeńskich (`LABEL_TO_ID`).
+- Generator nie korzysta z modeli AI, promptingu runtime ani zewnętrznych usług.
+Uzasadnienie:
+- Zapewnia to powtarzalność opisów, pełną deterministyczność i brak ryzyka regresji w logice scoringu.
+
+### D-279: Standaryzacja nazw sekcji interpretacyjnych w widoku personalnym
+Decyzja:
+- Dla 3 kluczowych wizualizacji stosujemy nazwy:
+  - `Koło pragnień i wartości`,
+  - `Koło potrzeb`,
+  - `Profil działania archetypu`.
+Uzasadnienie:
+- Ujednolicone nazwy poprawiają czytelność raportową i upraszczają mapowanie opisu do konkretnej wizualizacji.
+
+### D-280: Generator interpretacji używa jawnych form fleksyjnych fraz i wymiarów
+Decyzja:
+- W module `archetype_interpretation.py` stosujemy jawne formy fleksyjne:
+  - frazy wartości: `potrzebą ...` / `potrzebę ...`,
+  - etykiety wymiarów: osobno dla miejscownika, biernika i narzędnika.
+Uzasadnienie:
+- Pozwala to utrzymać krótkie opisy raportowe w poprawnej, naturalnej polszczyźnie bez zmiany logiki obliczeń.

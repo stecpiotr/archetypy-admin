@@ -3312,3 +3312,36 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py db_jst_utils.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK),
   - `python -m py_compile C:\Poznan_Archetypy_Analiza\analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-123 [DONE]
+Temat: Deterministyczny moduł interpretacji pod trzema wizualizacjami archetypów w widoku personalnym.
+Kryteria ukonczenia:
+1. Dodany moduł generujący 3 krótkie opisy na bazie istniejących wyników TOP1/TOP2/(TOP3>=70), bez zmian scoringu.
+2. Opisy renderowane pod sekcjami: `Koło pragnień i wartości`, `Koło potrzeb`, `Profil działania archetypu`.
+3. Nazwy sekcji zaktualizowane do docelowych, bez przebudowy całego dashboardu.
+4. Dodane testy jednostkowe generatora (co-dominacja, TOP3 >= 70, TOP3 < 70, osie balanced).
+Pierwszy krok wykonawczy:
+- zlokalizować istniejące miejsca renderu trzech wizualizacji oraz źródło wyników TOP1/TOP2/TOP3 i podpiąć pod nie nowy, deterministyczny generator opisów.
+Wynik:
+- dodano moduł `archetype_interpretation.py` z:
+  - `ARCHETYPE_META` (12 archetypów),
+  - `LABEL_TO_ID` (męskie/żeńskie etykiety),
+  - `generate_archetype_descriptions(...)` zwracającą 3 opisy.
+- `admin_dashboard.py`:
+  - sekcja `Rozkład archetypów na osiach potrzeb` została nazwana `Koło potrzeb`,
+  - pod 3 sekcjami renderowane są nowe opisy interpretacyjne,
+  - sekcja kart zmieniona na `Profil działania archetypu`.
+- dodano testy jednostkowe: `test_archetype_interpretation.py`.
+
+### Hotfix H-124 [DONE]
+Temat: Korekta językowa generatora opisów archetypowych (odmiana i składnia zdań).
+Kryteria ukonczenia:
+1. Usunięte nienaturalne formy typu `przede wszystkim potrzeba ...`.
+2. Zdania raportowe są zrozumiałe i mają poprawną odmianę rzeczowników po przyimkach.
+3. Logika generatora i deterministyczność pozostają bez zmian.
+Wynik:
+- `archetype_interpretation.py`:
+  - dodano odmianę fraz wartości (`potrzebą ...` / `potrzebę ...`),
+  - poprawiono składnię opisu osi potrzeb (czytelniejsza kolejność i znaczenia),
+  - rozdzielono formy wymiarów dla kontekstów `na ...` (biernik) i `oparty na ...` (miejscownik),
+  - fallback par wymiarów generuje poprawną polszczyznę (`łączy X z Y`).
