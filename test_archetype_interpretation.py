@@ -263,3 +263,30 @@ def test_12_dominant_with_support_ma_naturalne_otwarcie_i_wartosc_publiczna():
     assert "na wartości Relacje" in txt_values
     assert "wzmacnianej przez Odnowę" in txt_values
     assert "archetyp Kochanki, wyraźnie wzmacniany przez Buntowniczkę" in txt_action
+
+
+def test_13_buntownik_top_empatia_sprawczosc_ma_mocniejsza_puente():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Buntownik", 90.0),
+            _result("Towarzysz", 85.0),
+            _result("Opiekun", 75.0),
+            subject_forms={"fullGen": "Mściwoja Pokemona"},
+        )
+    )
+    txt_action = out["actionProfileDescription"]
+    assert "przywództwa wyrazistego, społecznie zakorzenionego" in txt_action
+    assert "gotowego przekuwać energię zmiany w konkretne działanie" in txt_action
+
+
+def test_14_przy_trzecim_wymiarze_unika_podwojnego_przy():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Bohater", 76.0),
+            _result("Władca", 75.9),
+            _result("Odkrywca", 70.1),
+            subject_forms={"fullGen": "Krzysztofa Hetmana"},
+        )
+    )
+    txt_action = out["actionProfileDescription"]
+    assert "przy solidnym wsparciu racjonalności oraz" in txt_action

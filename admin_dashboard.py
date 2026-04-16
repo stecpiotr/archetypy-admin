@@ -7849,7 +7849,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     axes_img_width = 360 if is_mobile else 620
     segment_profile_width = 360 if is_mobile else 640
     # TU ZMIENISZ ROZMIAR sekcji "Profil siły archetypów ... (skala: 0-100)" dla desktopu.
-    segment_profile_display_width_desktop = 684
+    segment_profile_display_width_desktop = 855
     # Mobile-only: poprawa responsywności wykresów/obrazów i czytelności tabeli
     st.markdown(
         """

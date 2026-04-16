@@ -841,33 +841,29 @@ def _generate_action_description(
         sentence2 += f", z dodatkowym ważnym komponentem {DIM_LABELS[third[0]]}"
         third_support_used = True
 
+    low_prefix = ", oraz " if third_support_used else ", przy "
+
     if low1[1] >= 45 and low2[1] >= 45:
-        if low1_phrase == low2_phrase:
-            sentence2 += (
-                f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]}, "
-                "pozostających ważnymi, ale niedominującymi wymiarami działania."
-            )
-        else:
-            sentence2 += (
-                f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}, "
-                "pozostających ważnymi, ale niedominującymi wymiarami działania."
-            )
+        sentence2 += (
+            f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
+            "obecnych w wyraźnym, ale niedominującym stopniu."
+        )
     else:
         if low1_phrase == low2_phrase:
             if low1_phrase == "obniżonej":
                 sentence2 += (
-                    f", przy {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
+                    f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
                     "pozostających słabszymi wymiarami działania."
                 )
             elif low1_phrase == "obecnej w wyraźnym, ale niedominującym stopniu":
                 sentence2 += (
-                    f", przy {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
+                    f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
                     "obecnych w wyraźnym, ale niedominującym stopniu."
                 )
             else:
-                sentence2 += f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]}."
+                sentence2 += f"{low_prefix}{low1_phrase} {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]}."
         else:
-            sentence2 += f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}."
+            sentence2 += f"{low_prefix}{low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}."
 
     validation = validateGeneratedActionDescription(
         {
@@ -891,6 +887,11 @@ def _generate_action_description(
         )
 
     sentence3 = _pair_interpretation(top1[0], top2[0])
+    if primary.id == "buntownik" and {top1[0], top2[0]} == {"empatia", "sprawczosc"}:
+        sentence3 = (
+            "To wzmacnia obraz przywództwa wyrazistego, społecznie zakorzenionego "
+            "i gotowego przekuwać energię zmiany w konkretne działanie."
+        )
     return f"{sentence1} {sentence2} {sentence3}"
 
 
