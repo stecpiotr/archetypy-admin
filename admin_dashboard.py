@@ -539,6 +539,13 @@ def _img_data_uri_from_path(path: Path) -> str:
     b64 = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{b64}"
 
+
+def _img_data_uri_from_pil(img: Image.Image) -> str:
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
     """
     Zwraca InlineImage do docxtpl dla danego archetypu.
@@ -3007,14 +3014,21 @@ def _apply_values_wheel_public_overlay(base: Image.Image) -> Image.Image:
 
 
 @st.cache_data
-def load_base_arche_img(gender_code: str = "M"):
+def load_base_arche_img(gender_code: str = "M", dark_mode: bool = False):
     assets_dir = Path(__file__).with_name("assets")
     g = normalize_gender(gender_code)
-    candidates = (
-        ["archetype_wheel_female.png", "archetype_wheel.png"]
-        if g == "K"
-        else ["archetype_wheel_male.png", "archetype_wheel.png"]
-    )
+    if g == "K":
+        candidates = (
+            ["archetype_wheel_female_dark.png", "archetype_wheel_female.png", "archetype_wheel.png"]
+            if dark_mode
+            else ["archetype_wheel_female.png", "archetype_wheel_female_dark.png", "archetype_wheel.png"]
+        )
+    else:
+        candidates = (
+            ["archetype_wheel_male_dark.png", "archetype_wheel_male.png", "archetype_wheel.png"]
+            if dark_mode
+            else ["archetype_wheel_male.png", "archetype_wheel_male_dark.png", "archetype_wheel.png"]
+        )
     for name in candidates:
         p = assets_dir.joinpath(name)
         if p.exists():
@@ -3025,8 +3039,8 @@ def load_base_arche_img(gender_code: str = "M"):
     raise FileNotFoundError(f"Brak pliku koła archetypów. Szukano: {candidates}")
 
 
-def mask_for(idx, color, gender_code: str = "M"):
-    base = load_base_arche_img(gender_code)
+def mask_for(idx, color, gender_code: str = "M", dark_mode: bool = False):
+    base = load_base_arche_img(gender_code, dark_mode=dark_mode)
     w, h = base.size
     cx, cy = w//2, h//2
     # Klin wychodzi ze środka, ale krócej niż pełna przekątna płótna,
@@ -3040,22 +3054,43 @@ def mask_for(idx, color, gender_code: str = "M"):
     draw.pieslice([cx-r_outer, cy-r_outer, cx+r_outer, cy+r_outer], start, end, fill=color)
     return mask
 
-def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None, gender_code: str = "M"):
-    base = load_base_arche_img(gender_code).copy()
+def compose_archetype_highlight(
+    idx_main,
+    idx_aux=None,
+    idx_supplement=None,
+    gender_code: str = "M",
+    dark_mode: bool = False,
+):
+    base = load_base_arche_img(gender_code, dark_mode=dark_mode).copy()
 
     # Najpierw poboczny (żeby nakryło go potem żółte/czerwone, jeśli overlap)
     if idx_supplement is not None and idx_supplement not in [idx_main, idx_aux] and idx_supplement < 12:
-        mask_supplement = mask_for(idx_supplement, (64,185,0,140), gender_code=gender_code)  # zielony półtransparentny
+        mask_supplement = mask_for(
+            idx_supplement,
+            (64, 185, 0, 140),
+            gender_code=gender_code,
+            dark_mode=dark_mode,
+        )  # zielony półtransparentny
         base.alpha_composite(mask_supplement)
 
     # Potem wspierający
     if idx_aux is not None and idx_aux != idx_main and idx_aux < 12:
-        mask_aux = mask_for(idx_aux, (255,210,47,140), gender_code=gender_code)  # żółty
+        mask_aux = mask_for(
+            idx_aux,
+            (255, 210, 47, 140),
+            gender_code=gender_code,
+            dark_mode=dark_mode,
+        )  # żółty
         base.alpha_composite(mask_aux)
 
     # Na końcu główny (przykrywa wszystko)
     if idx_main is not None:
-        mask_main = mask_for(idx_main, (255,0,0,140), gender_code=gender_code)  # czerwony
+        mask_main = mask_for(
+            idx_main,
+            (255, 0, 0, 140),
+            gender_code=gender_code,
+            dark_mode=dark_mode,
+        )  # czerwony
         base.alpha_composite(mask_main)
 
     return base
@@ -3068,14 +3103,45 @@ KOLO_NAMES_ORDER = [
 ANGLE_OFFSET_DEG = -15  # przesunięcie o 2.5 min w lewo (2.5 × 6° = 15°)
 
 @st.cache_data
-def load_axes_wheel_img(gender_code: str = "M"):
+def load_axes_wheel_img(gender_code: str = "M", dark_mode: bool = False):
     base_dir = Path(__file__).with_name("assets")
     g = normalize_gender(gender_code)
-    candidates = (
-        [("png", "archetypy_kolo_female.png"), ("svg", "archetypy_kolo2.svg"), ("png", "archetypy_kolo.png")]
-        if g == "K"
-        else [("png", "archetypy_kolo.png"), ("svg", "archetypy_kolo2_male.svg"), ("svg", "archetypy_kolo2.svg")]
-    )
+    if g == "K":
+        if dark_mode:
+            candidates = [
+                ("png", "archetypy_kolo_female_dark.png"),
+                ("png", "archetypy_kolo_female_dark.png_dark.png"),
+                ("svg", "archetypy_kolo2_dark.svg"),
+                ("png", "archetypy_kolo_dark.png"),
+                ("png", "archetypy_kolo_female.png"),
+                ("svg", "archetypy_kolo2.svg"),
+                ("png", "archetypy_kolo.png"),
+            ]
+        else:
+            candidates = [
+                ("png", "archetypy_kolo_female.png"),
+                ("png", "archetypy_kolo_female_dark.png"),
+                ("png", "archetypy_kolo_female_dark.png_dark.png"),
+                ("svg", "archetypy_kolo2.svg"),
+                ("png", "archetypy_kolo.png"),
+            ]
+    else:
+        if dark_mode:
+            candidates = [
+                ("png", "archetypy_kolo_dark.png"),
+                ("svg", "archetypy_kolo2_male_dark.svg"),
+                ("svg", "archetypy_kolo2_dark.svg"),
+                ("png", "archetypy_kolo.png"),
+                ("svg", "archetypy_kolo2_male.svg"),
+                ("svg", "archetypy_kolo2.svg"),
+            ]
+        else:
+            candidates = [
+                ("png", "archetypy_kolo.png"),
+                ("svg", "archetypy_kolo2_male.svg"),
+                ("svg", "archetypy_kolo2.svg"),
+                ("png", "archetypy_kolo_dark.png"),
+            ]
     for ftype, name in candidates:
         p = base_dir / name
         if not p.exists():
@@ -3114,9 +3180,15 @@ def _mask_pie_ring(base: Image.Image, idx: int, rgba,
     base.alpha_composite(layer)
     return base
 
-def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None, gender_code: str = "M") -> Image.Image:
+def compose_axes_wheel_highlight(
+    main_name,
+    aux_name=None,
+    supp_name=None,
+    gender_code: str = "M",
+    dark_mode: bool = False,
+) -> Image.Image:
     """Koło z podświetleniem: zielony (poboczny), żółty (wspierający), czerwony (główny)."""
-    img = load_axes_wheel_img(gender_code).copy()
+    img = load_axes_wheel_img(gender_code, dark_mode=dark_mode).copy()
 
     def idx(n):
         try:
@@ -3152,6 +3224,7 @@ def _plot_segment_profile_wheel_from_scores(
     mean_scores: dict[str, float],
     label_mode: str = "arche",
     gender_code: str = "M",
+    dark_mode: bool = False,
 ) -> None:
     from matplotlib.patches import Wedge, Circle
     import math
@@ -3165,6 +3238,13 @@ def _plot_segment_profile_wheel_from_scores(
         bbox = alpha.getbbox()
         if bbox:
             img = img.crop(bbox)
+        if dark_mode:
+            arr = np.asarray(img).copy()
+            mask = arr[..., 3] > 0
+            arr[..., 0][mask] = 222
+            arr[..., 1][mask] = 231
+            arr[..., 2][mask] = 247
+            img = Image.fromarray(arr, mode="RGBA")
         return np.asarray(img)
 
     def _draw_text_on_arc(ax, text: str, center_deg: float, radius: float) -> None:
@@ -3200,7 +3280,7 @@ def _plot_segment_profile_wheel_from_scores(
                 rotation_mode="anchor",
                 fontsize=11.4,
                 fontweight="bold",
-                color="#363636",
+                color="#DCE7F5" if dark_mode else "#363636",
                 zorder=4,
             )
 
@@ -3219,7 +3299,13 @@ def _plot_segment_profile_wheel_from_scores(
     r_label_outer = 0.92
     r_accent_inner = 0.95
     r_accent_outer = 0.99
-    edgecolor = "#d4d4d4"
+    edgecolor = "#556376" if dark_mode else "#d4d4d4"
+    ring_grid_color = "#4E5E72" if dark_mode else "#dfdfdf"
+    radial_line_color = "#5A6E84" if dark_mode else "#d7d7d7"
+    score_color = "#E5EDF8" if dark_mode else "#2f2f2f"
+    score_bbox_fc = (0.06, 0.10, 0.18, 0.74) if dark_mode else "white"
+    hole_edge = "#6C819A" if dark_mode else "#d0d0d0"
+    cross_color = "#708196" if dark_mode else "#e1e1e1"
 
     icon_dir = Path(__file__).with_name("ikony")
     icon_cache: dict[str, np.ndarray] = {}
@@ -3233,7 +3319,7 @@ def _plot_segment_profile_wheel_from_scores(
 
     for k in range(n_cells + 1):
         r = r_hole + k * dr
-        ax.add_patch(Circle((0, 0), r, facecolor="none", edgecolor="#dfdfdf", linewidth=0.7, zorder=0))
+        ax.add_patch(Circle((0, 0), r, facecolor="none", edgecolor=ring_grid_color, linewidth=0.7, zorder=0))
 
     for i in range(12):
         center = 75 - i * 30
@@ -3241,7 +3327,7 @@ def _plot_segment_profile_wheel_from_scores(
         ax.plot(
             [r_hole * math.cos(edge_ang), r_accent_outer * math.cos(edge_ang)],
             [r_hole * math.sin(edge_ang), r_accent_outer * math.sin(edge_ang)],
-            color="#d7d7d7",
+            color=radial_line_color,
             lw=0.7,
             zorder=0,
         )
@@ -3338,16 +3424,22 @@ def _plot_segment_profile_wheel_from_scores(
             ha="center",
             va="center",
             fontsize=12.2,
-            color="#2f2f2f",
+            color=score_color,
             fontweight="bold",
             zorder=8,
-            bbox=dict(boxstyle="round,pad=0.24,rounding_size=0.10", fc="white", ec=color, lw=1.0, alpha=0.68),
+            bbox=dict(
+                boxstyle="round,pad=0.24,rounding_size=0.10",
+                fc=score_bbox_fc,
+                ec=color,
+                lw=1.0,
+                alpha=0.82 if dark_mode else 0.68,
+            ),
         )
 
-    ax.add_patch(Circle((0, 0), r_hole * 0.98, facecolor=bg, edgecolor="#d0d0d0", linewidth=1.2, zorder=10))
+    ax.add_patch(Circle((0, 0), r_hole * 0.98, facecolor=bg, edgecolor=hole_edge, linewidth=1.2, zorder=10))
     for angle_deg in [0, 90, 180, 270]:
         ang = math.radians(angle_deg)
-        ax.plot([0, 1.02 * math.cos(ang)], [0, 1.02 * math.sin(ang)], color="#e1e1e1", lw=0.9, zorder=0)
+        ax.plot([0, 1.02 * math.cos(ang)], [0, 1.02 * math.sin(ang)], color=cross_color, lw=0.9, zorder=0)
 
     ax.set_xlim(-1.22, 1.22)
     ax.set_ylim(-1.22, 1.22)
@@ -3363,12 +3455,14 @@ def make_segment_profile_wheel_png(
     out_path: str = "segment_profile_wheel.png",
     label_mode: str = "arche",
     gender_code: str = "M",
+    dark_mode: bool = False,
 ) -> str:
     _plot_segment_profile_wheel_from_scores(
         Path(out_path),
         mean_scores or {},
         label_mode=label_mode,
         gender_code=gender_code,
+        dark_mode=dark_mode,
     )
     return out_path
 
@@ -4629,8 +4723,17 @@ def _render_personal_demography_subpage(
             out_path=f"personal_demo_all_{safe_study}.png",
             label_mode="arche",
             gender_code=gender_code,
+            dark_mode=False,
+        )
+        wheel_all_dark = make_segment_profile_wheel_png(
+            mean_scores=profile_all_100,
+            out_path=f"personal_demo_all_{safe_study}_dark.png",
+            label_mode="arche",
+            gender_code=gender_code,
+            dark_mode=True,
         )
         wheel_sub = None
+        wheel_sub_dark = None
         if has_active_filters:
             profile_sub_100 = {k: max(0.0, min(100.0, float(filtered_means_20.get(k, 0.0)) * 5.0)) for k in archetype_names}
             wheel_sub = make_segment_profile_wheel_png(
@@ -4638,21 +4741,42 @@ def _render_personal_demography_subpage(
                 out_path=f"personal_demo_sub_{safe_study}.png",
                 label_mode="arche",
                 gender_code=gender_code,
+                dark_mode=False,
+            )
+            wheel_sub_dark = make_segment_profile_wheel_png(
+                mean_scores=profile_sub_100,
+                out_path=f"personal_demo_sub_{safe_study}_dark.png",
+                label_mode="arche",
+                gender_code=gender_code,
+                dark_mode=True,
             )
 
-        def _show_image_compat(img_path: str, max_width_px: int = 560) -> None:
+        def _show_image_compat(img_path: str, dark_img_path: str | None = None, max_width_px: int = 560) -> None:
             try:
-                raw = Path(img_path).read_bytes()
-                b64 = base64.b64encode(raw).decode("ascii")
-                st.markdown(
-                    (
-                        "<div class='pdemo-wheel-image'>"
-                        f"<img src='data:image/png;base64,{b64}' "
-                        f"style='width:min(100%, {int(max_width_px)}px);height:auto;'/>"
-                        "</div>"
-                    ),
-                    unsafe_allow_html=True,
-                )
+                if dark_img_path and Path(dark_img_path).exists():
+                    light_uri = _img_data_uri_from_path(Path(img_path))
+                    dark_uri = _img_data_uri_from_path(Path(dark_img_path))
+                    st.markdown(
+                        (
+                            "<div class='pdemo-wheel-image'><picture>"
+                            f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
+                            f"<img src='{light_uri}' style='width:min(100%, {int(max_width_px)}px);height:auto;'/>"
+                            "</picture></div>"
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    raw = Path(img_path).read_bytes()
+                    b64 = base64.b64encode(raw).decode("ascii")
+                    st.markdown(
+                        (
+                            "<div class='pdemo-wheel-image'>"
+                            f"<img src='data:image/png;base64,{b64}' "
+                            f"style='width:min(100%, {int(max_width_px)}px);height:auto;'/>"
+                            "</div>"
+                        ),
+                        unsafe_allow_html=True,
+                    )
             except Exception:
                 try:
                     st.image(img_path, width=max_width_px)
@@ -4663,13 +4787,13 @@ def _render_personal_demography_subpage(
             wheels_col1, wheels_col2 = st.columns(2, gap="large")
             with wheels_col1:
                 st.markdown("<div class='pdemo-profile-title'>Profil siły archetypów całej próby</div>", unsafe_allow_html=True)
-                _show_image_compat(wheel_all, max_width_px=520)
+                _show_image_compat(wheel_all, dark_img_path=wheel_all_dark, max_width_px=520)
             with wheels_col2:
                 st.markdown("<div class='pdemo-profile-title'>Profil siły archetypów podgrupy filtrowanej</div>", unsafe_allow_html=True)
-                _show_image_compat(wheel_sub, max_width_px=520)
+                _show_image_compat(wheel_sub, dark_img_path=wheel_sub_dark, max_width_px=520)
         else:
             st.markdown("<div class='pdemo-profile-title'>Profil siły archetypów całej próby</div>", unsafe_allow_html=True)
-            _show_image_compat(wheel_all, max_width_px=620 if not is_mobile else 520)
+            _show_image_compat(wheel_all, dark_img_path=wheel_all_dark, max_width_px=620 if not is_mobile else 520)
         st.markdown(
             """
             <div class="pdemo-wheel-legend-wrap">
@@ -7716,11 +7840,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    radar_plot_size = 500 if is_mobile else 560
+    radar_plot_size = 430 if is_mobile else 560
     radar_tick_size = 10 if is_mobile else 15
     radar_hover_size = 12 if is_mobile else 14
-    radar_margins = dict(l=24, r=24, t=10, b=6) if is_mobile else dict(l=20, r=20, t=20, b=0)
-    radar_domain = dict(x=[0.08, 0.92], y=[0.04, 0.98]) if is_mobile else dict(x=[0.10, 0.90], y=[0.06, 0.95])
+    radar_margins = dict(l=16, r=16, t=2, b=0) if is_mobile else dict(l=20, r=20, t=20, b=0)
+    radar_domain = dict(x=[0.08, 0.92], y=[0.10, 0.99]) if is_mobile else dict(x=[0.10, 0.90], y=[0.06, 0.95])
     wheel_img_width = 360 if is_mobile else 620
     axes_img_width = 360 if is_mobile else 620
     segment_profile_width = 360 if is_mobile else 640
@@ -7787,7 +7911,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             -webkit-overflow-scrolling:touch !important;
           }
           .ap-table{
-            min-width:820px !important;
+            min-width:690px !important;
             width:max-content !important;
             table-layout:auto !important;
             background:#ffffff !important;
@@ -7799,8 +7923,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             background:#ffffff !important;
           }
           .ap-table th, .ap-table td{
-            font-size:12.2px !important;
-            padding:9px 7px !important;
+            font-size:11.6px !important;
+            padding:7px 5px !important;
             white-space:nowrap !important;
             word-break:normal !important;
           }
@@ -8204,8 +8328,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         flex-wrap:wrap;
                         /* TU REGULUJESZ ODSTĘP LEGENDY OD WYKRESU "Profil archetypów":
                            ujemny margin-top przybliża legendę do radaru. */
-                        margin-top:-8px;
-                        margin-bottom:0;
+                        margin-top:-12px;
+                        margin-bottom:-2px;
                         color:var(--text-color,#334155);
                         font-size:0.90em;
                         font-weight:500;
@@ -8229,8 +8353,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       @media (max-width: 900px){
                         .ap-radar-role-legend{
                           gap:12px;
-                          margin-top:-10px;
-                          margin-bottom:0;
+                          margin-top:-16px;
+                          margin-bottom:-4px;
                           font-size:0.86em;
                         }
                         .ap-radar-role-legend .ap-dot{
@@ -8248,10 +8372,49 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     unsafe_allow_html=True,
                 )
 
-            def _render_image_90pct(image_obj) -> None:
+            def _render_image_90pct(image_obj, dark_image_obj=None) -> None:
                 _pad_l, _img_col, _pad_r = st.columns([0.05, 0.90, 0.05], gap="small")
                 with _img_col:
-                    st.image(image_obj, use_column_width=True)
+                    if dark_image_obj is not None:
+                        light_uri = _img_data_uri_from_pil(image_obj)
+                        dark_uri = _img_data_uri_from_pil(dark_image_obj)
+                        st.markdown(
+                            (
+                                "<picture>"
+                                f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
+                                f"<img src='{light_uri}' style='width:100%;height:auto;display:block;'/>"
+                                "</picture>"
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.image(image_obj, use_column_width=True)
+
+            def _render_theme_path_image(light_path: str | Path, dark_path: str | Path | None, width_px: int | None = None) -> None:
+                light_path_obj = Path(light_path)
+                dark_path_obj = Path(dark_path) if dark_path else None
+                if dark_path_obj and dark_path_obj.exists() and light_path_obj.exists():
+                    light_uri = _img_data_uri_from_path(light_path_obj)
+                    dark_uri = _img_data_uri_from_path(dark_path_obj)
+                    width_style = (
+                        f"width:min(100%, {int(width_px)}px);height:auto;display:block;"
+                        if width_px
+                        else "width:100%;height:auto;display:block;"
+                    )
+                    st.markdown(
+                        (
+                            "<picture>"
+                            f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
+                            f"<img src='{light_uri}' style='{width_style}'/>"
+                            "</picture>"
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    return
+                if width_px:
+                    st.image(str(light_path_obj), width=int(width_px))
+                else:
+                    st.image(str(light_path_obj), use_column_width=True)
 
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (
@@ -8641,15 +8804,19 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                     @media (max-width: 900px){{
                       .ap-table {{
-                        min-width: 760px !important;
-                        width: 760px !important;
+                        min-width: 680px !important;
+                        width: max-content !important;
                         table-layout: fixed !important;
                       }}
                       .ap-table th, .ap-table td {{
-                        padding: 9px 7px !important;
-                        font-size: 12.4px !important;
+                        padding: 7px 5px !important;
+                        font-size: 11.6px !important;
                         white-space: nowrap !important;
                         word-break: normal !important;
+                      }}
+                      .ap-table .ap-vert-col {{
+                        min-height: 66px !important;
+                        font-size: 12px !important;
                       }}
                     }}
 
@@ -8767,10 +8934,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     "displayModeBar": (not is_mobile),
                     "responsive": True,
                 }
+                radar_heading_mb = 2 if is_mobile else 8
 
                 if is_mobile:
                     st.markdown(
-                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
+                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=radar_heading_mb),
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
@@ -8782,7 +8950,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     _render_radar_role_legend()
                 else:
                     st.markdown(
-                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
+                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=radar_heading_mb),
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
@@ -8814,6 +8982,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 mean_scores=means_pct,
                 out_path=f"segment_profile_{study_id}.png",
                 gender_code=report_gender_code,
+                dark_mode=False,
+            )
+            segment_profile_png_path_dark = make_segment_profile_wheel_png(
+                mean_scores=means_pct,
+                out_path=f"segment_profile_{study_id}_dark.png",
+                gender_code=report_gender_code,
+                dark_mode=True,
             )
 
             with left_col:
@@ -8846,9 +9021,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     unsafe_allow_html=True,
                 )
                 if is_mobile:
-                    st.image(segment_profile_png_path, use_column_width=True)
+                    _render_theme_path_image(segment_profile_png_path, segment_profile_png_path_dark, width_px=None)
                 else:
-                    st.image(segment_profile_png_path, width=segment_profile_display_width_desktop)
+                    _render_theme_path_image(
+                        segment_profile_png_path,
+                        segment_profile_png_path_dark,
+                        width_px=segment_profile_display_width_desktop,
+                    )
                 st.markdown(
                     """
                     <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
@@ -8885,12 +9064,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 idx_aux_wheel,
                                 idx_supp_wheel,
                                 gender_code=report_gender_code,
+                                dark_mode=False,
+                            )
+                            kola_img_dark = compose_archetype_highlight(
+                                idx_main_wheel,
+                                idx_aux_wheel,
+                                idx_supp_wheel,
+                                gender_code=report_gender_code,
+                                dark_mode=True,
                             )
                             if not isinstance(kola_img, Image.Image):
                                 raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                         except Exception:
-                            kola_img = load_base_arche_img(gender_code=report_gender_code)
-                        _render_image_90pct(kola_img)
+                            kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
+                            kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -8920,12 +9108,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 idx_aux_wheel,
                                 idx_supp_wheel,
                                 gender_code=report_gender_code,
+                                dark_mode=False,
+                            )
+                            kola_img_dark = compose_archetype_highlight(
+                                idx_main_wheel,
+                                idx_aux_wheel,
+                                idx_supp_wheel,
+                                gender_code=report_gender_code,
+                                dark_mode=True,
                             )
                             if not isinstance(kola_img, Image.Image):
                                 raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                         except Exception:
-                            kola_img = load_base_arche_img(gender_code=report_gender_code)
-                        _render_image_90pct(kola_img)
+                            kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
+                            kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -8947,8 +9144,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     )
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
-                    kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
-                    _render_image_90pct(kolo_axes_img)
+                    kolo_axes_img = compose_axes_wheel_highlight(
+                        main_avg,
+                        aux,
+                        supp,
+                        gender_code=report_gender_code,
+                        dark_mode=False,
+                    )
+                    kolo_axes_img_dark = compose_axes_wheel_highlight(
+                        main_avg,
+                        aux,
+                        supp,
+                        gender_code=report_gender_code,
+                        dark_mode=True,
+                    )
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
                 else:
                     st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
@@ -8963,8 +9173,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     )
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
-                    kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
-                    _render_image_90pct(kolo_axes_img)
+                    kolo_axes_img = compose_axes_wheel_highlight(
+                        main_avg,
+                        aux,
+                        supp,
+                        gender_code=report_gender_code,
+                        dark_mode=False,
+                    )
+                    kolo_axes_img_dark = compose_axes_wheel_highlight(
+                        main_avg,
+                        aux,
+                        supp,
+                        gender_code=report_gender_code,
+                        dark_mode=True,
+                    )
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
 
             top_profile_archetypes: list[str] = [main_avg]
