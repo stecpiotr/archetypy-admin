@@ -2671,3 +2671,15 @@ Decyzja:
 - walidator wymusza m.in. regułę wspólnej dominacji przy różnicy TOP2 <= 7 pkt oraz regułę wsparcia 3. wymiaru przy >= 60.
 Uzasadnienie:
 - Ogranicza ryzyko językowego przeszacowania lub niedoszacowania opisu praktycznego stylu działania.
+
+### D-298: W opisie koła potrzeb nazwy archetypów po słowie `archetypy` zapisujemy w dopełniaczu
+Decyzja:
+- W zdaniach kończących opis `Koło potrzeb` używamy form dopełniaczowych etykiet archetypów (np. `Kochanki i Buntowniczki`, `Bohatera i Władcy`).
+Uzasadnienie:
+- Eliminuje to mieszanie form i poprawia naturalność językową raportu.
+
+### D-299: Końcówki interpretacyjne profilu działania są neutralne rodzajowo
+Decyzja:
+- W banku `PAIR_INTERPRETATION` używamy form neutralnych (`obraz przywództwa ...`) zamiast form zależnych od płci (`obraz lidera ...`).
+Uzasadnienie:
+- Zapobiega błędom rodzaju gramatycznego w opisach dla etykiet żeńskich i mieszanych.

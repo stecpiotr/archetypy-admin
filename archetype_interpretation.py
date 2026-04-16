@@ -270,6 +270,33 @@ LABEL_ACCUSATIVE: dict[str, str] = {
     "Władczyni": "Władczynię",
 }
 
+LABEL_GENITIVE: dict[str, str] = {
+    "Niewinny": "Niewinnego",
+    "Niewinna": "Niewinnej",
+    "Mędrzec": "Mędrca",
+    "Mędrczyni": "Mędrczyni",
+    "Odkrywca": "Odkrywcy",
+    "Odkrywczyni": "Odkrywczyni",
+    "Kochanek": "Kochanka",
+    "Kochanka": "Kochanki",
+    "Towarzysz": "Towarzysza",
+    "Towarzyszka": "Towarzyszki",
+    "Błazen": "Błazna",
+    "Komiczka": "Komiczki",
+    "Bohater": "Bohatera",
+    "Bohaterka": "Bohaterki",
+    "Buntownik": "Buntownika",
+    "Buntowniczka": "Buntowniczki",
+    "Czarodziej": "Czarodzieja",
+    "Czarodziejka": "Czarodziejki",
+    "Opiekun": "Opiekuna",
+    "Opiekunka": "Opiekunki",
+    "Twórca": "Twórcy",
+    "Twórczyni": "Twórczyni",
+    "Władca": "Władcy",
+    "Władczyni": "Władczyni",
+}
+
 FEMALE_LABELS = {
     "Niewinna",
     "Mędrczyni",
@@ -294,16 +321,16 @@ DIM_LABELS: dict[str, str] = {
 }
 
 PAIR_INTERPRETATION: dict[str, str] = {
-    "sprawczosc+niezaleznosc": "To wzmacnia obraz lidera decyzyjnego, samodzielnego i odpowiedzialnego za wynik.",
-    "sprawczosc+racjonalnosc": "To wzmacnia obraz lidera rzeczowego, uporządkowanego i zdolnego przekładać diagnozę na działanie.",
-    "empatia+sprawczosc": "To wzmacnia obraz lidera, który łączy troskę z realnym działaniem.",
-    "empatia+kreatywnosc": "To wzmacnia obraz lidera relacyjnego, atrakcyjnego komunikacyjnie i łatwo budującego zaangażowanie.",
-    "niezaleznosc+kreatywnosc": "To wzmacnia obraz lidera reformującego, który szuka nowych dróg i nie boi się wychodzić poza schemat.",
-    "racjonalnosc+niezaleznosc": "To wzmacnia obraz lidera samodzielnego strategicznie, bardziej ufającego własnemu osądowi niż presji otoczenia.",
-    "racjonalnosc+kreatywnosc": "To wzmacnia obraz lidera wizjonerskiego, który łączy wyobraźnię z myśleniem systemowym.",
-    "empatia+racjonalnosc": "To wzmacnia obraz lidera rozważnego i społecznie uważnego.",
-    "empatia+niezaleznosc": "To wzmacnia obraz lidera wyrazistego, ale nadal zakorzenionego w potrzebach ludzi.",
-    "sprawczosc+kreatywnosc": "To wzmacnia obraz lidera, który nie tylko wymyśla zmianę, ale potrafi ją uruchomić.",
+    "sprawczosc+niezaleznosc": "To wzmacnia obraz przywództwa decyzyjnego, samodzielnego i odpowiedzialnego za wynik.",
+    "sprawczosc+racjonalnosc": "To wzmacnia obraz przywództwa rzeczowego, uporządkowanego i zdolnego przekładać diagnozę na działanie.",
+    "empatia+sprawczosc": "To wzmacnia obraz przywództwa, które łączy troskę z realnym działaniem.",
+    "empatia+kreatywnosc": "To wzmacnia obraz przywództwa relacyjnego, atrakcyjnego komunikacyjnie i łatwo budującego zaangażowanie.",
+    "niezaleznosc+kreatywnosc": "To wzmacnia obraz przywództwa reformującego, które szuka nowych dróg i nie boi się wychodzić poza schemat.",
+    "racjonalnosc+niezaleznosc": "To wzmacnia obraz przywództwa samodzielnego strategicznie, bardziej ufającego własnemu osądowi niż presji otoczenia.",
+    "racjonalnosc+kreatywnosc": "To wzmacnia obraz przywództwa wizjonerskiego, które łączy wyobraźnię z myśleniem systemowym.",
+    "empatia+racjonalnosc": "To wzmacnia obraz przywództwa rozważnego i społecznie uważnego.",
+    "empatia+niezaleznosc": "To wzmacnia obraz przywództwa wyrazistego, ale nadal zakorzenionego w potrzebach ludzi.",
+    "sprawczosc+kreatywnosc": "To wzmacnia obraz przywództwa, które nie tylko wymyśla zmianę, ale potrafi ją uruchomić.",
 }
 
 INTENSITY_BANDS: list[tuple[float, ArchetypeIntensityBand, str]] = [
@@ -391,7 +418,7 @@ def getDimensionPhrase(value: float, role: Literal["top", "middle", "low"]) -> s
         "high": "obecnej w wyraźnym stopniu",
         "mid_high": "obecnej w wyraźnym stopniu",
         "mid": "obecnej w wyraźnym stopniu",
-        "low_mid": "obniżonej",
+        "low_mid": "umiarkowanej" if value >= 40 else "obniżonej",
         "low": "niskiej",
     }[band]
 
@@ -556,12 +583,63 @@ def _y_meaning(y: float) -> str:
     return "szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji"
 
 
+def _x_opposite_meaning(x: float) -> str:
+    if _axis_strength(x) == "balanced":
+        return "jednostronnym forsowaniu tylko jednej strony osi"
+    if x < 0:
+        return "silnym dostrajaniu się do otoczenia i podporządkowaniu wspólnocie za wszelką cenę"
+    return "działaniu w pełnej autonomii i bez szerokiego dostrajania się do ludzi"
+
+
+def _y_opposite_meaning(y: float) -> str:
+    if _axis_strength(y) == "balanced":
+        return "szukaniu skrajności zamiast równowagi"
+    if y < 0:
+        return "utrzymywaniu status quo i unikaniu ruchu"
+    return "sztywnym trzymaniu się rutyny i przewidywalności"
+
+
 def _is_female_label(label: str) -> bool:
     return label in FEMALE_LABELS
 
 
 def _label_accusative(label: str) -> str:
     return LABEL_ACCUSATIVE.get(label, label)
+
+
+def _label_genitive(label: str) -> str:
+    return LABEL_GENITIVE.get(label, label)
+
+
+PUBLIC_VALUE_LOCATIVE: dict[str, str] = {
+    "Przejrzystość": "Przejrzystości",
+    "Rozsądek": "Rozsądku",
+    "Wolność": "Wolności",
+    "Odnowa": "Odnowie",
+    "Wizja": "Wizji",
+    "Odwaga": "Odwadze",
+    "Relacje": "Relacjach",
+    "Otwartość": "Otwartości",
+    "Współpraca": "Współpracy",
+    "Troska": "Trosce",
+    "Porządek": "Porządku",
+    "Rozwój": "Rozwoju",
+}
+
+PUBLIC_VALUE_PRONOUN: dict[str, str] = {
+    "Przejrzystość": "która",
+    "Rozsądek": "który",
+    "Wolność": "która",
+    "Odnowa": "która",
+    "Wizja": "która",
+    "Odwaga": "która",
+    "Relacje": "które",
+    "Otwartość": "która",
+    "Współpraca": "która",
+    "Troska": "która",
+    "Porządek": "który",
+    "Rozwój": "który",
+}
 
 
 def _support_participle(primary_label: str) -> str:
@@ -595,15 +673,18 @@ def _generate_values_description(
     if dominance_type == "co_dominant":
         text = (
             f"{opening} tworzy niemal równorzędny duet: {primary_meta['publicValue']} i {supporting_meta['publicValue']}. "
-            f"Oznacza to przywództwo napędzane przede wszystkim tym, że kluczowa staje się {primary_meta['publicValuePhrase']}, "
-            f"wzmacniane tym, że istotna pozostaje także {supporting_meta['publicValuePhrase']}."
+            f"Oznacza to przywództwo napędzane przede wszystkim {primary_meta['publicValuePhrase']}, "
+            f"wzmacniane przez {supporting_meta['publicValuePhrase']}."
         )
     elif dominance_type == "dominant_with_strong_support":
+        primary_value = str(primary_meta["publicValue"])
+        supporting_value = str(supporting_meta["publicValue"])
+        primary_loc = PUBLIC_VALUE_LOCATIVE.get(primary_value, primary_value)
         text = (
-            f"{opening} ma jako główną oś wartość {primary_meta['publicValue']}, "
-            f"z wyraźnym wsparciem wartości {supporting_meta['publicValue']}. "
-            f"W praktyce oznacza to styl budowany wokół tego, że centralna jest {primary_meta['publicValuePhrase']}, "
-            f"z dodatkowym akcentem na to, że ważna jest też {supporting_meta['publicValuePhrase']}."
+            f"{opening} opiera się przede wszystkim na {primary_loc}, "
+            f"wyraźnie wzmacnianej przez {supporting_value}. "
+            f"W praktyce oznacza to styl budowany na {primary_meta['publicValuePhrase']}, "
+            f"z dodatkowym akcentem na {supporting_meta['publicValuePhrase']}."
         )
     else:
         text = (
@@ -614,9 +695,11 @@ def _generate_values_description(
 
     if tertiary is not None:
         tertiary_meta = ARCHETYPE_META[tertiary.id]
+        tertiary_value = str(tertiary_meta["publicValue"])
+        pronoun = PUBLIC_VALUE_PRONOUN.get(tertiary_value, "która")
         text += (
-            f" Dodatkowy ton wnosi tu także {tertiary_meta['publicValue']}; "
-            f"ten element poszerza układ, bo pojawia się także {tertiary_meta['publicValuePhrase']}."
+            f" Dodatkowy ton wnosi tu także {tertiary_value}, "
+            f"{pronoun} poszerza ten układ o {tertiary_meta['publicValuePhrase']}."
         )
     return text
 
@@ -633,18 +716,39 @@ def _generate_needs_description(
     y = sum(item.score * ARCHETYPE_META[item.id]["needsY"] for item in active) / total
 
     opening = getNameAwareOpening("needs", subject_forms)
-    text = (
-        f"{opening} {_x_description(x)}, {_y_description(y)}. "
-        f"W praktyce oznacza to styl działania oparty bardziej na {_x_meaning(x)} i {_y_meaning(y)} "
-        "niż na przeciwnej logice. "
-    )
+    x_strength = _axis_strength(x)
+    y_strength = _axis_strength(y)
+    if x_strength == "balanced" and y_strength == "balanced":
+        second_sentence = (
+            f"W praktyce oznacza to styl działania oparty na {_x_meaning(x)} oraz {_y_meaning(y)}, "
+            "bez wyraźnego przechodzenia w skrajności."
+        )
+    elif x_strength == "balanced":
+        second_sentence = (
+            f"W praktyce oznacza to styl działania oparty na {_x_meaning(x)}, "
+            f"a zarazem bardziej na {_y_meaning(y)} niż na {_y_opposite_meaning(y)}."
+        )
+    elif y_strength == "balanced":
+        second_sentence = (
+            f"W praktyce oznacza to styl działania oparty bardziej na {_x_meaning(x)} niż na {_x_opposite_meaning(x)}, "
+            f"przy jednoczesnym {_y_meaning(y)}."
+        )
+    else:
+        second_sentence = (
+            f"W praktyce oznacza to styl działania oparty bardziej na {_x_meaning(x)} niż na {_x_opposite_meaning(x)}, "
+            f"a zarazem bardziej na {_y_meaning(y)} niż na {_y_opposite_meaning(y)}."
+        )
+
+    text = f"{opening} {_x_description(x)}, {_y_description(y)}. {second_sentence} "
+    primary_gen = _label_genitive(primary.label)
+    supporting_gen = _label_genitive(supporting.label)
     if tertiary is not None:
         text += (
-            f"Ten kierunek budują przede wszystkim archetypy {primary.label} i {supporting.label}, "
+            f"Ten kierunek budują przede wszystkim archetypy {primary_gen} i {supporting_gen}, "
             f"a dodatkowy akcent wnosi {tertiary.label}."
         )
     else:
-        text += f"Ten kierunek budują przede wszystkim archetypy {primary.label} i {supporting.label}."
+        text += f"Ten kierunek budują przede wszystkim archetypy {primary_gen} i {supporting_gen}."
     return text
 
 

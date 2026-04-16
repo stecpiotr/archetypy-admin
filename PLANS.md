@@ -3593,3 +3593,14 @@ Wynik:
 - `archetype_interpretation.py`: domknięty silnik regułowy + helpery i walidacja.
 - `admin_dashboard.py`: usunięte stare nazwy `Rozkład archetypów na osiach potrzeb`.
 - `test_archetype_interpretation.py`: nowy zestaw testów 1–8.
+
+### Hotfix H-133 [DONE]
+Temat: Redakcja jakościowa generatora opisów (język naturalny + poprawna odmiana archetypów + neutralizacja rodzaju w końcówkach działania).
+Kryteria ukonczenia:
+1. Usunięte sformułowania ciężkie/generatorowe (`tym, że kluczowa...`, `ma jako główną oś...`, `na przeciwnej logice`).
+2. W `Koło potrzeb` zdanie o kierunku używa poprawnej odmiany nazw archetypów (`Kochanki i Buntowniczki`, `Bohatera i Władcy` itd.).
+3. Końcówki interpretacyjne `Profilu działania` nie mieszają rodzaju (`lidera/liderki`) dzięki neutralnym formom przywództwa.
+4. Testy uwzględniają odmianę nazw archetypów w opisie potrzeb.
+Wynik:
+- `archetype_interpretation.py`: wygładzona składnia + helper odmiany dopełniaczowej + neutralne frazy interpretacyjne.
+- `test_archetype_interpretation.py`: asercje dostosowane do nowych form fleksyjnych.

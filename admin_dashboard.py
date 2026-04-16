@@ -3005,8 +3005,9 @@ def mask_for(idx, color, gender_code: str = "M"):
     base = load_base_arche_img(gender_code)
     w, h = base.size
     cx, cy = w//2, h//2
-    # Klin wychodzi ze środka i jest długi (jak referencyjny panel eksportowy).
-    r_outer = int(min(w, h) * 0.74)
+    # Klin wychodzi ze środka, ale krócej niż pełna przekątna płótna,
+    # żeby nie „zalewał” całego koła i zostawiał czytelne marginesy.
+    r_outer = int(min(w, h) * 0.54)
     mask = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(mask, "RGBA")
     start = -90 + idx*30
@@ -7691,14 +7692,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    radar_plot_size = 420 if is_mobile else 760
+    radar_plot_size = 500 if is_mobile else 560
     radar_tick_size = 10 if is_mobile else 15
     radar_hover_size = 12 if is_mobile else 14
-    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=24, r=24, t=18, b=8)
-    radar_domain = dict(x=[0.10, 0.90], y=[0.10, 0.90]) if is_mobile else dict(x=[0.12, 0.88], y=[0.06, 0.98])
+    radar_margins = dict(l=24, r=24, t=10, b=6) if is_mobile else dict(l=20, r=20, t=20, b=0)
+    radar_domain = dict(x=[0.08, 0.92], y=[0.04, 0.98]) if is_mobile else dict(x=[0.10, 0.90], y=[0.06, 0.95])
     wheel_img_width = 360 if is_mobile else 620
     axes_img_width = 360 if is_mobile else 620
     segment_profile_width = 360 if is_mobile else 640
+    # TU ZMIENISZ ROZMIAR sekcji "Profil siły archetypów ... (skala: 0-100)" dla desktopu.
+    segment_profile_display_width_desktop = 684
     # Mobile-only: poprawa responsywności wykresów/obrazów i czytelności tabeli
     st.markdown(
         """
@@ -8157,12 +8160,73 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 st.markdown(
                     (
                         "<div style='margin-top:10px;margin-bottom:16px;"
-                        "font-size:0.93em;line-height:1.58;color:#334155;'>"
+                        "font-size:0.92em;line-height:1.58;color:var(--text-color,#334155);'>"
                         f"{html.escape(text)}"
                         "</div>"
                     ),
                     unsafe_allow_html=True,
                 )
+
+            def _render_radar_role_legend() -> None:
+                st.markdown(
+                    """
+                    <style>
+                      .ap-radar-role-legend{
+                        display:flex;
+                        justify-content:center;
+                        align-items:center;
+                        gap:24px;
+                        flex-wrap:wrap;
+                        /* TU REGULUJESZ ODSTĘP LEGENDY OD WYKRESU "Profil archetypów":
+                           ujemny margin-top przybliża legendę do radaru. */
+                        margin-top:-8px;
+                        margin-bottom:0;
+                        color:var(--text-color,#334155);
+                        font-size:0.90em;
+                        font-weight:500;
+                      }
+                      .ap-radar-role-legend .ap-item{
+                        display:inline-flex;
+                        align-items:center;
+                        gap:8px;
+                      }
+                      .ap-radar-role-legend .ap-dot{
+                        width:21px;
+                        height:21px;
+                        border-radius:50%;
+                        display:inline-block;
+                        border:2px solid var(--text-color,#0f172a);
+                        box-sizing:border-box;
+                      }
+                      .ap-radar-role-legend .ap-dot-main{ background:#ff0000; }
+                      .ap-radar-role-legend .ap-dot-aux{ background:#FFD22F; }
+                      .ap-radar-role-legend .ap-dot-supp{ background:#40b900; }
+                      @media (max-width: 900px){
+                        .ap-radar-role-legend{
+                          gap:12px;
+                          margin-top:-10px;
+                          margin-bottom:0;
+                          font-size:0.86em;
+                        }
+                        .ap-radar-role-legend .ap-dot{
+                          width:17px;
+                          height:17px;
+                        }
+                      }
+                    </style>
+                    <div class="ap-radar-role-legend">
+                      <span class="ap-item"><span class="ap-dot ap-dot-main"></span><span>Archetyp główny</span></span>
+                      <span class="ap-item"><span class="ap-dot ap-dot-aux"></span><span>Archetyp wspierający</span></span>
+                      <span class="ap-item"><span class="ap-dot ap-dot-supp"></span><span>Archetyp poboczny</span></span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            def _render_image_90pct(image_obj) -> None:
+                _pad_l, _img_col, _pad_r = st.columns([0.05, 0.90, 0.05], gap="small")
+                with _img_col:
+                    st.image(image_obj, use_column_width=True)
 
             # --- LICZEBNOŚCI TYLKO DO TABELI (NIE DO RANKINGU/WYKRESU) ---
             counts_main = (
@@ -8690,22 +8754,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         config=radar_config,
                         key=f"radar-{study_id}",
                     )
-                    st.markdown("""
-                    <div style="display:flex;justify-content:center;align-items:center;margin-top:2px;margin-bottom:2px;">
-                      <span style="display:flex;align-items:center;margin-right:34px;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp główny</span>
-                      </span>
-                      <span style="display:flex;align-items:center;margin-right:34px;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp wspierający</span>
-                      </span>
-                      <span style="display:flex;align-items:center;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp poboczny</span>
-                      </span>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    _render_radar_role_legend()
                 else:
                     st.markdown(
                         ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
@@ -8717,22 +8766,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         config=radar_config,
                         key=f"radar-{study_id}",
                     )
-                    st.markdown("""
-                    <div style="display:flex;justify-content:center;align-items:center;margin-top:2px;margin-bottom:2px;">
-                      <span style="display:flex;align-items:center;margin-right:34px;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp główny</span>
-                      </span>
-                      <span style="display:flex;align-items:center;margin-right:34px;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp wspierający</span>
-                      </span>
-                      <span style="display:flex;align-items:center;">
-                        <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                        <span style="font-size:0.85em;">Archetyp poboczny</span>
-                      </span>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    _render_radar_role_legend()
 
             # --- Heurystyczna analiza koloru + profil podsumowania pod tabelą ---
             color_pcts = calc_color_percentages_from_df(data)
@@ -8789,7 +8823,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 if is_mobile:
                     st.image(segment_profile_png_path, use_column_width=True)
                 else:
-                    st.image(segment_profile_png_path, width=760)
+                    st.image(segment_profile_png_path, width=segment_profile_display_width_desktop)
                 st.markdown(
                     """
                     <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
@@ -8831,10 +8865,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code)
-                        st.image(
-                            kola_img,
-                            use_column_width=True,
-                        )
+                        _render_image_90pct(kola_img)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -8869,9 +8900,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code)
-                        _pad_l, _wheel_col, _pad_r = st.columns([0.10, 0.80, 0.10], gap="small")
-                        with _wheel_col:
-                            st.image(kola_img, use_column_width=True)
+                        _render_image_90pct(kola_img)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -8894,7 +8923,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
                     kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
-                    st.image(kolo_axes_img, use_column_width=True)
+                    _render_image_90pct(kolo_axes_img)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
                 else:
                     st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
@@ -8910,7 +8939,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
                     kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
-                    st.image(kolo_axes_img, use_column_width=True)
+                    _render_image_90pct(kolo_axes_img)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
 
             top_profile_archetypes: list[str] = [main_avg]

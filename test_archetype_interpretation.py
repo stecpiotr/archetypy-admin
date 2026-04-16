@@ -85,7 +85,7 @@ def test_3_kolo_potrzeb_bohater_wladca_odkrywca():
     txt = out["needsWheelDescription"]
     assert "niezależności" in txt
     assert "stabilności" in txt
-    assert "Bohater i Władca" in txt
+    assert "Bohatera i Władcy" in txt
     assert "napięcie" not in txt.lower()
 
 
@@ -180,6 +180,7 @@ def test_8_fallback_personalizacji_i_helpery():
     assert "tego układu" in txt_values
     assert "tego wyniku" in txt_needs
     assert "tego układu" in txt_action
+    assert "Kochanki i Buntowniczki" in txt_needs
     assert "None" not in txt_values + txt_needs + txt_action
 
 

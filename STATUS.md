@@ -2837,3 +2837,15 @@
   - nazwa sekcji `Rozkład archetypów na osiach potrzeb` zastąpiona przez `Koło potrzeb`.
 - `archetypy-admin/test_archetype_interpretation.py`:
   - odświeżony zestaw testów jednostkowych (scenariusze 1–8).
+
+### Zrobione w Hotfix H-133 (2026-04-16, redakcja jakościowa opisów)
+- `archetypy-admin/archetype_interpretation.py`:
+  - usunięto konstrukcje „generatorowe” i ciężkie składniowo w sekcjach:
+    - `Koło pragnień i wartości`,
+    - `Koło potrzeb`,
+  - dodano odmianę nazw archetypów do dopełniacza (`LABEL_GENITIVE`) dla zdań typu:
+    `Ten kierunek budują przede wszystkim archetypy ...`,
+  - frazy końcowe profilu działania przepisano na neutralne rodzajowo (`przywództwo` zamiast `lidera`),
+  - rozdzielono semantykę osi potrzeb na bardziej naturalne porównania (`bardziej na ... niż na ...`) bez frazy `na przeciwnej logice`.
+- `archetypy-admin/test_archetype_interpretation.py`:
+  - zaktualizowano asercje pod nowe formy fleksyjne (`Bohatera i Władcy`, `Kochanki i Buntowniczki`).
