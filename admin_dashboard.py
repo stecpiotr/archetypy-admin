@@ -515,6 +515,30 @@ def _profile_card_file_for(archetype_name: str, gender_code: str = "M"):
         return None
     return None
 
+
+def _profile_card_dark_variant(light_path: Path | None) -> Path | None:
+    """
+    Dla <nazwa>.png zwraca <nazwa>_dark.png jeśli istnieje.
+    """
+    try:
+        if not light_path:
+            return None
+        candidate = light_path.with_name(f"{light_path.stem}_dark{light_path.suffix}")
+        return candidate if candidate.exists() else None
+    except Exception:
+        return None
+
+
+def _img_data_uri_from_path(path: Path) -> str:
+    suffix = path.suffix.lower()
+    mime = "image/png"
+    if suffix in {".jpg", ".jpeg"}:
+        mime = "image/jpeg"
+    elif suffix == ".webp":
+        mime = "image/webp"
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
     """
     Zwraca InlineImage do docxtpl dla danego archetypu.
@@ -8949,7 +8973,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             if supp_avg and supp_avg not in [main_avg, aux_avg]:
                 top_profile_archetypes.append(supp_avg)
 
-            profile_cards_for_top: list[tuple[int, str, str, Path]] = []
+            profile_cards_for_top: list[tuple[int, str, str, Path, Path | None]] = []
             def _role_for_rank(rank: int) -> str:
                 if rank == 1:
                     return "Archetyp główny"
@@ -8960,17 +8984,20 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             for rank, arch_name in enumerate(top_profile_archetypes, start=1):
                 profile_path = _profile_card_file_for(arch_name, gender_code=report_gender_code)
                 if profile_path and Path(profile_path).exists():
-                    profile_cards_for_top.append((rank, _role_for_rank(rank), disp_name(arch_name), Path(profile_path)))
+                    light_path = Path(profile_path)
+                    dark_path = _profile_card_dark_variant(light_path)
+                    profile_cards_for_top.append((rank, _role_for_rank(rank), disp_name(arch_name), light_path, dark_path))
             profile_cards_export: list[dict[str, str]] = [
                 {
                     "role": role_label,
                     "name": title,
-                    "path": str(card_path),
+                    "path": str(light_path),
+                    "dark_path": str(dark_path) if dark_path else "",
                 }
-                for _, role_label, title, card_path in profile_cards_for_top
+                for _, role_label, title, light_path, dark_path in profile_cards_for_top
             ]
 
-            def _render_top_profile_cards(items: list[tuple[int, str, str, Path]]) -> None:
+            def _render_top_profile_cards(items: list[tuple[int, str, str, Path, Path | None]]) -> None:
                 if not items:
                     return
                 st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
@@ -8983,7 +9010,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     ),
                     unsafe_allow_html=True,
                 )
-                for rank, role_label, title, card_path in items:
+                for rank, role_label, title, light_path, dark_path in items:
                     st.markdown(
                         (
                             "<div style='font-size:.9em;font-weight:700;color:#475569;"
@@ -8993,7 +9020,20 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         ),
                         unsafe_allow_html=True,
                     )
-                    st.image(str(card_path), use_column_width=True)
+                    if dark_path and dark_path.exists():
+                        light_uri = _img_data_uri_from_path(light_path)
+                        dark_uri = _img_data_uri_from_path(dark_path)
+                        st.markdown(
+                            (
+                                "<picture>"
+                                f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
+                                f"<img src='{light_uri}' style='width:100%;height:auto;display:block;' />"
+                                "</picture>"
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.image(str(light_path), use_column_width=True)
                     st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
                 _render_auto_description(generated_descriptions["actionProfileDescription"])
 

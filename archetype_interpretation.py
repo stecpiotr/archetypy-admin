@@ -417,7 +417,7 @@ def getDimensionPhrase(value: float, role: Literal["top", "middle", "low"]) -> s
         "very_high": "wyraźnej",
         "high": "wyraźnej",
         "mid_high": "wyraźnej",
-        "mid": "wyraźnej",
+        "mid": "obecnej w wyraźnym, ale niedominującym stopniu",
         "low_mid": "obniżonej",
         "low": "obniżonej",
     }[band]
@@ -452,8 +452,8 @@ def validateGeneratedActionDescription(meta: dict[str, object]) -> ActionDescrip
             diff = abs(float(blended[d1]) - float(blended[d2]))
             if diff <= 7 and not joint_dominance:
                 issues.append("Brak sygnału wspólnej dominacji przy różnicy <= 7 pkt.")
-    if third_value >= 60 and not third_support_used:
-        issues.append("Brak wzmianki o istotnym wsparciu trzeciego wymiaru >= 60.")
+    if third_value >= 55 and not third_support_used:
+        issues.append("Brak wzmianki o istotnym wsparciu trzeciego wymiaru >= 55.")
 
     return {"ok": not issues, "issues": issues}
 
@@ -572,7 +572,7 @@ def _x_meaning(x: float) -> str:
         return "łączeniu samodzielnego podejmowania decyzji z byciem blisko ludzi i współdziałaniem"
     if x < 0:
         return "samodzielnym podejmowaniu decyzji i opieraniu się na własnym kierunku"
-    return "relacji z ludźmi, wspólnocie i dostrajaniu się do otoczenia"
+    return "relacji z ludźmi, budowaniu wspólnoty i dostrajaniu się do otoczenia"
 
 
 def _y_meaning(y: float) -> str:
@@ -588,14 +588,14 @@ def _x_opposite_meaning(x: float) -> str:
         return "jednostronnym forsowaniu tylko jednej strony osi"
     if x < 0:
         return "silnym dostrajaniu się do otoczenia"
-    return "działaniu w pełnej autonomii i bez szerszego kontaktu z ludźmi"
+    return "dystansie i pełnej autonomii"
 
 
 def _y_opposite_meaning(y: float) -> str:
     if _axis_strength(y) == "balanced":
         return "szukaniu skrajności zamiast równowagi"
     if y < 0:
-        return "utrzymywaniu status quo i unikaniu zmiany"
+        return "biernym trwaniu przy tym, co zastane"
     return "trzymaniu się rutyny i przewidywalności"
 
 
@@ -704,15 +704,14 @@ def _generate_values_description(
         text = (
             f"{opening} tworzy niemal równorzędny duet: {primary_meta['publicValue']} i {supporting_meta['publicValue']}. "
             f"Oznacza to przywództwo napędzane przede wszystkim {_phrase_case(primary_meta['publicValuePhrase'], 'instrumental')}, "
-            f"wzmacniane przez {_phrase_case(supporting_meta['publicValuePhrase'], 'accusative')}."
+            f"wzmacnianą przez {_phrase_case(supporting_meta['publicValuePhrase'], 'accusative')}."
         )
     elif dominance_type == "dominant_with_strong_support":
         primary_value = str(primary_meta["publicValue"])
         supporting_value = str(supporting_meta["publicValue"])
-        primary_loc = PUBLIC_VALUE_LOCATIVE.get(primary_value, primary_value)
         supporting_acc = _public_value_accusative(supporting_value)
         text = (
-            f"{opening} opiera się przede wszystkim na {primary_loc}, "
+            f"{opening} opiera się przede wszystkim na wartości {primary_value}, "
             f"wyraźnie wzmacnianej przez {supporting_acc}. "
             f"W praktyce oznacza to styl budowany na {_phrase_case(primary_meta['publicValuePhrase'], 'locative')}, "
             f"z dodatkowym akcentem na {_phrase_case(supporting_meta['publicValuePhrase'], 'accusative')}."
@@ -797,8 +796,8 @@ def _generate_action_description(
         sentence1 = f"Rdzeń działania {subject} tworzą {primary.label} i {supporting.label}."
     elif dominance_type == "dominant_with_strong_support":
         sentence1 = (
-            f"Rdzeń działania {subject} buduje przede wszystkim {primary.label}, "
-            f"wyraźnie {_support_participle(primary.label)} przez {_label_accusative(supporting.label)}."
+            f"Rdzeń działania {subject} buduje przede wszystkim archetyp {_label_genitive(primary.label)}, "
+            f"wyraźnie wzmacniany przez {_label_accusative(supporting.label)}."
         )
     else:
         sentence1 = f"Dominującym archetypem {subject} jest {primary.label}, a {supporting.label} pełni rolę wspierającą."
@@ -835,7 +834,7 @@ def _generate_action_description(
         used_top_phrase = f"{top1_phrase} / {top2_phrase}"
 
     third_support_used = False
-    if third[1] >= 60:
+    if third[1] >= 55:
         sentence2 += f", przy solidnym wsparciu {DIM_LABELS[third[0]]}"
         third_support_used = True
     elif third[1] >= 50:
@@ -854,7 +853,21 @@ def _generate_action_description(
                 "pozostających ważnymi, ale niedominującymi wymiarami działania."
             )
     else:
-        sentence2 += f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}."
+        if low1_phrase == low2_phrase:
+            if low1_phrase == "obniżonej":
+                sentence2 += (
+                    f", przy {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
+                    "pozostających słabszymi wymiarami działania."
+                )
+            elif low1_phrase == "obecnej w wyraźnym, ale niedominującym stopniu":
+                sentence2 += (
+                    f", przy {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
+                    "obecnych w wyraźnym, ale niedominującym stopniu."
+                )
+            else:
+                sentence2 += f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]}."
+        else:
+            sentence2 += f", przy {low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}."
 
     validation = validateGeneratedActionDescription(
         {

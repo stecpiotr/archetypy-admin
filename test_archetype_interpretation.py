@@ -125,6 +125,7 @@ def test_5_niewinny_medrzec_tworca():
 
     assert "lekko ciąży ku niezależności" in needs
     assert "z lekkim przechyłem ku stabilności" in needs
+    assert "biernym trwaniu przy tym, co zastane" in needs
     assert "racjonalności" in action
     assert "niskiej empatii" not in action
     assert "umiarkowanej racjonalności" not in action
@@ -160,7 +161,7 @@ def test_6b_odkrywczyni_tworczyni_nie_zawyza_racjonalnosci():
     action = out["actionProfileDescription"].lower()
     assert "kreatywności" in action
     assert "niezależności" in action
-    assert "obniżonej empatii i racjonalności" in action or "obniżonej empatii oraz racjonalności" in action
+    assert "empatii i racjonalności pozostających słabszymi wymiarami działania" in action
     assert "umiarkowanej racjonalności" not in action
 
 
@@ -202,6 +203,10 @@ def test_8_fallback_personalizacji_i_helpery():
     assert "tego układu" in txt_values
     assert "tego wyniku" in txt_needs
     assert "tego układu" in txt_action
+    assert "wnosi tu Odnowę" in txt_values
+    assert "budowaniu wspólnoty" in txt_needs
+    assert "niż na dystansie i pełnej autonomii" in txt_needs
+    assert "Dominującym archetypem tego układu jest Kochanka" in txt_action
     assert "Kochanki i Buntowniczki" in txt_needs
     assert "None" not in txt_values + txt_needs + txt_action
 
@@ -242,3 +247,19 @@ def test_11_needs_balanced_x_ma_czasownik_pozostaje():
     )
     txt = out["needsWheelDescription"]
     assert "pozostaje bez wyraźnego przechyłu między niezależnością a przynależnością" in txt
+
+
+def test_12_dominant_with_support_ma_naturalne_otwarcie_i_wartosc_publiczna():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Kochanka", 88.0),
+            _result("Buntowniczka", 80.0),
+            None,
+            subject_forms={"fullGen": "Kornelii Lemańskiej"},
+        )
+    )
+    txt_values = out["valuesWheelDescription"]
+    txt_action = out["actionProfileDescription"]
+    assert "na wartości Relacje" in txt_values
+    assert "wzmacnianej przez Odnowę" in txt_values
+    assert "archetyp Kochanki, wyraźnie wzmacniany przez Buntowniczkę" in txt_action

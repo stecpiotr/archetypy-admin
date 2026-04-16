@@ -439,12 +439,21 @@ def draw_archetype_panel(
     color_hex: str,
     face_path: Path,
     display_name: str | None = None,
+    theme_variant: str = "light",
 ) -> Image.Image:
     canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     color_rgb = hex_to_rgb(color_hex)
+    is_dark = str(theme_variant or "light").lower() == "dark"
+
     fill_rgb = color_rgb
-    stroke_rgb = darken(color_rgb, 0.22)
+    stroke_rgb = lighten(color_rgb, 0.14) if is_dark else darken(color_rgb, 0.22)
+    title_fill = (238, 242, 248, 255) if is_dark else (20, 20, 20, 255)
+    value_fill = (245, 248, 252, 255) if is_dark else (28, 28, 28, 255)
+    label_fill = (222, 230, 240, 255) if is_dark else (40, 40, 40, 255)
+    baseline_alpha = 132 if is_dark else 92
+    contour_alpha = 162 if is_dark else 125
+    tail_alpha = 128 if is_dark else 100
 
     # Portret po lewej
     face = prepare_face(face_path)
@@ -471,10 +480,10 @@ def draw_archetype_panel(
     face_bottom = fy + face.height
     # Nazwa zawsze pod portretem, z wyraźnym odstępem i bez obcinania dołu.
     title_y = min(CANVAS_H - title_h - 6, face_bottom + -1)
-    draw.text((160 - title_w // 2, int(title_y)), shown_name, fill=(20, 20, 20, 255), font=title_font)
+    draw.text((160 - title_w // 2, int(title_y)), shown_name, fill=title_fill, font=title_font)
 
     # Delikatna linia bazowa wykresu
-    draw.line((CHART_X0 - 8, BASELINE_Y, CHART_X1 + 8, BASELINE_Y), fill=(*stroke_rgb, 92), width=2)
+    draw.line((CHART_X0 - 8, BASELINE_Y, CHART_X1 + 8, BASELINE_Y), fill=(*stroke_rgb, baseline_alpha), width=2)
 
     chart_width = CHART_X1 - CHART_X0
     step = chart_width / len(values)
@@ -532,9 +541,9 @@ def draw_archetype_panel(
         canvas.alpha_composite(hump)
 
         # Subtelny kontur górnej krawędzi fali
-        draw.line(curve, fill=(*stroke_rgb, 125), width=2)
-        draw.line([(curve[0][0] - 7, BASELINE_Y), (curve[0][0], BASELINE_Y)], fill=(*stroke_rgb, 100), width=2)
-        draw.line([(curve[-1][0], BASELINE_Y), (curve[-1][0] + 7, BASELINE_Y)], fill=(*stroke_rgb, 100), width=2)
+        draw.line(curve, fill=(*stroke_rgb, contour_alpha), width=2)
+        draw.line([(curve[0][0] - 7, BASELINE_Y), (curve[0][0], BASELINE_Y)], fill=(*stroke_rgb, tail_alpha), width=2)
+        draw.line([(curve[-1][0], BASELINE_Y), (curve[-1][0] + 7, BASELINE_Y)], fill=(*stroke_rgb, tail_alpha), width=2)
 
         value_txt = f"{int(value)}%"
         vb = draw.textbbox((0, 0), value_txt, font=value_font)
@@ -546,7 +555,7 @@ def draw_archetype_panel(
             (float(cx - vw / 2), float(vy)),
             value_txt,
             value_font,
-            (28, 28, 28, 255),
+            value_fill,
             tracking_px=tracking,
         )
 
@@ -557,7 +566,7 @@ def draw_archetype_panel(
             (float(cx - mw / 2), float(BASELINE_Y + 9)),
             metric,
             label_font,
-            (40, 40, 40, 255),
+            label_fill,
             tracking_px=tracking,
         )
 
@@ -575,6 +584,13 @@ def main() -> None:
         help="M = męskie, K = żeńskie, BOTH = generuj oba zestawy jednym uruchomieniem (domyślnie BOTH)",
     )
     parser.add_argument(
+        "--theme",
+        type=str.upper,
+        default="BOTH",
+        choices=["LIGHT", "DARK", "BOTH"],
+        help="LIGHT = standard, DARK = wariant pod ciemny motyw, BOTH = oba warianty (domyślnie BOTH)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default="",
@@ -588,6 +604,7 @@ def main() -> None:
     args = parser.parse_args()
 
     gender_codes = ["M", "K"] if args.gender == "BOTH" else [args.gender]
+    theme_variants = ["light", "dark"] if args.theme == "BOTH" else [args.theme.lower()]
 
     if args.rebuild_female_faces and "K" in gender_codes:
         ensure_female_faces(force=True)
@@ -611,16 +628,20 @@ def main() -> None:
             color = str(config["color"])
             face_path = face_path_for_archetype(arche_name, gender_code=gender_code)
             display_name = FEMININE_TITLES.get(arche_name, arche_name) if gender_code == "K" else arche_name
-            panel = draw_archetype_panel(
-                arche_name,
-                values,
-                color,
-                face_path=face_path,
-                display_name=display_name,
-            )
-            out = out_dir / f"{arche_name}.png"
-            panel.save(out, "PNG", optimize=True)
-            print(f"[OK] [{gender_code}] {out}")
+
+            for theme_variant in theme_variants:
+                panel = draw_archetype_panel(
+                    arche_name,
+                    values,
+                    color,
+                    face_path=face_path,
+                    display_name=display_name,
+                    theme_variant=theme_variant,
+                )
+                suffix = "_dark" if theme_variant == "dark" else ""
+                out = out_dir / f"{arche_name}{suffix}.png"
+                panel.save(out, "PNG", optimize=True)
+                print(f"[OK] [{gender_code}/{theme_variant.upper()}] {out}")
 
 
 if __name__ == "__main__":
