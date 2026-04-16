@@ -2657,3 +2657,31 @@
 - Poprawiono odmianę i składnię opisów w generatorze interpretacji.
 - Usunięto konstrukcje nienaturalne gramatycznie (`przede wszystkim potrzeba ...`).
 - Utrzymano bez zmian logikę scoringu i reguły deterministyczne generatora.
+
+### Zrobione w Hotfix H-125 (2026-04-16, układ/typografia/responsive + fallback demografii + eksport kart działania)
+- `archetypy-admin/app.py`:
+  - przycisk `Połącz i policz matching` przeniesiony do prawej kolumny sekcji wyboru,
+  - fallback `brak danych` dodany do generatora rzędów demografii Matchingu (gdy wszystkie kategorie mają 0%),
+  - w tabelach demografii (`Matching`, `Segmenty`) pogrubianie max nie aktywuje się przy samych zerach.
+- `archetypy-admin/admin_dashboard.py`:
+  - tabela `Podsumowanie archetypów`:
+    - spójna typografia pionowych nagłówków (`Główny/Wspierający/Poboczny`) z resztą headera,
+    - wiersze archetypów renderują emoji we wrapperze CSS, a dla viewportu `<=1920px` lub `<=1200px` wysokości emoji są ukrywane,
+  - zmniejszono domyślne rozmiary radaru i kół na desktopie (`radar_plot_size`, `wheel_img_width`, `axes_img_width`),
+  - sekcje `Heurystyczna analiza koloru psychologicznego` oraz `Profil siły archetypów ...` przeniesione pod tabelę podsumowania (lewa kolumna),
+  - `Koło pragnień i wartości` oraz `Rozkład archetypów na osiach potrzeb` mają wyśrodkowane tytuły i większe odstępy pionowe między sekcjami,
+  - sekcja kart ma tytuł `Profile działania archetypów {osoba}` i etykiety:
+    - `Archetyp główny: ... - profil działania`,
+    - `Archetyp wspierający: ... - profil działania`,
+    - `Archetyp poboczny: ... - profil działania`,
+  - fallback `brak danych` dodany w tabeli demografii personalnej, gdy wszystkie kategorie zmiennej mają 0%,
+  - wydłużono kliny podświetlenia w `Kole pragnień i wartości` (większy zasięg radialny),
+  - full DOCX/PDF dostał dodatkową stronę `Profile działania archetypów ...` z pojedynczymi grafikami kart.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do potwierdzenia manualnego na UI:
+  - czy nowy układ (heurystyka + profil pod tabelą, koła/karty po prawej) odpowiada docelowemu odbiorowi,
+  - czy breakpoint `<=1920x1200` dla ukrywania emoji w tabeli jest optymalny wizualnie,
+  - czy pełny raport DOCX/PDF pokazuje wszystkie oczekiwane karty `Profile działania archetypów` dla TOP1/TOP2/(TOP3).

@@ -2508,3 +2508,38 @@ Decyzja:
   - etykiety wymiarów: osobno dla miejscownika, biernika i narzędnika.
 Uzasadnienie:
 - Pozwala to utrzymać krótkie opisy raportowe w poprawnej, naturalnej polszczyźnie bez zmiany logiki obliczeń.
+
+### D-281: Fallback `brak danych` w demografii przy 0% we wszystkich kategoriach
+Decyzja:
+- Jeżeli dla danej zmiennej demograficznej wszystkie kategorie mają `0.0%` po stronie podgrupy/segmentu, dodajemy wiersz `brak danych` (priorytetowo z `100%` po stronie podgrupy i udziałem rezydualnym po stronie próby referencyjnej).
+- Dodatkowo pogrubianie TOP jest wyłączane dla sekcji, gdzie maksimum pozostaje `0.0`.
+Uzasadnienie:
+- Zapobiega mylącemu efektowi „wszystko pogrubione przy 0%” i daje czytelny sygnał braku danych zamiast pozornego wyniku.
+
+### D-282: W widoku personalnym sekcje heurystyki i profilu 0-100 są kotwiczone pod tabelą podsumowania
+Decyzja:
+- `Heurystyczna analiza koloru psychologicznego` oraz `Profil siły archetypów ...` są renderowane w lewej kolumnie (`col1`) pod tabelą `Podsumowanie archetypów`.
+Uzasadnienie:
+- Redukuje dużą pustą przestrzeń po lewej stronie i utrzymuje logiczny tok czytania raportu.
+
+### D-283: Karty `Profile działania` dostają opisy ról zamiast etykiet TOP
+Decyzja:
+- Zamiast `TOP1/TOP2/TOP3` używamy etykiet:
+  - `Archetyp główny: ... - profil działania`,
+  - `Archetyp wspierający: ... - profil działania`,
+  - `Archetyp poboczny: ... - profil działania`.
+Uzasadnienie:
+- Jest to bardziej semantyczne i spójne z nomenklaturą raportu.
+
+### D-284: Full DOCX/PDF zawiera stronę z pojedynczymi grafikami `Profile działania archetypów`
+Decyzja:
+- Eksport pełny (`export_word_docxtpl`) po stronie dodatków raportu dopina dedykowaną stronę z kartami `Profile działania archetypów` (dla dostępnych TOP1/TOP2/TOP3).
+Uzasadnienie:
+- Ujednolica zawartość „na ekranie” i „w pełnym raporcie” bez ręcznego montażu grafik.
+
+### D-285: Responsywność desktop ≤1920×1200 i czytelność tabeli podsumowania
+Decyzja:
+- W podsumowaniu archetypów emoji przy nazwach archetypów są ukrywane przez CSS dla viewportu `max-width:1920px` lub `max-height:1200px`.
+- Domyślne rozmiary wizualizacji (radar/koła) na desktopie zostały lekko zmniejszone.
+Uzasadnienie:
+- Ogranicza przepełnienie i poprawia czytelność na rozdzielczościach klasy 1920×1200 oraz niższych.

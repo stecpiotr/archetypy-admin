@@ -3345,3 +3345,35 @@ Wynik:
   - poprawiono składnię opisu osi potrzeb (czytelniejsza kolejność i znaczenia),
   - rozdzielono formy wymiarów dla kontekstów `na ...` (biernik) i `oparty na ...` (miejscownik),
   - fallback par wymiarów generuje poprawną polszczyznę (`łączy X z Y`).
+
+### Hotfix H-125 [DONE]
+Temat: Dopracowanie układu raportu personalnego + fallback „brak danych” w demografii + eksport kart działania.
+Kryteria ukonczenia:
+1. W tabeli `Podsumowanie archetypów (liczebność i natężenie)` nagłówki `Główny/Wspierający/Poboczny` używają tej samej rodziny pisma co reszta nagłówka.
+2. Przycisk `Połącz i policz matching` jest po prawej stronie sekcji wyboru.
+3. Widok 1920×1200 i mniejszy ma lżejsze rozmiary radaru/kół; emoji przy archetypach w tabeli podsumowania są ukrywane dla ≤1920×1200.
+4. Tytuł `Koło pragnień i wartości` jest wycentrowany analogicznie do sekcji rozkładu.
+5. Sekcje `Heurystyczna analiza koloru...` oraz `Profil siły archetypów ...` są renderowane pod tabelą podsumowania (bez dużej pustej przestrzeni).
+6. Zwiększone odstępy pionowe między `Koło pragnień i wartości`, `Rozkład archetypów na osiach potrzeb` i `Profile działania archetypów ...`.
+7. Etykiety kart działania mają formę:
+   - `Archetyp główny: ... - profil działania`,
+   - `Archetyp wspierający: ... - profil działania`,
+   - `Archetyp poboczny: ... - profil działania`.
+8. W tabelach demograficznych przy 0% we wszystkich kategoriach pojawia się fallback `brak danych` (zamiast błędnego pogrubiania wszystkich pozycji).
+9. Full raport DOCX/PDF zawiera również pojedyncze grafiki `Profile działania archetypów`.
+10. Podświetlenia w `Kole pragnień i wartości` są wydłużone.
+Wynik:
+- `archetypy-admin/app.py`:
+  - przycisk `Połącz i policz matching` przeniesiony do prawej kolumny,
+  - fallback `brak danych` i poprawka boldowania dla tabel demograficznych Matchingu i Segmentów.
+- `archetypy-admin/admin_dashboard.py`:
+  - tabela podsumowania: spójne fonty nagłówków + warunkowe ukrywanie emoji archetypu dla viewportu ≤1920×1200,
+  - mniejsze domyślne rozmiary radaru/kół na desktopie,
+  - sekcje `Heurystyczna analiza...` i `Profil siły archetypów ...` przeniesione pod tabelę (w lewej kolumnie),
+  - większe odstępy między `Koło pragnień...`, `Rozkład...` i `Profile działania...`,
+  - etykiety kart działania zmienione na `Archetyp główny/wspierający/poboczny: ... - profil działania`,
+  - fallback `brak danych` dla tabel demografii personalnej,
+  - wydłużone kliny podświetlenia w `Kole pragnień i wartości`,
+  - eksport pełny DOCX/PDF rozszerzony o stronę z pojedynczymi grafikami `Profile działania archetypów`.
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

@@ -2794,8 +2794,9 @@ def mask_for(idx, color, gender_code: str = "M"):
     base = load_base_arche_img(gender_code)
     w, h = base.size
     cx, cy = w//2, h//2
-    r_outer = int(min(w, h) * 0.39)
-    r_inner = int(min(w, h) * 0.13)
+    # Dłuższy klin podświetlenia (bliżej referencyjnych paneli eksportowych).
+    r_outer = int(min(w, h) * 0.50)
+    r_inner = int(min(w, h) * 0.07)
     mask = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(mask, "RGBA")
     start = -90 + idx*30
@@ -3992,6 +3993,21 @@ def _render_personal_demography_subpage(
         if not categories:
             continue
 
+        has_missing_row = any(str(c.get("code") or "").strip().lower() == "brak danych" for c in categories)
+        all_zero_known = all(abs(float(c.get("pct_sub") or 0.0)) <= 1e-9 for c in categories)
+        if all_zero_known and not has_missing_row:
+            pct_all_sum = float(sum(float(c.get("pct_all") or 0.0) for c in categories))
+            pct_all_missing = max(0.0, min(100.0, 100.0 - pct_all_sum))
+            categories.append(
+                {
+                    "code": "brak danych",
+                    "label": "brak danych",
+                    "pct_all": float(pct_all_missing),
+                    "pct_sub": 100.0,
+                    "diff": float(100.0 - pct_all_missing),
+                }
+            )
+
         strongest = max(
             categories,
             key=lambda c: (float(c.get("pct_sub") or 0.0), -int(categories.index(c))),
@@ -4012,7 +4028,7 @@ def _render_personal_demography_subpage(
             pct_sub = float(cat["pct_sub"])
             pct_all = float(cat["pct_all"])
             diff = float(cat["diff"])
-            is_top = abs(pct_sub - top_pct_sub) <= 1e-9
+            is_top = (top_pct_sub > 1e-9) and (abs(pct_sub - top_pct_sub) <= 1e-9)
             bar_w = max(0.0, min(100.0, pct_sub))
             fill_color = "#8ecae6" if is_top else "#d8e5f1"
             top_border = "border-top:3px solid #b8c2cc;"
@@ -5185,6 +5201,38 @@ def _append_segment_profile_page(doc_tpl, segment_profile_img_path: str | None, 
     add_image(p, segment_profile_img_path, width=Mm(170))
 
 
+def _append_action_profiles_page(
+    doc_tpl,
+    action_profiles: list[dict[str, str]] | None,
+    subject_gen: str = "",
+):
+    items = []
+    for entry in list(action_profiles or []):
+        if not isinstance(entry, dict):
+            continue
+        path = str(entry.get("path") or "").strip()
+        if not path or not os.path.exists(path):
+            continue
+        role = str(entry.get("role") or "").strip()
+        name = str(entry.get("name") or "").strip()
+        items.append({"role": role, "name": name, "path": path})
+    if not items:
+        return
+
+    doc_obj = doc_tpl.docx
+    doc_obj.add_page_break()
+    title = re.sub(r"\s{2,}", " ", f"Profile działania archetypów {subject_gen}").strip()
+    _doc_add_paragraph(doc_obj, title, "Heading 1")
+
+    for item in items:
+        role_txt = str(item.get("role") or "").strip()
+        name_txt = str(item.get("name") or "").strip()
+        subtitle = f"{role_txt}: {name_txt} - profil działania".strip(": ")
+        _doc_add_paragraph(doc_obj, subtitle, "Heading 3")
+        p = doc_obj.add_paragraph()
+        add_image(p, item["path"], width=Mm(170))
+
+
 def export_word_metrics_only(
     main_type,
     second_type,
@@ -5294,6 +5342,7 @@ def export_word_docxtpl(
     archetype_stacked_img_path: str | None = None,
     capsule_columns_img_path: str | None = None,
     segment_profile_img_path: str | None = None,
+    action_profiles: list[dict[str, str]] | None = None,
     show_supplement: bool = True,                       # ⬅️ NOWY ARGUMENT
     template_path: str | None = None,                   # ⬅️ (opcjonalny override)
 ):
@@ -5483,6 +5532,7 @@ def export_word_docxtpl(
     _append_archetype_appendix(doc, appendix_payload)
     subject_gen = (person or {}).get("GEN") or (person or {}).get("NOM") or ""
     _append_segment_profile_page(doc, segment_profile_img_path, subject_gen=subject_gen)
+    _append_action_profiles_page(doc, action_profiles, subject_gen=subject_gen)
 
     # Hiperłącza do osób: tylko jeśli akapit zawiera wyłącznie nazwisko (z opcjonalnym prefiksem "- ").
     for para in doc.paragraphs:
@@ -7371,13 +7421,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    radar_plot_size = 330 if is_mobile else 550
-    radar_tick_size = 10 if is_mobile else 17
-    radar_hover_size = 12 if is_mobile else 17
+    radar_plot_size = 330 if is_mobile else 500
+    radar_tick_size = 10 if is_mobile else 16
+    radar_hover_size = 12 if is_mobile else 16
     radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=0, r=0, t=32, b=32)
-    wheel_img_width = 360 if is_mobile else 640
-    axes_img_width = 360 if is_mobile else 650
-    segment_profile_width = 360 if is_mobile else 713
+    wheel_img_width = 360 if is_mobile else 600
+    axes_img_width = 360 if is_mobile else 610
+    segment_profile_width = 360 if is_mobile else 640
     # Mobile-only: poprawa responsywności wykresów/obrazów i czytelności tabeli
     st.markdown(
         """
@@ -7913,7 +7963,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 ])
 
                 archetype_table = pd.DataFrame({
-                    ("", "Archetyp"): [f"{get_emoji(n)} {disp_name(n)}" for n in ordered_names],
+                    ("", "Archetyp"): [
+                        (
+                            f"<span class='ap-arch-emoji'>{html.escape(get_emoji(n))}</span>"
+                            f"<span class='ap-arch-name'>{html.escape(disp_name(n))}</span>"
+                        )
+                        for n in ordered_names
+                    ],
                     ("", "Główny"): [zero_to_dash(counts_main.get(normalize(n), 0)) for n in ordered_names],
                     ("", "Wspierający"): [zero_to_dash(counts_aux.get(normalize(n), 0)) for n in ordered_names],
                     ("", "Poboczny"): [zero_to_dash(counts_supp.get(normalize(n), 0)) for n in ordered_names],
@@ -7981,9 +8037,25 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     writing-mode:vertical-rl;
                     transform:rotate(180deg);
                     white-space:nowrap;
-                    letter-spacing:.02em;
+                    letter-spacing:0;
                     line-height:1;
                     min-height:78px;
+                    font-family:'Segoe UI', system-ui, -apple-system, Arial, sans-serif !important;
+                    font-size:14px !important;
+                    font-weight:700 !important;
+                  }}
+                  .ap-table .ap-arch-emoji {{
+                    display:inline-block;
+                    margin-right:6px;
+                  }}
+                  .ap-table .ap-arch-name {{
+                    display:inline-block;
+                  }}
+                  @media (max-width:1920px), (max-height:1200px) {{
+                    .ap-table .ap-arch-emoji {{
+                      display:none !important;
+                      margin-right:0 !important;
+                    }}
                   }}
 
                   /* Wyrównania tylko dla WIERZY (tbody) w kolumnach 1 i 6 */
@@ -8033,9 +8105,25 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     writing-mode:vertical-rl;
                     transform:rotate(180deg);
                     white-space:nowrap;
-                    letter-spacing:.02em;
+                    letter-spacing:0;
                     line-height:1;
                     min-height:78px;
+                    font-family:'Segoe UI', system-ui, -apple-system, Arial, sans-serif !important;
+                    font-size:14px !important;
+                    font-weight:700 !important;
+                  }}
+                  .ap-table .ap-arch-emoji {{
+                    display:inline-block;
+                    margin-right:6px;
+                  }}
+                  .ap-table .ap-arch-name {{
+                    display:inline-block;
+                  }}
+                  @media (max-width:1920px), (max-height:1200px) {{
+                    .ap-table .ap-arch-emoji {{
+                      display:none !important;
+                      margin-right:0 !important;
+                    }}
                   }}
                   .ap-table tbody td:nth-child(1),
                   .ap-table tbody td:nth-child(6) {{ text-align: left !important; }}
@@ -8328,7 +8416,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         )
                         st.plotly_chart(
                             fig,
-                            use_container_width=True,
+                            use_container_width=False,
                             config=radar_config,
                             key=f"radar-{study_id}",
                         )
@@ -8349,41 +8437,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         </div>
                         """, unsafe_allow_html=True)
 
-
-            # --- Heurystyczna analiza koloru (bąbelki OUT; słupki po LEWEJ; prawa pusta) ---
+            # --- Heurystyczna analiza koloru + profil podsumowania pod tabelą ---
             color_pcts = calc_color_percentages_from_df(data)
-
-            st.markdown("<div style='height:50px;'></div>", unsafe_allow_html=True)
-            left_col, right_col = st.columns([0.55, 0.45], gap="large")
-
-            with left_col:
-                # tylko słupki
-                st.markdown(ap_section_heading("Heurystyczna analiza koloru psychologicznego", center=False, margin_bottom_px=8),
-                            unsafe_allow_html=True)
-                components.html(color_progress_bars_html(color_pcts, order="desc"),
-                                height=280, scrolling=False)  # niższy iframe
-
-                st.markdown("<style>.cp-row{margin:15px 0 !important}</style>",
-                            unsafe_allow_html=True)  # mniejsze odstępy między wierszami
-
-                # opisy ZOSTAJĄ — dominujący kolor + opis
-                dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
-                st.markdown(
-                    f"<div style='text-align:center; font:680 20px/1.30 \"Roboto\",\"Segoe UI\",\"Arial\",system-ui,sans-serif; color:#222; margin: -15px 0 60px;'>"
-                    f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
-                    unsafe_allow_html=True
-                )
-                st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
-
-            # prawa kolumna w tej sekcji zostaje pusta; wykresy przeniesione do wspólnej kolumny obok.
-            with right_col:
-                st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-
-            # tylko dominujący kolor
             dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
-
-            color_pcts = calc_color_percentages_from_df(data)
-
 
             # Dane opisowe dominującego koloru do Worda
             dom_meta = COLOR_LONG[dom_name]  # masz już COLOR_LONG w pliku
@@ -8397,6 +8453,54 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 "politics": dom_meta["politics"],
                 "hex": dom_meta["hex"],
             }
+
+            segment_profile_png_path = make_segment_profile_wheel_png(
+                mean_scores=means_pct,
+                out_path=f"segment_profile_{study_id}.png",
+                gender_code=report_gender_code,
+            )
+
+            with col1:
+                st.markdown("<div style='height:22px;'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    ap_section_heading("Heurystyczna analiza koloru psychologicznego", center=False, margin_bottom_px=8),
+                    unsafe_allow_html=True,
+                )
+                components.html(
+                    color_progress_bars_html(color_pcts, order="desc"),
+                    height=280,
+                    scrolling=False,
+                )
+                st.markdown("<style>.cp-row{margin:15px 0 !important}</style>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='text-align:center; font:680 20px/1.30 \"Roboto\",\"Segoe UI\",\"Arial\",system-ui,sans-serif; color:#222; margin: -15px 0 60px;'>"
+                    f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
+
+                st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    ap_section_heading(
+                        f"Profil siły archetypów {personGen} (skala: 0-100)",
+                        center=False,
+                        margin_bottom_px=12,
+                        margin_top_px=6,
+                    ),
+                    unsafe_allow_html=True,
+                )
+                st.image(segment_profile_png_path, use_column_width=True)
+                st.markdown(
+                    """
+                    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#de4b43;border-radius:2px;display:inline-block;"></span>Zmiana</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2d5ad5;border-radius:2px;display:inline-block;"></span>Ludzie</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2f8a45;border-radius:2px;display:inline-block;"></span>Porządek</span>
+                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#6f53d4;border-radius:2px;display:inline-block;"></span>Niezależność</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 
             with col3:
@@ -8441,7 +8545,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 "Koło pragnień i wartości",
                                 center=True,
                                 margin_bottom_px=8,
-                                shift_x_px=-10,
+                                shift_x_px=0,
                             ),
                             unsafe_allow_html=True,
                         )
@@ -8470,9 +8574,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             _render_auto_description(generated_descriptions["valuesWheelDescription"])
 
                 if is_mobile:
+                    st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
                     st.markdown(
                         ap_section_heading(
-                            "Koło potrzeb",
+                            "Rozkład archetypów na osiach potrzeb",
                             center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
@@ -8487,12 +8592,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 else:
                     k_pad_l, k_mid, k_pad_r = st.columns([0.09, 0.88, 0.03], gap="small")
                     with k_mid:
+                        st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
                         st.markdown(
                             ap_section_heading(
-                                "Koło potrzeb",
+                                "Rozkład archetypów na osiach potrzeb",
                                 center=True,
                                 margin_bottom_px=8,
-                                shift_x_px=-10,
+                                shift_x_px=0,
                             ),
                             unsafe_allow_html=True,
                         )
@@ -8502,53 +8608,53 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         st.image(kolo_axes_img, width=axes_img_width)
                         _render_auto_description(generated_descriptions["needsWheelDescription"])
 
-            segment_profile_png_path = make_segment_profile_wheel_png(
-                mean_scores=means_pct,
-                out_path=f"segment_profile_{study_id}.png",
-                gender_code=report_gender_code,
-            )
-            st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
-            st.markdown(
-                ap_section_heading(
-                    f"Profil siły archetypów {personGen} (skala: 0-100)",
-                    center=False,
-                    margin_bottom_px=12,
-                    margin_top_px=6,
-                ),
-                unsafe_allow_html=True,
-            )
-
             top_profile_archetypes: list[str] = [main_avg]
             if aux_avg and aux_avg != main_avg:
                 top_profile_archetypes.append(aux_avg)
             if supp_avg and supp_avg not in [main_avg, aux_avg]:
                 top_profile_archetypes.append(supp_avg)
 
-            profile_cards_for_top: list[tuple[int, str, Path]] = []
+            profile_cards_for_top: list[tuple[int, str, str, Path]] = []
+            def _role_for_rank(rank: int) -> str:
+                if rank == 1:
+                    return "Archetyp główny"
+                if rank == 2:
+                    return "Archetyp wspierający"
+                return "Archetyp poboczny"
+
             for rank, arch_name in enumerate(top_profile_archetypes, start=1):
                 profile_path = _profile_card_file_for(arch_name, gender_code=report_gender_code)
                 if profile_path and Path(profile_path).exists():
-                    profile_cards_for_top.append((rank, disp_name(arch_name), Path(profile_path)))
+                    profile_cards_for_top.append((rank, _role_for_rank(rank), disp_name(arch_name), Path(profile_path)))
+            profile_cards_export: list[dict[str, str]] = [
+                {
+                    "role": role_label,
+                    "name": title,
+                    "path": str(card_path),
+                }
+                for _, role_label, title, card_path in profile_cards_for_top
+            ]
 
-            def _render_top_profile_cards(items: list[tuple[int, str, Path]]) -> None:
+            def _render_top_profile_cards(items: list[tuple[int, str, str, Path]]) -> None:
                 if not items:
                     return
+                st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
                 st.markdown(
                     ap_section_heading(
-                        "Profil działania archetypu",
-                        center=False,
+                        f"Profile działania archetypów {personGen}",
+                        center=True,
                         margin_bottom_px=12,
-                        margin_top_px=6,
+                        margin_top_px=8,
                     ),
                     unsafe_allow_html=True,
                 )
                 _render_auto_description(generated_descriptions["actionProfileDescription"])
-                for rank, title, card_path in items:
+                for rank, role_label, title, card_path in items:
                     st.markdown(
                         (
                             "<div style='font-size:.9em;font-weight:700;color:#475569;"
                             "margin-top:14px;margin-bottom:10px;'>"
-                            f"TOP{rank}: {html.escape(title)}"
+                            f"{html.escape(role_label)}: {html.escape(title)} - profil działania"
                             "</div>"
                         ),
                         unsafe_allow_html=True,
@@ -8558,22 +8664,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             with col3:
                 _render_top_profile_cards(profile_cards_for_top)
-
-            if is_mobile:
-                st.image(segment_profile_png_path, use_column_width=True)
-            else:
-                st.image(segment_profile_png_path, width=segment_profile_width)
-            st.markdown(
-                """
-                <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
-                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#de4b43;border-radius:2px;display:inline-block;"></span>Zmiana</span>
-                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2d5ad5;border-radius:2px;display:inline-block;"></span>Ludzie</span>
-                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2f8a45;border-radius:2px;display:inline-block;"></span>Porządek</span>
-                  <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#6f53d4;border-radius:2px;display:inline-block;"></span>Niezależność</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
 
             st.markdown("""
             <hr style="height:1px; border:none; background:#eee; margin-top:34px; margin-bottom:19px;" />
@@ -8702,6 +8792,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     archetype_stacked_img_path=stacked_png_path,
                     capsule_columns_img_path=capsules_path,
                     segment_profile_img_path=segment_profile_png_path,
+                    action_profiles=profile_cards_export,
                     show_supplement=SHOW_SUPP
                 )
 

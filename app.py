@@ -7084,18 +7084,29 @@ def _matching_demo_build_rows(
         if not cats:
             continue
 
-        top_cat: Optional[str] = None
-        top_pct = -1.0
-        top_all_pct = 0.0
+        cat_rows: List[Tuple[str, float, float]] = []
         for cat in cats:
             c_sub = float(dist_sub.get(cat, 0.0))
             c_all = float(dist_all.get(cat, 0.0))
             pct_sub = (100.0 * c_sub / sum_sub) if sum_sub > 0 else 0.0
             pct_all = (100.0 * c_all / sum_all) if sum_all > 0 else 0.0
+            cat_rows.append((str(cat), float(pct_sub), float(pct_all)))
+
+        has_missing_row = any(str(cat).strip().lower() == "brak danych" for cat, _, _ in cat_rows)
+        all_zero_known = bool(cat_rows) and all(abs(float(pct_sub)) <= 1e-9 for _, pct_sub, _ in cat_rows)
+        if all_zero_known and not has_missing_row:
+            pct_all_sum = float(sum(float(pct_all) for _, _, pct_all in cat_rows))
+            pct_all_missing = max(0.0, min(100.0, 100.0 - pct_all_sum))
+            cat_rows.append(("brak danych", 100.0, pct_all_missing))
+
+        top_cat: Optional[str] = None
+        top_pct = -1.0
+        top_all_pct = 0.0
+        for cat, pct_sub, pct_all in cat_rows:
             if pct_sub > top_pct:
-                top_pct = pct_sub
+                top_pct = float(pct_sub)
                 top_cat = str(cat)
-                top_all_pct = pct_all
+                top_all_pct = float(pct_all)
             demo_rows.append(
                 {
                     "Zmienna": dim_label,
@@ -7117,7 +7128,7 @@ def _matching_demo_build_rows(
                     "top": _matching_demo_label_for_code(spec, str(top_cat)),
                     "pct": round(max(top_pct, 0.0), 1),
                     "diff_pp": round(top_pct - top_all_pct, 1),
-                    "emoji": str(value_emoji.get(str(top_cat), "•")),
+                    "emoji": str(value_emoji.get(str(top_cat), "❔" if str(top_cat) == "brak danych" else "•")),
                     "variable_emoji": str(spec.get("variable_emoji") or "📌"),
                 }
             )
@@ -7422,7 +7433,15 @@ def matching_view() -> None:
             ):
                 _invalidate_matching_result()
 
-        if st.button("Połącz i policz matching", type="primary"):
+        _match_btn_spacer, _match_btn_col = st.columns([0.72, 0.28], gap="small")
+        with _match_btn_col:
+            recalc_matching = st.button(
+                "Połącz i policz matching",
+                type="primary",
+                use_container_width=True,
+            )
+
+        if recalc_matching:
             person = p_options[pick_personal]
             jst_study = j_options[pick_jst]
             person_gender_code = _normalize_matching_gender_code(person.get("gender"))
@@ -8798,7 +8817,7 @@ def matching_view() -> None:
                     pct_sub = float(row["% grupa dopasowana"])
                     pct_all = float(row["% ogół mieszkańców (ważony)"])
                     diff = float(row["Róznica (w pp.)"])
-                    is_top = abs(pct_sub - top_pct) <= 1e-9
+                    is_top = (top_pct > 1e-9) and (abs(pct_sub - top_pct) <= 1e-9)
                     bar_w = max(0.0, min(100.0, pct_sub))
                     var_icon = variable_emoji.get(var_name, "📌")
                     cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")
@@ -9795,7 +9814,7 @@ def matching_view() -> None:
                                         pct_sub = float(row["% segment"])
                                         pct_all = float(row["% ogół mieszkańców (ważony)"])
                                         diff = float(row["Róznica (w pp.)"])
-                                        is_top = abs(pct_sub - top_pct) <= 1e-9
+                                        is_top = (top_pct > 1e-9) and (abs(pct_sub - top_pct) <= 1e-9)
                                         bar_w = max(0.0, min(100.0, pct_sub))
                                         var_icon = seg_variable_emoji.get(var_name, "📌")
                                         cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")
