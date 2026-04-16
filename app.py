@@ -2433,6 +2433,51 @@ def _xlsx_bytes_from_df(df: pd.DataFrame, sheet_name: str = "Dane") -> bytes:
     return out.getvalue()
 
 
+def _metryczka_schema_df(config: Any) -> pd.DataFrame:
+    cfg = normalize_jst_metryczka_config(config)
+    rows: List[Dict[str, Any]] = []
+    questions = list(cfg.get("questions") or [])
+    for idx, q in enumerate(questions, start=1):
+        if not isinstance(q, dict):
+            continue
+        prompt = str(q.get("prompt") or "").strip()
+        q_code = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        options = q.get("options") if isinstance(q.get("options"), list) else []
+        if not options:
+            rows.append(
+                {
+                    "Lp pytania": idx,
+                    "Pytanie": prompt,
+                    "Kod pytania (kolumna)": q_code,
+                    "Możliwa odpowiedź": "",
+                    "Kod odpowiedzi": "",
+                }
+            )
+            continue
+        for opt in options:
+            if not isinstance(opt, dict):
+                continue
+            rows.append(
+                {
+                    "Lp pytania": idx,
+                    "Pytanie": prompt,
+                    "Kod pytania (kolumna)": q_code,
+                    "Możliwa odpowiedź": str(opt.get("label") or "").strip(),
+                    "Kod odpowiedzi": str(opt.get("code") or "").strip(),
+                }
+            )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "Lp pytania",
+            "Pytanie",
+            "Kod pytania (kolumna)",
+            "Możliwa odpowiedź",
+            "Kod odpowiedzi",
+        ],
+    )
+
+
 def jst_add_view() -> None:
     require_auth()
     if not _require_jst_ready():
@@ -4870,7 +4915,20 @@ def jst_metryczka_view() -> None:
             on_save_and_leave=lambda: _save_jst_metryczka(rerun_after=False),
         )
 
-    _, save_col = st.columns([0.66, 0.34], gap="small")
+    schema_df = _metryczka_schema_df(edited_cfg)
+    schema_bytes = _xlsx_bytes_from_df(schema_df, sheet_name="Schemat metryczki")
+    schema_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str(slug or sid or "ankieta")).strip("-") or "ankieta"
+
+    _, export_col, save_col = st.columns([0.33, 0.33, 0.34], gap="small")
+    with export_col:
+        _download_button_compat(
+            "⬇️ Pobierz schemat metryczki (.xlsx)",
+            data=schema_bytes,
+            file_name=f"schemat-metryczki-{schema_slug}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"jst_metryczka_schema_xlsx_{sid}",
+            use_container_width=True,
+        )
     with save_col:
         save_clicked = st.button(
             "💾 Zapisz metryczkę",
@@ -10162,7 +10220,20 @@ def personal_metryczka_view() -> None:
             on_save_and_leave=lambda: _save_personal_metryczka(rerun_after=False),
         )
 
-    _, save_col = st.columns([0.66, 0.34], gap="small")
+    schema_df = _metryczka_schema_df(edited_cfg)
+    schema_bytes = _xlsx_bytes_from_df(schema_df, sheet_name="Schemat metryczki")
+    schema_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str(slug or study_id or "ankieta")).strip("-") or "ankieta"
+
+    _, export_col, save_col = st.columns([0.33, 0.33, 0.34], gap="small")
+    with export_col:
+        _download_button_compat(
+            "⬇️ Pobierz schemat metryczki (.xlsx)",
+            data=schema_bytes,
+            file_name=f"schemat-metryczki-{schema_slug}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"personal_metryczka_schema_xlsx_{study_id or slug}",
+            use_container_width=True,
+        )
     with save_col:
         save_clicked = st.button(
             "💾 Zapisz metryczkę",
