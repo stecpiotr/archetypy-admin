@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from docx import Document
+from public_labels import FINAL_VALUES_WHEEL_ARC_LABELS
 
 
 METRIC_FIELDS_ORDER = (
@@ -41,6 +42,17 @@ HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}")
 METRIC_FIELD_LOOKUP = {name.casefold(): name for name in METRIC_FIELDS_ORDER}
 EXAMPLE_GROUP_LOOKUP = {name.casefold(): name for name in EXAMPLE_GROUPS}
 EXAMPLE_GROUP_LOOKUP["popkultura/postaci"] = "Popkultura/postacie"
+
+GROUP_PUBLIC_LABELS_NORMALIZATION = {
+    "stabilizacja / kontrola": FINAL_VALUES_WHEEL_ARC_LABELS["upper_left"],
+    "stabilność / zarządzanie": FINAL_VALUES_WHEEL_ARC_LABELS["upper_left"],
+    "niezależność / samorealizacja": FINAL_VALUES_WHEEL_ARC_LABELS["upper_right"],
+    "niezależność / samodzielność": FINAL_VALUES_WHEEL_ARC_LABELS["upper_right"],
+    "przynależność / ludzie": FINAL_VALUES_WHEEL_ARC_LABELS["lower_left"],
+    "relacje / współdziałanie": FINAL_VALUES_WHEEL_ARC_LABELS["lower_left"],
+    "ryzyko / mistrzostwo": FINAL_VALUES_WHEEL_ARC_LABELS["lower_right"],
+    "zmiana / przywództwo": FINAL_VALUES_WHEEL_ARC_LABELS["lower_right"],
+}
 
 CORE_TRIPLET_MAP = {
     "Bohater": "Odwaga. Determinacja. Wyzwanie.",
@@ -196,6 +208,14 @@ def _is_subsection_heading(text: str, style_name: str) -> bool:
     return False
 
 
+def _normalize_group_public_label(value: str) -> str:
+    clean = _normalize_ws(value)
+    if not clean:
+        return ""
+    key = clean.casefold()
+    return GROUP_PUBLIC_LABELS_NORMALIZATION.get(key, clean)
+
+
 def _build_metric_display(
     metric_raw: dict[str, list[str]],
     example_map: dict[str, list[str]],
@@ -229,6 +249,8 @@ def _build_metric_display(
             kind = "list"
         else:
             value = _join_paragraphs(lines)
+            if label == "Grupa":
+                value = _normalize_group_public_label(value)
             kind = "text"
         rows.append({"label": label, "kind": kind, "value": value})
     return rows
