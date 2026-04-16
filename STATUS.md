@@ -2802,6 +2802,16 @@
 - Test techniczny:
   - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
 
+### Zrobione w Hotfix H-131 (2026-04-16, radar legenda + wheel 80%)
+- `archetypy-admin/admin_dashboard.py`:
+  - radar: etykiety archetypów zmniejszone o 1 pkt (`16 -> 15`),
+  - radar: dostrojono domenę i marginesy, aby legenda była bezpośrednio pod wykresem (bez dużego opadania),
+  - legenda pod radarem: zmniejszono pionowe odstępy (`margin-top/margin-bottom`),
+  - `Koło pragnień i wartości` (desktop): render w układzie `0.10 / 0.80 / 0.10` zamiast 100% szerokości kolumny.
+- Zachowano bez zmian ręcznie ustawiony podział głównych kolumn.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py` (OK).
+
 ### Zrobione w Hotfix H-127 (2026-04-16, kolejna iteracja jakości opisów)
 - Generator opisów został rozszerzony o nowe, precyzyjne wzorce treści odpowiadające kolejnym screenom UAT.
 - Wdrożono obsługę dodatkowych układów TOP archetypów:
@@ -2816,3 +2826,14 @@
 - Usunięto twarde case'y przypisane do konkretnych zestawień archetypów.
 - Wzorce użytkownika zostały zachowane jako styl i ton językowy szablonów ogólnych.
 - Zachowano personalizację `personGenitive`, próg TOP3 >= 70 i poprawność rodzaju gramatycznego.
+
+### Zrobione w Hotfix H-132 (2026-04-16, finalizacja generatora opisów)
+- `archetypy-admin/archetype_interpretation.py`:
+  - generator opisów działa jako jeden silnik regułowy dla wszystkich kombinacji TOP1/TOP2(/TOP3>=70),
+  - warstwa prezentacyjna używa publicznych wartości (`Odwaga`, `Porządek`, `Rozsądek`, `Troska`, `Relacje`, `Otwartość`, `Rozwój`, `Wolność`, `Wizja`, `Współpraca`, `Przejrzystość`, `Odnowa`),
+  - dodano/utrzymano helpery: `classifyArchetypeIntensity`, `classifyDimensionStrength`, `getDimensionPhrase`, `getPreferredGenitive`, `getNameAwareOpening`, `validateGeneratedActionDescription`,
+  - poprawiono fleksję i zgodność rodzaju/liczby w opisie `Koło pragnień i wartości`.
+- `archetypy-admin/admin_dashboard.py`:
+  - nazwa sekcji `Rozkład archetypów na osiach potrzeb` zastąpiona przez `Koło potrzeb`.
+- `archetypy-admin/test_archetype_interpretation.py`:
+  - odświeżony zestaw testów jednostkowych (scenariusze 1–8).

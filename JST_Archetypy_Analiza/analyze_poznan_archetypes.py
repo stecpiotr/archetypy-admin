@@ -358,9 +358,9 @@ D_WHEEL_ORDER = [
 ]
 
 DEFAULT_BRAND_VALUES = {
-    "Władca": "Skuteczność",
+    "Władca": "Porządek",
     "Bohater": "Odwaga",
-    "Mędrzec": "Racjonalność",
+    "Mędrzec": "Rozsądek",
     "Opiekun": "Troska",
     "Kochanek": "Relacje",
     "Błazen": "Otwartość",
@@ -15862,8 +15862,8 @@ def _plot_segment_profile_wheel(outpath: Path,
         ("Opiekun", "Troska", "opiekun.png", "#42a5f5"),
         ("Towarzysz", "Współpraca", "towarzysz.png", "#1565c0"),
         ("Niewinny", "Przejrzystość", "niewinny.png", "#81c784"),
-        ("Władca", "Skuteczność", "wladca.png", "#43a047"),
-        ("Mędrzec", "Racjonalność", "medrzec.png", "#1b5e20"),
+        ("Władca", "Porządek", "wladca.png", "#43a047"),
+        ("Mędrzec", "Rozsądek", "medrzec.png", "#1b5e20"),
         ("Czarodziej", "Wizja", "czarodziej.png", "#b39ddb"),
         ("Bohater", "Odwaga", "bohater.png", "#7e57c2"),
         ("Twórca", "Rozwój", "tworca.png", "#5e35b1"),
@@ -16225,8 +16225,8 @@ def _make_marketing_name_from_top3(top3: List[str], brand_values: Dict[str, str]
         v1 = vals[0] if len(vals) >= 1 else ""
         v2 = vals[1] if len(vals) >= 2 else ""
         pair_map = {
-            ("Skuteczność", "Troska"): "Sprawczy opiekunowie",
-            ("Skuteczność", "Przejrzystość"): "Przejrzysty ład",
+            ("Porządek", "Troska"): "Sprawczy opiekunowie",
+            ("Porządek", "Przejrzystość"): "Przejrzysty ład",
             ("Odwaga", "Rozwój"): "Sprawczy innowatorzy",
             ("Wolność", "Współpraca"): "Wspólnotowi reformatorzy",
             ("Wolność", "Odnowa"): "Niezależni reformatorzy",
@@ -16241,9 +16241,9 @@ def _make_marketing_name_from_top3(top3: List[str], brand_values: Dict[str, str]
             return v1
 
         value_adj = {
-            "Skuteczność": "Skuteczni",
+            "Porządek": "Uporządkowani",
             "Odwaga": "Odważni",
-            "Racjonalność": "Racjonalni",
+            "Rozsądek": "Rozsądni",
             "Troska": "Opiekuńczy",
             "Relacje": "Relacyjni",
             "Otwartość": "Pozytywni",
@@ -16255,9 +16255,9 @@ def _make_marketing_name_from_top3(top3: List[str], brand_values: Dict[str, str]
             "Odnowa": "Reformatorscy",
         }
         value_noun = {
-            "Skuteczność": "decydenci",
+            "Porządek": "organizatorzy",
             "Odwaga": "mobilizatorzy",
-            "Racjonalność": "stratedzy",
+            "Rozsądek": "stratedzy",
             "Troska": "opiekunowie",
             "Relacje": "wspólnotowcy",
             "Otwartość": "animatorzy",

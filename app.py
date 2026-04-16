@@ -98,6 +98,7 @@ from metryczka_config import (
     normalize_jst_metryczka_config,
     normalize_personal_metryczka_config,
 )
+from public_labels import ARCHETYPE_PUBLIC_VALUES
 
 warnings.filterwarnings(
     "ignore",
@@ -6189,20 +6190,7 @@ JST_D_ITEMS: List[Tuple[str, str]] = [
     ("D12", "Buntownik"),
 ]
 JST_D_BY_ARCH: Dict[str, str] = {arch: qid for qid, arch in JST_D_ITEMS}
-JST_VALUE_BY_ARCH: Dict[str, str] = {
-    "Buntownik": "Odnowa",
-    "Błazen": "Otwartość",
-    "Kochanek": "Relacje",
-    "Opiekun": "Troska",
-    "Towarzysz": "Współpraca",
-    "Niewinny": "Przejrzystość",
-    "Władca": "Skuteczność",
-    "Mędrzec": "Racjonalność",
-    "Czarodziej": "Wizja",
-    "Bohater": "Odwaga",
-    "Twórca": "Rozwój",
-    "Odkrywca": "Wolność",
-}
+JST_VALUE_BY_ARCH: Dict[str, str] = {str(k): str(v) for k, v in ARCHETYPE_PUBLIC_VALUES.items()}
 JST_ARCH_BY_KEY: Dict[str, str] = {}
 for _idx, _arch in enumerate(JST_ARCHETYPES):
     _k = str(_arch or "").strip()

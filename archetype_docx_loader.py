@@ -44,8 +44,8 @@ EXAMPLE_GROUP_LOOKUP["popkultura/postaci"] = "Popkultura/postacie"
 
 CORE_TRIPLET_MAP = {
     "Bohater": "Odwaga. Determinacja. Wyzwanie.",
-    "Władca": "Skuteczność. Autorytet. Kontrola.",
-    "Mędrzec": "Racjonalność. Wiedza. Analiza.",
+    "Władca": "Porządek. Odpowiedzialność. Ramy.",
+    "Mędrzec": "Rozsądek. Wiedza. Analiza.",
     "Opiekun": "Troska. Empatia. Bezpieczeństwo.",
     "Kochanek": "Relacje. Bliskość. Emocje.",
     "Błazen": "Otwartość. Poczucie humoru. Dystans.",

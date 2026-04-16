@@ -2630,6 +2630,13 @@ Decyzja:
 Uzasadnienie:
 - To stabilizuje UX między 1920x1200 i wyższymi rozdzielczościami bez degradacji czytelności nazw archetypów.
 
+### D-294: Ręczny podział kolumn w sekcji „Sprawdź wyniki badania archetypu” jest zamrożony
+Decyzja:
+- Bez wyraźnej prośby użytkownika nie zmieniamy proporcji kolumn układu sekcji „Informacje na temat archetypów ...”.
+- Dopuszczalne są jedynie mikro-poprawki wewnątrz kolumn (np. domena/marginesy radaru, spacing legendy, skala pojedynczego obrazu).
+Uzasadnienie:
+- Użytkownik ręcznie dostroił układ wizualny i oczekuje jego stabilności między kolejnymi hotfixami.
+
 ### D-284: Generator opisów ma warstwę dedykowanych wzorców dla najczęstszych układów TOP archetypów
 Decyzja:
 - Dla wybranych kombinacji TOP1/TOP2(/TOP3) używamy jawnych wzorców tekstowych dopasowanych do raportowego stylu produktu.
@@ -2643,3 +2650,24 @@ Decyzja:
 - Przykłady UAT służą jako referencja stylu raportowego oraz testy jakości, bez wprowadzania osobnych bloków if dla konkretnych par TOP.
 Uzasadnienie:
 - Zapewnia to skalowalność, spójność i przewidywalność opisów dla nowych, nieprzewidzianych zestawień wyników.
+
+### D-295: Publiczne wartości są jedyną warstwą display dla opisów archetypowych
+Decyzja:
+- Generator opisów sekcji `Koło pragnień i wartości` używa wyłącznie publicznych nazw wartości oraz publicznych fraz (`publicValue`, `publicValuePhrase`).
+- Bazowe wartości (`valueKey`, `valuePhrase`) pozostają warstwą wewnętrzną i nie są używane w finalnym tekście prezentacyjnym.
+Uzasadnienie:
+- Zapewnia to spójność języka raportowego i eliminuje mieszanie słownika technicznego z warstwą UI.
+
+### D-296: W opisie działania obowiązuje oddzielenie natężenia archetypu od siły wymiarów
+Decyzja:
+- Natężenie archetypu klasyfikujemy helperem `classifyArchetypeIntensity(...)` (skala popup/tabela),
+- Siłę wymiarów klasyfikujemy osobno helperem `classifyDimensionStrength(...)` i wykorzystujemy tylko ten słownik w `Profilu działania archetypu`.
+Uzasadnienie:
+- Chroni to przed mieszaniem dwóch porządków interpretacji i przed zaniżaniem/zawyżaniem opisu wymiarów.
+
+### D-297: Walidator opisu działania jest bramką jakości dla klas siły wymiarów
+Decyzja:
+- `validateGeneratedActionDescription(...)` sprawdza zgodność użytych klas i sformułowań z realnymi przedziałami blended dimensions,
+- walidator wymusza m.in. regułę wspólnej dominacji przy różnicy TOP2 <= 7 pkt oraz regułę wsparcia 3. wymiaru przy >= 60.
+Uzasadnienie:
+- Ogranicza ryzyko językowego przeszacowania lub niedoszacowania opisu praktycznego stylu działania.

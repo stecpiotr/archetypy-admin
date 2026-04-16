@@ -27,11 +27,12 @@ from fpdf import FPDF
 import unicodedata
 import colorsys
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import io
 import re
 import html
 import base64
+import math
 from textwrap import dedent
 from datetime import datetime
 import pytz
@@ -61,6 +62,11 @@ import numpy as np
 from archetype_docx_loader import load_archetype_extended
 from archetype_interpretation import generate_archetype_descriptions
 from metryczka_config import normalize_personal_metryczka_config
+from public_labels import (
+    ARCHETYPE_PUBLIC_VALUES,
+    FINAL_VALUES_WHEEL_ARC_LABELS,
+    FINAL_VALUES_WHEEL_CENTRAL_FIELDS,
+)
 
 import sys
 if sys.platform.startswith("linux"):
@@ -1320,9 +1326,9 @@ def zero_to_dash(val):
     return "-" if val == 0 else str(val)
 
 archetype_features = {
-    "Władca": "Potrzeba kontroli, organizacji, zarządzanie, wprowadzanie ładu.",
+    "Władca": "Potrzeba porządku, organizacji, odpowiedzialności i utrzymania ładu.",
     "Bohater": "Odwaga, walka z przeciwnościami, mobilizacja do działania.",
-    "Mędrzec": "Wiedza, analityczność, logiczne argumenty, racjonalność.",
+    "Mędrzec": "Rozsądek, analityczność, logiczne argumenty i decyzje oparte na faktach.",
     "Opiekun": "Empatia, dbanie o innych, ochrona, troska.",
     "Kochanek": "Relacje, emocje, bliskość, autentyczność uczuć.",
     "Błazen": "Poczucie humoru, dystans, lekkość, rozładowywanie napięć.",
@@ -1336,8 +1342,8 @@ archetype_features = {
 
 CORE_TRIPLET_MAP = {
     "Bohater": "Odwaga. Determinacja. Wyzwanie.",
-    "Władca": "Skuteczność. Autorytet. Kontrola.",
-    "Mędrzec": "Racjonalność. Wiedza. Analiza.",
+    "Władca": "Porządek. Odpowiedzialność. Ramy.",
+    "Mędrzec": "Rozsądek. Wiedza. Analiza.",
     "Opiekun": "Troska. Empatia. Bezpieczeństwo.",
     "Kochanek": "Relacje. Bliskość. Emocje.",
     "Błazen": "Otwartość. Poczucie humoru. Dystans.",
@@ -2774,6 +2780,208 @@ def ap_section_heading(
 
 ARCHE_NAME_TO_IDX = {n.lower(): i for i, n in enumerate(ARCHE_NAMES_ORDER)}
 
+
+_WHEEL_VALUE_ORDER = [
+    "Niewinny",
+    "Mędrzec",
+    "Odkrywca",
+    "Buntownik",
+    "Czarodziej",
+    "Bohater",
+    "Kochanek",
+    "Błazen",
+    "Towarzysz",
+    "Opiekun",
+    "Władca",
+    "Twórca",
+]
+
+
+@lru_cache(maxsize=64)
+def _load_wheel_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    assets_dir = Path(__file__).with_name("assets")
+    font_candidates = (
+        [assets_dir / "fonts" / "DejaVuSans-Bold.ttf", assets_dir / "DejaVuSans-Bold.ttf"]
+        if bold
+        else [assets_dir / "fonts" / "DejaVuSans.ttf", assets_dir / "DejaVuSans.ttf"]
+    )
+    for font_path in font_candidates:
+        if font_path.exists():
+            try:
+                return ImageFont.truetype(str(font_path), size=size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
+def _segment_label_text(value: str) -> str:
+    manual = {
+        "Przejrzystość": "PRZEJRZY-\nSTOŚĆ",
+        "Współpraca": "WSPÓŁ-\nPRACA",
+    }
+    return manual.get(value, value.upper())
+
+
+def _center_field_texts() -> dict[str, str]:
+    return {
+        key: str(value).replace(" i ", "\ni ")
+        for key, value in FINAL_VALUES_WHEEL_CENTRAL_FIELDS.items()
+    }
+
+
+def _draw_rotated_capsule(
+    base: Image.Image,
+    text: str,
+    center_xy: tuple[float, float],
+    angle_deg: float,
+    box_size: tuple[int, int],
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+) -> None:
+    box_w, box_h = box_size
+    capsule = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
+    drawer = ImageDraw.Draw(capsule, "RGBA")
+    radius = max(6, int(box_h * 0.45))
+    drawer.rounded_rectangle(
+        (0, 0, box_w - 1, box_h - 1),
+        radius=radius,
+        fill=(235, 238, 241, 248),
+        outline=(208, 214, 220, 245),
+        width=max(1, box_h // 18),
+    )
+    drawer.text((box_w / 2, box_h / 2), text, anchor="mm", fill=(44, 51, 58, 255), font=font)
+    rotated = capsule.rotate(angle_deg, expand=True, resample=Image.BICUBIC)
+    px = int(center_xy[0] - rotated.width / 2)
+    py = int(center_xy[1] - rotated.height / 2)
+    base.alpha_composite(rotated, (px, py))
+
+
+def _apply_values_wheel_public_overlay(base: Image.Image) -> Image.Image:
+    img = base.copy().convert("RGBA")
+    w, h = img.size
+    m = float(min(w, h))
+    cx = w / 2.0
+    cy = h / 2.0
+
+    # 1) Segmenty wartości: czyścimy stare etykiety i rysujemy finalne.
+    segment_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    segment_draw = ImageDraw.Draw(segment_layer, "RGBA")
+    r_outer = m * 0.36
+    r_inner = m * 0.20
+    r_text = m * 0.272
+    for idx, archetype_name in enumerate(_WHEEL_VALUE_ORDER):
+        center_deg = 75 - idx * 30
+        theta1 = center_deg - 14
+        theta2 = center_deg + 14
+        ang = math.radians(center_deg)
+        sample_x = int(max(0, min(w - 1, cx + m * 0.312 * math.cos(ang))))
+        sample_y = int(max(0, min(h - 1, cy - m * 0.312 * math.sin(ang))))
+        fill_rgba = img.getpixel((sample_x, sample_y))
+
+        segment_draw.pieslice(
+            [cx - r_outer, cy - r_outer, cx + r_outer, cy + r_outer],
+            start=theta1,
+            end=theta2,
+            fill=fill_rgba,
+        )
+        segment_draw.pieslice(
+            [cx - r_inner, cy - r_inner, cx + r_inner, cy + r_inner],
+            start=theta1,
+            end=theta2,
+            fill=(0, 0, 0, 0),
+        )
+    img.alpha_composite(segment_layer)
+
+    seg_font = _load_wheel_font(int(m * 0.036), bold=False)
+    seg_draw = ImageDraw.Draw(img, "RGBA")
+    for idx, archetype_name in enumerate(_WHEEL_VALUE_ORDER):
+        value = ARCHETYPE_PUBLIC_VALUES[archetype_name]
+        center_deg = 75 - idx * 30
+        ang = math.radians(center_deg)
+        tx = cx + r_text * math.cos(ang)
+        ty = cy - r_text * math.sin(ang)
+        seg_draw.multiline_text(
+            (tx, ty),
+            _segment_label_text(value),
+            anchor="mm",
+            align="center",
+            spacing=max(2, int(m * 0.0025)),
+            fill=(22, 24, 28, 248),
+            font=seg_font,
+        )
+
+    # 2) Pola centralne: finalny zestaw 4 pól.
+    center_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    center_draw = ImageDraw.Draw(center_layer, "RGBA")
+    center_text = _center_field_texts()
+    center_positions = {
+        "upper_left": (cx - m * 0.115, cy - m * 0.076),
+        "upper_right": (cx + m * 0.115, cy - m * 0.076),
+        "lower_left": (cx - m * 0.115, cy + m * 0.076),
+        "lower_right": (cx + m * 0.115, cy + m * 0.076),
+    }
+    half_w = m * 0.108
+    half_h = m * 0.064
+    center_font = _load_wheel_font(int(m * 0.031), bold=False)
+    for key, (px, py) in center_positions.items():
+        sample_x = int(max(0, min(w - 1, px)))
+        sample_y = int(max(0, min(h - 1, py)))
+        fill_rgba = img.getpixel((sample_x, sample_y))
+        center_draw.rounded_rectangle(
+            (px - half_w, py - half_h, px + half_w, py + half_h),
+            radius=max(8, int(m * 0.019)),
+            fill=(fill_rgba[0], fill_rgba[1], fill_rgba[2], 244),
+        )
+        center_draw.multiline_text(
+            (px, py),
+            center_text[key],
+            anchor="mm",
+            align="center",
+            spacing=max(2, int(m * 0.0022)),
+            fill=(22, 24, 28, 248),
+            font=center_font,
+        )
+    img.alpha_composite(center_layer)
+
+    # 3) Szare łuki/grupy: finalne nazwy.
+    capsule_font = _load_wheel_font(int(m * 0.028), bold=False)
+    cap_w = int(w * 0.29)
+    cap_h = int(h * 0.065)
+    _draw_rotated_capsule(
+        img,
+        FINAL_VALUES_WHEEL_ARC_LABELS["upper_left"],
+        center_xy=(w * 0.12, h * 0.16),
+        angle_deg=-62,
+        box_size=(cap_w, cap_h),
+        font=capsule_font,
+    )
+    _draw_rotated_capsule(
+        img,
+        FINAL_VALUES_WHEEL_ARC_LABELS["upper_right"],
+        center_xy=(w * 0.88, h * 0.16),
+        angle_deg=62,
+        box_size=(cap_w, cap_h),
+        font=capsule_font,
+    )
+    _draw_rotated_capsule(
+        img,
+        FINAL_VALUES_WHEEL_ARC_LABELS["lower_left"],
+        center_xy=(w * 0.12, h * 0.84),
+        angle_deg=62,
+        box_size=(cap_w, cap_h),
+        font=capsule_font,
+    )
+    _draw_rotated_capsule(
+        img,
+        FINAL_VALUES_WHEEL_ARC_LABELS["lower_right"],
+        center_xy=(w * 0.88, h * 0.84),
+        angle_deg=-62,
+        box_size=(cap_w, cap_h),
+        font=capsule_font,
+    )
+
+    return img
+
+
 @st.cache_data
 def load_base_arche_img(gender_code: str = "M"):
     assets_dir = Path(__file__).with_name("assets")
@@ -2786,7 +2994,10 @@ def load_base_arche_img(gender_code: str = "M"):
     for name in candidates:
         p = assets_dir.joinpath(name)
         if p.exists():
-            return Image.open(p).convert("RGBA")
+            img = Image.open(p).convert("RGBA")
+            if name in {"archetype_wheel_male.png", "archetype_wheel_female.png"}:
+                img = _apply_values_wheel_public_overlay(img)
+            return img
     raise FileNotFoundError(f"Brak pliku koła archetypów. Szukano: {candidates}")
 
 
@@ -2896,18 +3107,18 @@ def compose_axes_wheel_highlight(main_name, aux_name=None, supp_name=None, gende
 
 
 SEGMENT_PROFILE_ITEMS = [
-    ("Buntownik", "Odnowa", "buntownik.png", "#c62828"),
-    ("Błazen", "Otwartość", "blazen.png", "#ef5350"),
-    ("Kochanek", "Relacje", "kochanek.png", "#90caf9"),
-    ("Opiekun", "Troska", "opiekun.png", "#42a5f5"),
-    ("Towarzysz", "Współpraca", "towarzysz.png", "#1565c0"),
-    ("Niewinny", "Przejrzystość", "niewinny.png", "#81c784"),
-    ("Władca", "Skuteczność", "wladca.png", "#43a047"),
-    ("Mędrzec", "Racjonalność", "medrzec.png", "#1b5e20"),
-    ("Czarodziej", "Wizja", "czarodziej.png", "#b39ddb"),
-    ("Bohater", "Odwaga", "bohater.png", "#7e57c2"),
-    ("Twórca", "Rozwój", "tworca.png", "#5e35b1"),
-    ("Odkrywca", "Wolność", "odkrywca.png", "#8e0000"),
+    ("Buntownik", ARCHETYPE_PUBLIC_VALUES["Buntownik"], "buntownik.png", "#c62828"),
+    ("Błazen", ARCHETYPE_PUBLIC_VALUES["Błazen"], "blazen.png", "#ef5350"),
+    ("Kochanek", ARCHETYPE_PUBLIC_VALUES["Kochanek"], "kochanek.png", "#90caf9"),
+    ("Opiekun", ARCHETYPE_PUBLIC_VALUES["Opiekun"], "opiekun.png", "#42a5f5"),
+    ("Towarzysz", ARCHETYPE_PUBLIC_VALUES["Towarzysz"], "towarzysz.png", "#1565c0"),
+    ("Niewinny", ARCHETYPE_PUBLIC_VALUES["Niewinny"], "niewinny.png", "#81c784"),
+    ("Władca", ARCHETYPE_PUBLIC_VALUES["Władca"], "wladca.png", "#43a047"),
+    ("Mędrzec", ARCHETYPE_PUBLIC_VALUES["Mędrzec"], "medrzec.png", "#1b5e20"),
+    ("Czarodziej", ARCHETYPE_PUBLIC_VALUES["Czarodziej"], "czarodziej.png", "#b39ddb"),
+    ("Bohater", ARCHETYPE_PUBLIC_VALUES["Bohater"], "bohater.png", "#7e57c2"),
+    ("Twórca", ARCHETYPE_PUBLIC_VALUES["Twórca"], "tworca.png", "#5e35b1"),
+    ("Odkrywca", ARCHETYPE_PUBLIC_VALUES["Odkrywca"], "odkrywca.png", "#8e0000"),
 ]
 
 
@@ -5281,7 +5492,7 @@ def _append_generated_descriptions_page(
         _doc_add_paragraph(doc_obj, values_desc)
 
     if needs_desc:
-        _doc_add_paragraph(doc_obj, "Rozkład archetypów na osiach potrzeb", "Heading 2")
+        _doc_add_paragraph(doc_obj, "Koło potrzeb", "Heading 2")
         _doc_add_paragraph(doc_obj, needs_desc)
 
     if action_desc:
@@ -7476,15 +7687,15 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     inject_global_css(GLOBAL_CSS)
     # Szerokość raportu (również dla widoku publicznego).
     st.markdown(
-        f"<style>.block-container{{max-width:{'98vw' if wide else '1160px'} !important;}}</style>",
+        f"<style>.block-container{{max-width:{'100vw' if wide else '1160px'} !important;}}</style>",
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
     radar_plot_size = 420 if is_mobile else 760
-    radar_tick_size = 10 if is_mobile else 16
+    radar_tick_size = 10 if is_mobile else 15
     radar_hover_size = 12 if is_mobile else 14
-    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=24, r=24, t=22, b=30)
-    radar_domain = dict(x=[0.10, 0.90], y=[0.10, 0.90]) if is_mobile else dict(x=[0.14, 0.86], y=[0.14, 0.86])
+    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=24, r=24, t=18, b=8)
+    radar_domain = dict(x=[0.10, 0.90], y=[0.10, 0.90]) if is_mobile else dict(x=[0.12, 0.88], y=[0.06, 0.98])
     wheel_img_width = 360 if is_mobile else 620
     axes_img_width = 360 if is_mobile else 620
     segment_profile_width = 360 if is_mobile else 640
@@ -7835,7 +8046,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 )
 
             # --- ⬇️ RANKING I WYKRES NA BAZIE ŚREDNIEJ (0–20), NIE LICZEBNOŚCI! ---
-            # Kolejność zgodna z "Rozkład archetypów na osiach potrzeb"
+            # Kolejność zgodna z "Koło potrzeb"
             # (od godz. 12, zgodnie z ruchem wskazówek zegara).
 
             # 1) średnia suma punktów dla każdego archetypu (0–20)
@@ -7892,9 +8103,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             if supp_data:
                 supp_disp["name"] = disp_name(supp_avg or "")
 
-            left_col, col3 = st.columns([0.65, 0.35], gap="small")
+            left_col, col3 = st.columns([0.62, 0.38], gap="large")  #ręczna regulacja w "Informacje na temat archetypów"
             with left_col:
-                col1, col2 = st.columns([0.31, 0.69], gap="small")
+                col1, col2 = st.columns([0.39, 0.61], gap="small")  #ręczna regulacja tabala a radar
             means_pct = mean_pct_by_archetype_from_df(data)
 
             def _make_desc_result(arche_name: str | None) -> dict[str, object] | None:
@@ -8044,14 +8255,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 #    więc nie wykonujemy dodatkowego sortowania DataFrame.
                 archetype_table = archetype_table.reset_index(drop=True)
 
-                # 5) HTML + CSS tabeli
+                # 5) HTML + CSS tabeli -> tabela: Liczebność i natężenie archetypów
                 # --- ŁATWE DO ZMIANY SZEROKOŚCI (procenty) ---
-                COL_W = {"c1": "22%",
+                COL_W = {"c1": "27%",
                          "c2": "7%",
                          "c3": "7%",
                          "c4": "7%",
-                         "c5": "6%",
-                         "c6": "51%"}
+                         "c5": "3%",
+                         "c6": "52%"}
 
                 # Budujemy body tabeli bez nagłówka (header=False), a nagłówek zrobimy ręcznie (rowspan/colspan).
                 _body = (
@@ -8480,7 +8691,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         key=f"radar-{study_id}",
                     )
                     st.markdown("""
-                    <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:center;align-items:center;margin-top:2px;margin-bottom:2px;">
                       <span style="display:flex;align-items:center;margin-right:34px;">
                         <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
                         <span style="font-size:0.85em;">Archetyp główny</span>
@@ -8507,7 +8718,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         key=f"radar-{study_id}",
                     )
                     st.markdown("""
-                    <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:center;align-items:center;margin-top:2px;margin-bottom:2px;">
                       <span style="display:flex;align-items:center;margin-right:34px;">
                         <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
                         <span style="font-size:0.85em;">Archetyp główny</span>
@@ -8658,7 +8869,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code)
-                        st.image(kola_img, use_column_width=True)
+                        _pad_l, _wheel_col, _pad_r = st.columns([0.10, 0.80, 0.10], gap="small")
+                        with _wheel_col:
+                            st.image(kola_img, use_column_width=True)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -8671,7 +8884,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
                     st.markdown(
                         ap_section_heading(
-                            "Rozkład archetypów na osiach potrzeb",
+                            "Koło potrzeb",
                             center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
@@ -8687,7 +8900,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
                     st.markdown(
                         ap_section_heading(
-                            "Rozkład archetypów na osiach potrzeb",
+                            "Koło potrzeb",
                             center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,

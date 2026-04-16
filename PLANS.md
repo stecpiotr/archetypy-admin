@@ -3536,6 +3536,22 @@ Wynik:
 - Smoke-check:
   - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
 
+### Hotfix H-131 [DONE]
+Temat: Mikro-korekta radaru i koła wg uwag UI (bez zmiany ręcznie ustawionego podziału kolumn).
+Kryteria ukonczenia:
+1. Legenda `Profil archetypów ...` renderuje się bliżej radaru.
+2. Etykiety archetypów na radarze są o 1 pkt mniejsze.
+3. Grafika `Koło pragnień i wartości` na desktopie zajmuje ~80% szerokości kolumny.
+4. Nie ruszamy ręcznie ustawionego podziału kolumn.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - radar: `radar_tick_size` zmieniono z `16` na `15`,
+  - radar: dostrojono `radar_margins` i `radar_domain` (mniejsza luka między wykresem i legendą),
+  - legenda pod radarem: zmniejszono odstępy (`margin-top`/`margin-bottom`),
+  - `Koło pragnień i wartości` (desktop): obraz renderowany w środkowej kolumnie `0.80` szerokości.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py` (OK).
+
 ### Hotfix H-127 [DONE]
 Temat: Rozszerzenie generatora opisów o kolejne wzorce jakościowe (Towarzysz+Błazen, Niewinny+Mędrzec+Twórca, Odkrywca+Opiekun, Opiekunka+Niewinna+Odkrywczyni).
 Kryteria ukonczenia:
@@ -3564,3 +3580,16 @@ Wynik:
   - opisy wartości/potrzeb/działania są generowane na wspólnym silniku regułowym.
 - `test_archetype_interpretation.py`:
   - testy sprawdzają logikę generatora (otwarcia sekcji, osie, TOP3, fleksja).
+
+### Hotfix H-132 [DONE]
+Temat: Finalizacja regułowego generatora opisów (publiczne wartości + walidacja siły wymiarów + personalizacja).
+Kryteria ukonczenia:
+1. Warstwa opisowa dla 3 sekcji działa na regułach ogólnych (bez twardych case'ów).
+2. Opisy używają publicznych wartości (Odwaga, Porządek, Rozsądek, itd.), bez słownika bazowego w warstwie prezentacyjnej.
+3. Dodane helpery: interpretator natężenia archetypu, interpretator siły wymiarów, personalizacja i walidator opisu działania.
+4. Zaktualizowane nazwy sekcji UI do: `Koło pragnień i wartości`, `Koło potrzeb`, `Profil działania archetypu`.
+5. Testy jednostkowe pokrywają scenariusze 1–8.
+Wynik:
+- `archetype_interpretation.py`: domknięty silnik regułowy + helpery i walidacja.
+- `admin_dashboard.py`: usunięte stare nazwy `Rozkład archetypów na osiach potrzeb`.
+- `test_archetype_interpretation.py`: nowy zestaw testów 1–8.
