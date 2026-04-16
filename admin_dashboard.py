@@ -2995,8 +2995,8 @@ def load_base_arche_img(gender_code: str = "M"):
         p = assets_dir.joinpath(name)
         if p.exists():
             img = Image.open(p).convert("RGBA")
-            if name in {"archetype_wheel_male.png", "archetype_wheel_female.png"}:
-                img = _apply_values_wheel_public_overlay(img)
+            # Assets koła mają już finalne, ręcznie dopracowane etykiety.
+            # Nie nakładamy runtime-overlay, żeby nie psuć layoutu.
             return img
     raise FileNotFoundError(f"Brak pliku koła archetypów. Szukano: {candidates}")
 

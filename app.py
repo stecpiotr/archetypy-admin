@@ -5851,6 +5851,7 @@ def jst_analysis_view() -> None:
                     st.session_state[cache_key] = "__report_path_only__"
                 st.session_state[cache_meta_key] = {
                     "report_path": str(report_path),
+                    "report_mtime_ns": int(report_path.stat().st_mtime_ns),
                     "raw_bytes": raw_bytes,
                     "inlined_bytes": inlined_bytes,
                     "inlined_used": inlined_used,
@@ -5892,6 +5893,12 @@ def jst_analysis_view() -> None:
     raw_bytes = int(meta.get("raw_bytes") or 0)
     inlined_bytes = int(meta.get("inlined_bytes") or 0)
     inlined_used = bool(meta.get("inlined_used"))
+    report_mtime_ns = int(meta.get("report_mtime_ns") or 0)
+    current_report_mtime_ns = int(report_path.stat().st_mtime_ns) if (report_path and report_path.exists()) else 0
+    rendered_fresh = bool(report_mtime_ns and current_report_mtime_ns and report_mtime_ns == current_report_mtime_ns)
+    if not rendered_fresh:
+        st.session_state.pop(preview_inline_key, None)
+        st.session_state.pop(preview_inline_meta_key, None)
     safe_limit = int(meta.get("safe_message_limit") or safe_message_limit)
     hard_limit = int(meta.get("panel_hard_limit") or panel_hard_limit)
     standalone_limit = int(meta.get("standalone_html_limit") or standalone_html_limit)
@@ -5909,7 +5916,7 @@ def jst_analysis_view() -> None:
         full_report_error = ""
         full_report_available = False
         # Nie osadzamy ponownie całego raportu przy każdym rerunie: to potrafi mocno wydłużyć UI.
-        if rendered and rendered != "__report_path_only__" and inlined_used:
+        if rendered and rendered != "__report_path_only__" and inlined_used and rendered_fresh:
             full_report = _apply_archetype_label_mode_to_html(str(rendered), label_mode_choice)
             full_report_bytes = len(full_report.encode("utf-8", errors="ignore"))
             full_report_available = bool(full_report and full_report_bytes <= standalone_limit)
@@ -6023,7 +6030,7 @@ def jst_analysis_view() -> None:
             st.error("Nie udało się odnaleźć pliku raportu do podglądu.")
             return
     else:
-        if rendered and rendered != "__report_path_only__" and inlined_used:
+        if rendered and rendered != "__report_path_only__" and inlined_used and rendered_fresh:
             to_render = str(rendered)
         else:
             cached_inline = st.session_state.get(preview_inline_key)
