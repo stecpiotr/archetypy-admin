@@ -267,6 +267,13 @@ def _phrase_accusative(value_phrase: str) -> str:
     return value_phrase
 
 
+def _phrase_locative(value_phrase: str) -> str:
+    prefix = "potrzeba "
+    if value_phrase.startswith(prefix):
+        return "potrzebie " + value_phrase[len(prefix):]
+    return value_phrase
+
+
 def _axis_strength(value: float) -> str:
     abs_value = abs(value)
     if abs_value < 0.18:
@@ -339,6 +346,7 @@ def _generate_values_description(
     supporting_meta = ARCHETYPE_META[supporting.id]
     primary_phrase_inst = _phrase_instrumental(primary_meta["valuePhrase"])
     primary_phrase_acc = _phrase_accusative(primary_meta["valuePhrase"])
+    primary_phrase_loc = _phrase_locative(primary_meta["valuePhrase"])
     supporting_phrase_acc = _phrase_accusative(supporting_meta["valuePhrase"])
 
     if dominance_type == "co_dominant":
@@ -348,19 +356,19 @@ def _generate_values_description(
         )
     elif dominance_type == "dominant_with_strong_support":
         text = (
-            f"Rdzeń motywacyjny tego profilu opiera się przede wszystkim na {primary_meta['valueKey']}, wyraźnie wzmacnianej przez {supporting_meta['valueKey']}. "
+            f"Rdzeń tego profilu opiera się przede wszystkim na {primary_phrase_loc}, wyraźnie wzmacnianej przez {supporting_phrase_acc}. "
             f"W praktyce oznacza to styl budowany na {primary_phrase_acc}, z dodatkowym akcentem na {supporting_phrase_acc}."
         )
     else:
         text = (
-            f"Profil jest wyraźnie zdominowany przez wartość {primary_meta['valueKey']}. "
-            f"Archetyp wspierający dodaje tu {supporting_meta['valueKey']}, ale to {primary_meta['valueKey']} pozostaje głównym źródłem energii i kierunku działania."
+            f"W tym profilu główną wartością jest {primary_meta['valueKey']}. "
+            f"Archetyp wspierający wnosi {supporting_meta['valueKey']}, ale to {primary_meta['valueKey']} pozostaje głównym źródłem energii i kierunku działania."
         )
 
     if has_tertiary and tertiary is not None:
         tertiary_meta = ARCHETYPE_META[tertiary.id]
         tertiary_phrase_acc = _phrase_accusative(tertiary_meta["valuePhrase"])
-        text += f" Dodatkowy ton wnosi tu także {tertiary_meta['valueKey']}, która poszerza profil o {tertiary_phrase_acc}."
+        text += f" Dodatkowy ton wnosi tu także {tertiary_meta['valueKey']}, poszerzając profil o {tertiary_phrase_acc}."
 
     return text
 
@@ -395,11 +403,27 @@ def _dominance_opening(
     supporting: _ResolvedResult,
     dominance_type: str,
 ) -> str:
+    female_labels_norm = {
+        _normalize_label("Niewinna"),
+        _normalize_label("Mędrczyni"),
+        _normalize_label("Odkrywczyni"),
+        _normalize_label("Kochanka"),
+        _normalize_label("Towarzyszka"),
+        _normalize_label("Komiczka"),
+        _normalize_label("Bohaterka"),
+        _normalize_label("Buntowniczka"),
+        _normalize_label("Czarodziejka"),
+        _normalize_label("Opiekunka"),
+        _normalize_label("Twórczyni"),
+        _normalize_label("Władczyni"),
+    }
+    pronoun = "ją" if _normalize_label(primary.label) in female_labels_norm else "go"
+
     if dominance_type == "co_dominant":
         return f"Profil jest współdominowany przez archetypy {primary.label} i {supporting.label}."
     if dominance_type == "dominant_with_strong_support":
-        return f"Dominantą profilu jest archetyp {primary.label}, wyraźnie wzmacniany przez {supporting.label}."
-    return f"Profil jest wyraźnie zdominowany przez archetyp {primary.label}, a {supporting.label} pełni rolę wspierającą."
+        return f"Profil główny buduje {primary.label}, a wyraźnie wzmacnia {pronoun} {supporting.label}."
+    return f"Profil główny buduje {primary.label}, a {supporting.label} pełni rolę wspierającą."
 
 
 def _pair_interpretation(dim_a: str, dim_b: str) -> str:

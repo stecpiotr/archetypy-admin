@@ -2685,3 +2685,37 @@
   - czy nowy układ (heurystyka + profil pod tabelą, koła/karty po prawej) odpowiada docelowemu odbiorowi,
   - czy breakpoint `<=1920x1200` dla ukrywania emoji w tabeli jest optymalny wizualnie,
   - czy pełny raport DOCX/PDF pokazuje wszystkie oczekiwane karty `Profile działania archetypów` dla TOP1/TOP2/(TOP3).
+
+### Zrobione w Hotfix H-125 (2026-04-16, dopracowanie odmiany i rodzaju)
+- Generator opisów używa teraz poprawnych form: `na potrzebie ...`, `na potrzebę ...`, `napędzane potrzebą ...`.
+- Szablon opisu działania nie miesza już rodzaju męskiego i żeńskiego przy TOP1/TOP2.
+- Logika obliczeń (dominacja, osie potrzeb, blend wymiarów) nie była zmieniana.
+
+### Zrobione w Hotfix H-126 (2026-04-16, korekty demografii bez filtrów + layout + eksport opisów)
+- `archetypy-admin/app.py`:
+  - `brak danych` ma wymuszoną ikonę `❔` w kartach/tabelach demografii Matchingu i Segmentów (także gdy mapa ikon ma pustą wartość).
+- `archetypy-admin/admin_dashboard.py`:
+  - `_personal_metry_cat_icon(...)` zwraca `❔` dla kategorii `brak danych`,
+  - podstrona `Profile demograficzne archetypu`:
+    - przy braku aktywnych filtrów radar pokazuje wyłącznie profil całej próby,
+    - przy braku aktywnych filtrów sekcja TOP i koła 0-100 nie pokazują „podgrupy filtrowanej”,
+  - tabela podsumowania ma nową nazwę:
+    - `Liczebność i natężenie archetypów`,
+  - w tabeli podsumowania zwężono kolumny `Główny/Wspierający/Poboczny` i poszerzono `opis`,
+  - radar profilu archetypów w głównym widoku personalnym używa dopasowania do szerokości kolumny (`use_container_width=True`),
+  - sekcja `Heurystyczna analiza koloru psychologicznego` i `Profil siły archetypów ...` renderuje się w szerszej kolumnie (`0.64` szerokości),
+  - `Profil siły archetypów ...` ma większy render obrazu na desktopie (`width=760`),
+  - nagłówki `Koło pragnień i wartości`, `Rozkład archetypów na osiach potrzeb`, `Profile działania archetypów ...` są wyrównane do lewej,
+  - opis sekcji `Profile działania archetypów ...` renderuje się pod kartami wykresów (nie nad nimi),
+  - eksport full DOCX/PDF został rozszerzony o stronę tekstową z opisami:
+    - `Koło pragnień i wartości`,
+    - `Rozkład archetypów na osiach potrzeb`,
+    - `Profile działania archetypów ...`.
+- Test techniczny:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do manualnego potwierdzenia na UI:
+  - zachowanie radaru i opisów przy różnych rozdzielczościach (1920×1200 i wyższe),
+  - docelowa szerokość sekcji `Heurystyczna analiza koloru psychologicznego`,
+  - obecność nowej strony z opisami interpretacyjnymi w pełnym DOCX/PDF.

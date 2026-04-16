@@ -3377,3 +3377,48 @@ Wynik:
   - eksport pełny DOCX/PDF rozszerzony o stronę z pojedynczymi grafikami `Profile działania archetypów`.
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-125 [DONE]
+Temat: Doprecyzowanie generatora opisów — pełna naturalność polszczyzny i spójność form żeńskich/męskich.
+Kryteria ukonczenia:
+1. Frazy wartości mają poprawną odmianę (`potrzebie` / `potrzebę` / `potrzebą`).
+2. Zdania o dominacji nie mieszają form płci (`Kochanka ... wzmacnia ją Buntowniczka`).
+3. Logika obliczeniowa pozostaje bez zmian.
+Wynik:
+- `archetype_interpretation.py`:
+  - dodano odmianę lokatywną (`_phrase_locative`),
+  - przebudowano szablon `dominant_with_strong_support` dla `Koło pragnień i wartości`,
+  - zmieniono szablony otwarcia opisu działania tak, by nie tworzyć błędów rodzaju gramatycznego,
+  - utrzymano bez zmian deterministykę i reguły wyliczania osi/wymiarów.
+
+### Hotfix H-126 [DONE]
+Temat: Korekty demografii bez filtrów + układ/typografia panelu archetypów + dopięcie opisów do full raportu.
+Kryteria ukonczenia:
+1. `brak danych` ma zawsze ikonę `❔` (także gdy w konfiguracji ikon jest pusty wpis).
+2. W `Profile demograficzne archetypu` przy braku aktywnych filtrów nie renderujemy „profilu podgrupy filtrowanej” (radar + koła 0-100).
+3. Tytuł tabeli podsumowania to `Liczebność i natężenie archetypów`; kolumny `Główny/Wspierający/Poboczny` są węższe, a kolumna `opis` szersza.
+4. Radar archetypów skaluje się do szerokości kolumny (bez chowania się pod tabelę).
+5. `Heurystyczna analiza koloru psychologicznego` i `Profil siły archetypów ...` są szersze (obszar lewej części raportu) i profil 0-100 jest wyraźnie większy.
+6. Tytuł `Profile działania archetypów ...` jest wyrównany do lewej; opis tej sekcji jest pod wykresami.
+7. Opisy pod `Koło pragnień i wartości` oraz `Rozkład archetypów na osiach potrzeb` są wyrównane do lewej jak sekcja `Profile działania...`.
+8. Full raport DOCX/PDF zawiera także teksty interpretacyjne dla:
+   - `Koło pragnień i wartości`,
+   - `Rozkład archetypów na osiach potrzeb`,
+   - `Profile działania archetypów ...`.
+Wynik:
+- `archetypy-admin/app.py`:
+  - wymuszono `❔` dla kategorii `brak danych` w kartach i tabelach demografii Matchingu/Segmentów (niezależnie od pustej ikonki w mapie).
+- `archetypy-admin/admin_dashboard.py`:
+  - `_personal_metry_cat_icon(...)` zwraca `❔` dla `brak danych`,
+  - przy braku aktywnych filtrów w podstronie demografii:
+    - radar pokazuje tylko profil całej próby,
+    - sekcja TOP pokazuje tylko całą próbę,
+    - koła 0-100 pokazują tylko profil całej próby,
+  - tabela podsumowania ma nową nazwę sekcji i nowe proporcje kolumn (`opis` poszerzony),
+  - radar archetypów używa `use_container_width=True` na desktopie i automatycznego dopasowania szerokości,
+  - sekcja heurystyki + profil siły renderowana w szerszym obszarze (`0.64` szerokości), a profil 0-100 ma większy render,
+  - `Koło...`, `Rozkład...`, `Profile działania...` mają nagłówki wyrównane do lewej,
+  - opis sekcji `Profile działania...` przeniesiono pod wykresy kart,
+  - eksport full DOCX/PDF rozszerzono o stronę z tekstami interpretacyjnymi (3 sekcje jak w panelu).
+- Smoke-check:
+  - `python -m py_compile app.py admin_dashboard.py` (OK).

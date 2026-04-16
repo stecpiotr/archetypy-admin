@@ -2543,3 +2543,41 @@ Decyzja:
 - Domyślne rozmiary wizualizacji (radar/koła) na desktopie zostały lekko zmniejszone.
 Uzasadnienie:
 - Ogranicza przepełnienie i poprawia czytelność na rozdzielczościach klasy 1920×1200 oraz niższych.
+
+### D-281: W opisie działania unikamy konstrukcji zależnych od rodzaju przymiotnika przy TOP1/TOP2
+Decyzja:
+- Zamiast form typu `archetyp X, wzmacniany przez Y`, stosujemy konstrukcję neutralną rodzajowo:
+  - `Profil główny buduje X, a wyraźnie wzmacnia go/ją Y`.
+Uzasadnienie:
+- Eliminuje to błędy typu `Kochanka ... wzmacniany` oraz zapewnia spójność językową dla wariantów męskich i żeńskich.
+
+### D-286: `brak danych` zawsze renderujemy z ikoną `❔`
+Decyzja:
+- Kategoria `brak danych` ma wymuszoną ikonę `❔` w demografii (Matching + raport wielocechowy), nawet gdy mapa ikon zawiera pustą wartość.
+Uzasadnienie:
+- `brak danych` jest kategorią systemową i ma stały semantyczny znacznik; nie może zniknąć przez pusty wpis w konfiguracji.
+
+### D-287: W demografii personalnej „brak aktywnych filtrów” = brak warstwy podgrupy
+Decyzja:
+- Jeżeli użytkownik nie ustawił żadnego filtra, sekcje porównawcze podgrupy są ukrywane:
+  - radar pokazuje wyłącznie całą próbę,
+  - koła 0-100 pokazują wyłącznie całą próbę,
+  - box TOP dla podgrupy nie jest renderowany.
+Uzasadnienie:
+- Bez aktywnych filtrów podgrupa jest tożsama z całą próbą, więc render „podgrupy filtrowanej” jest mylący.
+
+### D-288: Tabela podsumowania archetypów priorytetyzuje czytelność kolumny `opis`
+Decyzja:
+- Sekcja tabeli nazywa się `Liczebność i natężenie archetypów`.
+- Kolumny `Główny/Wspierający/Poboczny` mają mniejszą szerokość, a `opis` większą.
+Uzasadnienie:
+- Ogranicza łamanie wierszy i poprawia czytelność etykiet z kolorowym kwadratem natężenia.
+
+### D-289: Full DOCX/PDF zawiera także teksty interpretacyjne pod 3 wizualizacjami
+Decyzja:
+- W eksporcie pełnym dodajemy stronę `Opisy interpretacyjne (widok panelu)` z trzema sekcjami:
+  - `Koło pragnień i wartości`,
+  - `Rozkład archetypów na osiach potrzeb`,
+  - `Profile działania archetypów ...`.
+Uzasadnienie:
+- Domyka spójność między panelem i plikiem końcowym, nawet jeśli użytkownik później ręcznie przestawia kolejność stron.

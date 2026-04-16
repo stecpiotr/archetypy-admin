@@ -7120,6 +7120,11 @@ def _matching_demo_build_rows(
             )
         if top_cat is not None:
             value_emoji = spec.get("value_emoji") if isinstance(spec.get("value_emoji"), dict) else {}
+            raw_top_icon = str(value_emoji.get(str(top_cat), "") or "").strip()
+            if str(top_cat).strip().lower() == "brak danych":
+                top_icon = "❔"
+            else:
+                top_icon = raw_top_icon or "•"
             demo_cards.append(
                 {
                     "field": str(spec.get("field") or "").strip().upper(),
@@ -7128,7 +7133,7 @@ def _matching_demo_build_rows(
                     "top": _matching_demo_label_for_code(spec, str(top_cat)),
                     "pct": round(max(top_pct, 0.0), 1),
                     "diff_pp": round(top_pct - top_all_pct, 1),
-                    "emoji": str(value_emoji.get(str(top_cat), "❔" if str(top_cat) == "brak danych" else "•")),
+                    "emoji": str(top_icon),
                     "variable_emoji": str(spec.get("variable_emoji") or "📌"),
                 }
             )
@@ -8820,7 +8825,15 @@ def matching_view() -> None:
                     is_top = (top_pct > 1e-9) and (abs(pct_sub - top_pct) <= 1e-9)
                     bar_w = max(0.0, min(100.0, pct_sub))
                     var_icon = variable_emoji.get(var_name, "📌")
-                    cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")
+                    raw_cat_icon = (
+                        str(value_emoji_map.get(cat_code, "") or "").strip()
+                        if cat_code in value_emoji_map
+                        else ""
+                    )
+                    if str(cat_code).strip().lower() == "brak danych" or str(cat).strip().lower() == "brak danych":
+                        cat_icon = "❔"
+                    else:
+                        cat_icon = raw_cat_icon or "📌"
                     fill_color = "#8ecae6" if is_top else "#d8e5f1"
                     top_border = "border-top:3px solid #b8c2cc;"
                     diff_color = "#0f766e" if diff >= 0 else "#9a3412"
@@ -9817,7 +9830,15 @@ def matching_view() -> None:
                                         is_top = (top_pct > 1e-9) and (abs(pct_sub - top_pct) <= 1e-9)
                                         bar_w = max(0.0, min(100.0, pct_sub))
                                         var_icon = seg_variable_emoji.get(var_name, "📌")
-                                        cat_icon = value_emoji_map.get(cat_code, "❔" if cat == "brak danych" else "📌")
+                                        raw_cat_icon = (
+                                            str(value_emoji_map.get(cat_code, "") or "").strip()
+                                            if cat_code in value_emoji_map
+                                            else ""
+                                        )
+                                        if str(cat_code).strip().lower() == "brak danych" or str(cat).strip().lower() == "brak danych":
+                                            cat_icon = "❔"
+                                        else:
+                                            cat_icon = raw_cat_icon or "📌"
                                         fill_color = "#8ecae6" if is_top else "#d8e5f1"
                                         top_border = "border-top:3px solid #b8c2cc;"
                                         diff_color = "#0f766e" if diff >= 0 else "#9a3412"
