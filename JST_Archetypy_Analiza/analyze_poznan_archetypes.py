@@ -8012,7 +8012,6 @@ CHART_NOTES = {
     "D13_top1.png": "Długość słupka = udział wskazań jako najważniejszego; podział kolorów = sentyment wśród wskazujących ten archetyp.",
     "D13_top1_values.png": "Długość słupka = udział wskazań jako najważniejszego; podział kolorów = sentyment wśród wskazujących tę wartość.",
     "mentions_total.png": "Suma ważonych wskazań archetypów we wszystkich pytaniach wyboru.",
-    "SEGMENTY_ULTRA_PREMIUM_P_babelki.png": "TOP segmentów: kolumny = segmenty, wiersze = archetypy / wartości. Liczba w środku = surowy poziom Pm w segmencie, rozmiar bąbla = siła wyróżnienia względem pozostałych segmentów.",
     "SEGMENTY_META_MAPA_STALA.png": "Stała mapa ćwiartek segmentów: archetypy / wartości są osadzone w stałym układzie, a segmenty pokazujemy jako centroidy i obszary interpretacyjne.",
     "SEGMENTY_METRYCZKA_P_babelki.png": "Profile (deterministyczne): odchylenie P od średniej. Rozmiar bąbla = |odchylenie|.",
     "SEGMENTY_POSTAWY_P_babelki.png": "Postawy (P+E): odchylenie P od średniej. Rozmiar bąbla = |odchylenie|.",
@@ -11248,90 +11247,6 @@ def _seg_df_from_ranked_profiles(segs: List[Dict[str, Any]]) -> pd.DataFrame:
             })
 
     return pd.DataFrame(rows)
-
-
-def _bubble_for_segments(seg_df: pd.DataFrame, P_mean_overall: np.ndarray, brand_values: Dict[str, str],
-                         outdir: Path, fname_base: str, title: str) -> None:
-    """
-    Rysuje bąbelki segmentów.
-
-    Obsługiwane formaty wejścia:
-    1) long: kolumny [segment_id, archetyp, P_mean]
-    2) wide: index = Seg_1.. / 0..k-1, kolumny = ARCHETYPES,
-       wartości = surowe poziomy Pm / P_mean
-    """
-    overall_s = pd.Series({a: float(P_mean_overall[i]) for i, a in enumerate(ARCHETYPES)})
-    seg_means_p = pd.DataFrame(index=list(ARCHETYPES), dtype=float)
-
-    # --- FORMAT 1: long (stary)
-    if isinstance(seg_df, pd.DataFrame) and {"segment_id", "archetyp", "P_mean"}.issubset(set(seg_df.columns)):
-        seg_means_p = seg_df.pivot(index="archetyp", columns="segment_id", values="P_mean").copy()
-
-    # --- FORMAT 2: wide (nowy)
-    elif isinstance(seg_df, pd.DataFrame):
-        arch_cols = [a for a in ARCHETYPES if a in seg_df.columns]
-        if not arch_cols:
-            return
-
-        wide_vals = seg_df[arch_cols].apply(pd.to_numeric, errors="coerce")
-
-        for row_label, row in wide_vals.iterrows():
-            sid: Optional[int] = None
-
-            try:
-                if isinstance(row_label, str) and row_label.startswith("Seg_"):
-                    sid = int(str(row_label).split("_", 1)[1]) - 1
-                else:
-                    sid = int(row_label)
-            except Exception:
-                sid = None
-
-            if sid is None:
-                continue
-
-            for a in ARCHETYPES:
-                if a not in wide_vals.columns:
-                    continue
-                try:
-                    v = float(row.get(a, np.nan))
-                except Exception:
-                    continue
-                if not np.isfinite(v):
-                    continue
-
-                seg_means_p.loc[a, sid] = v
-    else:
-        return
-
-    seg_means_p = seg_means_p.reindex(index=list(ARCHETYPES))
-    seg_means_p = seg_means_p.reindex(sorted([int(c) for c in seg_means_p.columns if pd.notna(c)]), axis=1)
-
-    if seg_means_p.empty or len(seg_means_p.columns) == 0:
-        return
-
-    # Archetypy
-    plot_segment_bubble_matrix(
-        seg_means=seg_means_p,
-        overall_mean=overall_s,
-        outpath=outdir / f"{fname_base}.png",
-        title=title,
-        highlight=None,
-    )
-
-    # Wartości (ten sam wykres, tylko podmienione etykiety wierszy)
-    seg_means_v = seg_means_p.copy()
-    seg_means_v.index = [brand_values.get(a, a) for a in seg_means_v.index]
-
-    overall_v = overall_s.copy()
-    overall_v.index = [brand_values.get(a, a) for a in overall_v.index]
-
-    plot_segment_bubble_matrix(
-        seg_means=seg_means_v,
-        overall_mean=overall_v,
-        outpath=outdir / f"{fname_base}_values.png",
-        title=title,
-        highlight=None,
-    )
 
 
 # =========================
@@ -17717,23 +17632,9 @@ def main() -> None:
         seg_packs_render["ultra_premium"]["map_arche_by_k"] = dict(seg_map_arche_by_k)
         seg_packs_render["ultra_premium"]["map_values_by_k"] = dict(seg_map_values_by_k)
 
-    # Bąbelkowa macierz TOP segmentów (statyczny widok zgodny z domyślnym TOP5)
-    P_mean_overall = _wmean_cols(P, weights)
-
-    seg_df_bubble_top = seg_df.copy()
-    if "segment_id" in seg_df_bubble_top.columns:
-        seg_df_bubble_top = seg_df_bubble_top[
-            pd.to_numeric(seg_df_bubble_top["segment_id"], errors="coerce") < float(display_top_k)
-            ].copy()
-
-    _bubble_for_segments(
-        seg_df=seg_df_bubble_top,
-        P_mean_overall=P_mean_overall,
-        brand_values=brand_values,
-        outdir=outdir,
-        fname_base="SEGMENTY_ULTRA_PREMIUM_P_babelki",
-        title=f"TOP{int(display_top_k)} segmentów × archetypy / wartości"
-    )
+    # Bąbelkowa macierz TOP segmentów została wyłączona:
+    # pliki `SEGMENTY_ULTRA_PREMIUM_P_babelki.png` i
+    # `SEGMENTY_ULTRA_PREMIUM_P_babelki_values.png` nie są używane w raporcie.
 
     _export_segment_profiles_csv(seg_prof_ultra, outdir / "SEGMENTY_ULTRA_PREMIUM_profile.csv")
     _export_segment_matrix_csv(seg_df, outdir / "SEGMENTY_ULTRA_PREMIUM_P_matrix.csv", "P")

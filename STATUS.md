@@ -2767,3 +2767,52 @@
 - Generator przeszedł na bardziej raportowe wzorce tekstu (mniej słowa `profil`, czytelniejsze rozdzielenie funkcji 3 sekcji).
 - Poprawiono rodzaj i odmianę w opisie TOP archetypów (`wzmacniana/wzmacniany` + formy biernika nazw).
 - Dla zgłaszanych przypadków (Kochanka+Buntowniczka oraz Bohater+Władca+Odkrywca) dodano dedykowane szablony jakościowe zgodne ze wzorcami użytkownika.
+
+### Zrobione w Hotfix H-129 (2026-04-16, usunięcie zbędnie generowanych plików)
+- `archetypy-admin/admin_dashboard.py`:
+  - eksport Word/PDF nie zapisuje już pliku pośredniego `color_ring.svg`;
+  - generujemy od razu `color_ring.png` z `bytestring` SVG.
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - wyłączono generowanie:
+    - `SEGMENTY_ULTRA_PREMIUM_P_babelki.png`,
+    - `SEGMENTY_ULTRA_PREMIUM_P_babelki_values.png`,
+  - usunięto powiązaną martwą notkę w `CHART_NOTES`.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Zrobione w Hotfix H-130 (2026-04-16, poprawki UI wg screenów 3176/3177/3179/3180/3181/3182/3183)
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - usunięto martwą funkcję `_bubble_for_segments(...)`.
+- `archetypy-admin/admin_dashboard.py`:
+  - radar:
+    - zwiększono czytelność etykiet (`radar_tick_size=16`),
+    - powiększono render desktop (`radar_plot_size=760`),
+    - zawężono domenę wykresu (`0.14..0.86`) zamiast redukować fonty etykiet,
+  - proporcje sekcji:
+    - prawa kolumna została poszerzona (`left_col/col3 = 0.65/0.35`),
+    - w lewej sekcji większy udział kolumny radaru (`col1/col2 = 0.31/0.69`),
+  - `Koło pragnień i wartości`:
+    - skrócono podświetlenia (z `r_outer=0.90` do `0.74`),
+    - podpis `Podświetlenie: ...` ma `font-size:0.88em`,
+  - tabela `Liczebność i natężenie archetypów`:
+    - zwiększono szerokość kolumny `opis`,
+    - wymuszono jedną linię dla komórki `opis` (`white-space: nowrap`),
+    - dla 1920x1200 zmniejszono font/padding tabeli,
+  - opisy interpretacyjne pod wykresami mają `font-size:0.93em`.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Zrobione w Hotfix H-127 (2026-04-16, kolejna iteracja jakości opisów)
+- Generator opisów został rozszerzony o nowe, precyzyjne wzorce treści odpowiadające kolejnym screenom UAT.
+- Wdrożono obsługę dodatkowych układów TOP archetypów:
+  - Towarzysz + Błazen,
+  - Niewinny + Mędrzec + Twórca,
+  - Odkrywca + Opiekun,
+  - Opiekunka + Niewinna + Odkrywczyni.
+- Utrzymano personalizację treści dopełniaczem osoby oraz deterministyczny charakter generatora.
+
+### Zrobione w Hotfix H-128 (2026-04-16, pełny generator regułowy)
+- Generator opisów został przełączony na jeden model regułowy dla wszystkich kombinacji TOP1/TOP2(/TOP3).
+- Usunięto twarde case'y przypisane do konkretnych zestawień archetypów.
+- Wzorce użytkownika zostały zachowane jako styl i ton językowy szablonów ogólnych.
+- Zachowano personalizację `personGenitive`, próg TOP3 >= 70 i poprawność rodzaju gramatycznego.

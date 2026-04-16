@@ -3488,3 +3488,79 @@ Wynik:
   - generator dostaje `personGenitive` z bieżącego kontekstu raportu.
 - `test_archetype_interpretation.py`:
   - testy pod nową składnię, personalizację i brak błędnych form.
+
+### Hotfix H-129 [DONE]
+Temat: Usunięcie zbędnych artefaktów plikowych (`color_ring.svg`, `SEGMENTY_ULTRA_PREMIUM_P_babelki*.png`).
+Kryteria ukonczenia:
+1. Eksport raportu nie tworzy pośredniego pliku `color_ring.svg`.
+2. Pipeline JST nie generuje już `SEGMENTY_ULTRA_PREMIUM_P_babelki.png` ani `SEGMENTY_ULTRA_PREMIUM_P_babelki_values.png`.
+3. Smoke-check składni przechodzi dla zmienionych modułów.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - konwersja pierścienia koloru działa bez pliku pośredniego SVG (`bytestring -> color_ring.png`).
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - wyłączono generowanie bąbelkowej macierzy TOP segmentów (`SEGMENTY_ULTRA_PREMIUM_P_babelki*.png`),
+  - usunięto martwy wpis notki wykresu dla `SEGMENTY_ULTRA_PREMIUM_P_babelki.png`.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-130 [DONE]
+Temat: Korekta layoutu sekcji „Informacje na temat archetypów ...” + finalny tuning radaru/tabeli/koła.
+Kryteria ukonczenia:
+1. Usunięta martwa funkcja `_bubble_for_segments(...)`.
+2. Radar ma większe etykiety archetypów i responsywną skalę bez degradacji czytelności.
+3. Podświetlenia w `Kole pragnień i wartości` skrócone względem H-128.
+4. Podpis `Podświetlenie: ...` ma `font-size: 0.88em`.
+5. W tabeli `Liczebność i natężenie archetypów` komórka `opis` mieści etykietę z kwadracikiem w jednej linii.
+6. Prawa kolumna (`Koło ... / Rozkład ... / Profile działania ...`) jest szersza; lewa sekcja heurystyki krótsza.
+7. Opisy pod wykresami mają `font-size: 0.93em`.
+Wynik:
+- `archetypy-admin/JST_Archetypy_Analiza/analyze_poznan_archetypes.py`:
+  - usunięto nieużywaną funkcję `_bubble_for_segments(...)`.
+- `archetypy-admin/admin_dashboard.py`:
+  - radar:
+    - większa czcionka etykiet (`radar_tick_size=16`),
+    - większy desktopowy render (`radar_plot_size=760`),
+    - domena radaru zawężona (`0.14..0.86`) zamiast zmniejszania fontów,
+  - layout kolumn:
+    - `left_col/col3 = 0.65/0.35`,
+    - `col1/col2 = 0.31/0.69`,
+  - `Koło pragnień i wartości`:
+    - skrócono klin podświetlenia (`r_outer=0.74`),
+    - podpis pod kołem `font-size:0.88em`,
+  - tabela podsumowania:
+    - nowe szerokości kolumn (szersza kolumna `opis`),
+    - `opis` wymuszony bez zawijania (`white-space: nowrap`),
+    - dla 1920x1200 lżejszy font/padding tabeli,
+  - opisy interpretacyjne: `font-size:0.93em`.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py JST_Archetypy_Analiza/analyze_poznan_archetypes.py` (OK).
+
+### Hotfix H-127 [DONE]
+Temat: Rozszerzenie generatora opisów o kolejne wzorce jakościowe (Towarzysz+Błazen, Niewinny+Mędrzec+Twórca, Odkrywca+Opiekun, Opiekunka+Niewinna+Odkrywczyni).
+Kryteria ukonczenia:
+1. Dla nowych układów generator zwraca opisy zgodne ze stylem raportowym dostarczonym przez użytkownika.
+2. Zachowana personalizacja `{imię i nazwisko w dopełniaczu}`.
+3. Zachowana deterministyczność i brak zmian logiki scoringu.
+4. Testy jednostkowe obejmują nowe przypadki.
+Wynik:
+- `archetype_interpretation.py`:
+  - dodano dedykowane reguły tekstowe dla 4 nowych układów archetypów,
+  - utrzymano fallback ogólny dla pozostałych kombinacji,
+  - zachowano poprawność odmiany i rodzaju.
+- `test_archetype_interpretation.py`:
+  - dodano testy dla nowych scenariuszy i ochrony progu TOP3 < 70.
+
+### Hotfix H-128 [DONE]
+Temat: Przebudowa generatora na pełny model regułowy (bez twardych case'ów pod konkretne zestawienia).
+Kryteria ukonczenia:
+1. Generator działa na jednolitych regułach dla wszystkich kombinacji TOP archetypów.
+2. Przykłady użytkownika są użyte jako styl i jakość języka, nie jako hardcoded mapowanie konkretnych par.
+3. Zachowana personalizacja dopełniacza, próg TOP3 i poprawność fleksji.
+4. Testy jednostkowe weryfikują reguły, nie pojedyncze zahardkodowane scenariusze.
+Wynik:
+- `archetype_interpretation.py`:
+  - usunięto dedykowane bloki warunkowe pod konkretne zestawienia,
+  - opisy wartości/potrzeb/działania są generowane na wspólnym silniku regułowym.
+- `test_archetype_interpretation.py`:
+  - testy sprawdzają logikę generatora (otwarcia sekcji, osie, TOP3, fleksja).

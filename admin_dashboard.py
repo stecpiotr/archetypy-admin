@@ -2795,7 +2795,7 @@ def mask_for(idx, color, gender_code: str = "M"):
     w, h = base.size
     cx, cy = w//2, h//2
     # Klin wychodzi ze środka i jest długi (jak referencyjny panel eksportowy).
-    r_outer = int(min(w, h) * 0.90)
+    r_outer = int(min(w, h) * 0.74)
     mask = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(mask, "RGBA")
     start = -90 + idx*30
@@ -7480,10 +7480,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    radar_plot_size = 380 if is_mobile else 620
-    radar_tick_size = 10 if is_mobile else 12
+    radar_plot_size = 420 if is_mobile else 760
+    radar_tick_size = 10 if is_mobile else 16
     radar_hover_size = 12 if is_mobile else 14
-    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=42, r=42, t=26, b=34)
+    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=24, r=24, t=22, b=30)
+    radar_domain = dict(x=[0.10, 0.90], y=[0.10, 0.90]) if is_mobile else dict(x=[0.14, 0.86], y=[0.14, 0.86])
     wheel_img_width = 360 if is_mobile else 620
     axes_img_width = 360 if is_mobile else 620
     segment_profile_width = 360 if is_mobile else 640
@@ -7891,9 +7892,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             if supp_data:
                 supp_disp["name"] = disp_name(supp_avg or "")
 
-            left_col, col3 = st.columns([0.70, 0.30], gap="small")
+            left_col, col3 = st.columns([0.65, 0.35], gap="small")
             with left_col:
-                col1, col2 = st.columns([0.34, 0.66], gap="small")
+                col1, col2 = st.columns([0.31, 0.69], gap="small")
             means_pct = mean_pct_by_archetype_from_df(data)
 
             def _make_desc_result(arche_name: str | None) -> dict[str, object] | None:
@@ -7945,7 +7946,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 st.markdown(
                     (
                         "<div style='margin-top:10px;margin-bottom:16px;"
-                        "font-size:0.97em;line-height:1.58;color:#334155;'>"
+                        "font-size:0.93em;line-height:1.58;color:#334155;'>"
                         f"{html.escape(text)}"
                         "</div>"
                     ),
@@ -8045,12 +8046,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 # 5) HTML + CSS tabeli
                 # --- ŁATWE DO ZMIANY SZEROKOŚCI (procenty) ---
-                COL_W = {"c1": "23%",
-                         "c2": "8%",
-                         "c3": "8%",
-                         "c4": "8%",
+                COL_W = {"c1": "22%",
+                         "c2": "7%",
+                         "c3": "7%",
+                         "c4": "7%",
                          "c5": "6%",
-                         "c6": "47%"}
+                         "c6": "51%"}
 
                 # Budujemy body tabeli bez nagłówka (header=False), a nagłówek zrobimy ręcznie (rowspan/colspan).
                 _body = (
@@ -8134,7 +8135,20 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                   /* Kwadracik przy opisie natężenia */
                   .ap-int-ico {{
                     display:inline-block; width:12px; height:12px; border-radius:3px;
-                    border:1px solid #d1d5db; margin-right:6px; vertical-align:-2px;
+                    border:1px solid #d1d5db; margin-right:5px; vertical-align:-2px;
+                  }}
+
+                  .ap-table tbody td:nth-child(6) {{
+                    white-space: nowrap !important;
+                  }}
+
+                  @media (max-width:1920px), (max-height:1200px) {{
+                    .ap-table {{
+                      font-size: 13px !important;
+                    }}
+                    .ap-table th, .ap-table td {{
+                      padding: 11px 7px !important;
+                    }}
                   }}
                 </style>
                 """, unsafe_allow_html=True)
@@ -8197,7 +8211,20 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                   .ap-int-ico {{
                     display:inline-block; width:12px; height:12px; border-radius:3px;
-                    border:1px solid #d1d5db; margin-right:6px; vertical-align:-2px;
+                    border:1px solid #d1d5db; margin-right:5px; vertical-align:-2px;
+                  }}
+
+                  .ap-table tbody td:nth-child(6) {{
+                    white-space: nowrap !important;
+                  }}
+
+                  @media (max-width:1920px), (max-height:1200px) {{
+                    .ap-table {{
+                      font-size: 13px !important;
+                    }}
+                    .ap-table th, .ap-table td {{
+                      padding: 11px 7px !important;
+                    }}
                   }}
 
                   /* 👉 KONFIGURACJA — tu zmieniasz marginesy/paddingi */
@@ -8415,7 +8442,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     polar=dict(
-                        domain=dict(x=[0.08, 0.92], y=[0.08, 0.92]),
+                        domain=radar_domain,
                         bgcolor="rgba(0,0,0,0)",
                         radialaxis=dict(visible=True, range=[0, 20]),
                         angularaxis=dict(
@@ -8598,7 +8625,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             use_column_width=True,
                         )
                         st.markdown(
-                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.93em;color:#64748b;text-align:center;'>"
+                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
                             "</div>",
                             unsafe_allow_html=True,
@@ -8633,7 +8660,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             kola_img = load_base_arche_img(gender_code=report_gender_code)
                         st.image(kola_img, use_column_width=True)
                         st.markdown(
-                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.93em;color:#64748b;text-align:center;'>"
+                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
                             "</div>",
                             unsafe_allow_html=True,
@@ -8797,9 +8824,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 big_color = max(color_pcts.items(), key=lambda kv: kv[1])[0]
                 big_svg = _ring_svg(color_pcts[big_color], COLOR_HEX[big_color], size=600,
                                     stroke=48)
-                with open("color_ring.svg", "w", encoding="utf-8") as f:
-                    f.write(big_svg)
-                cairosvg.svg2png(url="color_ring.svg", write_to="color_ring.png")
+                # Nie zapisujemy pliku pośredniego SVG na dysku.
+                cairosvg.svg2png(bytestring=big_svg.encode("utf-8"), write_to="color_ring.png")
 
                 # 4) Pastylki kolorów (PNG)
                 progress_png_path = make_color_progress_png_for_word(

@@ -2611,3 +2611,35 @@ Decyzja:
   generator używa precyzyjnych szablonów opisowych zgodnych ze wzorcem raportowym.
 Uzasadnienie:
 - Te kombinacje są częste i wrażliwe językowo; dedykowane szablony podnoszą trafność opisu bez naruszania logiki obliczeń.
+
+### D-292: Nie tworzymy artefaktów plikowych, jeśli nie są konsumowane przez raport
+Decyzja:
+- W eksporcie personalnym konwersję pierścienia koloru robimy bez pliku pośredniego `color_ring.svg` (bezpośrednio `bytestring -> color_ring.png`).
+- W pipeline JST wyłączamy generowanie `SEGMENTY_ULTRA_PREMIUM_P_babelki.png` i `SEGMENTY_ULTRA_PREMIUM_P_babelki_values.png`, bo nie są używane w raportach.
+Uzasadnienie:
+- Ogranicza to „śmieci” w katalogu wynikowym, skraca pipeline i zmniejsza ryzyko mylących, martwych artefaktów.
+
+### D-293: Responsywność sekcji archetypów opieramy na geometrii radaru i proporcjach kolumn, nie na redukcji fontów etykiet
+Decyzja:
+- W radarze utrzymujemy większe etykiety archetypów (czytelność), a dopasowanie do 1920x1200 uzyskujemy przez:
+  - zmianę domeny radaru,
+  - większą wysokość renderu,
+  - korektę proporcji kolumn sekcji.
+- Dla koła wartości stosujemy umiarkowany promień podświetlenia (`r_outer=0.74`) jako kompromis między „za krótkie” i „za długie”.
+- W tabeli podsumowania wymuszamy jedną linię w kolumnie `opis` oraz dostrajamy szerokości kolumn i padding dla 1920x1200.
+Uzasadnienie:
+- To stabilizuje UX między 1920x1200 i wyższymi rozdzielczościami bez degradacji czytelności nazw archetypów.
+
+### D-284: Generator opisów ma warstwę dedykowanych wzorców dla najczęstszych układów TOP archetypów
+Decyzja:
+- Dla wybranych kombinacji TOP1/TOP2(/TOP3) używamy jawnych wzorców tekstowych dopasowanych do raportowego stylu produktu.
+- Dla pozostałych kombinacji działa fallback oparty o reguły ogólne.
+Uzasadnienie:
+- Podnosi to trafność i naturalność opisu w przypadkach najczęściej ocenianych przez użytkownika, bez ingerencji w logikę obliczeniową.
+
+### D-285: Generator opisów działa jako uniwersalny silnik regułowy, a nie zestaw hardcoded scenariuszy
+Decyzja:
+- Treści 3 sekcji są budowane na wspólnych regułach (dominacja, osie potrzeb, blend wymiarów, próg TOP3), niezależnie od konkretnego układu archetypów.
+- Przykłady UAT służą jako referencja stylu raportowego oraz testy jakości, bez wprowadzania osobnych bloków if dla konkretnych par TOP.
+Uzasadnienie:
+- Zapewnia to skalowalność, spójność i przewidywalność opisów dla nowych, nieprzewidzianych zestawień wyników.

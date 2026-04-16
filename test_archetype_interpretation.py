@@ -9,8 +9,8 @@ def _input(
     primary: dict[str, object],
     supporting: dict[str, object],
     tertiary: dict[str, object] | None,
-    person_genitive: str = "Kornelii Lemańskiej",
-):
+    person_genitive: str = "Jana Testowego",
+) -> dict[str, object]:
     all_archetypes = [primary, supporting]
     if tertiary is not None:
         all_archetypes.append(tertiary)
@@ -23,59 +23,44 @@ def _input(
     }
 
 
-def test_values_description_is_natural_for_kochanka_buntowniczka():
-    descriptions = generate_archetype_descriptions(
-        _input(
-            primary=_result("Kochanka", 88.0),
-            supporting=_result("Buntowniczka", 72.0),
-            tertiary=None,
-        )
+def test_values_section_has_report_opening_and_personalization():
+    out = generate_archetype_descriptions(
+        _input(_result("Towarzysz", 83.0), _result("Błazen", 78.0), None, "Janusza Testowego")
     )
-
-    values = descriptions["valuesWheelDescription"]
-    assert values.startswith("Rdzeń motywacyjny")
-    assert "na relacjach" in values
-    assert "wzmacnianych przez odnowę" in values
-    assert "na intymność" not in values
+    txt = out["valuesWheelDescription"]
+    assert txt.startswith("Rdzeń motywacyjny Janusza Testowego")
+    assert "potrzebie" in txt
 
 
-def test_action_description_has_correct_feminine_form():
-    descriptions = generate_archetype_descriptions(
-        _input(
-            primary=_result("Kochanka", 88.0),
-            supporting=_result("Buntowniczka", 72.0),
-            tertiary=None,
-        )
+def test_needs_section_has_direction_logic_and_named_archetypes():
+    out = generate_archetype_descriptions(
+        _input(_result("Odkrywca", 86.0), _result("Opiekun", 79.0), None, "Mściwoja Złego")
     )
+    txt = out["needsWheelDescription"]
+    assert "Układ potrzeb Mściwoja Złego" in txt
+    assert "Ten kierunek budują przede wszystkim archetypy Odkrywca i Opiekun." in txt
 
-    action = descriptions["actionProfileDescription"]
-    assert "Kochanka" in action
-    assert "wzmacniana przez Buntowniczkę" in action
 
-
-def test_no_tertiary_mention_when_score_is_below_threshold():
-    descriptions = generate_archetype_descriptions(
-        _input(
-            primary=_result("Bohater", 88.0),
-            supporting=_result("Władca", 82.0),
-            tertiary=_result("Odkrywca", 69.9),
-            person_genitive="Jana Kowalskiego",
-        )
+def test_action_section_keeps_feminine_grammar():
+    out = generate_archetype_descriptions(
+        _input(_result("Kochanka", 88.0), _result("Buntowniczka", 72.0), None, "Kornelii Lemańskiej")
     )
+    txt = out["actionProfileDescription"]
+    assert "Kochanka" in txt
+    assert "wzmacniana przez Buntowniczkę" in txt
 
-    assert "dodatkowy ton wnosi" not in descriptions["valuesWheelDescription"].lower()
-    assert "dodatkowy ton wnosi" not in descriptions["actionProfileDescription"].lower()
 
-
-def test_balanced_axis_phrase_is_used():
-    descriptions = generate_archetype_descriptions(
-        _input(
-            primary=_result("Opiekun", 80.0),
-            supporting=_result("Bohater", 80.0),
-            tertiary=None,
-            person_genitive="Anny Nowak",
-        )
+def test_tertiary_below_threshold_is_not_mentioned():
+    out = generate_archetype_descriptions(
+        _input(_result("Bohater", 88.0), _result("Władca", 82.0), _result("Odkrywca", 69.9), "Jana Kowalskiego")
     )
+    assert "Dodatkowy ton" not in out["valuesWheelDescription"]
+    assert "Dodatkowy ton" not in out["actionProfileDescription"]
 
-    needs = descriptions["needsWheelDescription"].lower()
-    assert "równowagi między niezależnością a przynależnością" in needs
+
+def test_tertiary_above_threshold_is_mentioned():
+    out = generate_archetype_descriptions(
+        _input(_result("Bohater", 88.0), _result("Władca", 82.0), _result("Odkrywca", 71.0), "Jana Kowalskiego")
+    )
+    assert "Dodatkowy ton wnosi" in out["valuesWheelDescription"]
+    assert "Dodatkowy ton wnosi" in out["actionProfileDescription"]

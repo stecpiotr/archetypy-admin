@@ -164,70 +164,6 @@ LABEL_TO_ID: dict[str, ArchetypeId] = {
 }
 
 
-VALUE_REPORT: dict[ArchetypeId, dict[str, str]] = {
-    "niewinny": {
-        "nom": "bezpieczeństwo",
-        "loc": "bezpieczeństwie",
-        "sense": "utrzymywać przewidywalność i poczucie stabilnego gruntu",
-    },
-    "medrzec": {
-        "nom": "diagnoza",
-        "loc": "diagnozie",
-        "sense": "opierać decyzje na faktach i trafnym rozpoznaniu sytuacji",
-    },
-    "odkrywca": {
-        "nom": "wolność",
-        "loc": "wolności",
-        "sense": "zachować autonomię i szukać własnej drogi",
-    },
-    "kochanek": {
-        "nom": "relacje",
-        "loc": "relacjach",
-        "sense": "budować bliskość, znaczenie i emocjonalne zaangażowanie",
-    },
-    "towarzysz": {
-        "nom": "wspólnota",
-        "loc": "wspólnocie",
-        "sense": "wzmacniać więź i poczucie bycia razem",
-    },
-    "blazen": {
-        "nom": "energia",
-        "loc": "energii",
-        "sense": "uruchamiać lekkość, uwagę i kontakt",
-    },
-    "bohater": {
-        "nom": "odwaga",
-        "loc": "odwadze",
-        "sense": "działać skutecznie, przejmować odpowiedzialność i dowozić efekt",
-    },
-    "buntownik": {
-        "nom": "odnowa",
-        "loc": "odnowie",
-        "sense": "przełamywać zastój i uruchamiać zmianę",
-    },
-    "czarodziej": {
-        "nom": "wpływ",
-        "loc": "wpływie",
-        "sense": "przekuwać wizję w realną zmianę",
-    },
-    "opiekun": {
-        "nom": "troska",
-        "loc": "trosce",
-        "sense": "chronić ludzi i wzmacniać bezpieczeństwo relacji",
-    },
-    "tworca": {
-        "nom": "innowacja",
-        "loc": "innowacji",
-        "sense": "szukać nowych rozwiązań i nadawać im konkretną formę",
-    },
-    "wladca": {
-        "nom": "porządek",
-        "loc": "porządku",
-        "sense": "utrzymywać sterowność i kontrolę nad biegiem spraw",
-    },
-}
-
-
 LABEL_ACCUSATIVE = {
     "Niewinny": "Niewinnego",
     "Niewinna": "Niewinną",
@@ -295,6 +231,70 @@ PAIR_INTERPRETATION: dict[str, str] = {
 }
 
 
+VALUE_REPORT: dict[ArchetypeId, dict[str, str]] = {
+    "niewinny": {
+        "nom": "bezpieczeństwo",
+        "main_need": "potrzebie bezpieczeństwa i przejrzystości",
+        "sense": "porządkować rzeczywistość i budować poczucie przewidywalności",
+    },
+    "medrzec": {
+        "nom": "wiedza",
+        "main_need": "potrzebie wiedzy i rozumienia",
+        "sense": "opierać decyzje na faktach i logicznym rozpoznaniu sytuacji",
+    },
+    "odkrywca": {
+        "nom": "wolność",
+        "main_need": "potrzebie wolności i autonomii",
+        "sense": "szukać własnej drogi i nie zamykać się w utartych ramach",
+    },
+    "kochanek": {
+        "nom": "relacje",
+        "main_need": "potrzebie bliskości, znaczenia i relacyjnej intensywności",
+        "sense": "budować emocjonalny kontakt i angażować ludzi",
+    },
+    "towarzysz": {
+        "nom": "przynależność",
+        "main_need": "potrzebie przynależności, współdziałania i bycia blisko ludzi",
+        "sense": "budować wspólnotę i atmosferę bycia razem",
+    },
+    "blazen": {
+        "nom": "lekkość",
+        "main_need": "potrzebie lekkości, swobody i przyciągania uwagi",
+        "sense": "obniżać temperaturę sporów i uruchamiać komunikacyjną energię",
+    },
+    "bohater": {
+        "nom": "odwaga",
+        "main_need": "potrzebie działania, skuteczności i dowożenia wyniku",
+        "sense": "przejmować odpowiedzialność i skutecznie domykać sprawy",
+    },
+    "buntownik": {
+        "nom": "odnowa",
+        "main_need": "potrzebie przełamania ograniczeń i uruchamiania zmiany",
+        "sense": "kwestionować zastój i otwierać nowe kierunki",
+    },
+    "czarodziej": {
+        "nom": "wpływ",
+        "main_need": "potrzebie wpływu i transformacji",
+        "sense": "przekuwać wizję w realną zmianę",
+    },
+    "opiekun": {
+        "nom": "troska",
+        "main_need": "potrzebie troski i ochrony",
+        "sense": "wzmacniać bezpieczeństwo ludzi i poczucie oparcia",
+    },
+    "tworca": {
+        "nom": "innowacja",
+        "main_need": "potrzebie innowacji i rozwoju",
+        "sense": "szukać lepszych rozwiązań i nadawać im konkretną formę",
+    },
+    "wladca": {
+        "nom": "porządek",
+        "main_need": "potrzebie porządku i sterowności",
+        "sense": "utrzymywać wpływ i kontrolę nad biegiem spraw",
+    },
+}
+
+
 @dataclass(frozen=True)
 class _ResolvedResult:
     id: ArchetypeId
@@ -323,7 +323,6 @@ def _resolve_archetype_id(result: ArchetypeResult) -> ArchetypeId:
     mapped = NORMALIZED_LABEL_TO_ID.get(normalized_label)
     if mapped:
         return mapped
-
     raise ValueError(f"Nieznana etykieta archetypu: {raw_label!r}")
 
 
@@ -348,9 +347,19 @@ def _has_tertiary(tertiary: _ResolvedResult | None) -> bool:
 
 def _subject_genitive(input_data: InputData) -> str:
     person = str(input_data.get("personGenitive") or "").strip()
-    if person:
-        return person
-    return "tej osoby"
+    return person if person else "tej osoby"
+
+
+def _is_female_label(label: str) -> bool:
+    return label in FEMALE_LABELS
+
+
+def _label_accusative(label: str) -> str:
+    return LABEL_ACCUSATIVE.get(label, label)
+
+
+def _support_participle(primary_label: str) -> str:
+    return "wzmacniana" if _is_female_label(primary_label) else "wzmacniany"
 
 
 def _axis_strength(value: float) -> str:
@@ -386,43 +395,15 @@ def _x_meaning(x: float) -> str:
         return "łączeniu samodzielności z pracą relacyjną"
     if x < 0:
         return "samodzielnym podejmowaniu decyzji i przejmowaniu odpowiedzialności"
-    return "relacji z ludźmi, emocjonalnym kontakcie i przyciąganiu uwagi"
+    return "budowaniu relacji, wspólnoty i poczucia bliskości"
 
 
 def _y_meaning(y: float) -> str:
     if _axis_strength(y) == "balanced":
         return "utrzymywaniu kierunku przy gotowości do korekt"
     if y < 0:
-        return "utrzymywaniu kierunku i porządkowaniu działań"
-    return "poruszaniu ludzi, przełamywaniu zastoju i nadawaniu energii nowy kierunek"
-
-
-def _is_pair(primary: _ResolvedResult, supporting: _ResolvedResult, id_a: ArchetypeId, id_b: ArchetypeId) -> bool:
-    return {primary.id, supporting.id} == {id_a, id_b}
-
-
-def _is_female_label(label: str) -> bool:
-    return label in FEMALE_LABELS
-
-
-def _label_accusative(label: str) -> str:
-    return LABEL_ACCUSATIVE.get(label, label)
-
-
-def _support_participle(primary_label: str) -> str:
-    return "wzmacniana" if _is_female_label(primary_label) else "wzmacniany"
-
-
-def _dimension_level(value: float) -> str:
-    if value >= 80:
-        return "bardzo wysokiej"
-    if value >= 65:
-        return "wysokiej"
-    if value >= 50:
-        return "umiarkowanej"
-    if value >= 35:
-        return "niższej"
-    return "wyraźnie słabszej"
+        return "porządkowaniu działań i utrzymywaniu przewidywalności"
+    return "uruchamianiu ruchu, przełamywaniu zastoju i nadawaniu zmianie tempa"
 
 
 def _pair_interpretation(dim_a: str, dim_b: str) -> str:
@@ -437,55 +418,60 @@ def _pair_interpretation(dim_a: str, dim_b: str) -> str:
     )
 
 
+def _dimension_level(value: float) -> str:
+    if value >= 85:
+        return "bardzo wysokiej"
+    if value >= 70:
+        return "wysokiej"
+    if value >= 50:
+        return "umiarkowanej"
+    if value >= 35:
+        return "niższej"
+    return "wyraźnie słabszej"
+
+
+def _match_exact(
+    primary: _ResolvedResult,
+    supporting: _ResolvedResult,
+    tertiary: _ResolvedResult | None,
+    case: tuple[ArchetypeId, ArchetypeId, ArchetypeId | None],
+) -> bool:
+    cp, cs, ct = case
+    if primary.id != cp or supporting.id != cs:
+        return False
+    if ct is None:
+        return tertiary is None
+    return bool(tertiary and tertiary.id == ct)
+
+
 def _generate_values_description(
     input_data: InputData,
     primary: _ResolvedResult,
     supporting: _ResolvedResult,
     tertiary: _ResolvedResult | None,
-    has_tertiary: bool,
     dominance_type: str,
 ) -> str:
-    subject_gen = _subject_genitive(input_data)
-
-    if _is_pair(primary, supporting, "kochanek", "buntownik"):
-        return (
-            f"Rdzeń motywacyjny {subject_gen} opiera się przede wszystkim na relacjach, wyraźnie wzmacnianych przez odnowę. "
-            "Oznacza to styl przywództwa, który chce budować bliskość, znaczenie i emocjonalne zaangażowanie, ale nie po to, "
-            "by tylko podtrzymywać zgodę — raczej po to, by poruszać ludzi i uruchamiać zmianę. "
-            "To układ łączący więź z wyrazistością."
-        )
-
-    if _is_pair(primary, supporting, "bohater", "wladca") and has_tertiary and tertiary and tertiary.id == "odkrywca":
-        return (
-            f"Rdzeń motywacyjny {subject_gen} tworzy niemal równorzędny duet: odwaga i porządek. "
-            "Oznacza to przywództwo napędzane potrzebą działania, skuteczności i utrzymywania steru nad biegiem spraw. "
-            "Dodatkowy ton wnosi wolność, która poszerza ten układ o potrzebę autonomii, samodzielności i gotowości do szukania własnej drogi."
-        )
-
-    val_primary = VALUE_REPORT[primary.id]
-    val_supporting = VALUE_REPORT[supporting.id]
-
+    subject = _subject_genitive(input_data)
+    val1 = VALUE_REPORT[primary.id]
+    val2 = VALUE_REPORT[supporting.id]
     if dominance_type == "co_dominant":
         text = (
-            f"Rdzeń motywacyjny {subject_gen} tworzy niemal równorzędny duet: {val_primary['nom']} i {val_supporting['nom']}. "
-            f"Oznacza to sposób działania, który chce {val_primary['sense']}, a jednocześnie {val_supporting['sense']}."
+            f"Rdzeń motywacyjny {subject} tworzy niemal równorzędny duet: {val1['nom']} i {val2['nom']}. "
+            f"Oznacza to sposób przywództwa oparty na potrzebie, by {val1['sense']}, a jednocześnie {val2['sense']}."
         )
     elif dominance_type == "dominant_with_strong_support":
         text = (
-            f"Rdzeń motywacyjny {subject_gen} opiera się przede wszystkim na {val_primary['loc']}. "
-            f"Wyraźnie wzmacnia go {val_supporting['nom']}. "
-            f"W praktyce oznacza to styl przywództwa, który chce {val_primary['sense']}, a jednocześnie {val_supporting['sense']}."
+            f"Rdzeń motywacyjny {subject} opiera się przede wszystkim na {val1['main_need']}, wyraźnie wzmacnianej przez {val2['main_need']}. "
+            f"W praktyce oznacza to styl działania, który chce {val1['sense']}, ale równie mocno potrzebuje, by {val2['sense']}."
         )
     else:
         text = (
-            f"Rdzeń motywacyjny {subject_gen} opiera się głównie na {val_primary['loc']}. "
-            f"Archetyp wspierający wnosi {val_supporting['nom']}, ale kierunek nadal wyznacza {val_primary['nom']}."
+            f"Rdzeń motywacyjny {subject} opiera się głównie na {val1['main_need']}. Archetyp wspierający wnosi {val2['nom']}, "
+            f"ale kierunek nadal wyznacza {val1['nom']}."
         )
-
-    if has_tertiary and tertiary is not None:
-        val_tertiary = VALUE_REPORT[tertiary.id]
-        text += f" Dodatkowy ton wnosi {val_tertiary['nom']}. To poszerza układ o gotowość, by {val_tertiary['sense']}."
-
+    if tertiary is not None:
+        val3 = VALUE_REPORT[tertiary.id]
+        text += f" Dodatkowy ton wnosi {val3['nom']}, co poszerza ten układ o gotowość, by {val3['sense']}."
     return text
 
 
@@ -494,116 +480,58 @@ def _generate_needs_description(
     primary: _ResolvedResult,
     supporting: _ResolvedResult,
     tertiary: _ResolvedResult | None,
-    has_tertiary: bool,
 ) -> str:
-    subject_gen = _subject_genitive(input_data)
-
-    if _is_pair(primary, supporting, "kochanek", "buntownik"):
-        return (
-            f"Układ potrzeb {subject_gen} ciąży ku przynależności, ale równocześnie wyraźnie otwiera się na zmianę. "
-            "W praktyce oznacza to styl działania oparty na relacji z ludźmi, emocjonalnym kontakcie i przyciąganiu uwagi, "
-            "ale nie po to, by tylko stabilizować sytuację — raczej po to, by poruszać, przełamywać zastój i nadawać energii nowy kierunek."
-        )
-
-    if _is_pair(primary, supporting, "bohater", "wladca") and has_tertiary and tertiary and tertiary.id == "odkrywca":
-        return (
-            f"Układ potrzeb {subject_gen} wyraźnie ciąży ku niezależności, przy bardziej uporządkowanym niż rewolucyjnym stylu działania. "
-            "W praktyce oznacza to sposób funkcjonowania oparty na samodzielnym podejmowaniu decyzji, przejmowaniu odpowiedzialności i utrzymywaniu kierunku, "
-            "ale z widoczną gotowością do wyjścia poza rutynę, gdy wymaga tego sytuacja."
-        )
-
-    active = [primary, supporting] + ([tertiary] if has_tertiary and tertiary is not None else [])
+    subject = _subject_genitive(input_data)
+    active = [primary, supporting] + ([tertiary] if tertiary else [])
     total = sum(item.score for item in active) or 1.0
-
     x = sum(item.score * ARCHETYPE_META[item.id]["needsX"] for item in active) / total
     y = sum(item.score * ARCHETYPE_META[item.id]["needsY"] for item in active) / total
-    y_strength = _axis_strength(y)
-
-    first_sentence = f"Układ potrzeb {subject_gen} {_direction_x_text(x)}"
-    if y_strength == "balanced":
-        first_sentence += ", przy bardziej uporządkowanym niż rewolucyjnym stylu działania."
+    ys = _axis_strength(y)
+    first = f"Układ potrzeb {subject} {_direction_x_text(x)}"
+    if ys == "balanced":
+        first += ", przy bardziej uporządkowanym niż rewolucyjnym stylu działania."
     elif y < 0:
-        y_part = {
-            "soft": "z lekkim przechyłem ku stabilności",
-            "clear": "z wyraźnym przechyłem ku stabilności",
-            "strong": "zdecydowanie po stronie stabilności",
-        }[y_strength]
-        first_sentence += f", {y_part}."
+        first += {"soft": ", z lekkim przechyłem ku stabilności.", "clear": ", z wyraźnym przechyłem ku stabilności.", "strong": ", zdecydowanie po stronie stabilności."}[ys]
     else:
-        y_part = {
-            "soft": "ale równocześnie lekko otwiera się na zmianę",
-            "clear": "ale równocześnie wyraźnie otwiera się na zmianę",
-            "strong": "i równocześnie mocno otwiera się na zmianę",
-        }[y_strength]
-        first_sentence += f", {y_part}."
-
-    text = (
-        f"{first_sentence} "
-        f"W praktyce oznacza to sposób działania oparty bardziej na {_x_meaning(x)} oraz {_y_meaning(y)} niż na przeciwnej logice."
-    )
-    return text
+        first += {"soft": ", ale równocześnie lekko otwiera się na zmianę.", "clear": ", ale równocześnie wyraźnie otwiera się na zmianę.", "strong": ", i równocześnie mocno otwiera się na zmianę."}[ys]
+    direction = f"{first} W praktyce oznacza to styl działania oparty bardziej na {_x_meaning(x)} i {_y_meaning(y)} niż na przeciwnej logice."
+    if tertiary is not None:
+        return f"{direction} Ten kierunek budują przede wszystkim archetypy {primary.label} i {supporting.label}, a dodatkowy akcent wnosi {tertiary.label}."
+    return f"{direction} Ten kierunek budują przede wszystkim archetypy {primary.label} i {supporting.label}."
 
 
-def _generate_action_profile_description(
+def _generate_action_description(
     input_data: InputData,
     primary: _ResolvedResult,
     supporting: _ResolvedResult,
     tertiary: _ResolvedResult | None,
-    has_tertiary: bool,
     dominance_type: str,
 ) -> str:
-    subject_gen = _subject_genitive(input_data)
-
-    if _is_pair(primary, supporting, "kochanek", "buntownik"):
-        return (
-            f"U {subject_gen} rdzeń działania buduje {primary.label}, wyraźnie {_support_participle(primary.label)} przez {_label_accusative(supporting.label)}. "
-            "W praktyce daje to układ oparty na bardzo wysokiej empatii i kreatywności, przy jednocześnie silnym komponencie niezależności oraz umiarkowanej sprawczości. "
-            "Taki zestaw sprzyja budowaniu silnej więzi z ludźmi i wyrazistej komunikacji, ale wymaga pilnowania, by emocja i impuls zmiany nie osłabiły porządku działania."
-        )
-
-    if _is_pair(primary, supporting, "bohater", "wladca") and has_tertiary and tertiary and tertiary.id == "odkrywca":
-        return (
-            f"U {subject_gen} rdzeń działania tworzą {primary.label} i {supporting.label}, a dodatkowy ton wnosi {tertiary.label}. "
-            "W praktyce daje to bardzo wysoką sprawczość, wysoką niezależność i solidne zaplecze racjonalności, przy wyraźnie słabszym nacisku na empatię i kreatywność. "
-            "To układ sprzyjający wizerunkowi osoby zdecydowanej, odpowiedzialnej i skutecznej, która najlepiej wypada tam, gdzie trzeba przejąć ster i dowieźć efekt."
-        )
+    subject = _subject_genitive(input_data)
 
     if dominance_type == "co_dominant":
-        opening = f"U {subject_gen} rdzeń działania tworzą {primary.label} i {supporting.label}."
+        opening = f"Rdzeń działania {subject} tworzą {primary.label} i {supporting.label}."
     elif dominance_type == "dominant_with_strong_support":
-        opening = (
-            f"U {subject_gen} rdzeń działania buduje {primary.label}, "
-            f"wyraźnie {_support_participle(primary.label)} przez {_label_accusative(supporting.label)}."
-        )
+        opening = f"Rdzeń działania {subject} buduje {primary.label}, wyraźnie {_support_participle(primary.label)} przez {_label_accusative(supporting.label)}."
     else:
-        opening = f"U {subject_gen} rdzeń działania buduje {primary.label}, a {supporting.label} stanowi wyraźne wsparcie."
+        opening = f"Rdzeń działania {subject} buduje {primary.label}, a {supporting.label} stanowi wyraźne wsparcie."
 
-    active = [primary, supporting] + ([tertiary] if has_tertiary and tertiary is not None else [])
+    active = [primary, supporting] + ([tertiary] if tertiary else [])
     total = sum(item.score for item in active) or 1.0
     dims = ("empatia", "sprawczosc", "racjonalnosc", "niezaleznosc", "kreatywnosc")
-    blended = {
-        dim: sum(item.score * ARCHETYPE_META[item.id]["dimensions"][dim] for item in active) / total
-        for dim in dims
-    }
-    sorted_dims = sorted(blended.items(), key=lambda item: item[1], reverse=True)
-    top_dim_1 = sorted_dims[0][0]
-    top_dim_2 = sorted_dims[1][0]
-    third_dim = sorted_dims[2][0]
-    low_dim = sorted_dims[-1][0]
-
-    middle = (
-        "W praktyce daje to układ oparty na "
-        f"{_dimension_level(blended[top_dim_1])} {DIM_LABELS_LOC[top_dim_1]} i "
-        f"{_dimension_level(blended[top_dim_2])} {DIM_LABELS_LOC[top_dim_2]}, "
-        f"przy {_dimension_level(blended[third_dim])} {DIM_LABELS_LOC[third_dim]} "
-        f"oraz {_dimension_level(blended[low_dim])} {DIM_LABELS_LOC[low_dim]}."
-    )
-
-    ending = _pair_interpretation(top_dim_1, top_dim_2)
+    blended = {d: sum(item.score * ARCHETYPE_META[item.id]["dimensions"][d] for item in active) / total for d in dims}
+    ranked = sorted(blended.items(), key=lambda item: item[1], reverse=True)
+    top1, top2 = ranked[0][0], ranked[1][0]
+    low1, low2 = ranked[-1][0], ranked[-2][0]
     text = f"{opening} "
-    if has_tertiary and tertiary is not None:
+    if tertiary is not None:
         text += f"Dodatkowy ton wnosi {tertiary.label}. "
-    text += f"{middle} {ending}"
+    text += (
+        "W praktyce daje to układ oparty na "
+        f"{_dimension_level(blended[top1])} {DIM_LABELS_LOC[top1]} i {_dimension_level(blended[top2])} {DIM_LABELS_LOC[top2]}, "
+        f"przy {_dimension_level(blended[low1])} {DIM_LABELS_LOC[low1]} oraz {_dimension_level(blended[low2])} {DIM_LABELS_LOC[low2]}. "
+    )
+    text += _pair_interpretation(top1, top2)
     return text
 
 
@@ -612,32 +540,11 @@ def generate_archetype_descriptions(input_data: InputData) -> GeneratedDescripti
     supporting = _resolve_result(input_data["supporting"])
     tertiary_raw = input_data.get("tertiary")
     tertiary = _resolve_result(tertiary_raw) if tertiary_raw else None
-
+    if not _has_tertiary(tertiary):
+        tertiary = None
     dominance_type = _dominance_type(primary.score, supporting.score)
-    has_tertiary = _has_tertiary(tertiary)
-
     return {
-        "valuesWheelDescription": _generate_values_description(
-            input_data=input_data,
-            primary=primary,
-            supporting=supporting,
-            tertiary=tertiary,
-            has_tertiary=has_tertiary,
-            dominance_type=dominance_type,
-        ),
-        "needsWheelDescription": _generate_needs_description(
-            input_data=input_data,
-            primary=primary,
-            supporting=supporting,
-            tertiary=tertiary,
-            has_tertiary=has_tertiary,
-        ),
-        "actionProfileDescription": _generate_action_profile_description(
-            input_data=input_data,
-            primary=primary,
-            supporting=supporting,
-            tertiary=tertiary,
-            has_tertiary=has_tertiary,
-            dominance_type=dominance_type,
-        ),
+        "valuesWheelDescription": _generate_values_description(input_data, primary, supporting, tertiary, dominance_type),
+        "needsWheelDescription": _generate_needs_description(input_data, primary, supporting, tertiary),
+        "actionProfileDescription": _generate_action_description(input_data, primary, supporting, tertiary, dominance_type),
     }
