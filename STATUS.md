@@ -2719,3 +2719,51 @@
   - zachowanie radaru i opisów przy różnych rozdzielczościach (1920×1200 i wyższe),
   - docelowa szerokość sekcji `Heurystyczna analiza koloru psychologicznego`,
   - obecność nowej strony z opisami interpretacyjnymi w pełnym DOCX/PDF.
+
+### Zrobione w Hotfix H-127 (2026-04-16, radar/koło/layout)
+- `archetypy-admin/admin_dashboard.py`:
+  - poprawiono responsywność radaru:
+    - zwiększono wysokość desktop (`radar_plot_size=620`),
+    - ustawiono bezpieczniejszą domenę polar (`x/y: 0.08..0.92`) dla etykiet,
+    - dostrojono marginesy i rozmiar etykiet osi,
+  - przebudowano układ sekcji:
+    - `left_col` (tabela + radar + heurystyka + profil 0-100),
+    - `col3` (koło pragnień + rozkład osi + profile działania),
+    - dzięki temu zniknęła duża biała przestrzeń między tabelą a heurystyką,
+  - `mask_for(...)`:
+    - klin podświetlenia wychodzi od środka koła,
+    - zwiększono zasięg klina (`r_outer`) dla efektu bliższego panelowi referencyjnemu,
+  - `Koło pragnień i wartości`:
+    - wycentrowany tytuł,
+    - wycentrowany podpis `Podświetlenie: ...`,
+  - `Rozkład archetypów na osiach potrzeb`:
+    - wycentrowany tytuł nad wykresem.
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do ręcznego potwierdzenia:
+  - czy nowa długość klinów podświetlenia w `Kole pragnień i wartości` jest już 1:1 z oczekiwaniem,
+  - czy radar na 1920x1200 nie ucina etykiet i na 2560x1440 ma oczekiwany rozmiar.
+
+### Zrobione w Hotfix H-128 (2026-04-16, finalne strojenie pod screeny 3157/3158/3160/3161/3162)
+- `archetypy-admin/admin_dashboard.py`:
+  - `mask_for(...)`: podświetlenie klina wydłużone do `r_outer = 0.90 * min(w,h)` (klin od środka, dłuższy jak referencja),
+  - radar:
+    - usunięto desktopowe bufory kolumnowe (`padL/mid/padR`), wykres renderuje się bezpośrednio w kolumnie radaru,
+    - zwiększono udział szerokości kolumny radaru (`left_col/col3 = 0.70/0.30`, `col1/col2 = 0.34/0.66`),
+    - dostrojono etykiety (`radar_tick_size=12`) i marginesy (`l/r=42`) pod 1920x1200,
+  - podpis pod `Kołem pragnień i wartości` centrowany względem wykresu (`margin:auto`, `width:fit-content`).
+- Test techniczny:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### RYZYKO / do domknięcia
+- Do ręcznego potwierdzenia na UI:
+  - czy po zwiększeniu promienia podświetlenia (`0.90`) długość klina jest już zgodna z referencją `panel_bohater_władca_odkrywca.png`,
+  - czy radar przy 1920x1200 nie ucina skrajnych etykiet i czy przy 2560x1440 ma oczekiwany rozmiar.
+
+### Zrobione w Hotfix H-126 (2026-04-16, personalizacja + styl raportowy opisów)
+- Opisy pod trzema wizualizacjami są personalizowane imieniem i nazwiskiem w dopełniaczu.
+- Generator przeszedł na bardziej raportowe wzorce tekstu (mniej słowa `profil`, czytelniejsze rozdzielenie funkcji 3 sekcji).
+- Poprawiono rodzaj i odmianę w opisie TOP archetypów (`wzmacniana/wzmacniany` + formy biernika nazw).
+- Dla zgłaszanych przypadków (Kochanka+Buntowniczka oraz Bohater+Władca+Odkrywca) dodano dedykowane szablony jakościowe zgodne ze wzorcami użytkownika.

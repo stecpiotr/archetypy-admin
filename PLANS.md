@@ -3422,3 +3422,69 @@ Wynik:
   - eksport full DOCX/PDF rozszerzono o stronę z tekstami interpretacyjnymi (3 sekcje jak w panelu).
 - Smoke-check:
   - `python -m py_compile app.py admin_dashboard.py` (OK).
+
+### Hotfix H-127 [DONE]
+Temat: Dopięcie responsywności radaru + korekta podświetleń koła + usunięcie „dziury” przed heurystyką.
+Kryteria ukonczenia:
+1. Radar nie ucina etykiet na 1920x1200 i rośnie sensownie na większych ekranach (np. 2560x1440).
+2. Podświetlenia `Koło pragnień i wartości` wychodzą od środka i są dłuższe (zbliżone do referencji `panel_bohater_władca_odkrywca.png`).
+3. Tekst `Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony` jest wyśrodkowany pod wykresem.
+4. `Heurystyczna analiza koloru psychologicznego` jest bezpośrednio pod sekcją tabela+radar (bez dużej pustej przestrzeni).
+5. Tytuły `Koło pragnień i wartości` i `Rozkład archetypów na osiach potrzeb` są wycentrowane nad wykresami.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - przebudowano layout na:
+    - lewa strefa (`left_col`) dla tabeli + radaru + heurystyki + profilu 0-100,
+    - prawa strefa (`col3`) dla koła/rozkładu/profili działania,
+  - radar:
+    - większa wysokość desktop (`radar_plot_size=620`),
+    - większa przestrzeń wewnętrzna domeny (`polar.domain=[0.08,0.92]`),
+    - łagodniejsze marginesy i mniejszy `tickfont` dla stabilności etykiet,
+  - podświetlenie koła:
+    - kliny wychodzą od środka (bez wycięcia środka),
+    - wydłużono promień klina (`r_outer`),
+  - `Koło pragnień i wartości`:
+    - tytuł wycentrowany,
+    - podpis o podświetleniu wycentrowany pod wykresem,
+  - `Rozkład archetypów na osiach potrzeb`:
+    - tytuł wycentrowany nad wykresem.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### Hotfix H-128 [DONE]
+Temat: Finalne domknięcie responsywności radaru i geometrii podświetleń koła wg screenów 3157/3158/3160/3161/3162.
+Kryteria ukonczenia:
+1. Radar ma większą realną szerokość roboczą (bez dodatkowych buforów), a etykiety nie są ucinane na 1920x1200.
+2. Na większych ekranach radar nie zostaje sztucznie „mały” względem kolumny.
+3. Podświetlenia w `Kole pragnień i wartości` są dłuższe i wychodzą od środka.
+4. Podpis `Podświetlenie: ...` jest wycentrowany względem wykresu.
+5. Układ sekcji zachowuje heurystykę bezpośrednio pod lewą częścią (tabela+radar), bez dodatkowych zwężeń.
+Wynik:
+- `archetypy-admin/admin_dashboard.py`:
+  - zwiększono promień klina podświetlenia (`mask_for`: `r_outer=0.90 * min(w,h)`),
+  - radar:
+    - usunięto desktopowe bufory `padL/mid/padR` i renderujemy wykres bezpośrednio w kolumnie,
+    - dostrojono `radar_tick_size` i `radar_margins` dla etykiet,
+    - poszerzono udział kolumny radaru (`left_col/col3 = 0.70/0.30`, wewnątrz `col1/col2 = 0.34/0.66`),
+  - podpis pod `Kołem pragnień i wartości` ma centrowanie przez `margin:auto` + `width:fit-content`.
+- Smoke-check:
+  - `python -m py_compile admin_dashboard.py app.py` (OK).
+
+### Hotfix H-126 [DONE]
+Temat: Personalizacja opisów (imię i nazwisko w dopełniaczu) + raportowy styl tekstu + korekty fleksji i rodzaju.
+Kryteria ukonczenia:
+1. Opisy przyjmują personalizację `personGenitive` i używają jej w zdaniach otwierających.
+2. `Koło pragnień i wartości` zawsze zaczyna się od `Rdzeń motywacyjny ...`.
+3. Opisy są mniej „generatorowe”: mniejsze nadużycie słowa `profil`, wyraźny podział na `co motywuje`, `w którą stronę układa się energia`, `jak to działa w praktyce`.
+4. Formy żeńskie/męskie w opisie TOP1/TOP2 są poprawne (np. `wzmacniana przez Buntowniczkę`).
+5. Dodane/odświeżone testy jednostkowe dla nowego stylu i fleksji.
+Wynik:
+- `archetype_interpretation.py`:
+  - nowa warstwa personalizacji (`personGenitive`),
+  - nowe, raportowe szablony opisów,
+  - specjalizacje jakościowe dla zestawów `Kochanek/Kochanka + Buntownik/Buntowniczka` oraz `Bohater + Władca (+ Odkrywca)`,
+  - poprawki fleksji i rodzaju (`wzmacniana/wzmacniany`, formy biernika etykiet).
+- `admin_dashboard.py`:
+  - generator dostaje `personGenitive` z bieżącego kontekstu raportu.
+- `test_archetype_interpretation.py`:
+  - testy pod nową składnię, personalizację i brak błędnych form.

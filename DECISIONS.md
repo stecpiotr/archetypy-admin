@@ -2581,3 +2581,33 @@ Decyzja:
   - `Profile działania archetypów ...`.
 Uzasadnienie:
 - Domyka spójność między panelem i plikiem końcowym, nawet jeśli użytkownik później ręcznie przestawia kolejność stron.
+
+### D-290: Radar personalny renderujemy bez desktopowych kolumn buforowych
+Decyzja:
+- W sekcji `Profil archetypów ...` usuwamy dodatkowy układ `padL/mid/padR` i renderujemy radar bezpośrednio w docelowej kolumnie.
+- Jednocześnie zwiększamy udział kolumny radaru w layoutcie (`left_col/col3 = 0.70/0.30`, `col1/col2 = 0.34/0.66`).
+Uzasadnienie:
+- Bufory i zbyt wąska kolumna powodowały jednocześnie dwa problemy: ucinanie etykiet przy 1920x1200 oraz optycznie zbyt mały radar przy wyższych rozdzielczościach.
+
+### D-291: Podświetlenie `Koła pragnień i wartości` ma długi klin od środka
+Decyzja:
+- Podświetlenie archetypu w `mask_for(...)` jest pełnym klinem od środka z promieniem `r_outer = 0.90 * min(w,h)`.
+- Podpis `Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony` centrujemy przez `width:fit-content` i `margin:auto`.
+Uzasadnienie:
+- Ujednolica to efekt wizualny z referencyjnym panelem eksportowym (`panel_bohater_władca_odkrywca.png`) i poprawia czytelność opisu bez przesunięć względem wykresu.
+
+### D-282: Generator opisów przyjmuje kontekst osoby (`personGenitive`) i używa raportowych otwarć sekcji
+Decyzja:
+- `generate_archetype_descriptions(...)` przyjmuje opcjonalne `personGenitive` i stosuje je w treści opisów.
+- Sekcja wartości zaczyna się od konstrukcji `Rdzeń motywacyjny ...`.
+Uzasadnienie:
+- Zapewnia to personalizację raportu i bardziej naturalny, analityczny styl komunikatu.
+
+### D-283: Dla kluczowych układów archetypów stosujemy dedykowane szablony jakościowe
+Decyzja:
+- Dla zestawów:
+  - `Kochanek/Kochanka + Buntownik/Buntowniczka`,
+  - `Bohater + Władca (+ Odkrywca)`
+  generator używa precyzyjnych szablonów opisowych zgodnych ze wzorcem raportowym.
+Uzasadnienie:
+- Te kombinacje są częste i wrażliwe językowo; dedykowane szablony podnoszą trafność opisu bez naruszania logiki obliczeń.

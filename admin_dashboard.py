@@ -2794,16 +2794,14 @@ def mask_for(idx, color, gender_code: str = "M"):
     base = load_base_arche_img(gender_code)
     w, h = base.size
     cx, cy = w//2, h//2
-    # Dłuższy klin podświetlenia (bliżej referencyjnych paneli eksportowych).
-    r_outer = int(min(w, h) * 0.50)
-    r_inner = int(min(w, h) * 0.07)
+    # Klin wychodzi ze środka i jest długi (jak referencyjny panel eksportowy).
+    r_outer = int(min(w, h) * 0.90)
     mask = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(mask, "RGBA")
     start = -90 + idx*30
     end = start + 30
-    # Podświetlamy wyłącznie pierścień koła (bez zalewania całego sektora od środka).
+    # Podświetlamy pełny klin od środka koła.
     draw.pieslice([cx-r_outer, cy-r_outer, cx+r_outer, cy+r_outer], start, end, fill=color)
-    draw.ellipse([cx-r_inner, cy-r_inner, cx+r_inner, cy+r_inner], fill=(0, 0, 0, 0))
     return mask
 
 def compose_archetype_highlight(idx_main, idx_aux=None, idx_supplement=None, gender_code: str = "M"):
@@ -7482,10 +7480,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    radar_plot_size = 360 if is_mobile else 460
-    radar_tick_size = 10 if is_mobile else 14
+    radar_plot_size = 380 if is_mobile else 620
+    radar_tick_size = 10 if is_mobile else 12
     radar_hover_size = 12 if is_mobile else 14
-    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=0, r=0, t=32, b=32)
+    radar_margins = dict(l=58, r=58, t=30, b=56) if is_mobile else dict(l=42, r=42, t=26, b=34)
     wheel_img_width = 360 if is_mobile else 620
     axes_img_width = 360 if is_mobile else 620
     segment_profile_width = 360 if is_mobile else 640
@@ -7893,7 +7891,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             if supp_data:
                 supp_disp["name"] = disp_name(supp_avg or "")
 
-            col1, col2, col3 = st.columns([0.28, 0.36, 0.36], gap="small")
+            left_col, col3 = st.columns([0.70, 0.30], gap="small")
+            with left_col:
+                col1, col2 = st.columns([0.34, 0.66], gap="small")
             means_pct = mean_pct_by_archetype_from_df(data)
 
             def _make_desc_result(arche_name: str | None) -> dict[str, object] | None:
@@ -7929,6 +7929,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         "primary": primary_for_desc,
                         "supporting": supporting_for_desc,
                         "tertiary": tertiary_for_desc,
+                        "personGenitive": personGen,
                     }
                 )
             except Exception:
@@ -8414,7 +8415,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     polar=dict(
-                        domain=dict(x=[0, 1], y=[0, 1]),  # pełna szerokość/wysokość domeny
+                        domain=dict(x=[0.08, 0.92], y=[0.08, 0.92]),
                         bgcolor="rgba(0,0,0,0)",
                         radialaxis=dict(visible=True, range=[0, 20]),
                         angularaxis=dict(
@@ -8468,35 +8469,32 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     </div>
                     """, unsafe_allow_html=True)
                 else:
-                    # desktop: węższe boczne „bufory” + środkowa kolumna z wykresem
-                    padL, mid, padR = st.columns([0.05, 0.90, 0.05], gap="small")
-                    with mid:
-                        st.markdown(
-                            ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
-                            unsafe_allow_html=True,
-                        )
-                        st.plotly_chart(
-                            fig,
-                            use_container_width=True,
-                            config=radar_config,
-                            key=f"radar-{study_id}",
-                        )
-                        st.markdown("""
-                        <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
-                          <span style="display:flex;align-items:center;margin-right:34px;">
-                            <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                            <span style="font-size:0.85em;">Archetyp główny</span>
-                          </span>
-                          <span style="display:flex;align-items:center;margin-right:34px;">
-                            <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                            <span style="font-size:0.85em;">Archetyp wspierający</span>
-                          </span>
-                          <span style="display:flex;align-items:center;">
-                            <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
-                            <span style="font-size:0.85em;">Archetyp poboczny</span>
-                          </span>
-                        </div>
-                        """, unsafe_allow_html=True)
+                    st.markdown(
+                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=8),
+                        unsafe_allow_html=True,
+                    )
+                    st.plotly_chart(
+                        fig,
+                        use_container_width=True,
+                        config=radar_config,
+                        key=f"radar-{study_id}",
+                    )
+                    st.markdown("""
+                    <div style="display:flex;justify-content:center;align-items:center;margin-top:12px;margin-bottom:10px;">
+                      <span style="display:flex;align-items:center;margin-right:34px;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:red;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp główny</span>
+                      </span>
+                      <span style="display:flex;align-items:center;margin-right:34px;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:#FFD22F;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp wspierający</span>
+                      </span>
+                      <span style="display:flex;align-items:center;">
+                        <span style="width:21px;height:21px;border-radius:50%;background:#40b900;border:2px solid black;display:inline-block;margin-right:8px;"></span>
+                        <span style="font-size:0.85em;">Archetyp poboczny</span>
+                      </span>
+                    </div>
+                    """, unsafe_allow_html=True)
 
             # --- Heurystyczna analiza koloru + profil podsumowania pod tabelą ---
             color_pcts = calc_color_percentages_from_df(data)
@@ -8521,8 +8519,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 gender_code=report_gender_code,
             )
 
-            analysis_col, _analysis_spacer = st.columns([0.64, 0.36], gap="small")
-            with analysis_col:
+            with left_col:
                 st.markdown("<div style='height:22px;'></div>", unsafe_allow_html=True)
                 st.markdown(
                     ap_section_heading("Heurystyczna analiza koloru psychologicznego", center=False, margin_bottom_px=8),
@@ -8573,7 +8570,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.markdown(
                         ap_section_heading(
                             "Koło pragnień i wartości",
-                            center=False,
+                            center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
                         ),
@@ -8601,7 +8598,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             use_column_width=True,
                         )
                         st.markdown(
-                            "<div style='margin-top:6px;margin-bottom:6px;font-size:0.93em;color:#64748b;'>"
+                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.93em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
                             "</div>",
                             unsafe_allow_html=True,
@@ -8611,7 +8608,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.markdown(
                         ap_section_heading(
                             "Koło pragnień i wartości",
-                            center=False,
+                            center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
                         ),
@@ -8634,9 +8631,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                                 raise TypeError("compose_archetype_highlight nie zwrócił obrazu PIL")
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code)
-                        st.image(kola_img, width=wheel_img_width)
+                        st.image(kola_img, use_column_width=True)
                         st.markdown(
-                            "<div style='margin-top:6px;margin-bottom:6px;font-size:0.93em;color:#64748b;'>"
+                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.93em;color:#64748b;text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
                             "</div>",
                             unsafe_allow_html=True,
@@ -8648,7 +8645,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.markdown(
                         ap_section_heading(
                             "Rozkład archetypów na osiach potrzeb",
-                            center=False,
+                            center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
                         ),
@@ -8664,7 +8661,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     st.markdown(
                         ap_section_heading(
                             "Rozkład archetypów na osiach potrzeb",
-                            center=False,
+                            center=True,
                             margin_bottom_px=8,
                             shift_x_px=0,
                         ),
@@ -8673,7 +8670,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     aux = aux_avg if aux_avg != main_avg else None
                     supp = supp_avg if supp_avg not in [main_avg, aux_avg] else None
                     kolo_axes_img = compose_axes_wheel_highlight(main_avg, aux, supp, gender_code=report_gender_code)
-                    st.image(kolo_axes_img, width=axes_img_width)
+                    st.image(kolo_axes_img, use_column_width=True)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
 
             top_profile_archetypes: list[str] = [main_avg]
