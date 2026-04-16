@@ -289,4 +289,5 @@ def test_14_przy_trzecim_wymiarze_unika_podwojnego_przy():
         )
     )
     txt_action = out["actionProfileDescription"]
-    assert "przy solidnym wsparciu racjonalności oraz" in txt_action
+    assert "przy solidnym wsparciu racjonalności, podczas gdy" in txt_action
+    assert "empatia i kreatywność pozostają słabszymi wymiarami działania" in txt_action

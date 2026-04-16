@@ -320,6 +320,14 @@ DIM_LABELS: dict[str, str] = {
     "kreatywnosc": "kreatywności",
 }
 
+DIM_LABELS_NOMINATIVE: dict[str, str] = {
+    "empatia": "empatia",
+    "sprawczosc": "sprawczość",
+    "racjonalnosc": "racjonalność",
+    "niezaleznosc": "niezależność",
+    "kreatywnosc": "kreatywność",
+}
+
 PAIR_INTERPRETATION: dict[str, str] = {
     "sprawczosc+niezaleznosc": "To wzmacnia obraz przywództwa decyzyjnego, samodzielnego i odpowiedzialnego za wynik.",
     "sprawczosc+racjonalnosc": "To wzmacnia obraz przywództwa rzeczowego, uporządkowanego i zdolnego przekładać diagnozę na działanie.",
@@ -841,15 +849,26 @@ def _generate_action_description(
         sentence2 += f", z dodatkowym ważnym komponentem {DIM_LABELS[third[0]]}"
         third_support_used = True
 
-    low_prefix = ", oraz " if third_support_used else ", przy "
+    low_prefix = ", przy "
 
     if low1[1] >= 45 and low2[1] >= 45:
-        sentence2 += (
-            f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
-            "obecnych w wyraźnym, ale niedominującym stopniu."
-        )
+        if third_support_used:
+            sentence2 += (
+                f", podczas gdy {DIM_LABELS_NOMINATIVE[low1[0]]} i {DIM_LABELS_NOMINATIVE[low2[0]]} "
+                "pozostają obecne w wyraźnym, ale niedominującym stopniu."
+            )
+        else:
+            sentence2 += (
+                f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
+                "obecnych w wyraźnym, ale niedominującym stopniu."
+            )
     else:
-        if low1_phrase == low2_phrase:
+        if third_support_used:
+            sentence2 += (
+                f", podczas gdy {DIM_LABELS_NOMINATIVE[low1[0]]} i {DIM_LABELS_NOMINATIVE[low2[0]]} "
+                "pozostają słabszymi wymiarami działania."
+            )
+        elif low1_phrase == low2_phrase:
             if low1_phrase == "obniżonej":
                 sentence2 += (
                     f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "

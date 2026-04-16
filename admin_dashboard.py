@@ -7070,6 +7070,13 @@ def _expanded_subsection_content_html(content_lines: list[str], subsection_title
             prev_technika = False
         return "".join(blocks)
 
+    if sub_prefix in {"2.3.", "2.4.", "4.3."}:
+        lead = lines[0] if lines else ""
+        if lead.endswith(":"):
+            rest_items = split_semicolon_items(lines[1:])
+            return p(lead) + ul(rest_items)
+        return ul(split_semicolon_items(lines))
+
     if sub_prefix in bullet_only_prefixes:
         return ul(split_semicolon_items(lines))
 
@@ -7840,6 +7847,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
+    mobile_section_margin_top = 30 if is_mobile else 6
+    mobile_profile_actions_margin_top = 32 if is_mobile else 8
     radar_plot_size = 430 if is_mobile else 560
     radar_tick_size = 10 if is_mobile else 15
     radar_hover_size = 12 if is_mobile else 14
@@ -7849,7 +7858,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     axes_img_width = 360 if is_mobile else 620
     segment_profile_width = 360 if is_mobile else 640
     # TU ZMIENISZ ROZMIAR sekcji "Profil siły archetypów ... (skala: 0-100)" dla desktopu.
-    segment_profile_display_width_desktop = 855
+    segment_profile_display_width_desktop = 800
+    # TU ZMIENISZ ROZMIAR tej sekcji dla mniejszych desktopów (np. <=1920x1200).
+    segment_profile_display_width_mid_desktop = 680
     # Mobile-only: poprawa responsywności wykresów/obrazów i czytelności tabeli
     st.markdown(
         """
@@ -7929,6 +7940,31 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             word-break:normal !important;
           }
         }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"""
+        <style>
+        .ap-strength-wheel-img {{
+          width:min(100%, {segment_profile_display_width_desktop}px) !important;
+          height:auto !important;
+          display:block !important;
+          margin-left:0 !important;
+          margin-right:0 !important;
+        }}
+        /* Desktop do około 1920-2048 px szerokości: wyraźnie zmniejsz wykres. */
+        @media (min-width:1200px) and (max-width:2050px) {{
+          .ap-strength-wheel-img {{
+            width:min(100%, {segment_profile_display_width_mid_desktop}px) !important;
+          }}
+        }}
+        @media (max-width:900px) {{
+          .ap-strength-wheel-img {{
+            width:100% !important;
+          }}
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -8390,9 +8426,15 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     else:
                         st.image(image_obj, use_column_width=True)
 
-            def _render_theme_path_image(light_path: str | Path, dark_path: str | Path | None, width_px: int | None = None) -> None:
+            def _render_theme_path_image(
+                light_path: str | Path,
+                dark_path: str | Path | None,
+                width_px: int | None = None,
+                img_css_class: str | None = None,
+            ) -> None:
                 light_path_obj = Path(light_path)
                 dark_path_obj = Path(dark_path) if dark_path else None
+                class_attr = f" class='{img_css_class}'" if img_css_class else ""
                 if dark_path_obj and dark_path_obj.exists() and light_path_obj.exists():
                     light_uri = _img_data_uri_from_path(light_path_obj)
                     dark_uri = _img_data_uri_from_path(dark_path_obj)
@@ -8405,9 +8447,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         (
                             "<picture>"
                             f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
-                            f"<img src='{light_uri}' style='{width_style}'/>"
+                            f"<img src='{light_uri}'{class_attr} style='{width_style}'/>"
                             "</picture>"
                         ),
+                        unsafe_allow_html=True,
+                    )
+                    return
+                if img_css_class and light_path_obj.exists():
+                    light_uri = _img_data_uri_from_path(light_path_obj)
+                    width_style = (
+                        f"width:min(100%, {int(width_px)}px);height:auto;display:block;"
+                        if width_px
+                        else "width:100%;height:auto;display:block;"
+                    )
+                    st.markdown(
+                        f"<img src='{light_uri}'{class_attr} style='{width_style}'/>",
                         unsafe_allow_html=True,
                     )
                     return
@@ -8445,7 +8499,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             with col1:
                 st.markdown(
-                    ap_section_heading("Liczebność i natężenie archetypów", center=False, margin_bottom_px=8),
+                    ap_section_heading(
+                        "Liczebność i natężenie archetypów",
+                        center=False,
+                        margin_bottom_px=8,
+                        margin_top_px=mobile_section_margin_top,
+                    ),
                     unsafe_allow_html=True
                 )
 
@@ -8938,7 +8997,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 if is_mobile:
                     st.markdown(
-                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=radar_heading_mb),
+                        ap_section_heading(
+                            f"Profil archetypów {personGen}",
+                            center=True,
+                            margin_bottom_px=radar_heading_mb,
+                            margin_top_px=mobile_section_margin_top,
+                        ),
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
@@ -8950,7 +9014,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     _render_radar_role_legend()
                 else:
                     st.markdown(
-                        ap_section_heading(f"Profil archetypów {personGen}", center=True, margin_bottom_px=radar_heading_mb),
+                        ap_section_heading(
+                            f"Profil archetypów {personGen}",
+                            center=True,
+                            margin_bottom_px=radar_heading_mb,
+                            margin_top_px=mobile_section_margin_top,
+                        ),
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
@@ -8994,7 +9063,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             with left_col:
                 st.markdown("<div style='height:22px;'></div>", unsafe_allow_html=True)
                 st.markdown(
-                    ap_section_heading("Heurystyczna analiza koloru psychologicznego", center=False, margin_bottom_px=8),
+                    ap_section_heading(
+                        "Heurystyczna analiza koloru psychologicznego",
+                        center=False,
+                        margin_bottom_px=8,
+                        margin_top_px=mobile_section_margin_top,
+                    ),
                     unsafe_allow_html=True,
                 )
                 components.html(
@@ -9016,17 +9090,23 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         f"Profil siły archetypów {personGen} (skala: 0-100)",
                         center=False,
                         margin_bottom_px=12,
-                        margin_top_px=6,
+                        margin_top_px=mobile_section_margin_top,
                     ),
                     unsafe_allow_html=True,
                 )
                 if is_mobile:
-                    _render_theme_path_image(segment_profile_png_path, segment_profile_png_path_dark, width_px=None)
+                    _render_theme_path_image(
+                        segment_profile_png_path,
+                        segment_profile_png_path_dark,
+                        width_px=None,
+                        img_css_class="ap-strength-wheel-img",
+                    )
                 else:
                     _render_theme_path_image(
                         segment_profile_png_path,
                         segment_profile_png_path_dark,
                         width_px=segment_profile_display_width_desktop,
+                        img_css_class="ap-strength-wheel-img",
                     )
                 st.markdown(
                     """
@@ -9048,6 +9128,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             "Koło pragnień i wartości",
                             center=True,
                             margin_bottom_px=8,
+                            margin_top_px=mobile_section_margin_top,
                             shift_x_px=0,
                         ),
                         unsafe_allow_html=True,
@@ -9092,6 +9173,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             "Koło pragnień i wartości",
                             center=True,
                             margin_bottom_px=8,
+                            margin_top_px=mobile_section_margin_top,
                             shift_x_px=0,
                         ),
                         unsafe_allow_html=True,
@@ -9138,6 +9220,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             "Koło potrzeb",
                             center=True,
                             margin_bottom_px=8,
+                            margin_top_px=mobile_section_margin_top,
                             shift_x_px=0,
                         ),
                         unsafe_allow_html=True,
@@ -9167,6 +9250,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             "Koło potrzeb",
                             center=True,
                             margin_bottom_px=8,
+                            margin_top_px=mobile_section_margin_top,
                             shift_x_px=0,
                         ),
                         unsafe_allow_html=True,
@@ -9229,7 +9313,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         f"Profile działania archetypów {personGen}",
                         center=False,
                         margin_bottom_px=12,
-                        margin_top_px=8,
+                        margin_top_px=mobile_profile_actions_margin_top,
                     ),
                     unsafe_allow_html=True,
                 )
