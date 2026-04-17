@@ -145,7 +145,7 @@ def _attach_inflections_for_insert(payload: Dict) -> Dict:
 _ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
 PERSONAL_QUESTION_COLUMNS: List[str] = [f"Q{i}" for i in range(1, 49)]
 PERSONAL_TEMPLATE_LEGACY_COLUMNS: List[str] = ["respondent_id", *PERSONAL_QUESTION_COLUMNS]
-PERSONAL_TEMPLATE_BASE_COLUMNS: List[str] = ["respondent_id"]
+PERSONAL_TEMPLATE_BASE_COLUMNS: List[str] = ["respondent_id", "created_at", "response_id"]
 PERSONAL_METRY_PREFIX = "M_"
 
 
@@ -413,16 +413,16 @@ def _personal_metry_columns_from_config(metryczka_config: Any = None) -> List[st
 
 
 def _personal_template_columns(metryczka_config: Any = None) -> List[str]:
-    # Publiczny szablon importu: najpierw metryczka (jeśli skonfigurowana),
-    # potem 48 odpowiedzi archetypowych w osobnych kolumnach.
+    # Publiczny szablon importu: najpierw identyfikacja rekordu,
+    # potem metryczka (jeśli skonfigurowana), następnie 48 pytań archetypowych.
     cols: List[str] = []
+    for col in PERSONAL_TEMPLATE_BASE_COLUMNS:
+        if col not in cols:
+            cols.append(col)
     for col in _personal_metry_columns_from_config(metryczka_config):
         if col not in cols:
             cols.append(col)
     for col in PERSONAL_QUESTION_COLUMNS:
-        if col not in cols:
-            cols.append(col)
-    for col in PERSONAL_TEMPLATE_BASE_COLUMNS:
         if col not in cols:
             cols.append(col)
     return cols

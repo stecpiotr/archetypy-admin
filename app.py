@@ -5417,7 +5417,7 @@ def personal_io_view() -> None:
             use_container_width=True,
         )
     st.caption(
-        "Import personalny: kolumny metryczki (`M_*` / `METRY_M_*`, zgodne z konfiguracją badania), "
+        "Import personalny: `respondent_id`, opcjonalnie `created_at` i `response_id`, kolumny metryczki (`M_*` / `METRY_M_*`, zgodne z konfiguracją badania), "
         "następnie `Q1..Q48` (wartości 0..5 w osobnych komórkach). "
         "`respondent_id` jest opcjonalny. Dla kompatybilności nadal akceptujemy także kolumnę `answers` (JSON)."
     )

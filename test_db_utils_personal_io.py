@@ -61,11 +61,11 @@ def _sample_metry_cfg():
 def test_personal_template_uses_metry_columns_then_q_columns():
     df = personal_import_template_dataframe(_sample_metry_cfg())
     cols = list(df.columns)
+    assert cols[:3] == ["respondent_id", "created_at", "response_id"]
     idx_q1 = cols.index("Q1")
     idx_q48 = cols.index("Q48")
     assert idx_q48 > idx_q1
-    assert all(col.startswith("M_") for col in cols[:idx_q1])
-    assert cols[-1] == "respondent_id"
+    assert all(col.startswith("M_") for col in cols[3:idx_q1])
     assert "M_PLEC" in cols
     assert "M_ZAWOD" in cols
     assert "M_ZAWOD_OTHER" in cols
