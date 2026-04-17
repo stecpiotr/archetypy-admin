@@ -1,0 +1,14 @@
+﻿sekcja,pole,archetyp,typ_odpowiedzi,dopuszczalne_wejscie_A,dopuszczalne_wejscie_B,normalizacja
+D,D1,Władca,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D2,Bohater,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D3,Mędrzec,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D4,Opiekun,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D5,Kochanek,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D6,Błazen,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D7,Twórca,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D8,Odkrywca,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D9,Czarodziej,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D10,Towarzysz,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D11,Niewinny,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D12,Buntownik,A/B,"A, a, 1, +, plus, tak","B, b, 2, -, minus, nie",_to_ab => A lub B (inne = puste)
+D,D13,wybór jednego archetypu,nazwa archetypu / numer 1..12,jak B2,jak B2,canonical_archetype

@@ -27,11 +27,18 @@ import plotly.graph_objects as go
 from zoneinfo import ZoneInfo
 
 from db_utils import (
+    delete_personal_responses_by_ids,
     get_supabase,
     fetch_studies,
     fetch_personal_response_count,
+    insert_personal_response,
     insert_study,
+    list_personal_responses,
     merge_personal_study_responses,
+    make_personal_payload_from_row,
+    normalize_personal_response_row,
+    personal_import_template_dataframe,
+    personal_response_rows_to_dataframe,
     update_study,
     check_slug_availability,
     soft_delete_study,
@@ -1993,6 +2000,21 @@ def _next_jst_respondent_id(existing: set[str]) -> str:
             return cand
         n += 1
 
+
+def _next_personal_respondent_id(existing: set[str]) -> str:
+    max_n = 0
+    for rid in existing:
+        txt = str(rid or "")
+        m = re.fullmatch(r"R(\d{4,})", txt)
+        if m:
+            max_n = max(max_n, int(m.group(1)))
+    n = max_n + 1
+    while True:
+        cand = f"R{n:04d}"
+        if cand not in existing:
+            return cand
+        n += 1
+
 # ───────────────────────── wspólne UI ─────────────────────────
 def back_button(dest: str = "home_personal", label: str = "← Cofnij") -> None:
     st.markdown('<div class="top-back-wrap">', unsafe_allow_html=True)
@@ -2161,7 +2183,7 @@ def home_personal_view() -> None:
     header("Badania personalne - panel")
     render_titlebar(["Panel", "Badania personalne"])
 
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7, gap="small")
+    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(8, gap="small")
     with c1:
         if st.button("➕\n\nDodaj badanie archetypu", key="tile_home_personal_add", type="secondary", use_container_width=True):
             goto("add")
@@ -2183,6 +2205,9 @@ def home_personal_view() -> None:
     with c7:
         if st.button("📊\n\nSprawdź wyniki badania archetypu", key="tile_home_personal_results", type="secondary", use_container_width=True):
             goto("results")
+    with c8:
+        if st.button("💾\n\nImport i eksport baz danych", key="tile_home_personal_io", type="secondary", use_container_width=True):
+            goto("personal_io")
 
     # 🔽 linia oddzielająca kafle od statystyk
     st.markdown(
@@ -5277,6 +5302,263 @@ def jst_send_view() -> None:
     header("✉️ Wyślij link do ankiety")
     render_titlebar(["Panel", "Badania mieszkańców", "Wyślij link"])
     render_send_link_jst(lambda: back_button("home_jst"))
+
+
+def personal_io_view() -> None:
+    require_auth()
+    header("💾 Import i eksport baz danych")
+    render_titlebar(["Panel", "Badania personalne", "Import / eksport"])
+    back_button("home_personal", "← Powrót do panelu personalnego")
+
+    studies = fetch_studies(sb)
+    if not studies:
+        st.info("Brak badań personalnych w bazie.")
+        return
+
+    def _personal_option_label(study_row: Dict[str, Any]) -> str:
+        first = str(
+            study_row.get("first_name_nom")
+            or study_row.get("first_name")
+            or ""
+        ).strip()
+        last = str(
+            study_row.get("last_name_nom")
+            or study_row.get("last_name")
+            or ""
+        ).strip()
+        city = str(study_row.get("city_nom") or study_row.get("city") or "").strip()
+        slug = str(study_row.get("slug") or "").strip()
+        person = f"{first} {last}".strip() or "Bez nazwy"
+        city_part = f" ({city})" if city else ""
+        slug_part = f" – /{slug}" if slug else ""
+        return f"{person}{city_part}{slug_part}"
+
+    options = {_personal_option_label(s): s for s in studies}
+    chosen = st.selectbox("Wybierz badanie", list(options.keys()))
+    study = options[chosen]
+    study_id = str(study.get("id") or "").strip()
+    slug = str(study.get("slug") or "personal").strip()
+    safe_name = slugify(slug) or "personal"
+
+    st.markdown("### Szablon importu")
+    template_df = personal_import_template_dataframe()
+    tpl_col1, tpl_col2 = st.columns(2)
+    with tpl_col1:
+        _download_button_compat(
+            "Wygeneruj szablon CSV",
+            data=template_df.to_csv(index=False, encoding="utf-8-sig"),
+            file_name=f"szablon-importu-personal-{safe_name}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with tpl_col2:
+        _download_button_compat(
+            "Wygeneruj szablon XLSX",
+            data=_xlsx_bytes_from_df(template_df, sheet_name="Szablon"),
+            file_name=f"szablon-importu-personal-{safe_name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    st.caption(
+        "Import personalny przyjmuje kolumny respondent_id + Q1..Q48 (wartości 0..5). "
+        "Metryczka nie jest wymagana."
+    )
+
+    st.markdown("### Import odpowiedzi (CSV / XLSX)")
+    uploaded = st.file_uploader("Wybierz plik", type=["csv", "xlsx"], key=f"personal_io_upload_{study_id}")
+    if st.button("Importuj dane", type="primary", key=f"personal_io_import_btn_{study_id}"):
+        if uploaded is None:
+            st.error("Wybierz plik do importu.")
+        else:
+            try:
+                with st.spinner("Import trwa. Prosimy o chwilę cierpliwości..."):
+                    if uploaded.name.lower().endswith(".xlsx"):
+                        src_df = pd.read_excel(uploaded)
+                    else:
+                        src_df = pd.read_csv(uploaded, encoding="utf-8-sig")
+                    if src_df.empty:
+                        st.warning("Plik nie zawiera rekordów.")
+                        return
+
+                    total_rows = int(len(src_df.index))
+                    progress = st.progress(0.0, text=f"Przygotowanie importu ({total_rows} wierszy)...")
+
+                    existing_rows = list_personal_responses(sb, study_id)
+                    existing_rids = set()
+                    for rec in existing_rows:
+                        scores_payload = rec.get("scores")
+                        scores_dict = scores_payload if isinstance(scores_payload, dict) else {}
+                        rid = str(scores_dict.get("respondent_id") or "").strip()
+                        if rid:
+                            existing_rids.add(rid)
+
+                    next_id = _next_personal_respondent_id(existing_rids)
+                    next_n = int(next_id[1:]) if len(next_id) > 1 and next_id[1:].isdigit() else (len(existing_rids) + 1)
+
+                    inserted = 0
+                    skipped = 0
+                    invalid = 0
+                    progress_every = max(1, total_rows // 120)
+                    for idx, (_, row) in enumerate(src_df.iterrows(), start=1):
+                        raw = {k: row.get(k) for k in src_df.columns}
+                        rid = str(raw.get("respondent_id") or "").strip()
+                        if not rid:
+                            rid = f"R{next_n:04d}"
+                            next_n += 1
+
+                        norm = normalize_personal_response_row(raw, respondent_id_fallback=rid)
+                        norm_rid = str(norm.get("respondent_id") or "").strip() or rid
+                        norm["respondent_id"] = norm_rid
+
+                        if not bool(norm.get("answers_complete")):
+                            invalid += 1
+                        elif norm_rid in existing_rids:
+                            skipped += 1
+                        else:
+                            payload = make_personal_payload_from_row(norm)
+                            ok = insert_personal_response(
+                                sb,
+                                study_id=study_id,
+                                payload=payload,
+                            )
+                            if ok:
+                                inserted += 1
+                                existing_rids.add(norm_rid)
+                            else:
+                                skipped += 1
+
+                        if idx == 1 or idx % progress_every == 0 or idx == total_rows:
+                            progress.progress(
+                                min(1.0, idx / max(total_rows, 1)),
+                                text=f"Importowanie rekordów: {idx}/{total_rows}",
+                            )
+
+                    progress.progress(1.0, text="Finalizacja importu...")
+                    progress.empty()
+
+                st.success(
+                    f"Import zakończony. Dodano: {inserted}, pominięto (duplikaty/błędy zapisu): {skipped}, "
+                    f"niepoprawne wiersze: {invalid}."
+                )
+            except Exception as e:
+                st.error(f"Błąd importu: {e}")
+
+    st.markdown("---")
+    st.markdown("### Eksport odpowiedzi")
+    rows = list_personal_responses(sb, study_id)
+    if not rows:
+        st.info("Brak odpowiedzi do eksportu.")
+        return
+
+    out_df = personal_response_rows_to_dataframe(rows)
+    c1, c2 = st.columns(2)
+    with c1:
+        _download_button_compat(
+            "Pobierz CSV",
+            data=out_df.to_csv(index=False, encoding="utf-8-sig"),
+            file_name=f"baza-odpowiedzi-personal-{safe_name}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with c2:
+        _download_button_compat(
+            "Pobierz XLSX",
+            data=_xlsx_bytes_from_df(out_df, sheet_name="Odpowiedzi"),
+            file_name=f"baza-odpowiedzi-personal-{safe_name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+    st.markdown("#### Podgląd odpowiedzi")
+    preview_df = out_df.copy()
+    preview_df.insert(0, "Usuń", False)
+
+    selected_ids: List[str] = []
+    editor_key = f"personal_io_editor_{study_id}"
+    try:
+        edited_df = st.data_editor(
+            preview_df,
+            use_container_width=True,
+            hide_index=True,
+            height=420,
+            key=editor_key,
+            disabled=[col for col in preview_df.columns if col != "Usuń"],
+            column_config={
+                "Usuń": st.column_config.CheckboxColumn(
+                    "Usuń",
+                    help="Zaznacz rekordy do usunięcia z bazy.",
+                    default=False,
+                )
+            },
+        )
+        if isinstance(edited_df, pd.DataFrame):
+            sel_series = edited_df.loc[edited_df["Usuń"] == True, "response_id"]  # noqa: E712
+            selected_ids = [str(v).strip() for v in sel_series.tolist() if str(v).strip()]
+    except Exception:
+        st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
+        options_ids = [str(v).strip() for v in out_df.get("response_id", pd.Series(dtype=str)).tolist() if str(v).strip()]
+        selected_ids = st.multiselect(
+            "Wybierz rekordy do usunięcia",
+            options=options_ids,
+            key=f"personal_io_delete_multiselect_{study_id}",
+        )
+
+    selected_unique = sorted(set(selected_ids))
+    delete_confirm_key = f"personal_io_delete_confirm_{study_id}"
+    delete_ids_key = f"personal_io_delete_ids_{study_id}"
+
+    a1, a2, _sp = st.columns([0.28, 0.20, 0.52], gap="small")
+    with a1:
+        if st.button(
+            "🗑️ Usuń zaznaczone",
+            key=f"personal_io_delete_btn_{study_id}",
+            use_container_width=True,
+        ):
+            if not selected_unique:
+                st.warning("Zaznacz co najmniej jeden rekord do usunięcia.")
+            else:
+                st.session_state[delete_ids_key] = selected_unique
+                st.session_state[delete_confirm_key] = True
+                st.rerun()
+    with a2:
+        st.caption(f"Zaznaczone: {len(selected_unique)}")
+
+    pending_delete_ids = [str(v).strip() for v in st.session_state.get(delete_ids_key, []) if str(v).strip()]
+    if st.session_state.get(delete_confirm_key, False):
+        if not pending_delete_ids:
+            st.session_state.pop(delete_confirm_key, None)
+            st.session_state.pop(delete_ids_key, None)
+        else:
+            st.warning(
+                f"Czy na pewno usunąć zaznaczone rekordy? ({len(pending_delete_ids)}). "
+                "Tej operacji nie można cofnąć."
+            )
+            d1, d2, _dsp = st.columns([0.26, 0.16, 0.58], gap="small")
+            with d1:
+                if st.button(
+                    "✅ Tak, usuń zaznaczone",
+                    key=f"personal_io_delete_yes_{study_id}",
+                    use_container_width=True,
+                ):
+                    try:
+                        removed = delete_personal_responses_by_ids(sb, study_id, pending_delete_ids)
+                        st.session_state.pop(delete_confirm_key, None)
+                        st.session_state.pop(delete_ids_key, None)
+                        st.success(f"Usunięto {removed} rekordów.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.session_state.pop(delete_confirm_key, None)
+                        st.session_state.pop(delete_ids_key, None)
+                        st.error(f"Nie udało się usunąć zaznaczonych rekordów: {exc}")
+            with d2:
+                if st.button(
+                    "↩️ Anuluj",
+                    key=f"personal_io_delete_no_{study_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state.pop(delete_confirm_key, None)
+                    st.session_state.pop(delete_ids_key, None)
+                    st.rerun()
 
 
 def jst_io_view() -> None:
@@ -11580,6 +11862,8 @@ else:
         personal_metryczka_view()
     elif view == "personal_merge":
         personal_merge_view()
+    elif view == "personal_io":
+        personal_io_view()
     elif view == "results":
         results_view()
     elif view == "send":

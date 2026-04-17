@@ -1,0 +1,14 @@
+﻿sekcja,pole,dotyczy_archetypu,typ_odpowiedzi,jak_kodowane,wejscie_kodowane_jako_1,inne_wejscie
+B,B1_Władca,Władca,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Bohater,Bohater,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Mędrzec,Mędrzec,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Opiekun,Opiekun,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Kochanek,Kochanek,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Błazen,Błazen,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Twórca,Twórca,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Odkrywca,Odkrywca,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Czarodziej,Czarodziej,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Towarzysz,Towarzysz,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Niewinny,Niewinny,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B1_Buntownik,Buntownik,flaga 0/1,_to_flag,"1, true, t, tak, yes, y, on, x (bez rozróżniania wielkości i spacji)",0
+B,B2,wybór jednego archetypu,nazwa archetypu / numer 1..12,canonical_archetype,nazwa archetypu z listy lub numer 1..12,zwracany jest surowy tekst (zalecane: pełna nazwa lub numer)

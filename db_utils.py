@@ -6,6 +6,7 @@ import ast
 import json
 import os
 from datetime import datetime
+import pandas as pd
 import streamlit as st
 from supabase import create_client, Client
 from metryczka_config import default_personal_metryczka_config, normalize_personal_metryczka_config
@@ -138,6 +139,8 @@ def _attach_inflections_for_insert(payload: Dict) -> Dict:
 # CRUD (z obsługą soft-delete)
 # ────────────────────────────────────────────────────────────────────────────────
 _ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
+PERSONAL_QUESTION_COLUMNS: List[str] = [f"Q{i}" for i in range(1, 49)]
+PERSONAL_TEMPLATE_COLUMNS: List[str] = ["respondent_id", *PERSONAL_QUESTION_COLUMNS]
 
 
 def _utc_now_iso() -> str:
@@ -314,6 +317,195 @@ def _normalize_answers_for_merge(raw: Any) -> Optional[List[int]]:
                     return out2
         return None
     return None
+
+
+def _normalize_scores_dict(raw: Any) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return {}
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                parsed = parser(text)
+            except Exception:
+                continue
+            if isinstance(parsed, dict):
+                return dict(parsed)
+    return {}
+
+
+def _to_int_0_5(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    txt = str(value).strip().replace(",", ".")
+    if not txt:
+        return None
+    try:
+        iv = int(float(txt))
+    except Exception:
+        return None
+    return iv if 0 <= iv <= 5 else None
+
+
+def _answers_48_from_raw(raw: Any) -> Optional[List[int]]:
+    seq = _normalize_answers_for_merge(raw)
+    if not seq:
+        return None
+    if len(seq) < 48:
+        return None
+    out: List[int] = []
+    for v in seq[:48]:
+        try:
+            iv = int(v)
+        except Exception:
+            return None
+        if iv < 0 or iv > 5:
+            return None
+        out.append(iv)
+    return out
+
+
+def personal_import_template_dataframe() -> pd.DataFrame:
+    return pd.DataFrame(columns=PERSONAL_TEMPLATE_COLUMNS)
+
+
+def normalize_personal_response_row(raw: Dict[str, Any], respondent_id_fallback: str = "") -> Dict[str, Any]:
+    src = dict(raw or {})
+    respondent_id = str(src.get("respondent_id") or src.get("RespondentID") or "").strip()
+    if not respondent_id:
+        respondent_id = str(respondent_id_fallback or "").strip()
+
+    answers: List[Optional[int]] = []
+    from_blob = _answers_48_from_raw(src.get("answers"))
+    if from_blob:
+        answers = [int(v) for v in from_blob]
+    else:
+        for i in range(1, 49):
+            keys = (
+                f"Q{i}",
+                f"q{i}",
+                f"P{i}",
+                f"p{i}",
+                f"A{i}",
+                f"a{i}",
+            )
+            val = None
+            for k in keys:
+                if k in src:
+                    val = src.get(k)
+                    break
+            answers.append(_to_int_0_5(val))
+
+    complete = len(answers) == 48 and all(isinstance(v, int) for v in answers)
+    complete_answers: List[int] = [int(v) for v in answers if isinstance(v, int)] if complete else []
+    raw_total = int(sum(complete_answers)) if complete else None
+    scores = _normalize_scores_dict(src.get("scores"))
+
+    return {
+        "respondent_id": respondent_id,
+        "answers": complete_answers if complete else answers,
+        "answers_complete": bool(complete),
+        "raw_total": raw_total,
+        "scores": scores,
+    }
+
+
+def make_personal_payload_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    answers_src = row.get("answers")
+    answers_48 = _answers_48_from_raw(answers_src)
+    if not answers_48:
+        raise ValueError("Nieprawidłowe odpowiedzi: wymagane 48 wartości 0..5.")
+
+    raw_total = row.get("raw_total")
+    try:
+        raw_total_int = int(raw_total) if raw_total is not None else int(sum(answers_48))
+    except Exception:
+        raw_total_int = int(sum(answers_48))
+
+    scores = _normalize_scores_dict(row.get("scores"))
+    rid = str(row.get("respondent_id") or "").strip()
+    if rid and not str(scores.get("respondent_id") or "").strip():
+        scores["respondent_id"] = rid
+
+    payload: Dict[str, Any] = {
+        "answers": answers_48,
+        "raw_total": raw_total_int,
+        "scores": scores,
+    }
+    return payload
+
+
+def list_personal_responses(sb: Client, study_id: str) -> List[Dict[str, Any]]:
+    sid = str(study_id or "").strip()
+    if not sid:
+        return []
+    res = (
+        sb.table("responses")
+        .select("id,created_at,answers,scores,raw_total")
+        .eq("study_id", sid)
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return [dict(r) for r in (res.data or [])]
+
+
+def insert_personal_response(
+    sb: Client,
+    *,
+    study_id: str,
+    payload: Dict[str, Any],
+) -> bool:
+    sid = str(study_id or "").strip()
+    if not sid:
+        raise ValueError("Brak study_id.")
+    data = dict(payload or {})
+    data["study_id"] = sid
+    ins = sb.table("responses").insert(data).execute()
+    return bool(ins.data)
+
+
+def personal_response_rows_to_dataframe(rows: List[Dict[str, Any]]) -> pd.DataFrame:
+    records: List[Dict[str, Any]] = []
+    for idx, raw in enumerate(rows or [], start=1):
+        rec = dict(raw or {})
+        answers = _answers_48_from_raw(rec.get("answers")) or []
+        scores = _normalize_scores_dict(rec.get("scores"))
+        respondent_id = str(scores.get("respondent_id") or "").strip() or f"R{idx:04d}"
+        out: Dict[str, Any] = {
+            "response_id": str(rec.get("id") or "").strip(),
+            "created_at": rec.get("created_at"),
+            "respondent_id": respondent_id,
+        }
+        for i in range(1, 49):
+            out[f"Q{i}"] = answers[i - 1] if len(answers) >= i else None
+        out["raw_total"] = rec.get("raw_total")
+        records.append(out)
+    cols = ["response_id", "created_at", "respondent_id", *PERSONAL_QUESTION_COLUMNS, "raw_total"]
+    return pd.DataFrame(records, columns=cols)
+
+
+def delete_personal_responses_by_ids(sb: Client, study_id: str, response_ids: List[str]) -> int:
+    sid = str(study_id or "").strip()
+    ids = [str(v or "").strip() for v in (response_ids or [])]
+    ids = [v for v in ids if v]
+    if not sid or not ids:
+        return 0
+    removed = 0
+    chunk_size = 200
+    for start in range(0, len(ids), chunk_size):
+        chunk = ids[start : start + chunk_size]
+        if not chunk:
+            continue
+        try:
+            sb.table("responses").delete().eq("study_id", sid).in_("id", chunk).execute()
+            removed += len(chunk)
+        except Exception:
+            for rid in chunk:
+                sb.table("responses").delete().eq("study_id", sid).eq("id", rid).execute()
+                removed += 1
+    return removed
 
 
 def fetch_personal_response_count(sb: Client, study_id: str) -> int:
