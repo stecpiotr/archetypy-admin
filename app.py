@@ -2958,21 +2958,47 @@ def _metryczka_extract_move_marker(df: Any, marker_col: str = "Przesuń") -> Tup
     return out, selected_idx
 
 
-def _editor_live_df(returned_df: Any, widget_state: Any) -> pd.DataFrame:
+def _editor_live_df(base_df: Any, widget_state: Any, *, returned_df: Any = None) -> pd.DataFrame:
     """
-    Streamlit bywa niespójny: `st.data_editor` zwraca DataFrame, ale session_state
-    pod kluczem widgetu czasem przechowuje obiekt stanu (dict), nie tabelę.
-    W przypadku dict aplikujemy delty edycji do ostatniej tabeli, aby uniknąć efektu
-    "muszę wpisać drugi raz".
+    Streamlit potrafi zwracać niespójne źródła stanu `st.data_editor`:
+    - czasem pełny DataFrame pod kluczem widgetu,
+    - czasem słownik delt (`edited_rows`, `added_rows`, ...),
+    - a wartość zwrotna z `st.data_editor` bywa opóźniona o 1 rerun.
+
+    Zasada:
+    1) bazujemy na ostatnim stabilnym stanie tabeli (`base_df` z session_state),
+    2) gdy mamy delty (dict) – aplikujemy je na bazę,
+    3) gdy mamy dwa DataFrame (widget + returned) – wybieramy ten, który
+       realnie odchodzi od bazy (świeższy).
     """
+    base_clean = _metryczka_editor_df_clean(base_df)
+    base_work = _metryczka_attach_move_marker(base_clean, selected_index=-1)
+    returned_work = returned_df.copy() if isinstance(returned_df, pd.DataFrame) else None
+
+    def _df_equalish(a: Any, b: Any) -> bool:
+        if not isinstance(a, pd.DataFrame) or not isinstance(b, pd.DataFrame):
+            return False
+        try:
+            return a.reset_index(drop=True).equals(b.reset_index(drop=True))
+        except Exception:
+            return False
+
     if isinstance(widget_state, pd.DataFrame):
+        if isinstance(returned_work, pd.DataFrame):
+            ws_eq_base = _df_equalish(widget_state, base_work)
+            ret_eq_base = _df_equalish(returned_work, base_work)
+            if ws_eq_base and not ret_eq_base:
+                return returned_work
+            if ret_eq_base and not ws_eq_base:
+                return widget_state
         return widget_state
-    base_df = returned_df.copy() if isinstance(returned_df, pd.DataFrame) else pd.DataFrame()
+
     if isinstance(widget_state, dict):
-        work = base_df.copy()
+        work = base_work.copy()
         if work.empty:
+            seed = returned_work if isinstance(returned_work, pd.DataFrame) else base_clean
             work = _metryczka_attach_move_marker(
-                _metryczka_editor_df_clean(returned_df),
+                _metryczka_editor_df_clean(seed),
                 selected_index=-1,
             )
         default_row = {
@@ -3058,9 +3084,11 @@ def _editor_live_df(returned_df: Any, widget_state: Any) -> pd.DataFrame:
         if "Przesuń" in work.columns:
             work["Przesuń"] = work["Przesuń"].map(lambda v: _bool_from_any(v, False)).astype(bool)
         return work
-    if isinstance(returned_df, pd.DataFrame):
-        return returned_df
-    return _metryczka_attach_move_marker(_metryczka_editor_df_clean(returned_df), selected_index=-1)
+    if isinstance(returned_work, pd.DataFrame):
+        return returned_work
+    if isinstance(base_work, pd.DataFrame) and not base_work.empty:
+        return base_work
+    return _metryczka_attach_move_marker(_metryczka_editor_df_clean(base_df), selected_index=-1)
 
 
 def _metryczka_options_from_df(df: Any) -> List[Dict[str, Any]]:
@@ -3762,7 +3790,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 tpl_editor_df = _metryczka_attach_move_marker(tpl_opts_df, move_idx)
                 tpl_icon_options = [""] + _metry_icon_options_for_df(tpl_opts_df)
                 tpl_editor_widget_key = f"{edit_opts_key}_editor_{picked_id}"
-                tpl_editor_df = st.data_editor(
+                tpl_editor_returned_df = st.data_editor(
                     tpl_editor_df,
                     height=_metryczka_data_editor_height(tpl_opts_df),
                     use_container_width=True,
@@ -3809,8 +3837,9 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
                 # W praktyce st.data_editor bywa "o 1 rerun do tyłu" na wartości zwracanej.
                 # Źródłem prawdy jest stan widgetu pod jego kluczem.
                 tpl_editor_live = _editor_live_df(
-                    tpl_editor_df,
+                    tpl_opts_df,
                     st.session_state.get(tpl_editor_widget_key),
+                    returned_df=tpl_editor_returned_df,
                 )
                 tpl_opts_df, move_idx = _metryczka_extract_move_marker(tpl_editor_live)
                 st.session_state[edit_opts_key] = tpl_opts_df
@@ -4051,7 +4080,7 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         options_editor_df = _metryczka_attach_move_marker(options_df, move_idx)
         options_icon_options = [""] + _metry_icon_options_for_df(options_df)
         options_editor_widget_key = f"{widget_prefix}opts_{ui_key}"
-        options_editor_df = st.data_editor(
+        options_editor_returned_df = st.data_editor(
             options_editor_df,
             height=_metryczka_data_editor_height(options_df),
             use_container_width=True,
@@ -4097,8 +4126,9 @@ def _render_metryczka_editor(kind: str, study_key: str, current_cfg: Dict[str, A
         )
         # Odczytujemy "live" dane z session_state, żeby nie gubić pierwszej edycji komórki.
         options_editor_live = _editor_live_df(
-            options_editor_df,
+            options_df,
             st.session_state.get(options_editor_widget_key),
+            returned_df=options_editor_returned_df,
         )
         edited_options_df, move_idx = _metryczka_extract_move_marker(options_editor_live)
         st.session_state[options_df_state_key] = edited_options_df
