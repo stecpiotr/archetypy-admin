@@ -5522,6 +5522,7 @@ def personal_io_view() -> None:
     st.markdown("---")
     st.markdown("### Eksport odpowiedzi")
     rows = list_personal_responses(sb, study_id)
+    st.caption(f"Liczba rekordów w bazie: {len(rows)}")
     if not rows:
         st.info("Brak odpowiedzi do eksportu.")
         return
@@ -5547,7 +5548,33 @@ def personal_io_view() -> None:
 
     st.markdown("#### Podgląd odpowiedzi")
     preview_df = out_df.copy()
-    preview_df.insert(0, "Usuń", False)
+    response_ids_all = [
+        str(v).strip()
+        for v in preview_df.get("response_id", pd.Series(dtype=str)).tolist()
+        if str(v).strip()
+    ]
+    selected_state_key = f"personal_io_selected_ids_{study_id}"
+    select_all_key = f"personal_io_select_all_{study_id}"
+    select_all_prev_key = f"personal_io_select_all_prev_{study_id}"
+    stored_selected = [
+        sid
+        for sid in st.session_state.get(selected_state_key, [])
+        if isinstance(sid, str) and sid in response_ids_all
+    ]
+    select_all_now = st.checkbox(
+        "Zaznacz wszystkie",
+        key=select_all_key,
+        help="Zaznacza wszystkie rekordy; potem możesz odklikać wybrane pozycje w kolumnie Usuń.",
+    )
+    select_all_prev = bool(st.session_state.get(select_all_prev_key, False))
+    if select_all_now and not select_all_prev:
+        stored_selected = list(response_ids_all)
+    elif (not select_all_now) and select_all_prev:
+        stored_selected = []
+    st.session_state[select_all_prev_key] = select_all_now
+    st.session_state[selected_state_key] = stored_selected
+
+    preview_df.insert(0, "Usuń", preview_df["response_id"].astype(str).isin(set(stored_selected)))
 
     selected_ids: List[str] = []
     editor_key = f"personal_io_editor_{study_id}"
@@ -5570,14 +5597,17 @@ def personal_io_view() -> None:
         if isinstance(edited_df, pd.DataFrame):
             sel_series = edited_df.loc[edited_df["Usuń"] == True, "response_id"]  # noqa: E712
             selected_ids = [str(v).strip() for v in sel_series.tolist() if str(v).strip()]
+            st.session_state[selected_state_key] = selected_ids
     except Exception:
         st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
         options_ids = [str(v).strip() for v in out_df.get("response_id", pd.Series(dtype=str)).tolist() if str(v).strip()]
         selected_ids = st.multiselect(
             "Wybierz rekordy do usunięcia",
             options=options_ids,
+            default=[sid for sid in st.session_state.get(selected_state_key, []) if sid in options_ids],
             key=f"personal_io_delete_multiselect_{study_id}",
         )
+        st.session_state[selected_state_key] = selected_ids
 
     selected_unique = sorted(set(selected_ids))
     delete_confirm_key = f"personal_io_delete_confirm_{study_id}"
@@ -5831,6 +5861,7 @@ def jst_io_view() -> None:
     st.markdown("---")
     st.markdown("### Eksport odpowiedzi")
     rows = list_jst_responses(sb, study_id)
+    st.caption(f"Liczba rekordów w bazie: {len(rows)}")
     if not rows:
         st.info("Brak odpowiedzi do eksportu.")
         return
@@ -5861,7 +5892,33 @@ def jst_io_view() -> None:
         if len(fallback_ids) != len(preview_df.index):
             fallback_ids = [f"R{idx:04d}" for idx in range(1, len(preview_df.index) + 1)]
         preview_df.insert(0, "respondent_id", fallback_ids)
-    preview_df.insert(0, "Usuń", False)
+    respondent_ids_all = [
+        str(v).strip()
+        for v in preview_df.get("respondent_id", pd.Series(dtype=str)).tolist()
+        if str(v).strip()
+    ]
+    selected_state_key = f"jst_io_selected_ids_{study_id}"
+    select_all_key = f"jst_io_select_all_{study_id}"
+    select_all_prev_key = f"jst_io_select_all_prev_{study_id}"
+    stored_selected = [
+        sid
+        for sid in st.session_state.get(selected_state_key, [])
+        if isinstance(sid, str) and sid in respondent_ids_all
+    ]
+    select_all_now = st.checkbox(
+        "Zaznacz wszystkie",
+        key=select_all_key,
+        help="Zaznacza wszystkie rekordy; potem możesz odklikać wybrane pozycje w kolumnie Usuń.",
+    )
+    select_all_prev = bool(st.session_state.get(select_all_prev_key, False))
+    if select_all_now and not select_all_prev:
+        stored_selected = list(respondent_ids_all)
+    elif (not select_all_now) and select_all_prev:
+        stored_selected = []
+    st.session_state[select_all_prev_key] = select_all_now
+    st.session_state[selected_state_key] = stored_selected
+
+    preview_df.insert(0, "Usuń", preview_df["respondent_id"].astype(str).isin(set(stored_selected)))
 
     selected_ids: List[str] = []
     editor_key = f"jst_io_editor_{study_id}"
@@ -5884,14 +5941,17 @@ def jst_io_view() -> None:
         if isinstance(edited_df, pd.DataFrame):
             sel_series = edited_df.loc[edited_df["Usuń"] == True, "respondent_id"]  # noqa: E712
             selected_ids = [str(v).strip() for v in sel_series.tolist() if str(v).strip()]
+            st.session_state[selected_state_key] = selected_ids
     except Exception:
         st.dataframe(out_df, use_container_width=True, hide_index=True, height=420)
         options = [str(v).strip() for v in out_df.get("respondent_id", pd.Series(dtype=str)).tolist() if str(v).strip()]
         selected_ids = st.multiselect(
             "Wybierz respondentów do usunięcia",
             options=options,
+            default=[sid for sid in st.session_state.get(selected_state_key, []) if sid in options],
             key=f"jst_io_delete_multiselect_{study_id}",
         )
+        st.session_state[selected_state_key] = selected_ids
 
     selected_unique = sorted(set(selected_ids))
     delete_confirm_key = f"jst_io_delete_confirm_{study_id}"
