@@ -1641,6 +1641,35 @@ def delete_jst_responses_by_respondent_ids(
     return len(ids_to_delete)
 
 
+def _is_duplicate_conflict_error(exc: Exception) -> bool:
+    msg = str(exc or "").lower()
+    return bool(
+        "duplicate" in msg
+        or "unique" in msg
+        or "23505" in msg
+        or "conflict" in msg
+    )
+
+
+def _build_jst_response_record(
+    *,
+    study_id: str,
+    respondent_id: str,
+    payload: Dict[str, Any],
+    source: str,
+) -> Dict[str, Any]:
+    now_iso = _utc_now_iso()
+    return {
+        "id": str(uuid.uuid4()),
+        "study_id": str(study_id),
+        "respondent_id": str(respondent_id),
+        "payload": dict(payload),
+        "source": str(source or "web"),
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+
 def insert_jst_response(
     sb: Client,
     study_id: str,
@@ -1649,23 +1678,90 @@ def insert_jst_response(
     source: str = "web",
     skip_if_exists: bool = True,
 ) -> bool:
-    rec = {
-        "id": str(uuid.uuid4()),
-        "study_id": str(study_id),
-        "respondent_id": str(respondent_id),
-        "payload": dict(payload),
-        "source": str(source or "web"),
-        "created_at": _utc_now_iso(),
-        "updated_at": _utc_now_iso(),
-    }
+    rec = _build_jst_response_record(
+        study_id=str(study_id),
+        respondent_id=str(respondent_id),
+        payload=payload,
+        source=source,
+    )
     try:
         ins = sb.table("jst_responses").insert(rec).execute()
         return bool(ins.data)
     except Exception as exc:
-        msg = str(exc).lower()
-        if skip_if_exists and ("duplicate" in msg or "unique" in msg or "23505" in msg or "conflict" in msg):
+        if skip_if_exists and _is_duplicate_conflict_error(exc):
             return False
         raise
+
+
+def insert_jst_response_batch(
+    sb: Client,
+    *,
+    study_id: str,
+    rows: Iterable[Dict[str, Any]],
+    source: str = "web",
+    skip_if_exists: bool = True,
+) -> Dict[str, int]:
+    sid = str(study_id or "").strip()
+    prepared: List[Dict[str, Any]] = []
+    skipped = 0
+    seen_rids: set[str] = set()
+
+    for raw in rows or []:
+        row = dict(raw or {})
+        rid = str(row.get("respondent_id") or "").strip()
+        payload = row.get("payload")
+        if not rid:
+            skipped += 1
+            continue
+        if not isinstance(payload, dict):
+            skipped += 1
+            continue
+        if skip_if_exists and rid in seen_rids:
+            skipped += 1
+            continue
+        seen_rids.add(rid)
+        prepared.append(
+            _build_jst_response_record(
+                study_id=sid,
+                respondent_id=rid,
+                payload=payload,
+                source=source,
+            )
+        )
+
+    if not prepared:
+        return {"inserted": 0, "skipped": skipped, "errors": 0}
+
+    try:
+        ins = sb.table("jst_responses").insert(prepared).execute()
+        inserted = len(prepared)
+        ins_data = getattr(ins, "data", None)
+        if isinstance(ins_data, list) and ins_data:
+            inserted = min(len(prepared), len(ins_data))
+        skipped += max(0, len(prepared) - inserted)
+        return {"inserted": inserted, "skipped": skipped, "errors": 0}
+    except Exception as exc:
+        if not (skip_if_exists and _is_duplicate_conflict_error(exc)):
+            raise
+        inserted = 0
+        errors = 0
+        for rec in prepared:
+            try:
+                ok = insert_jst_response(
+                    sb,
+                    study_id=sid,
+                    respondent_id=str(rec.get("respondent_id") or ""),
+                    payload=dict(rec.get("payload") or {}),
+                    source=source,
+                    skip_if_exists=skip_if_exists,
+                )
+                if ok:
+                    inserted += 1
+                else:
+                    skipped += 1
+            except Exception:
+                errors += 1
+        return {"inserted": inserted, "skipped": skipped, "errors": errors}
 
 
 def _strip_accents(s: str) -> str:

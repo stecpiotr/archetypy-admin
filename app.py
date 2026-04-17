@@ -54,6 +54,7 @@ from db_jst_utils import (
     fetch_jst_study_by_id,
     fetch_jst_studies,
     insert_jst_response,
+    insert_jst_response_batch,
     import_template_dataframe as jst_import_template_dataframe,
     insert_jst_study,
     list_jst_responses,
@@ -146,6 +147,62 @@ def _secret_get(name: str) -> str:
         return str(st.secrets.get(name) or "").strip()
     except Exception:
         return ""
+
+
+_TRANSIENT_IMPORT_ERROR_TOKENS: Tuple[str, ...] = (
+    "server disconnected",
+    "connection reset",
+    "connection aborted",
+    "connection refused",
+    "broken pipe",
+    "remote end closed connection",
+    "read timed out",
+    "timed out",
+    "timeout",
+    "temporarily unavailable",
+    "temporary failure",
+    "econnreset",
+)
+
+
+def _is_transient_import_error(exc: Exception) -> bool:
+    msg = str(exc or "").strip().lower()
+    if not msg:
+        return False
+    return any(token in msg for token in _TRANSIENT_IMPORT_ERROR_TOKENS)
+
+
+def _call_with_retry(
+    call_fn: Callable[[], Any],
+    *,
+    max_attempts: int = 4,
+    base_sleep_seconds: float = 0.35,
+) -> Tuple[Optional[Any], Optional[Exception], int]:
+    last_exc: Optional[Exception] = None
+    attempts = max(1, int(max_attempts))
+    for attempt in range(1, attempts + 1):
+        try:
+            return call_fn(), None, attempt
+        except Exception as exc:
+            last_exc = exc
+            if (not _is_transient_import_error(exc)) or attempt >= attempts:
+                return None, last_exc, attempt
+            time.sleep(float(base_sleep_seconds) * (2 ** (attempt - 1)))
+    return None, last_exc, attempts
+
+
+def _insert_with_retry(
+    insert_fn: Callable[[], bool],
+    *,
+    max_attempts: int = 4,
+    base_sleep_seconds: float = 0.35,
+) -> Tuple[Optional[bool], Optional[Exception], int]:
+    result, err, attempts = _call_with_retry(
+        lambda: bool(insert_fn()),
+        max_attempts=max_attempts,
+        base_sleep_seconds=base_sleep_seconds,
+    )
+    return (bool(result) if result is not None else None), err, attempts
 
 
 def _to_warsaw_time(raw: str) -> str:
@@ -5341,7 +5398,7 @@ def personal_io_view() -> None:
     safe_name = slugify(slug) or "personal"
 
     st.markdown("### Szablon importu")
-    template_df = personal_import_template_dataframe()
+    template_df = personal_import_template_dataframe(study.get("metryczka_config"))
     tpl_col1, tpl_col2 = st.columns(2)
     with tpl_col1:
         _download_button_compat(
@@ -5360,8 +5417,9 @@ def personal_io_view() -> None:
             use_container_width=True,
         )
     st.caption(
-        "Import personalny przyjmuje kolumny respondent_id + Q1..Q48 (wartości 0..5). "
-        "Metryczka nie jest wymagana."
+        "Import personalny (aktualny schemat bazy): `respondent_id`, `answers` (JSON: 48 wartości 0..5), "
+        "opcjonalnie `raw_total` i kolumny metryczkowe `M_*`/`METRY_M_*` zgodne z konfiguracją badania. "
+        "Dla kompatybilności nadal akceptujemy starszy układ `Q1..Q48`."
     )
 
     st.markdown("### Import odpowiedzi (CSV / XLSX)")
@@ -5398,6 +5456,8 @@ def personal_io_view() -> None:
                     inserted = 0
                     skipped = 0
                     invalid = 0
+                    insert_errors = 0
+                    error_samples: List[str] = []
                     progress_every = max(1, total_rows // 120)
                     for idx, (_, row) in enumerate(src_df.iterrows(), start=1):
                         raw = {k: row.get(k) for k in src_df.columns}
@@ -5416,16 +5476,25 @@ def personal_io_view() -> None:
                             skipped += 1
                         else:
                             payload = make_personal_payload_from_row(norm)
-                            ok = insert_personal_response(
-                                sb,
-                                study_id=study_id,
-                                payload=payload,
+                            result, err, _attempts = _insert_with_retry(
+                                lambda: insert_personal_response(
+                                    sb,
+                                    study_id=study_id,
+                                    payload=payload,
+                                )
                             )
-                            if ok:
+                            if result is True:
                                 inserted += 1
                                 existing_rids.add(norm_rid)
-                            else:
+                            elif result is False:
                                 skipped += 1
+                            else:
+                                insert_errors += 1
+                                if len(error_samples) < 5:
+                                    err_txt = str(err or "nieznany błąd zapisu").strip()
+                                    if len(err_txt) > 180:
+                                        err_txt = err_txt[:177] + "..."
+                                    error_samples.append(f"wiersz {idx} ({norm_rid}): {err_txt}")
 
                         if idx == 1 or idx % progress_every == 0 or idx == total_rows:
                             progress.progress(
@@ -5438,8 +5507,15 @@ def personal_io_view() -> None:
 
                 st.success(
                     f"Import zakończony. Dodano: {inserted}, pominięto (duplikaty/błędy zapisu): {skipped}, "
-                    f"niepoprawne wiersze: {invalid}."
+                    f"niepoprawne wiersze: {invalid}, błędy zapisu: {insert_errors}."
                 )
+                if insert_errors:
+                    st.warning(
+                        "Część wierszy nie została zapisana (np. chwilowe rozłączenie serwera). "
+                        "Możesz ponowić import tego samego pliku - duplikaty zostaną pominięte."
+                    )
+                    if error_samples:
+                        st.caption("Przykładowe błędy: " + " | ".join(error_samples))
             except Exception as e:
                 st.error(f"Błąd importu: {e}")
 
@@ -5450,7 +5526,7 @@ def personal_io_view() -> None:
         st.info("Brak odpowiedzi do eksportu.")
         return
 
-    out_df = personal_response_rows_to_dataframe(rows)
+    out_df = personal_response_rows_to_dataframe(rows, metryczka_config=study.get("metryczka_config"))
     c1, c2 = st.columns(2)
     with c1:
         _download_button_compat(
@@ -5632,6 +5708,10 @@ def jst_io_view() -> None:
 
                     inserted = 0
                     skipped = 0
+                    insert_errors = 0
+                    error_samples: List[str] = []
+                    prepared_rows: List[Dict[str, Any]] = []
+                    seen_upload_ids: set[str] = set()
                     progress_every = max(1, total_rows // 120)
                     for idx, (_, row) in enumerate(src_df.iterrows(), start=1):
                         raw = {k: row.get(k) for k in src_df.columns}
@@ -5646,34 +5726,105 @@ def jst_io_view() -> None:
                         )
                         if not norm.get("respondent_id"):
                             norm["respondent_id"] = rid
+                        norm_rid = str(norm.get("respondent_id") or "").strip() or rid
 
-                        if norm["respondent_id"] in existing_ids:
+                        if norm_rid in existing_ids or norm_rid in seen_upload_ids:
                             skipped += 1
                         else:
-                            ok = insert_jst_response(
-                                sb,
-                                study_id=study_id,
-                                respondent_id=str(norm["respondent_id"]),
-                                payload=jst_make_payload_from_row(norm, metryczka_config=metry_cfg),
-                                source="import",
-                                skip_if_exists=True,
-                            )
-                            if ok:
-                                inserted += 1
-                                existing_ids.add(str(norm["respondent_id"]))
-                            else:
-                                skipped += 1
+                            try:
+                                payload = jst_make_payload_from_row(norm, metryczka_config=metry_cfg)
+                                prepared_rows.append(
+                                    {
+                                        "respondent_id": norm_rid,
+                                        "payload": payload,
+                                        "_row_idx": idx,
+                                    }
+                                )
+                                seen_upload_ids.add(norm_rid)
+                            except Exception as err:
+                                insert_errors += 1
+                                if len(error_samples) < 5:
+                                    err_txt = str(err or "nieznany błąd zapisu").strip()
+                                    if len(err_txt) > 180:
+                                        err_txt = err_txt[:177] + "..."
+                                    error_samples.append(
+                                        f"wiersz {idx} ({norm_rid}): {err_txt}"
+                                    )
 
                         if idx == 1 or idx % progress_every == 0 or idx == total_rows:
                             progress.progress(
-                                min(1.0, idx / max(total_rows, 1)),
-                                text=f"Importowanie rekordów: {idx}/{total_rows}",
+                                min(0.55, 0.55 * idx / max(total_rows, 1)),
+                                text=f"Walidacja rekordów: {idx}/{total_rows}",
+                            )
+
+                    batch_size = 250
+                    total_prepared = len(prepared_rows)
+                    if total_prepared:
+                        for start in range(0, total_prepared, batch_size):
+                            chunk = prepared_rows[start : start + batch_size]
+                            batch_result, batch_err, _batch_attempts = _call_with_retry(
+                                lambda chunk=chunk: insert_jst_response_batch(
+                                    sb,
+                                    study_id=study_id,
+                                    rows=chunk,
+                                    source="import",
+                                    skip_if_exists=True,
+                                )
+                            )
+                            if batch_result is None:
+                                # Awaryjnie: zapis pojedynczy dla tej paczki, żeby nie stracić całości importu.
+                                for rec in chunk:
+                                    row_rid = str(rec.get("respondent_id") or "").strip()
+                                    row_payload = dict(rec.get("payload") or {})
+                                    row_idx = int(rec.get("_row_idx") or 0)
+                                    row_result, row_err, _row_attempts = _insert_with_retry(
+                                        lambda row_rid=row_rid, row_payload=row_payload: insert_jst_response(
+                                            sb,
+                                            study_id=study_id,
+                                            respondent_id=row_rid,
+                                            payload=row_payload,
+                                            source="import",
+                                            skip_if_exists=True,
+                                        )
+                                    )
+                                    if row_result is True:
+                                        inserted += 1
+                                    elif row_result is False:
+                                        skipped += 1
+                                    else:
+                                        insert_errors += 1
+                                        if len(error_samples) < 5:
+                                            err_txt = str(row_err or batch_err or "nieznany błąd zapisu").strip()
+                                            if len(err_txt) > 180:
+                                                err_txt = err_txt[:177] + "..."
+                                            rid_txt = row_rid or "brak_id"
+                                            idx_txt = row_idx if row_idx > 0 else "?"
+                                            error_samples.append(f"wiersz {idx_txt} ({rid_txt}): {err_txt}")
+                            else:
+                                inserted += int(batch_result.get("inserted") or 0)
+                                skipped += int(batch_result.get("skipped") or 0)
+                                insert_errors += int(batch_result.get("errors") or 0)
+
+                            done = min(total_prepared, start + len(chunk))
+                            progress.progress(
+                                min(0.99, 0.55 + 0.45 * done / max(total_prepared, 1)),
+                                text=f"Zapisywanie do bazy: {done}/{total_prepared}",
                             )
 
                     progress.progress(1.0, text="Finalizacja importu...")
                     progress.empty()
 
-                st.success(f"Import zakończony. Dodano: {inserted}, pominięto: {skipped}.")
+                st.success(
+                    f"Import zakończony. Dodano: {inserted}, pominięto: {skipped}, "
+                    f"błędy zapisu: {insert_errors}."
+                )
+                if insert_errors:
+                    st.warning(
+                        "Część wierszy nie została zapisana (np. chwilowe rozłączenie serwera). "
+                        "Możesz ponowić import tego samego pliku - duplikaty zostaną pominięte."
+                    )
+                    if error_samples:
+                        st.caption("Przykładowe błędy: " + " | ".join(error_samples))
             except Exception as e:
                 st.error(f"Błąd importu: {e}")
 

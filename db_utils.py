@@ -9,7 +9,11 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from supabase import create_client, Client
-from metryczka_config import default_personal_metryczka_config, normalize_personal_metryczka_config
+from metryczka_config import (
+    default_personal_metryczka_config,
+    metryczka_questions,
+    normalize_personal_metryczka_config,
+)
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Łagodne importy z polish.py (fallbacki jeśli czegoś brak)
@@ -140,7 +144,9 @@ def _attach_inflections_for_insert(payload: Dict) -> Dict:
 # ────────────────────────────────────────────────────────────────────────────────
 _ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
 PERSONAL_QUESTION_COLUMNS: List[str] = [f"Q{i}" for i in range(1, 49)]
-PERSONAL_TEMPLATE_COLUMNS: List[str] = ["respondent_id", *PERSONAL_QUESTION_COLUMNS]
+PERSONAL_TEMPLATE_LEGACY_COLUMNS: List[str] = ["respondent_id", *PERSONAL_QUESTION_COLUMNS]
+PERSONAL_TEMPLATE_BASE_COLUMNS: List[str] = ["respondent_id", "created_at", "answers", "raw_total"]
+PERSONAL_METRY_PREFIX = "M_"
 
 
 def _utc_now_iso() -> str:
@@ -336,6 +342,26 @@ def _normalize_scores_dict(raw: Any) -> Dict[str, Any]:
     return {}
 
 
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        txt = str(value).strip()
+    except Exception:
+        return ""
+    if txt.lower() in {"", "nan", "none", "<na>"}:
+        return ""
+    return txt
+
+
+def _first_clean_text(*values: Any) -> str:
+    for value in values:
+        txt = _clean_text(value)
+        if txt:
+            return txt
+    return ""
+
+
 def _to_int_0_5(value: Any) -> Optional[int]:
     if value is None:
         return None
@@ -367,18 +393,95 @@ def _answers_48_from_raw(raw: Any) -> Optional[List[int]]:
     return out
 
 
-def personal_import_template_dataframe() -> pd.DataFrame:
-    return pd.DataFrame(columns=PERSONAL_TEMPLATE_COLUMNS)
+def _personal_metry_columns_from_config(metryczka_config: Any = None) -> List[str]:
+    cols: List[str] = []
+    for q in metryczka_questions(metryczka_config):
+        if not isinstance(q, dict):
+            continue
+        db_col = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not db_col.startswith(PERSONAL_METRY_PREFIX):
+            continue
+        if db_col not in cols:
+            cols.append(db_col)
+        options = list(q.get("options") or [])
+        has_open = any(isinstance(opt, dict) and bool(opt.get("is_open")) for opt in options)
+        if has_open or db_col == "M_ZAWOD":
+            other_col = f"{db_col}_OTHER"
+            if other_col not in cols:
+                cols.append(other_col)
+    return cols
+
+
+def _personal_template_columns(metryczka_config: Any = None) -> List[str]:
+    cols = list(PERSONAL_TEMPLATE_BASE_COLUMNS)
+    for col in _personal_metry_columns_from_config(metryczka_config):
+        if col not in cols:
+            cols.append(col)
+    return cols
+
+
+def _normalize_metryczka_dict(raw: Any) -> Dict[str, str]:
+    payload = _normalize_scores_dict(raw)
+    out: Dict[str, str] = {}
+    for key, val in payload.items():
+        col = str(key or "").strip().upper()
+        if not col.startswith(PERSONAL_METRY_PREFIX):
+            continue
+        text = _clean_text(val)
+        if text:
+            out[col] = text
+    return out
+
+
+def _extract_metryczka_from_row(src: Dict[str, Any]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    if not isinstance(src, dict):
+        return out
+
+    scores_payload = _normalize_scores_dict(src.get("scores") or src.get("p_scores"))
+    if scores_payload:
+        nested = scores_payload.get("metryczka")
+        if nested is not None:
+            out.update(_normalize_metryczka_dict(nested))
+        out.update(_normalize_metryczka_dict(scores_payload))
+
+    if src.get("metryczka") is not None:
+        out.update(_normalize_metryczka_dict(src.get("metryczka")))
+
+    for raw_key, raw_val in src.items():
+        key = str(raw_key or "").strip().upper()
+        if not key:
+            continue
+        if key.startswith("METRY_M_"):
+            mapped = key[len("METRY_") :]
+        elif key.startswith(PERSONAL_METRY_PREFIX):
+            mapped = key
+        else:
+            continue
+        val = _clean_text(raw_val)
+        if val:
+            out[mapped] = val
+    return out
+
+
+def personal_import_template_dataframe(metryczka_config: Any = None) -> pd.DataFrame:
+    return pd.DataFrame(columns=_personal_template_columns(metryczka_config))
 
 
 def normalize_personal_response_row(raw: Dict[str, Any], respondent_id_fallback: str = "") -> Dict[str, Any]:
     src = dict(raw or {})
-    respondent_id = str(src.get("respondent_id") or src.get("RespondentID") or "").strip()
+    scores = _normalize_scores_dict(src.get("scores") or src.get("p_scores"))
+    respondent_id = _first_clean_text(
+        src.get("respondent_id"),
+        src.get("RespondentID"),
+        scores.get("respondent_id"),
+        scores.get("RespondentID"),
+    )
     if not respondent_id:
-        respondent_id = str(respondent_id_fallback or "").strip()
+        respondent_id = _clean_text(respondent_id_fallback)
 
     answers: List[Optional[int]] = []
-    from_blob = _answers_48_from_raw(src.get("answers"))
+    from_blob = _answers_48_from_raw(src.get("answers")) or _answers_48_from_raw(src.get("p_answers"))
     if from_blob:
         answers = [int(v) for v in from_blob]
     else:
@@ -386,10 +489,16 @@ def normalize_personal_response_row(raw: Dict[str, Any], respondent_id_fallback:
             keys = (
                 f"Q{i}",
                 f"q{i}",
+                f"Q_{i}",
+                f"q_{i}",
                 f"P{i}",
                 f"p{i}",
+                f"P_{i}",
+                f"p_{i}",
                 f"A{i}",
                 f"a{i}",
+                f"A_{i}",
+                f"a_{i}",
             )
             val = None
             for k in keys:
@@ -400,8 +509,22 @@ def normalize_personal_response_row(raw: Dict[str, Any], respondent_id_fallback:
 
     complete = len(answers) == 48 and all(isinstance(v, int) for v in answers)
     complete_answers: List[int] = [int(v) for v in answers if isinstance(v, int)] if complete else []
-    raw_total = int(sum(complete_answers)) if complete else None
-    scores = _normalize_scores_dict(src.get("scores"))
+    raw_total = None
+    if complete:
+        raw_total_raw = src.get("raw_total", src.get("p_raw_total"))
+        if raw_total_raw is None or str(raw_total_raw).strip() == "":
+            raw_total = int(sum(complete_answers))
+        else:
+            try:
+                raw_total = int(float(str(raw_total_raw).strip().replace(",", ".")))
+            except Exception:
+                raw_total = int(sum(complete_answers))
+
+    metryczka = _extract_metryczka_from_row(src)
+    if metryczka:
+        scores["metryczka"] = metryczka
+    if respondent_id and not _clean_text(scores.get("respondent_id")):
+        scores["respondent_id"] = respondent_id
 
     return {
         "respondent_id": respondent_id,
@@ -409,6 +532,7 @@ def normalize_personal_response_row(raw: Dict[str, Any], respondent_id_fallback:
         "answers_complete": bool(complete),
         "raw_total": raw_total,
         "scores": scores,
+        "metryczka": metryczka,
     }
 
 
@@ -424,9 +548,13 @@ def make_personal_payload_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         raw_total_int = int(sum(answers_48))
 
-    scores = _normalize_scores_dict(row.get("scores"))
-    rid = str(row.get("respondent_id") or "").strip()
-    if rid and not str(scores.get("respondent_id") or "").strip():
+    row_src = dict(row or {})
+    scores = _normalize_scores_dict(row_src.get("scores") or row_src.get("p_scores"))
+    metryczka = _extract_metryczka_from_row(row_src)
+    if metryczka:
+        scores["metryczka"] = metryczka
+    rid = _clean_text(row.get("respondent_id"))
+    if rid and not _clean_text(scores.get("respondent_id")):
         scores["respondent_id"] = rid
 
     payload: Dict[str, Any] = {
@@ -466,24 +594,41 @@ def insert_personal_response(
     return bool(ins.data)
 
 
-def personal_response_rows_to_dataframe(rows: List[Dict[str, Any]]) -> pd.DataFrame:
+def personal_response_rows_to_dataframe(rows: List[Dict[str, Any]], metryczka_config: Any = None) -> pd.DataFrame:
+    configured_metry_cols = _personal_metry_columns_from_config(metryczka_config)
+    detected_metry_cols: List[str] = []
     records: List[Dict[str, Any]] = []
     for idx, raw in enumerate(rows or [], start=1):
         rec = dict(raw or {})
         answers = _answers_48_from_raw(rec.get("answers")) or []
         scores = _normalize_scores_dict(rec.get("scores"))
-        respondent_id = str(scores.get("respondent_id") or "").strip() or f"R{idx:04d}"
+        metryczka = _extract_metryczka_from_row({"scores": scores})
+        for col in metryczka.keys():
+            if col not in detected_metry_cols:
+                detected_metry_cols.append(col)
+        respondent_id = _clean_text(scores.get("respondent_id")) or f"R{idx:04d}"
+        answers_json = json.dumps(answers, ensure_ascii=False) if answers else ""
         out: Dict[str, Any] = {
             "response_id": str(rec.get("id") or "").strip(),
             "created_at": rec.get("created_at"),
             "respondent_id": respondent_id,
+            "answers": answers_json,
+            "raw_total": rec.get("raw_total"),
+            "scores": json.dumps(scores, ensure_ascii=False) if scores else "",
+            "_metryczka": metryczka,
         }
-        for i in range(1, 49):
-            out[f"Q{i}"] = answers[i - 1] if len(answers) >= i else None
-        out["raw_total"] = rec.get("raw_total")
         records.append(out)
-    cols = ["response_id", "created_at", "respondent_id", *PERSONAL_QUESTION_COLUMNS, "raw_total"]
-    return pd.DataFrame(records, columns=cols)
+
+    metry_cols = [*configured_metry_cols, *[c for c in detected_metry_cols if c not in configured_metry_cols]]
+    flat_records: List[Dict[str, Any]] = []
+    for rec in records:
+        metryczka = dict(rec.pop("_metryczka", {}) or {})
+        for col in metry_cols:
+            rec[col] = _clean_text(metryczka.get(col))
+        flat_records.append(rec)
+
+    cols = ["response_id", "created_at", "respondent_id", "answers", "raw_total", "scores", *metry_cols]
+    return pd.DataFrame(flat_records, columns=cols)
 
 
 def delete_personal_responses_by_ids(sb: Client, study_id: str, response_ids: List[str]) -> int:
