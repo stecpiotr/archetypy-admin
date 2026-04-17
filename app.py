@@ -2200,14 +2200,14 @@ def home_personal_view() -> None:
         if st.button("✉️\n\nWyślij link do ankiety", key="tile_home_personal_send", type="secondary", use_container_width=True):
             goto("send")
     with c6:
-        if st.button("🔗\n\nPołącz badania", key="tile_home_personal_merge", type="secondary", use_container_width=True):
-            goto("personal_merge")
-    with c7:
-        if st.button("📊\n\nSprawdź wyniki badania archetypu", key="tile_home_personal_results", type="secondary", use_container_width=True):
-            goto("results")
-    with c8:
         if st.button("💾\n\nImport i eksport baz danych", key="tile_home_personal_io", type="secondary", use_container_width=True):
             goto("personal_io")
+    with c7:
+        if st.button("🔗\n\nPołącz badania", key="tile_home_personal_merge", type="secondary", use_container_width=True):
+            goto("personal_merge")
+    with c8:
+        if st.button("📊\n\nSprawdź wyniki badania archetypu", key="tile_home_personal_results", type="secondary", use_container_width=True):
+            goto("results")
 
     # 🔽 linia oddzielająca kafle od statystyk
     st.markdown(

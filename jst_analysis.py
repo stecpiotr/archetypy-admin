@@ -135,10 +135,17 @@ def _prepare_tool_run_dir(template_root: Path, run_root: Path) -> None:
         if src_engine.exists():
             dst_engine.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_engine, dst_engine)
-        for rel in ("requirements.txt", "README_PL.txt"):
+        sync_rules = (
+            ("requirements.txt", False),
+            ("README_PL.txt", False),
+            # Ten plik musi być zawsze aktualny, bo steruje publicznymi etykietami wartości.
+            ("archetype_values.json", True),
+        )
+        for rel, force_sync in sync_rules:
             src = template_root / rel
             dst = run_root / rel
-            if src.exists() and not dst.exists():
+            if src.exists() and (force_sync or not dst.exists()):
+                dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
         _sync_report_fonts()
         return
@@ -401,11 +408,12 @@ def _hash_payload(df: pd.DataFrame, study: Dict[str, Any], template_root: Path) 
     overrides_serialized = json.dumps(segment_overrides, ensure_ascii=False, sort_keys=True, default=str)
     archetype_label_mode = str(study.get("archetype_label_mode") or "male").strip().lower()
     engine_sha = _file_sha256(template_root / "analyze_poznan_archetypes.py")
-    jst_analysis_schema = "jst_analysis_hash_v6"
+    values_map_sha = _file_sha256(template_root / "archetype_values.json")
+    jst_analysis_schema = "jst_analysis_hash_v7"
     raw = (
         f"{jst_analysis_schema}|{study.get('id')}|{study.get('slug')}|{study.get('jst_full_nom')}|{study.get('jst_type')}|"
         f"{archetype_label_mode}|"
-        f"{poststrat_serialized}|{metryczka_serialized}|{population_15_plus}|{overrides_serialized}|{engine_sha}\n"
+        f"{poststrat_serialized}|{metryczka_serialized}|{population_15_plus}|{overrides_serialized}|{engine_sha}|{values_map_sha}\n"
         + df.to_csv(index=False)
     )
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()

@@ -372,6 +372,13 @@ DEFAULT_BRAND_VALUES = {
     "Buntownik": "Odnowa",
 }
 
+LEGACY_PUBLIC_VALUE_LABELS = {
+    "Racjonalność": "Rozsądek",
+    "Racjonalnosc": "Rozsądek",
+    "Skuteczność": "Porządek",
+    "Skutecznosc": "Porządek",
+}
+
 
 def load_brand_values(root: Path) -> Dict[str, str]:
     """
@@ -387,10 +394,12 @@ def load_brand_values(root: Path) -> Dict[str, str]:
             if isinstance(user_map, dict):
                 for k, v in user_map.items():
                     if k in mapping and isinstance(v, str) and v.strip():
-                        mapping[k] = v.strip()
+                        mapping[k] = _normalize_public_value_label(v.strip(), mapping)
         except Exception:
             # jeśli plik jest uszkodzony – zostają domyślne wartości
             pass
+    for k, v in list(mapping.items()):
+        mapping[k] = _normalize_public_value_label(v, mapping)
     globals()["CURRENT_BRAND_VALUES"] = dict(mapping)
     return mapping
 
@@ -410,9 +419,10 @@ def df_display_values(df: pd.DataFrame, brand_values: Dict[str, str], replace_in
         if not isinstance(x, str):
             return x
         out = brand_values.get(x, x)
-        if replace_inside and out == x:
+        if replace_inside:
             for a, v in brand_values.items():
                 out = out.replace(a, v)
+        out = _replace_legacy_public_values(out, brand_values)
         return out
 
     # 1) Komórki (bezpiecznie tylko kolumny tekstowe)
@@ -466,7 +476,10 @@ def df_display_values(df: pd.DataFrame, brand_values: Dict[str, str], replace_in
 
 def series_with_value_index(s: pd.Series, mapping: Dict[str, str]) -> pd.Series:
     s2 = s.copy()
-    s2.index = [mapping.get(str(i), str(i)) for i in s2.index]
+    s2.index = [
+        _replace_legacy_public_values(mapping.get(str(i), str(i)), mapping)
+        for i in s2.index
+    ]
     return s2
 
 
@@ -545,6 +558,58 @@ def _normalize_text_token(x: Any) -> str:
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
     s = re.sub(r"[^a-z0-9]+", " ", s).strip()
     return s
+
+
+def _public_value_label_aliases(brand_values: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    aliases: Dict[str, str] = {}
+
+    for v in DEFAULT_BRAND_VALUES.values():
+        vv = str(v)
+        key = _normalize_text_token(vv)
+        if key:
+            aliases[key] = vv
+
+    if isinstance(brand_values, dict):
+        for v in brand_values.values():
+            vv = str(v)
+            key = _normalize_text_token(vv)
+            if key:
+                aliases[key] = vv
+
+    for old, new in LEGACY_PUBLIC_VALUE_LABELS.items():
+        key = _normalize_text_token(old)
+        if key:
+            aliases[key] = str(new)
+
+    return aliases
+
+
+def _normalize_public_value_label(value: Any, brand_values: Optional[Dict[str, str]] = None) -> Any:
+    if not isinstance(value, str):
+        return value
+    raw = value.strip()
+    if not raw:
+        return raw
+    aliases = _public_value_label_aliases(brand_values)
+    return aliases.get(_normalize_text_token(raw), raw)
+
+
+def _replace_legacy_public_values(text: Any, brand_values: Optional[Dict[str, str]] = None) -> Any:
+    if not isinstance(text, str):
+        return text
+    out = str(text)
+
+    for old, new in LEGACY_PUBLIC_VALUE_LABELS.items():
+        out = re.sub(rf"\b{re.escape(str(old))}\b", str(new), out)
+
+    # Dla czystych etykiet (np. nazwa wiersza) normalizujemy także warianty tokenów.
+    stripped = out.strip()
+    if stripped:
+        normalized = _normalize_public_value_label(stripped, brand_values)
+        if stripped == out:
+            out = str(normalized)
+
+    return out
 
 
 def _build_archetype_lookup() -> Dict[str, int]:
@@ -7428,7 +7493,24 @@ def _brand_values_reverse_map() -> Dict[str, str]:
     rev: Dict[str, str] = {}
     if isinstance(mp, dict):
         for a, v in mp.items():
-            rev[str(v)] = str(a)
+            canon_v = str(_normalize_public_value_label(v, mp))
+            rev[canon_v] = str(a)
+            norm_key = _normalize_text_token(canon_v)
+            if norm_key:
+                rev[norm_key] = str(a)
+
+        # Stare publiczne etykiety muszą mapować do aktualnych archetypów.
+        for old_lbl, new_lbl in LEGACY_PUBLIC_VALUE_LABELS.items():
+            target_arch = None
+            for a, v in mp.items():
+                if str(_normalize_public_value_label(v, mp)) == str(new_lbl):
+                    target_arch = str(a)
+                    break
+            if target_arch:
+                rev[str(old_lbl)] = target_arch
+                old_norm = _normalize_text_token(old_lbl)
+                if old_norm:
+                    rev[old_norm] = target_arch
     return rev
 
 
@@ -7442,6 +7524,9 @@ def _resolve_archetype_for_need_axis(label: Any, index_hint: Optional[int] = Non
     rev = _brand_values_reverse_map()
     if s in rev:
         return str(rev[s])
+    s_norm = _normalize_text_token(s)
+    if s_norm and s_norm in rev:
+        return str(rev[s_norm])
 
     try:
         idx = int(index_hint) if index_hint is not None else -1
@@ -9206,7 +9291,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
     def _values_mode_text(x: Any) -> Any:
         if not isinstance(x, str):
             return x
-        s = str(x)
+        s = _replace_legacy_public_values(str(x), brand_values)
 
         phrase_replacements = [
             ("Archetyp / wartość", "Wartość"),
@@ -9259,6 +9344,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
         ]
         for old, new in word_replacements:
             s = s.replace(old, new)
+        s = _replace_legacy_public_values(s, brand_values)
         return s
 
     def _values_mode_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -9323,6 +9409,7 @@ try { if (window.__CLUSTER_RENDER) window.__CLUSTER_RENDER(); } catch(e) {}
             for k in sorted(brand_values.keys(), key=lambda z: -len(str(z))):
                 v = brand_values.get(k, k)
                 s = re.sub(rf"\b{re.escape(str(k))}\b", str(v), s)
+            s = _replace_legacy_public_values(s, brand_values)
             return s
 
         d_arche = df.copy() if df is not None else pd.DataFrame()
@@ -12856,7 +12943,7 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
         )
 
     def _to_values_language(text: Any) -> str:
-        s = str(text or "")
+        s = _replace_legacy_public_values(str(text or ""), brand_values)
         if not s:
             return s
 
@@ -12914,6 +13001,7 @@ def _profiles_to_html(profiles: List[Dict[str, Any]], brand_values: Optional[Dic
         for old, new in word_replacements:
             s = s.replace(old, new)
 
+        s = _replace_legacy_public_values(s, brand_values)
         return s
 
     def _render_demo_table(rows: List[Dict[str, Any]], palette: Dict[str, str]) -> str:
