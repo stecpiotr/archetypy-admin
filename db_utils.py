@@ -641,7 +641,7 @@ def personal_response_rows_to_dataframe(rows: List[Dict[str, Any]], metryczka_co
             rec[col] = value
         flat_records.append(rec)
 
-    cols = [*metry_cols, *PERSONAL_QUESTION_COLUMNS, "respondent_id", "created_at", "response_id", "raw_total"]
+    cols = ["respondent_id", "created_at", "response_id", *metry_cols, *PERSONAL_QUESTION_COLUMNS, "raw_total"]
     return pd.DataFrame(flat_records, columns=cols)
 
 
