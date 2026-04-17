@@ -58,10 +58,14 @@ def _sample_metry_cfg():
     }
 
 
-def test_personal_template_uses_db_like_columns_and_metry_fields():
+def test_personal_template_uses_metry_columns_then_q_columns():
     df = personal_import_template_dataframe(_sample_metry_cfg())
     cols = list(df.columns)
-    assert cols[:4] == ["respondent_id", "created_at", "answers", "raw_total"]
+    idx_q1 = cols.index("Q1")
+    idx_q48 = cols.index("Q48")
+    assert idx_q48 > idx_q1
+    assert all(col.startswith("M_") for col in cols[:idx_q1])
+    assert cols[-1] == "respondent_id"
     assert "M_PLEC" in cols
     assert "M_ZAWOD" in cols
     assert "M_ZAWOD_OTHER" in cols
@@ -107,7 +111,7 @@ def test_make_personal_payload_embeds_metryczka_in_scores():
     assert payload["scores"]["metryczka"]["M_ZAWOD_OTHER"] == "freelancer"
 
 
-def test_personal_export_dataframe_uses_answers_and_metry_columns():
+def test_personal_export_dataframe_uses_q_columns_and_metry_columns():
     answers = _answers_48()
     rows = [
         {
@@ -126,9 +130,12 @@ def test_personal_export_dataframe_uses_answers_and_metry_columns():
         }
     ]
     df = personal_response_rows_to_dataframe(rows, metryczka_config=_sample_metry_cfg())
-    assert "answers" in df.columns
+    assert "answers" not in df.columns
+    assert "scores" not in df.columns
     assert "M_PLEC" in df.columns
     assert "M_ZAWOD_OTHER" in df.columns
-    assert "Q1" not in df.columns
-    assert str(df.loc[0, "answers"]).startswith("[")
+    assert "Q1" in df.columns
+    assert "Q48" in df.columns
+    assert df.loc[0, "Q1"] == answers[0]
+    assert df.loc[0, "Q48"] == answers[47]
     assert df.loc[0, "M_PLEC"] == "kobieta"

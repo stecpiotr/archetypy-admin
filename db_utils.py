@@ -145,7 +145,7 @@ def _attach_inflections_for_insert(payload: Dict) -> Dict:
 _ALLOWED_STUDY_STATUSES = {"active", "suspended", "closed", "deleted"}
 PERSONAL_QUESTION_COLUMNS: List[str] = [f"Q{i}" for i in range(1, 49)]
 PERSONAL_TEMPLATE_LEGACY_COLUMNS: List[str] = ["respondent_id", *PERSONAL_QUESTION_COLUMNS]
-PERSONAL_TEMPLATE_BASE_COLUMNS: List[str] = ["respondent_id", "created_at", "answers", "raw_total"]
+PERSONAL_TEMPLATE_BASE_COLUMNS: List[str] = ["respondent_id"]
 PERSONAL_METRY_PREFIX = "M_"
 
 
@@ -413,8 +413,16 @@ def _personal_metry_columns_from_config(metryczka_config: Any = None) -> List[st
 
 
 def _personal_template_columns(metryczka_config: Any = None) -> List[str]:
-    cols = list(PERSONAL_TEMPLATE_BASE_COLUMNS)
+    # Publiczny szablon importu: najpierw metryczka (jeśli skonfigurowana),
+    # potem 48 odpowiedzi archetypowych w osobnych kolumnach.
+    cols: List[str] = []
     for col in _personal_metry_columns_from_config(metryczka_config):
+        if col not in cols:
+            cols.append(col)
+    for col in PERSONAL_QUESTION_COLUMNS:
+        if col not in cols:
+            cols.append(col)
+    for col in PERSONAL_TEMPLATE_BASE_COLUMNS:
         if col not in cols:
             cols.append(col)
     return cols
@@ -600,21 +608,23 @@ def personal_response_rows_to_dataframe(rows: List[Dict[str, Any]], metryczka_co
     records: List[Dict[str, Any]] = []
     for idx, raw in enumerate(rows or [], start=1):
         rec = dict(raw or {})
-        answers = _answers_48_from_raw(rec.get("answers")) or []
-        scores = _normalize_scores_dict(rec.get("scores"))
-        metryczka = _extract_metryczka_from_row({"scores": scores})
+        norm = normalize_personal_response_row(rec, respondent_id_fallback=f"R{idx:04d}")
+        answers = list(norm.get("answers") or [])
+        metryczka = dict(norm.get("metryczka") or {})
         for col in metryczka.keys():
             if col not in detected_metry_cols:
                 detected_metry_cols.append(col)
-        respondent_id = _clean_text(scores.get("respondent_id")) or f"R{idx:04d}"
-        answers_json = json.dumps(answers, ensure_ascii=False) if answers else ""
+        respondent_id = _clean_text(norm.get("respondent_id")) or f"R{idx:04d}"
+        raw_total = rec.get("raw_total")
+        if raw_total in (None, ""):
+            if len(answers) == 48 and all(isinstance(v, int) for v in answers):
+                raw_total = int(sum(int(v) for v in answers))
         out: Dict[str, Any] = {
             "response_id": str(rec.get("id") or "").strip(),
             "created_at": rec.get("created_at"),
             "respondent_id": respondent_id,
-            "answers": answers_json,
-            "raw_total": rec.get("raw_total"),
-            "scores": json.dumps(scores, ensure_ascii=False) if scores else "",
+            "raw_total": raw_total,
+            "_answers": answers,
             "_metryczka": metryczka,
         }
         records.append(out)
@@ -623,11 +633,15 @@ def personal_response_rows_to_dataframe(rows: List[Dict[str, Any]], metryczka_co
     flat_records: List[Dict[str, Any]] = []
     for rec in records:
         metryczka = dict(rec.pop("_metryczka", {}) or {})
+        answers = list(rec.pop("_answers", []) or [])
         for col in metry_cols:
             rec[col] = _clean_text(metryczka.get(col))
+        for idx, col in enumerate(PERSONAL_QUESTION_COLUMNS):
+            value = answers[idx] if idx < len(answers) and isinstance(answers[idx], int) else ""
+            rec[col] = value
         flat_records.append(rec)
 
-    cols = ["response_id", "created_at", "respondent_id", "answers", "raw_total", "scores", *metry_cols]
+    cols = [*metry_cols, *PERSONAL_QUESTION_COLUMNS, "respondent_id", "created_at", "response_id", "raw_total"]
     return pd.DataFrame(flat_records, columns=cols)
 
 

@@ -5417,9 +5417,9 @@ def personal_io_view() -> None:
             use_container_width=True,
         )
     st.caption(
-        "Import personalny (aktualny schemat bazy): `respondent_id`, `answers` (JSON: 48 wartości 0..5), "
-        "opcjonalnie `raw_total` i kolumny metryczkowe `M_*`/`METRY_M_*` zgodne z konfiguracją badania. "
-        "Dla kompatybilności nadal akceptujemy starszy układ `Q1..Q48`."
+        "Import personalny: kolumny metryczki (`M_*` / `METRY_M_*`, zgodne z konfiguracją badania), "
+        "następnie `Q1..Q48` (wartości 0..5 w osobnych komórkach). "
+        "`respondent_id` jest opcjonalny. Dla kompatybilności nadal akceptujemy także kolumnę `answers` (JSON)."
     )
 
     st.markdown("### Import odpowiedzi (CSV / XLSX)")
