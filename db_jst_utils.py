@@ -89,22 +89,69 @@ def _is_aux_metry_column(col: Any) -> bool:
     return any(key.endswith(sfx) for sfx in _AUX_METRY_SUFFIXES)
 
 
-def response_columns(metryczka_config: Any = None) -> List[str]:
-    core_prefix: List[str] = [
-        "respondent_id",
-        "M_PLEC",
-        "M_WIEK",
-        "M_WYKSZT",
-        "M_ZAWOD",
-        "M_MATERIAL",
-    ]
-    tail_cols: List[str] = [c for c in CANONICAL_COLUMNS if c not in core_prefix]
-    cols: List[str] = list(core_prefix)
+def _metry_open_option_codes_by_column(metryczka_config: Any = None) -> Dict[str, set[str]]:
+    out: Dict[str, set[str]] = {}
+    for q in metryczka_questions(metryczka_config):
+        if not isinstance(q, dict):
+            continue
+        col = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not col.startswith("M_"):
+            continue
+        open_codes: set[str] = set()
+        for opt in list(q.get("options") or []):
+            if not isinstance(opt, dict):
+                continue
+            label = str(opt.get("label") or "").strip()
+            code = str(opt.get("code") or label).strip()
+            is_open = bool(opt.get("is_open") is True) or ("inna (jaka?)" in label.lower())
+            if not is_open:
+                continue
+            if code:
+                open_codes.add(_norm(code))
+            if label:
+                open_codes.add(_norm(label))
+        if open_codes:
+            out[col] = open_codes
+    return out
+
+
+def _metry_columns_from_config(metryczka_config: Any = None) -> List[str]:
+    open_map = _metry_open_option_codes_by_column(metryczka_config)
+    cols: List[str] = []
+    for q in metryczka_questions(metryczka_config):
+        if not isinstance(q, dict):
+            continue
+        col = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not col.startswith("M_"):
+            continue
+        if col not in cols:
+            cols.append(col)
+        if col in open_map or col in {"M_ZAWOD", "M_PARTIA"}:
+            other_col = f"{col}_OTHER"
+            if other_col not in cols:
+                cols.append(other_col)
+
+    # Fallback bezpieczeństwa dla pól custom (gdyby nie były obecne w pytaniach).
     for col in metryczka_custom_columns(metryczka_config):
         txt = str(col or "").strip().upper()
-        if txt and txt not in cols:
+        if not txt.startswith("M_"):
+            continue
+        if txt not in cols:
             cols.append(txt)
-    cols.extend([c for c in tail_cols if c not in cols])
+        if txt in open_map or txt in {"M_ZAWOD", "M_PARTIA"}:
+            other_col = f"{txt}_OTHER"
+            if other_col not in cols:
+                cols.append(other_col)
+    return cols
+
+
+def response_columns(metryczka_config: Any = None) -> List[str]:
+    metry_cols = _metry_columns_from_config(metryczka_config)
+    if not metry_cols:
+        metry_cols = ["M_PLEC", "M_WIEK", "M_WYKSZT", "M_ZAWOD", "M_ZAWOD_OTHER", "M_MATERIAL"]
+    cols: List[str] = ["respondent_id", *metry_cols]
+    tail_cols: List[str] = [c for c in CANONICAL_COLUMNS if c not in cols]
+    cols.extend(tail_cols)
     return cols
 
 
@@ -1891,6 +1938,31 @@ def _metryczka_questions_by_column(metryczka_config: Any = None) -> Dict[str, Di
     return out
 
 
+def _validate_open_other_fields(row: Dict[str, Any], metryczka_config: Any = None) -> None:
+    open_map = _metry_open_option_codes_by_column(metryczka_config)
+    if not open_map:
+        return
+    labels: Dict[str, str] = {}
+    for q in metryczka_questions(metryczka_config):
+        if not isinstance(q, dict):
+            continue
+        col = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not col.startswith("M_"):
+            continue
+        label = str(q.get("table_label") or q.get("prompt") or col).strip()
+        labels[col] = label or col
+    for col, open_codes in open_map.items():
+        selected = _norm(str(row.get(col) or "").strip())
+        if not selected or selected not in open_codes:
+            continue
+        other_col = f"{col}_OTHER"
+        other_val = str(row.get(other_col) or "").strip()
+        if not other_val:
+            raise ValueError(
+                f"Dla pola '{labels.get(col, col)}' wybrano odpowiedź otwartą; uzupełnij '{other_col}'."
+            )
+
+
 def normalize_response_row(raw: Dict[str, Any], respondent_id_fallback: str = "", metryczka_config: Any = None) -> Dict[str, Any]:
     cols = response_columns(metryczka_config)
     row: Dict[str, Any] = {c: "" for c in cols}
@@ -2028,6 +2100,7 @@ def response_rows_to_dataframe(rows: Iterable[Dict[str, Any]], metryczka_config:
 
 
 def make_payload_from_row(row: Dict[str, Any], metryczka_config: Any = None) -> Dict[str, Any]:
+    _validate_open_other_fields(row, metryczka_config)
     cols = response_columns(metryczka_config)
     all_cols: List[str] = list(cols)
     for key in list((row or {}).keys()):
@@ -2045,5 +2118,4 @@ def make_payload_from_row(row: Dict[str, Any], metryczka_config: Any = None) -> 
 
 
 def import_template_dataframe(metryczka_config: Any = None) -> pd.DataFrame:
-    cols = [c for c in response_columns(metryczka_config) if not _is_aux_metry_column(c)]
-    return pd.DataFrame(columns=cols)
+    return pd.DataFrame(columns=response_columns(metryczka_config))

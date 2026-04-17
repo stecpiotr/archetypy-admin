@@ -5418,7 +5418,7 @@ def personal_io_view() -> None:
         )
     st.caption(
         "Import personalny: `respondent_id`, opcjonalnie `created_at` i `response_id`, kolumny metryczki (`M_*` / `METRY_M_*`, zgodne z konfiguracją badania), "
-        "następnie `Q1..Q48` (wartości 0..5 w osobnych komórkach). "
+        "dla odpowiedzi otwartych także kolumny `*_OTHER`, następnie `Q1..Q48` (wartości 0..5 w osobnych komórkach). "
         "`respondent_id` jest opcjonalny. Dla kompatybilności nadal akceptujemy także kolumnę `answers` (JSON)."
     )
 
@@ -5475,7 +5475,10 @@ def personal_io_view() -> None:
                         elif norm_rid in existing_rids:
                             skipped += 1
                         else:
-                            payload = make_personal_payload_from_row(norm)
+                            payload = make_personal_payload_from_row(
+                                norm,
+                                metryczka_config=study.get("metryczka_config"),
+                            )
                             result, err, _attempts = _insert_with_retry(
                                 lambda: insert_personal_response(
                                     sb,
@@ -5709,7 +5712,8 @@ def jst_io_view() -> None:
             use_container_width=True,
         )
     st.caption(
-        "Szablon jest generowany z aktualnej metryczki badania; import akceptuje też kolumny C1-C13 jako alias D1-D13."
+        "Szablon jest generowany z aktualnej metryczki badania; dla odpowiedzi otwartych zawiera kolumny `*_OTHER`. "
+        "Import akceptuje też kolumny C1-C13 jako alias D1-D13."
     )
 
     st.markdown("### Import odpowiedzi (CSV / XLSX)")

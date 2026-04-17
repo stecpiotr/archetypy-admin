@@ -111,6 +111,21 @@ def test_make_personal_payload_embeds_metryczka_in_scores():
     assert payload["scores"]["metryczka"]["M_ZAWOD_OTHER"] == "freelancer"
 
 
+def test_make_personal_payload_requires_other_for_open_answers():
+    try:
+        make_personal_payload_from_row(
+            {
+                "respondent_id": "R0011",
+                "answers": _answers_48(),
+                "M_ZAWOD": "inna",
+            },
+            metryczka_config=_sample_metry_cfg(),
+        )
+        assert False, "Expected validation error for missing M_ZAWOD_OTHER"
+    except ValueError as exc:
+        assert "M_ZAWOD_OTHER" in str(exc)
+
+
 def test_personal_export_dataframe_uses_q_columns_and_metry_columns():
     answers = _answers_48()
     rows = [

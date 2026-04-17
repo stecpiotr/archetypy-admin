@@ -11,6 +11,8 @@ Aktualizacja: 2026-04-17
 ## 2) Aktualny układ importu (zalecany)
 - Początek rekordu: `respondent_id`, `created_at`, `response_id`.
 - Następnie metryczka `M_*` (jeśli występuje w konfiguracji konkretnego badania).
+- Jeśli w metryczce istnieje odpowiedź otwarta (`is_open = true`, np. „inna (jaka?)”), pojawia się kolumna `M_*_OTHER`.
+- Dla wyboru odpowiedzi otwartej pole `M_*_OTHER` jest wymagane (nie może być puste).
 - Na końcu odpowiedzi: `Q1..Q48` (każde pytanie w oddzielnej kolumnie).
 - `respondent_id` może być pusty (system nada automatycznie, np. `R0001`).
 - `created_at` i `response_id` są techniczne/opsjonalne przy imporcie.

@@ -393,7 +393,34 @@ def _answers_48_from_raw(raw: Any) -> Optional[List[int]]:
     return out
 
 
+def _open_option_codes_by_metry_column(metryczka_config: Any = None) -> Dict[str, set[str]]:
+    out: Dict[str, set[str]] = {}
+    for q in metryczka_questions(metryczka_config):
+        if not isinstance(q, dict):
+            continue
+        db_col = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not db_col.startswith(PERSONAL_METRY_PREFIX):
+            continue
+        open_codes: set[str] = set()
+        for opt in list(q.get("options") or []):
+            if not isinstance(opt, dict):
+                continue
+            is_open = bool(opt.get("is_open") is True)
+            if not is_open:
+                continue
+            code = _clean_text(opt.get("code"))
+            label = _clean_text(opt.get("label"))
+            if code:
+                open_codes.add(code.lower())
+            if label:
+                open_codes.add(label.lower())
+        if open_codes:
+            out[db_col] = open_codes
+    return out
+
+
 def _personal_metry_columns_from_config(metryczka_config: Any = None) -> List[str]:
+    open_map = _open_option_codes_by_metry_column(metryczka_config)
     cols: List[str] = []
     for q in metryczka_questions(metryczka_config):
         if not isinstance(q, dict):
@@ -403,9 +430,7 @@ def _personal_metry_columns_from_config(metryczka_config: Any = None) -> List[st
             continue
         if db_col not in cols:
             cols.append(db_col)
-        options = list(q.get("options") or [])
-        has_open = any(isinstance(opt, dict) and bool(opt.get("is_open")) for opt in options)
-        if has_open or db_col == "M_ZAWOD":
+        if db_col in open_map or db_col in {"M_ZAWOD", "M_PARTIA"}:
             other_col = f"{db_col}_OTHER"
             if other_col not in cols:
                 cols.append(other_col)
@@ -470,6 +495,31 @@ def _extract_metryczka_from_row(src: Dict[str, Any]) -> Dict[str, str]:
         if val:
             out[mapped] = val
     return out
+
+
+def _validate_open_other_fields(metryczka: Dict[str, str], metryczka_config: Any = None) -> None:
+    open_map = _open_option_codes_by_metry_column(metryczka_config)
+    if not open_map:
+        return
+    labels: Dict[str, str] = {}
+    for q in metryczka_questions(metryczka_config):
+        if not isinstance(q, dict):
+            continue
+        col = str(q.get("db_column") or q.get("id") or "").strip().upper()
+        if not col.startswith(PERSONAL_METRY_PREFIX):
+            continue
+        label = _clean_text(q.get("table_label") or q.get("prompt") or col)
+        labels[col] = label or col
+    for col, open_codes in open_map.items():
+        selected = _clean_text(metryczka.get(col)).lower()
+        if not selected or selected not in open_codes:
+            continue
+        other_col = f"{col}_OTHER"
+        other_val = _clean_text(metryczka.get(other_col))
+        if not other_val:
+            raise ValueError(
+                f"Dla pola '{labels.get(col, col)}' wybrano odpowiedź otwartą; uzupełnij '{other_col}'."
+            )
 
 
 def personal_import_template_dataframe(metryczka_config: Any = None) -> pd.DataFrame:
@@ -544,7 +594,7 @@ def normalize_personal_response_row(raw: Dict[str, Any], respondent_id_fallback:
     }
 
 
-def make_personal_payload_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def make_personal_payload_from_row(row: Dict[str, Any], metryczka_config: Any = None) -> Dict[str, Any]:
     answers_src = row.get("answers")
     answers_48 = _answers_48_from_raw(answers_src)
     if not answers_48:
@@ -559,6 +609,7 @@ def make_personal_payload_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
     row_src = dict(row or {})
     scores = _normalize_scores_dict(row_src.get("scores") or row_src.get("p_scores"))
     metryczka = _extract_metryczka_from_row(row_src)
+    _validate_open_other_fields(metryczka, metryczka_config)
     if metryczka:
         scores["metryczka"] = metryczka
     rid = _clean_text(row.get("respondent_id"))

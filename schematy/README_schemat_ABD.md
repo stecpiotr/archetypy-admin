@@ -9,6 +9,11 @@ Wygenerowano: 2026-04-17 02:14:56
 - schemat_B_kodowanie.csv
 - schemat_D_kodowanie.csv
 - slownik_archetypow_1_12.csv
+- szablon_importu_jst_z_metryczka_przyklad.csv
 
 ## Uwaga
 Dla B2/D13 najbezpieczniejsze wejście to pełna nazwa archetypu lub numer 1..12.
+
+## Spójność metryczki (JST + personal)
+- Jeśli pytanie metryczkowe ma opcję otwartą (`is_open = true`, np. „inna (jaka?)”), w imporcie/eksporcie występuje kolumna pomocnicza `M_*_OTHER`.
+- Dla wyboru opcji otwartej pole `M_*_OTHER` jest wymagane (nie może być puste).
