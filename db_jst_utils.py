@@ -203,6 +203,7 @@ def ensure_jst_schema() -> None:
       survey_show_progress BOOLEAN NOT NULL DEFAULT TRUE,
       survey_allow_back BOOLEAN NOT NULL DEFAULT TRUE,
       survey_randomize_questions BOOLEAN NOT NULL DEFAULT FALSE,
+      survey_fast_click_check_enabled BOOLEAN NOT NULL DEFAULT FALSE,
       survey_auto_start_enabled BOOLEAN NOT NULL DEFAULT FALSE,
       survey_auto_start_at TIMESTAMPTZ NULL,
       survey_auto_start_applied_at TIMESTAMPTZ NULL,
@@ -239,6 +240,8 @@ def ensure_jst_schema() -> None:
       ADD COLUMN IF NOT EXISTS survey_allow_back BOOLEAN NOT NULL DEFAULT TRUE;
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS survey_randomize_questions BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE public.jst_studies
+      ADD COLUMN IF NOT EXISTS survey_fast_click_check_enabled BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE public.jst_studies
       ADD COLUMN IF NOT EXISTS survey_auto_start_enabled BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE public.jst_studies
@@ -344,6 +347,8 @@ def ensure_jst_schema() -> None:
           ADD COLUMN IF NOT EXISTS survey_allow_back BOOLEAN NOT NULL DEFAULT TRUE;
         ALTER TABLE public.studies
           ADD COLUMN IF NOT EXISTS survey_randomize_questions BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE public.studies
+          ADD COLUMN IF NOT EXISTS survey_fast_click_check_enabled BOOLEAN NOT NULL DEFAULT FALSE;
         ALTER TABLE public.studies
           ADD COLUMN IF NOT EXISTS survey_auto_start_enabled BOOLEAN NOT NULL DEFAULT FALSE;
         ALTER TABLE public.studies
@@ -513,6 +518,7 @@ def ensure_jst_schema() -> None:
           survey_show_progress,
           survey_allow_back,
           survey_randomize_questions,
+          survey_fast_click_check_enabled,
           survey_auto_start_enabled,
           survey_auto_start_at,
           survey_auto_start_applied_at,
@@ -1395,6 +1401,7 @@ def insert_jst_study(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
     data.setdefault("survey_show_progress", True)
     data.setdefault("survey_allow_back", True)
     data.setdefault("survey_randomize_questions", False)
+    data.setdefault("survey_fast_click_check_enabled", False)
     data.setdefault("survey_auto_start_enabled", False)
     data.setdefault("survey_auto_end_enabled", False)
     data.setdefault("survey_notify_on_response", False)

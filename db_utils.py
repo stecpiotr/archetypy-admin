@@ -193,6 +193,7 @@ def insert_study(sb: Client, payload: Dict) -> Dict:
     payload.setdefault("study_status", "active")
     payload.setdefault("status_changed_at", now_iso)
     payload.setdefault("started_at", now_iso)
+    payload.setdefault("survey_fast_click_check_enabled", False)
     payload.setdefault("survey_notify_on_response", False)
     payload.setdefault("survey_notify_email", None)
     payload.setdefault("survey_notify_last_count", 0)

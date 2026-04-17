@@ -3509,10 +3509,29 @@ def load(study_id=None):
                 return {}
             return {}
 
+        def include_in_report(raw_scores):
+            if not isinstance(raw_scores, dict):
+                return True
+            quality = raw_scores.get("survey_quality")
+            if not isinstance(quality, dict):
+                return True
+            flag = quality.get("include_in_report")
+            if flag is None:
+                return True
+            if isinstance(flag, bool):
+                return flag
+            txt = str(flag).strip().lower()
+            if txt in {"0", "false", "f", "no", "n", "off", "nie"}:
+                return False
+            if txt in {"1", "true", "t", "yes", "y", "on", "tak"}:
+                return True
+            return True
+
         if "answers" in df.columns:
             df["answers"] = df["answers"].apply(parse_answers)
         if "scores" in df.columns:
             df["scores"] = df["scores"].apply(parse_scores)
+            df = df[df["scores"].apply(include_in_report)].copy()
         return df
 
     except Exception as e:

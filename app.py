@@ -1027,6 +1027,7 @@ def _extract_survey_settings(study: Dict[str, Any], *, allow_single: bool) -> Di
         "show_progress": _bool_from_any(study.get("survey_show_progress"), True),
         "allow_back": _bool_from_any(study.get("survey_allow_back"), True),
         "randomize_questions": _bool_from_any(study.get("survey_randomize_questions"), False),
+        "fast_click_check_enabled": _bool_from_any(study.get("survey_fast_click_check_enabled"), False),
         "auto_start_enabled": _bool_from_any(study.get("survey_auto_start_enabled"), False),
         "auto_start_at": study.get("survey_auto_start_at"),
         "auto_start_applied_at": study.get("survey_auto_start_applied_at"),
@@ -1047,6 +1048,320 @@ def _normalize_notify_email(raw: Any) -> str:
     if not EMAIL_RE.match(email):
         return ""
     return email
+
+
+_FAST_CLICK_SUSPICIOUS_WARNINGS = 3
+
+
+def _json_dict(raw: Any) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str):
+        txt = raw.strip()
+        if not txt:
+            return {}
+        try:
+            parsed = json.loads(txt)
+        except Exception:
+            return {}
+        return dict(parsed) if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _int_or_default(raw: Any, default: int = 0) -> int:
+    try:
+        return int(float(str(raw).strip().replace(",", ".")))
+    except Exception:
+        return int(default)
+
+
+def _int_or_none(raw: Any) -> Optional[int]:
+    try:
+        return int(float(str(raw).strip().replace(",", ".")))
+    except Exception:
+        return None
+
+
+def _fmt_duration_seconds(raw_seconds: Any) -> str:
+    secs = _int_or_none(raw_seconds)
+    if secs is None or secs < 0:
+        return "—"
+    hours, rem = divmod(int(secs), 3600)
+    minutes, seconds = divmod(rem, 60)
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def _extract_personal_quality_meta(row: Dict[str, Any]) -> Dict[str, Any]:
+    scores = _json_dict((row or {}).get("scores"))
+    quality = _json_dict(scores.get("survey_quality"))
+    warning_count = max(0, _int_or_default(quality.get("warning_count"), 0))
+    suspicious = _bool_from_any(
+        quality.get("suspicious"),
+        warning_count >= _FAST_CLICK_SUSPICIOUS_WARNINGS,
+    )
+    include_raw = quality.get("include_in_report")
+    include_in_report = True if include_raw is None else _bool_from_any(include_raw, True)
+    completion_seconds = _int_or_none(quality.get("completion_seconds"))
+    respondent_id = str(scores.get("respondent_id") or "").strip()
+    return {
+        "response_id": str((row or {}).get("id") or "").strip(),
+        "respondent_id": respondent_id,
+        "warning_count": warning_count,
+        "suspicious": bool(suspicious),
+        "include_in_report": bool(include_in_report),
+        "completion_seconds": completion_seconds,
+        "reviewed_at": str(quality.get("reviewed_at") or "").strip(),
+        "scores": scores,
+    }
+
+
+def _extract_jst_quality_meta(row: Dict[str, Any]) -> Dict[str, Any]:
+    payload = _json_dict((row or {}).get("payload"))
+    quality = _json_dict(payload.get("survey_quality") or payload.get("SURVEY_QUALITY"))
+    warning_count = max(
+        0,
+        _int_or_default(
+            quality.get("warning_count", payload.get("SURVEY_QUALITY_WARNING_COUNT")),
+            0,
+        ),
+    )
+    suspicious = _bool_from_any(
+        quality.get("suspicious", payload.get("SURVEY_QUALITY_SUSPICIOUS")),
+        warning_count >= _FAST_CLICK_SUSPICIOUS_WARNINGS,
+    )
+    include_raw = quality.get("include_in_report", payload.get("SURVEY_QUALITY_INCLUDE_IN_REPORT"))
+    include_in_report = True if include_raw is None else _bool_from_any(include_raw, True)
+    completion_seconds = _int_or_none(
+        quality.get("completion_seconds", payload.get("SURVEY_QUALITY_COMPLETION_SECONDS"))
+    )
+    return {
+        "response_id": str((row or {}).get("id") or "").strip(),
+        "respondent_id": str((row or {}).get("respondent_id") or "").strip(),
+        "warning_count": warning_count,
+        "suspicious": bool(suspicious),
+        "include_in_report": bool(include_in_report),
+        "completion_seconds": completion_seconds,
+        "reviewed_at": str(quality.get("reviewed_at") or "").strip(),
+        "payload": payload,
+    }
+
+
+def _set_personal_include_in_report(response_id: str, include_in_report: bool, scores_snapshot: Any = None) -> None:
+    rid = str(response_id or "").strip()
+    if not rid:
+        return
+    scores = _json_dict(scores_snapshot)
+    if not scores:
+        res = sb.table("responses").select("scores").eq("id", rid).limit(1).execute()
+        row = (res.data or [None])[0]
+        scores = _json_dict((row or {}).get("scores"))
+    quality = _json_dict(scores.get("survey_quality"))
+    quality["include_in_report"] = bool(include_in_report)
+    quality["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+    quality["warning_count"] = max(0, _int_or_default(quality.get("warning_count"), 0))
+    quality["suspicious"] = _bool_from_any(
+        quality.get("suspicious"),
+        _int_or_default(quality.get("warning_count"), 0) >= _FAST_CLICK_SUSPICIOUS_WARNINGS,
+    )
+    scores["survey_quality"] = quality
+    sb.table("responses").update({"scores": scores}).eq("id", rid).execute()
+
+
+def _set_jst_include_in_report(response_id: str, include_in_report: bool, payload_snapshot: Any = None) -> None:
+    rid = str(response_id or "").strip()
+    if not rid:
+        return
+    payload = _json_dict(payload_snapshot)
+    if not payload:
+        res = sb.table("jst_responses").select("payload").eq("id", rid).limit(1).execute()
+        row = (res.data or [None])[0]
+        payload = _json_dict((row or {}).get("payload"))
+    quality = _json_dict(payload.get("survey_quality") or payload.get("SURVEY_QUALITY"))
+    quality["include_in_report"] = bool(include_in_report)
+    quality["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+    quality["warning_count"] = max(0, _int_or_default(quality.get("warning_count"), 0))
+    quality["suspicious"] = _bool_from_any(
+        quality.get("suspicious"),
+        _int_or_default(quality.get("warning_count"), 0) >= _FAST_CLICK_SUSPICIOUS_WARNINGS,
+    )
+    payload["survey_quality"] = quality
+    sb.table("jst_responses").update({"payload": payload}).eq("id", rid).execute()
+
+
+def _filter_jst_rows_for_report(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for row in rows or []:
+        meta = _extract_jst_quality_meta(row)
+        if not bool(meta.get("include_in_report", True)):
+            continue
+        out.append(row)
+    return out
+
+
+def _render_personal_quality_review(study_id: str) -> None:
+    rows = list_personal_responses(sb, study_id)
+    if not rows:
+        st.info("Brak odpowiedzi do oceny jakości.")
+        return
+
+    metas = [_extract_personal_quality_meta(row) for row in rows]
+    suspicious = [m for m in metas if bool(m.get("suspicious"))]
+    if not suspicious:
+        st.success("Brak ankiet oznaczonych jako podejrzane.")
+        return
+
+    included = sum(1 for m in suspicious if bool(m.get("include_in_report", True)))
+    excluded = len(suspicious) - included
+    st.warning(
+        f"Wykryto {len(suspicious)} podejrzanych ankiet. "
+        f"Uwzględnione w raporcie: {included}. Pominięte: {excluded}."
+    )
+
+    table_rows = []
+    by_response_id: Dict[str, Dict[str, Any]] = {}
+    for meta in suspicious:
+        response_id = str(meta.get("response_id") or "").strip()
+        if not response_id:
+            continue
+        by_response_id[response_id] = meta
+        table_rows.append(
+            {
+                "response_id": response_id,
+                "respondent_id": str(meta.get("respondent_id") or "—"),
+                "czas_wypelniania": _fmt_duration_seconds(meta.get("completion_seconds")),
+                "warningi": int(meta.get("warning_count") or 0),
+                "uwzglednij_w_raporcie": bool(meta.get("include_in_report", True)),
+            }
+        )
+    if not table_rows:
+        st.info("Nie udało się przygotować listy podejrzanych ankiet.")
+        return
+
+    review_df = pd.DataFrame(table_rows)
+    editor_key = f"personal_quality_editor_{study_id}"
+    edited_df = st.data_editor(
+        review_df,
+        key=editor_key,
+        use_container_width=True,
+        hide_index=True,
+        disabled=["response_id", "respondent_id", "czas_wypelniania", "warningi"],
+        column_config={
+            "response_id": st.column_config.TextColumn("ID odpowiedzi"),
+            "respondent_id": st.column_config.TextColumn("Respondent"),
+            "czas_wypelniania": st.column_config.TextColumn("Czas wypełniania"),
+            "warningi": st.column_config.NumberColumn("Liczba warningów", format="%d"),
+            "uwzglednij_w_raporcie": st.column_config.CheckboxColumn("Uwzględnij w raporcie"),
+        },
+    )
+
+    if st.button("💾 Zapisz decyzje jakości (personal)", key=f"personal_quality_save_{study_id}"):
+        changes = 0
+        for _, row in edited_df.iterrows():
+            rid = str(row.get("response_id") or "").strip()
+            if not rid or rid not in by_response_id:
+                continue
+            new_include = bool(row.get("uwzglednij_w_raporcie"))
+            old_include = bool(by_response_id[rid].get("include_in_report", True))
+            if new_include == old_include:
+                continue
+            _set_personal_include_in_report(
+                rid,
+                new_include,
+                scores_snapshot=by_response_id[rid].get("scores"),
+            )
+            changes += 1
+        if changes:
+            try:
+                import admin_dashboard as _AD  # type: ignore
+                if hasattr(_AD, "load") and hasattr(_AD.load, "clear"):
+                    _AD.load.clear()
+            except Exception:
+                pass
+            st.success(f"Zapisano {changes} decyzji.")
+            st.rerun()
+        else:
+            st.info("Brak zmian do zapisania.")
+
+
+def _render_jst_quality_review(study_id: str) -> None:
+    rows = list_jst_responses(sb, study_id)
+    if not rows:
+        st.info("Brak odpowiedzi do oceny jakości.")
+        return
+
+    metas = [_extract_jst_quality_meta(row) for row in rows]
+    suspicious = [m for m in metas if bool(m.get("suspicious"))]
+    if not suspicious:
+        st.success("Brak ankiet oznaczonych jako podejrzane.")
+        return
+
+    included = sum(1 for m in suspicious if bool(m.get("include_in_report", True)))
+    excluded = len(suspicious) - included
+    st.warning(
+        f"Wykryto {len(suspicious)} podejrzanych ankiet. "
+        f"Uwzględnione w raporcie: {included}. Pominięte: {excluded}."
+    )
+
+    table_rows = []
+    by_response_id: Dict[str, Dict[str, Any]] = {}
+    for meta in suspicious:
+        response_id = str(meta.get("response_id") or "").strip()
+        if not response_id:
+            continue
+        by_response_id[response_id] = meta
+        table_rows.append(
+            {
+                "response_id": response_id,
+                "respondent_id": str(meta.get("respondent_id") or "—"),
+                "czas_wypelniania": _fmt_duration_seconds(meta.get("completion_seconds")),
+                "warningi": int(meta.get("warning_count") or 0),
+                "uwzglednij_w_raporcie": bool(meta.get("include_in_report", True)),
+            }
+        )
+    if not table_rows:
+        st.info("Nie udało się przygotować listy podejrzanych ankiet.")
+        return
+
+    review_df = pd.DataFrame(table_rows)
+    editor_key = f"jst_quality_editor_{study_id}"
+    edited_df = st.data_editor(
+        review_df,
+        key=editor_key,
+        use_container_width=True,
+        hide_index=True,
+        disabled=["response_id", "respondent_id", "czas_wypelniania", "warningi"],
+        column_config={
+            "response_id": st.column_config.TextColumn("ID odpowiedzi"),
+            "respondent_id": st.column_config.TextColumn("Respondent"),
+            "czas_wypelniania": st.column_config.TextColumn("Czas wypełniania"),
+            "warningi": st.column_config.NumberColumn("Liczba warningów", format="%d"),
+            "uwzglednij_w_raporcie": st.column_config.CheckboxColumn("Uwzględnij w raporcie"),
+        },
+    )
+
+    if st.button("💾 Zapisz decyzje jakości (JST)", key=f"jst_quality_save_{study_id}"):
+        changes = 0
+        for _, row in edited_df.iterrows():
+            rid = str(row.get("response_id") or "").strip()
+            if not rid or rid not in by_response_id:
+                continue
+            new_include = bool(row.get("uwzglednij_w_raporcie"))
+            old_include = bool(by_response_id[rid].get("include_in_report", True))
+            if new_include == old_include:
+                continue
+            _set_jst_include_in_report(
+                rid,
+                new_include,
+                payload_snapshot=by_response_id[rid].get("payload"),
+            )
+            changes += 1
+        if changes:
+            st.success(f"Zapisano {changes} decyzji.")
+            st.rerun()
+        else:
+            st.info("Brak zmian do zapisania.")
 
 
 def _survey_notify_descriptor(study: Dict[str, Any], *, kind: str) -> str:
@@ -5124,6 +5439,16 @@ def jst_settings_view() -> None:
         value=bool(cfg.get("allow_back")),
         key=f"jst_settings_back_{sid}",
     )
+    st.markdown("#### Kontrola jakości odpowiedzi")
+    fast_click_check_enabled = st.checkbox(
+        "Sprawdzanie szybkiego klikania",
+        value=bool(cfg.get("fast_click_check_enabled")),
+        key=f"jst_settings_fast_click_check_{sid}",
+        help=(
+            "Po 4 kolejnych odpowiedziach udzielonych szybciej niż co 3 sekundy "
+            "ankieta pokaże ostrzeżenie. Po 3 ostrzeżeniach odpowiedź zostanie oznaczona jako podejrzana."
+        ),
+    )
 
     st.markdown("#### Powiadomienia")
     notify_on_response = st.checkbox(
@@ -5207,6 +5532,7 @@ def jst_settings_view() -> None:
     baseline_snapshot = {
         "show_progress": bool(cfg.get("show_progress")),
         "allow_back": bool(cfg.get("allow_back")),
+        "fast_click_check_enabled": bool(cfg.get("fast_click_check_enabled")),
         "notify_on_response": bool(cfg.get("notify_on_response")),
         "notify_email": str(cfg.get("notify_email") or "").strip().lower(),
         "start_enabled": bool(cfg.get("auto_start_enabled")),
@@ -5219,6 +5545,7 @@ def jst_settings_view() -> None:
     current_snapshot = {
         "show_progress": bool(show_progress),
         "allow_back": bool(allow_back),
+        "fast_click_check_enabled": bool(fast_click_check_enabled),
         "notify_on_response": bool(notify_on_response),
         "notify_email": str(notify_email or "").strip().lower(),
         "start_enabled": bool(start_enabled),
@@ -5254,6 +5581,7 @@ def jst_settings_view() -> None:
         updates: Dict[str, Any] = {
             "survey_show_progress": bool(show_progress),
             "survey_allow_back": bool(allow_back),
+            "survey_fast_click_check_enabled": bool(fast_click_check_enabled),
             "survey_auto_start_enabled": bool(start_enabled),
             "survey_auto_start_at": start_iso if start_enabled else None,
             "survey_auto_end_enabled": bool(end_enabled),
@@ -5307,6 +5635,10 @@ def jst_settings_view() -> None:
 
     if st.button("💾 Zapisz parametry ankiety", type="primary", key=f"jst_settings_save_params_{sid}"):
         _save_jst_settings(rerun_after=True)
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown("### Ankiety podejrzane")
+    _render_jst_quality_review(sid)
 
     def _do_suspend_jst() -> None:
         try:
@@ -6334,6 +6666,20 @@ def jst_analysis_view() -> None:
         st.info("Wybierz badanie z listy i kliknij „Generuj raport”.")
         return
 
+    quality_rows = list_jst_responses(sb, sid)
+    quality_metas = [_extract_jst_quality_meta(row) for row in quality_rows]
+    suspicious_count = sum(1 for meta in quality_metas if bool(meta.get("suspicious")))
+    if suspicious_count > 0:
+        suspicious_included = sum(
+            1 for meta in quality_metas if bool(meta.get("suspicious")) and bool(meta.get("include_in_report", True))
+        )
+        suspicious_excluded = suspicious_count - suspicious_included
+        st.warning(
+            f"W tym badaniu wykryto {suspicious_count} ankiet podejrzanych "
+            f"(uwzględnione: {suspicious_included}, pominięte: {suspicious_excluded}). "
+            "Decyzje możesz zmienić w „Ustawienia ankiety → Ankiety podejrzane”."
+        )
+
     label_mode_options = ["Archetypy męskie", "Archetypy żeńskie"]
     label_mode_key = f"jst_report_label_mode_{sid}"
     if str(st.session_state.get(label_mode_key) or "") not in label_mode_options:
@@ -6395,9 +6741,21 @@ def jst_analysis_view() -> None:
         except Exception as e:
             st.error(f"Nie można wygenerować raportu: niepoprawny JSON progów segmentów ({e}).")
             return
-        rows = list_jst_responses(sb, sid)
+        rows_all = list_jst_responses(sb, sid)
+        rows = _filter_jst_rows_for_report(rows_all)
+        excluded_for_report = max(0, len(rows_all) - len(rows))
+        if excluded_for_report > 0:
+            st.info(
+                f"W raporcie pomijamy {excluded_for_report} odpowiedzi oznaczonych jako „pomiń w raporcie”."
+            )
         if not rows:
-            st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
+            if rows_all:
+                st.warning(
+                    "Brak odpowiedzi do raportu po zastosowaniu filtrów jakości. "
+                    "Sprawdź decyzje w „Ustawienia ankiety → Ankiety podejrzane”."
+                )
+            else:
+                st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
             return
         out_df = jst_response_rows_to_dataframe(rows, metryczka_config=(study or {}).get("metryczka_config"))
         study_for_report = dict(study or {})
@@ -6457,7 +6815,7 @@ def jst_analysis_view() -> None:
     rendered = st.session_state.get(cache_key)
     meta = st.session_state.get(cache_meta_key) or {}
     if not rendered:
-        rows = list_jst_responses(sb, sid)
+        rows = _filter_jst_rows_for_report(list_jst_responses(sb, sid))
         if not rows:
             st.warning("To badanie nie ma jeszcze żadnych odpowiedzi.")
         else:
@@ -8033,7 +8391,14 @@ def matching_view() -> None:
             person_role_gen_calc = "polityczki" if person_gender_code == "K" else "polityka"
 
             p_profile, p_n = _load_personal_profile_pct(str(person.get("id")))
-            j_rows = list_jst_responses(sb, str(jst_study.get("id")))
+            j_rows_all = list_jst_responses(sb, str(jst_study.get("id")))
+            j_rows = _filter_jst_rows_for_report(j_rows_all)
+            if j_rows_all and not j_rows:
+                st.error(
+                    "W badaniu JST wszystkie odpowiedzi są obecnie oznaczone jako „pomiń w raporcie”. "
+                    "Zmień decyzje w „Ustawienia ankiety → Ankiety podejrzane”."
+                )
+                return
             source_payloads = [
                 (r.get("payload") if isinstance(r.get("payload"), dict) else {}) for r in j_rows
             ]
@@ -10240,7 +10605,7 @@ def matching_view() -> None:
                     if not jst_demo_vectors:
                         try:
                             jst_study_live = fetch_jst_study_by_id(sb, jst_sid) or {}
-                            j_rows_live = list_jst_responses(sb, jst_sid)
+                            j_rows_live = _filter_jst_rows_for_report(list_jst_responses(sb, jst_sid))
                             payloads_live = [
                                 (r.get("payload") if isinstance(r.get("payload"), dict) else {})
                                 for r in j_rows_live
@@ -10876,6 +11241,16 @@ def personal_settings_view() -> None:
         value=bool(cfg.get("allow_back")),
         key=f"personal_settings_back_{study_id or slug}",
     )
+    st.markdown("#### Kontrola jakości odpowiedzi")
+    fast_click_check_enabled = st.checkbox(
+        "Sprawdzanie szybkiego klikania",
+        value=bool(cfg.get("fast_click_check_enabled")),
+        key=f"personal_settings_fast_click_check_{study_id or slug}",
+        help=(
+            "Po 4 kolejnych odpowiedziach udzielonych szybciej niż co 3 sekundy "
+            "ankieta pokaże ostrzeżenie. Po 3 ostrzeżeniach odpowiedź zostanie oznaczona jako podejrzana."
+        ),
+    )
 
     st.markdown("#### Powiadomienia")
     notify_on_response = st.checkbox(
@@ -10961,6 +11336,7 @@ def personal_settings_view() -> None:
         "randomize_questions": bool(cfg.get("randomize_questions")),
         "show_progress": bool(cfg.get("show_progress")),
         "allow_back": bool(cfg.get("allow_back")),
+        "fast_click_check_enabled": bool(cfg.get("fast_click_check_enabled")),
         "notify_on_response": bool(cfg.get("notify_on_response")),
         "notify_email": str(cfg.get("notify_email") or "").strip().lower(),
         "start_enabled": bool(cfg.get("auto_start_enabled")),
@@ -10975,6 +11351,7 @@ def personal_settings_view() -> None:
         "randomize_questions": bool(randomize_questions),
         "show_progress": bool(show_progress),
         "allow_back": bool(allow_back),
+        "fast_click_check_enabled": bool(fast_click_check_enabled),
         "notify_on_response": bool(notify_on_response),
         "notify_email": str(notify_email or "").strip().lower(),
         "start_enabled": bool(start_enabled),
@@ -11013,6 +11390,7 @@ def personal_settings_view() -> None:
             "survey_show_progress": bool(show_progress),
             "survey_allow_back": bool(allow_back),
             "survey_randomize_questions": bool(randomize_questions),
+            "survey_fast_click_check_enabled": bool(fast_click_check_enabled),
             "survey_auto_start_enabled": bool(start_enabled),
             "survey_auto_start_at": start_iso if start_enabled else None,
             "survey_auto_end_enabled": bool(end_enabled),
@@ -11070,6 +11448,10 @@ def personal_settings_view() -> None:
         key=f"personal_settings_save_params_{study_id or slug}",
     ):
         _save_personal_settings(rerun_after=True)
+
+    st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
+    st.markdown("### Ankiety podejrzane")
+    _render_personal_quality_review(study_id)
 
     def _do_suspend_personal() -> None:
         try:
@@ -11735,6 +12117,19 @@ def results_view() -> None:
         unsafe_allow_html=True,
     )
     study = options[choice]
+    quality_rows = list_personal_responses(sb, str(study.get("id") or ""))
+    quality_metas = [_extract_personal_quality_meta(row) for row in quality_rows]
+    suspicious_count = sum(1 for meta in quality_metas if bool(meta.get("suspicious")))
+    if suspicious_count > 0:
+        suspicious_included = sum(
+            1 for meta in quality_metas if bool(meta.get("suspicious")) and bool(meta.get("include_in_report", True))
+        )
+        suspicious_excluded = suspicious_count - suspicious_included
+        st.warning(
+            f"W tym badaniu wykryto {suspicious_count} ankiet podejrzanych "
+            f"(uwzględnione: {suspicious_included}, pominięte: {suspicious_excluded}). "
+            "Decyzje możesz zmienić w „Ustawienia ankiety → Ankiety podejrzane”."
+        )
     if open_demo_requested:
         st.session_state[f"personal_demo_page_{study['id']}"] = True
         st.rerun()
