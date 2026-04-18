@@ -1822,7 +1822,32 @@ def _get_query_token() -> str:
 
 
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
-    public_flag = "1" if public_mode else "0"
+    public_css = ""
+    if public_mode:
+        public_css = """
+        :root{
+          color-scheme: light dark;
+        }
+        /* Public report: stabilizujemy kontrast wykresów między browserami.
+           Ciemne warianty PNG bywały niespójne (Samsung/Chrome mobile), więc
+           w podglądzie publicznym wymuszamy czytelny wariant light + jasne tło obrazu. */
+        .ap-theme-image-light{
+          display:block !important;
+          background:#ffffff !important;
+        }
+        .ap-theme-image-dark{
+          display:none !important;
+        }
+        @media (prefers-color-scheme: dark){
+          html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
+            background:#0b1220 !important;
+            color:#e2e8f0 !important;
+          }
+          .block-container{
+            color:#e2e8f0 !important;
+          }
+        }
+        """
     st.markdown(
         f"""
         <style>
@@ -1847,28 +1872,9 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             background:rgba(9,16,27,.75) !important;
             border-color:rgba(148,163,184,.45) !important;
           }}
-          body[data-ap-public-report="1"],
-          body[data-ap-public-report="1"] .stApp,
-          body[data-ap-public-report="1"] .main,
-          body[data-ap-public-report="1"] [data-testid="stAppViewContainer"],
-          body[data-ap-public-report="1"] [data-testid="stMain"]{{
-            background:#0b1220 !important;
-            color:#e2e8f0 !important;
-          }}
-          body[data-ap-public-report="1"] .block-container{{
-            color:#e2e8f0 !important;
-          }}
         }}
+        {public_css}
         </style>
-        <script>
-        (function(){{
-          try {{
-            const body = window.document && window.document.body;
-            if (!body) return;
-            body.setAttribute("data-ap-public-report", "{public_flag}");
-          }} catch (_e) {{}}
-        }})();
-        </script>
         """,
         unsafe_allow_html=True,
     )
@@ -11968,6 +11974,7 @@ def _render_public_gate(token: str) -> bool:
 
 
 def public_report_view(token: str) -> None:
+    _set_view_scope("public_report")
     ensure_report_share_schema()
     grant = get_report_access_by_token(token)
     if not grant:
