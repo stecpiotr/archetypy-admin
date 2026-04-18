@@ -5445,7 +5445,7 @@ def jst_settings_view() -> None:
         value=bool(cfg.get("fast_click_check_enabled")),
         key=f"jst_settings_fast_click_check_{sid}",
         help=(
-            "Po 4 kolejnych odpowiedziach udzielonych szybciej niż co 2 sekundy "
+            "Po 5 kolejnych odpowiedziach udzielonych szybciej niż co 2 sekundy "
             "ankieta pokaże ostrzeżenie. Po 3 ostrzeżeniach odpowiedź zostanie oznaczona jako podejrzana."
         ),
     )
@@ -11247,7 +11247,7 @@ def personal_settings_view() -> None:
         value=bool(cfg.get("fast_click_check_enabled")),
         key=f"personal_settings_fast_click_check_{study_id or slug}",
         help=(
-            "Po 4 kolejnych odpowiedziach udzielonych szybciej niż co 2 sekundy "
+            "Po 5 kolejnych odpowiedziach udzielonych szybciej niż co 2 sekundy "
             "ankieta pokaże ostrzeżenie. Po 3 ostrzeżeniach odpowiedź zostanie oznaczona jako podejrzana."
         ),
     )
