@@ -546,6 +546,24 @@ def _img_data_uri_from_pil(img: Image.Image) -> str:
     b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     return f"data:image/png;base64,{b64}"
 
+
+def _theme_image_dual_html(
+    light_uri: str,
+    dark_uri: str,
+    *,
+    style: str = "width:100%;height:auto;display:block;",
+    extra_class: str | None = None,
+) -> str:
+    extra = f" {extra_class.strip()}" if extra_class else ""
+    light_style = style
+    dark_style = f"{style};display:none;"
+    return (
+        "<span class='ap-theme-image-wrap'>"
+        f"<img src='{light_uri}' class='ap-theme-image ap-theme-image-light{extra}' style='{light_style}'/>"
+        f"<img src='{dark_uri}' class='ap-theme-image ap-theme-image-dark{extra}' style='{dark_style}'/>"
+        "</span>"
+    )
+
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
     """
     Zwraca InlineImage do docxtpl dla danego archetypu.
@@ -4777,10 +4795,13 @@ def _render_personal_demography_subpage(
                     dark_uri = _img_data_uri_from_path(Path(dark_img_path))
                     st.markdown(
                         (
-                            "<div class='pdemo-wheel-image'><picture>"
-                            f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
-                            f"<img src='{light_uri}' style='width:min(100%, {int(max_width_px)}px);height:auto;'/>"
-                            "</picture></div>"
+                            "<div class='pdemo-wheel-image'>"
+                            + _theme_image_dual_html(
+                                light_uri,
+                                dark_uri,
+                                style=f"width:min(100%, {int(max_width_px)}px);height:auto;",
+                            )
+                            + "</div>"
                         ),
                         unsafe_allow_html=True,
                     )
@@ -8434,11 +8455,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         light_uri = _img_data_uri_from_pil(image_obj)
                         dark_uri = _img_data_uri_from_pil(dark_image_obj)
                         st.markdown(
-                            (
-                                "<picture>"
-                                f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
-                                f"<img src='{light_uri}' style='width:100%;height:auto;display:block;'/>"
-                                "</picture>"
+                            _theme_image_dual_html(
+                                light_uri,
+                                dark_uri,
+                                style="width:100%;height:auto;display:block;",
                             ),
                             unsafe_allow_html=True,
                         )
@@ -8453,7 +8473,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             ) -> None:
                 light_path_obj = Path(light_path)
                 dark_path_obj = Path(dark_path) if dark_path else None
-                class_attr = f" class='{img_css_class}'" if img_css_class else ""
                 if dark_path_obj and dark_path_obj.exists() and light_path_obj.exists():
                     light_uri = _img_data_uri_from_path(light_path_obj)
                     dark_uri = _img_data_uri_from_path(dark_path_obj)
@@ -8463,11 +8482,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         else "width:100%;height:auto;display:block;"
                     )
                     st.markdown(
-                        (
-                            "<picture>"
-                            f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
-                            f"<img src='{light_uri}'{class_attr} style='{width_style}'/>"
-                            "</picture>"
+                        _theme_image_dual_html(
+                            light_uri,
+                            dark_uri,
+                            style=width_style,
+                            extra_class=img_css_class,
                         ),
                         unsafe_allow_html=True,
                     )
@@ -8480,7 +8499,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         else "width:100%;height:auto;display:block;"
                     )
                     st.markdown(
-                        f"<img src='{light_uri}'{class_attr} style='{width_style}'/>",
+                        f"<img src='{light_uri}' class='{img_css_class}' style='{width_style}'/>",
                         unsafe_allow_html=True,
                     )
                     return
@@ -9350,11 +9369,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         light_uri = _img_data_uri_from_path(light_path)
                         dark_uri = _img_data_uri_from_path(dark_path)
                         st.markdown(
-                            (
-                                "<picture>"
-                                f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'>"
-                                f"<img src='{light_uri}' style='width:100%;height:auto;display:block;' />"
-                                "</picture>"
+                            _theme_image_dual_html(
+                                light_uri,
+                                dark_uri,
+                                style="width:100%;height:auto;display:block;",
                             ),
                             unsafe_allow_html=True,
                         )

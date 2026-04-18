@@ -1821,27 +1821,54 @@ def _get_query_token() -> str:
             return ""
 
 
-def _inject_report_dark_fix_css() -> None:
+def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
+    public_flag = "1" if public_mode else "0"
     st.markdown(
-        """
+        f"""
         <style>
-        @media (prefers-color-scheme: dark){
-          .img,
-          .img-profile-sm,
-          .ap-ext-zestawy-card,
-          .ap-ext-card-modal-img,
-          .cluster-figure-wrap img,
-          img[src$=".png"],
-          img[src$=".jpg"],
-          img[src$=".jpeg"]{
-            background:#0f172a !important;
-          }
-          .ap-ext-card-modal-content{
+        .ap-theme-image-wrap{{
+          display:block;
+          width:100%;
+        }}
+        .ap-theme-image{{
+          display:block;
+        }}
+        .ap-theme-image-dark{{
+          display:none !important;
+        }}
+        @media (prefers-color-scheme: dark){{
+          .ap-theme-image-light{{
+            display:none !important;
+          }}
+          .ap-theme-image-dark{{
+            display:block !important;
+          }}
+          .ap-ext-card-modal-content{{
             background:rgba(9,16,27,.75) !important;
             border-color:rgba(148,163,184,.45) !important;
-          }
-        }
+          }}
+          body[data-ap-public-report="1"],
+          body[data-ap-public-report="1"] .stApp,
+          body[data-ap-public-report="1"] .main,
+          body[data-ap-public-report="1"] [data-testid="stAppViewContainer"],
+          body[data-ap-public-report="1"] [data-testid="stMain"]{{
+            background:#0b1220 !important;
+            color:#e2e8f0 !important;
+          }}
+          body[data-ap-public-report="1"] .block-container{{
+            color:#e2e8f0 !important;
+          }}
+        }}
         </style>
+        <script>
+        (function(){{
+          try {{
+            const body = window.document && window.document.body;
+            if (!body) return;
+            body.setAttribute("data-ap-public-report", "{public_flag}");
+          }} catch (_e) {{}}
+        }})();
+        </script>
         """,
         unsafe_allow_html=True,
     )
@@ -11875,6 +11902,13 @@ def _render_public_gate(token: str) -> bool:
           }
         }
         @media (prefers-color-scheme: dark){
+          html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
+            background:#0b1220 !important;
+            color:#e2e8f0 !important;
+          }
+          .block-container{
+            color:#e2e8f0 !important;
+          }
           .public-unlock-note{
             color:#d9e4f0 !important;
           }
@@ -11977,7 +12011,7 @@ def public_report_view(token: str) -> None:
         """,
         unsafe_allow_html=True,
     )
-    _inject_report_dark_fix_css()
+    _inject_report_dark_fix_css(public_mode=True)
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     try:
         import admin_dashboard as AD
@@ -12144,7 +12178,7 @@ def results_view() -> None:
 
     # ⬇️ PRZENIESIONA LINIA — TERAZ POD SELECTEM
     st.markdown('<hr class="hr-thin">', unsafe_allow_html=True)
-    _inject_report_dark_fix_css()
+    _inject_report_dark_fix_css(public_mode=False)
 
     try:
         import admin_dashboard as AD
