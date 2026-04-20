@@ -2042,6 +2042,36 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         .ap-theme-image{{
           display:block;
         }}
+        .ap-theme-image-light{{
+          display:block;
+        }}
+        .ap-theme-image-dark{{
+          display:none;
+        }}
+        html[data-ap-theme='dark'] .ap-theme-image-light,
+        body[data-ap-theme='dark'] .ap-theme-image-light{{
+          display:none !important;
+        }}
+        html[data-ap-theme='dark'] .ap-theme-image-dark,
+        body[data-ap-theme='dark'] .ap-theme-image-dark{{
+          display:block !important;
+        }}
+        html[data-ap-theme='light'] .ap-theme-image-light,
+        body[data-ap-theme='light'] .ap-theme-image-light{{
+          display:block !important;
+        }}
+        html[data-ap-theme='light'] .ap-theme-image-dark,
+        body[data-ap-theme='light'] .ap-theme-image-dark{{
+          display:none !important;
+        }}
+        @media (prefers-color-scheme: dark){{
+          html:not([data-ap-theme]) .ap-theme-image-light{{
+            display:none !important;
+          }}
+          html:not([data-ap-theme]) .ap-theme-image-dark{{
+            display:block !important;
+          }}
+        }}
         .ap-theme-image-swap{{
           display:block;
           width:100%;
