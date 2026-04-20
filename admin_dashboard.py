@@ -1462,7 +1462,7 @@ def intensity_icon_html(short_label: str) -> str:
 def intensity_help_modal_html(dark_mode: bool = False) -> str:
     """Modal 'Interpretacja natężenia' – 3 kolumny: Przedział; Interpretacja; Znaczenie i opis jakościowy."""
     modal_overlay = "rgba(0,0,0,.62)" if dark_mode else "rgba(0,0,0,.35)"
-    modal_bg = "#1d1f24" if dark_mode else "#ffffff"
+    modal_bg = "#1e1e1e" if dark_mode else "#ffffff"
     modal_border = "rgba(255,255,255,.15)" if dark_mode else "#e5e7eb"
     modal_shadow = "0 24px 62px rgba(0,0,0,.58)" if dark_mode else "0 20px 60px rgba(0,0,0,.25)"
     title_color = "#f1f4f9" if dark_mode else "#111827"
@@ -2312,7 +2312,7 @@ def color_explainer_one_html(name: str, pct: float, dark_mode: bool = False) -> 
     """Jeden panel z opisem dominującego koloru."""
     meta = COLOR_LONG[name]
     emoji = COLOR_EMOJI[name]
-    card_bg = "rgba(29, 31, 36, .96)" if dark_mode else "rgba(255,255,255,.65)"
+    card_bg = "rgba(30, 30, 30, .96)" if dark_mode else "rgba(255,255,255,.65)"
     card_border = "rgba(255,255,255,.15)" if dark_mode else "#ececf3"
     title_color = "#f1f4f9" if dark_mode else "#1f2937"
     body_color = "#d7dde7" if dark_mode else "#2a2a2a"
@@ -7902,7 +7902,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    public_dark_mode = bool(public_view)
+    public_theme = "light"
+    if public_view:
+        try:
+            qp_theme = st.query_params.get("ap_theme", "")
+            if isinstance(qp_theme, list):
+                qp_theme = qp_theme[0] if qp_theme else ""
+            public_theme = str(qp_theme or "").strip().lower() or "light"
+        except Exception:
+            try:
+                qp = st.experimental_get_query_params()
+                qp_theme = (qp.get("ap_theme") or [""])[0]
+                public_theme = str(qp_theme or "").strip().lower() or "light"
+            except Exception:
+                public_theme = "light"
+    public_dark_mode = bool(public_view and public_theme == "dark")
     mobile_table_bg = "transparent" if public_dark_mode else "#ffffff"
     mobile_table_text = "#dce8f8" if public_dark_mode else "#0f172a"
     mobile_table_border = "rgba(148,163,184,.34)" if public_dark_mode else "#e2e8f0"

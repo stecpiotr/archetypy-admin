@@ -1823,15 +1823,57 @@ def _get_query_token() -> str:
 
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     public_css = ""
+    public_theme_sync_js = ""
     if public_mode:
+        public_theme_sync_js = """
+        <script>
+        (function(){
+          try{
+            const mql = window.matchMedia('(prefers-color-scheme: dark)');
+            const syncThemeParam = () => {
+              const next = mql.matches ? 'dark' : 'light';
+              const url = new URL(window.location.href);
+              const current = (url.searchParams.get('ap_theme') || '').toLowerCase();
+              if (current !== next){
+                url.searchParams.set('ap_theme', next);
+                window.location.replace(url.toString());
+              }
+            };
+            syncThemeParam();
+            if (!window.__apThemeSyncBound){
+              window.__apThemeSyncBound = true;
+              const onThemeChange = () => syncThemeParam();
+              if (typeof mql.addEventListener === 'function'){
+                mql.addEventListener('change', onThemeChange);
+              } else if (typeof mql.addListener === 'function'){
+                mql.addListener(onThemeChange);
+              }
+            }
+          } catch(e){}
+        })();
+        </script>
+        """
         public_css = """
-        /* Public report: zawsze spójny kontrast i ta sama paleta dark */
+        /* Public report: tło i kontrast zgodne z motywem urządzenia */
         :root{
-          --ap-heading-color:#e8f1ff;
-          --text-color:#d7e3f5;
+          --ap-report-bg:#f5f5f5;
+          --ap-report-text:#1f2937;
+          --ap-heading-color:#1f2937;
+          --text-color:#334155;
         }
         html{
-          color-scheme: dark;
+          color-scheme: light;
+        }
+        @media (prefers-color-scheme: dark){
+          :root{
+            --ap-report-bg:#1e1e1e;
+            --ap-report-text:#e2e8f0;
+            --ap-heading-color:#e8f1ff;
+            --text-color:#d7e3f5;
+          }
+          html{
+            color-scheme: dark;
+          }
         }
         html, body,
         .stApp,
@@ -1843,19 +1885,19 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         [data-testid="stMain"],
         [data-testid="stMainBlockContainer"],
         [data-testid="stMainBlockContainer"] > div{
-          background:#1d1f24 !important;
+          background:var(--ap-report-bg,#f5f5f5) !important;
           background-image:none !important;
-          color:#e2e8f0 !important;
+          color:var(--ap-report-text,#1f2937) !important;
         }
         .block-container{
-          background:#1d1f24 !important;
+          background:var(--ap-report-bg,#f5f5f5) !important;
           background-image:none !important;
-          color:#e2e8f0 !important;
+          color:var(--ap-report-text,#1f2937) !important;
         }
         [data-testid="stMarkdownContainer"],
         .ap-heading-force,
         .ap-heading-force span{
-          color:var(--text-color,#d7e3f5) !important;
+          color:var(--text-color,#334155) !important;
         }
         @media (max-width: 900px){
           html, body,
@@ -1867,7 +1909,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           [data-testid="stMainBlockContainer"],
           [data-testid="stMainBlockContainer"] > div,
           .block-container{
-            background:#1d1f24 !important;
+            background:var(--ap-report-bg,#f5f5f5) !important;
             background-image:none !important;
           }
         }
@@ -1893,12 +1935,13 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             display:block !important;
           }}
           .ap-ext-card-modal-content{{
-            background:rgba(9,16,27,.75) !important;
-            border-color:rgba(148,163,184,.45) !important;
+            background:rgba(30,30,30,.84) !important;
+            border-color:rgba(255,255,255,.28) !important;
           }}
         }}
         {public_css}
         </style>
+        {public_theme_sync_js}
         """,
         unsafe_allow_html=True,
     )
@@ -11930,7 +11973,7 @@ def _render_public_gate(token: str) -> bool:
         }
         @media (prefers-color-scheme: dark){
           html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
-            background:#1d1f24 !important;
+            background:#1e1e1e !important;
             color:#e2e8f0 !important;
           }
           .block-container{
