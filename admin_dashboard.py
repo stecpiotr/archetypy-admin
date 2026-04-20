@@ -8085,24 +8085,31 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     public_theme = "light"
     if public_view:
         try:
+            hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
+            if "dark" in hdr_theme:
+                public_theme = "dark"
+            elif "light" in hdr_theme:
+                public_theme = "light"
+            else:
+                public_theme = ""
+        except Exception:
+            public_theme = ""
+        if public_theme not in {"dark", "light"}:
+            public_theme = "light"
+        try:
             theme_ctx = st.context.theme
             theme_base = ""
             if hasattr(theme_ctx, "get"):
                 theme_base = theme_ctx.get("base", "") or ""
             if (not theme_base) and hasattr(theme_ctx, "base"):
                 theme_base = getattr(theme_ctx, "base", "") or ""
-            public_theme = str(theme_base or "").strip().lower() or "light"
+            theme_base = str(theme_base or "").strip().lower()
+            if theme_base in {"dark", "light"} and public_theme not in {"dark", "light"}:
+                public_theme = theme_base
         except Exception:
-            public_theme = "light"
+            pass
         if public_theme not in {"dark", "light"}:
-            try:
-                hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
-                if "dark" in hdr_theme:
-                    public_theme = "dark"
-                elif "light" in hdr_theme:
-                    public_theme = "light"
-            except Exception:
-                pass
+            public_theme = "light"
     public_dark_mode = bool(public_view and public_theme == "dark")
     if public_view:
         mobile_table_bg = "transparent"

@@ -1824,17 +1824,6 @@ def _get_query_token() -> str:
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     public_css = ""
     public_script = ""
-    theme_base = ""
-    try:
-        ctx_theme = st.context.theme
-        if hasattr(ctx_theme, "get"):
-            theme_base = str(ctx_theme.get("base", "") or "").strip().lower()
-        if (not theme_base) and hasattr(ctx_theme, "base"):
-            theme_base = str(getattr(ctx_theme, "base", "") or "").strip().lower()
-    except Exception:
-        theme_base = ""
-    if theme_base not in {"dark", "light"}:
-        theme_base = ""
     if public_mode:
         public_css = """
         /* Public report: spójne tło/kontrast z motywem urządzenia */
@@ -1907,8 +1896,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     theme_sync_script = """
         <script>
         (function(){
-          var SERVER_THEME = "__AP_SERVER_THEME__";
-          var hasServerTheme = (SERVER_THEME === "dark" || SERVER_THEME === "light");
           var root = document.documentElement;
           var mq = null;
           try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
@@ -1934,7 +1921,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             syncThemeImages(theme);
           };
           var resolveTheme = function(){
-            if (hasServerTheme) { return SERVER_THEME; }
             if (mq) { return mq.matches ? "dark" : "light"; }
             return "light";
           };
@@ -1942,7 +1928,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
 
           if (!window.__apThemeSyncBound) {
             window.__apThemeSyncBound = true;
-            if (!hasServerTheme && mq) {
+            if (mq) {
               if (typeof mq.addEventListener === "function") {
                 mq.addEventListener("change", function(ev){ applyTheme(ev.matches ? "dark" : "light"); });
               } else if (typeof mq.addListener === "function") {
@@ -1953,7 +1939,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             try {
               mo = new MutationObserver(function(){ syncThemeImages(currentTheme || resolveTheme()); });
               mo.observe(document.body || root, {childList:true, subtree:true});
-              window.setTimeout(function(){ try { mo && mo.disconnect(); } catch(_e){} }, 15000);
             } catch(_e) {}
           } else {
             syncThemeImages(currentTheme || resolveTheme());
@@ -1963,16 +1948,13 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 1800);
         })();
         </script>
-    """.replace("__AP_SERVER_THEME__", theme_base)
+    """
     st.markdown(
         f"""
         <style>
         .ap-theme-image-wrap{{
           display:block;
           width:100%;
-        }}
-        .ap-theme-image-dark{{
-          display:none !important;
         }}
         .ap-theme-image{{
           display:block;
@@ -1982,21 +1964,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           width:100%;
           height:auto;
         }}
-        html[data-ap-theme='dark'] .ap-theme-image-light,
-        body[data-ap-theme='dark'] .ap-theme-image-light{{
-          display:none !important;
-        }}
-        html[data-ap-theme='dark'] .ap-theme-image-dark,
-        body[data-ap-theme='dark'] .ap-theme-image-dark{{
-          display:block !important;
-        }}
         @media (prefers-color-scheme: dark){{
-          html:not([data-ap-theme]) .ap-theme-image-light{{
-            display:none !important;
-          }}
-          html:not([data-ap-theme]) .ap-theme-image-dark{{
-            display:block !important;
-          }}
           .ap-ext-card-modal-content{{
             background:rgba(30,30,30,.84) !important;
             border-color:rgba(255,255,255,.28) !important;
@@ -2005,7 +1973,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         {public_css}
         </style>
         {theme_sync_script}
-        {public_script.replace("__AP_SERVER_THEME__", theme_base)}
+        {public_script}
         """,
         unsafe_allow_html=True,
     )
