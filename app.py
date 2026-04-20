@@ -1838,7 +1838,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         .main,
         [data-testid="stAppViewContainer"],
         [data-testid="stMain"]{
-          background:#111827 !important;
+          background:#1d1f24 !important;
           color:#e2e8f0 !important;
         }
         .block-container{
@@ -11911,7 +11911,7 @@ def _render_public_gate(token: str) -> bool:
         }
         @media (prefers-color-scheme: dark){
           html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
-            background:#111827 !important;
+            background:#1d1f24 !important;
             color:#e2e8f0 !important;
           }
           .block-container{
@@ -11924,17 +11924,17 @@ def _render_public_gate(token: str) -> bool:
             color:#d9e4f0 !important;
           }
           div[data-testid="stForm"] [data-baseweb="input"]{
-            background:#111b2a !important;
-            border:1px solid #334155 !important;
+            background:#2a2d33 !important;
+            border:1px solid #3f4552 !important;
           }
           div[data-testid="stForm"] input{
-            background:#111b2a !important;
+            background:#2a2d33 !important;
             color:#e2e8f0 !important;
             -webkit-text-fill-color:#e2e8f0 !important;
             caret-color:#e2e8f0 !important;
           }
           div[data-testid="stForm"] input::placeholder{
-            color:#9fb0c4 !important;
+            color:#aab2bf !important;
           }
         }
         div[data-testid="stForm"] button[kind="primaryFormSubmit"]{
