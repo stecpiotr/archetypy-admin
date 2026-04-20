@@ -1702,11 +1702,15 @@ def color_progress_bars_html(
     label_font: str = "'Roboto','Segoe UI',system-ui,Arial,sans-serif",
     label_size_px: int = 15,                  # mniejsze niż było
     label_color: str = "#31333F",
+    dark_label_color: str = "#d7e3f5",
     row_vmargin_px: int = 17,
     track_height_px: int = 40,
     track_color: str = "#eef2f7",
+    dark_track_color: str = "#dbe2ec",
     value_font: str = "'Roboto','Segoe UI',system-ui,Arial,sans-serif",
     value_size_px: int = 17,                  # większe %
+    badge_color: str = "#111",
+    dark_badge_color: str = "#0b1320",
 ):
     items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=(order == "desc"))
 
@@ -1733,6 +1737,18 @@ def color_progress_bars_html(
                 """)
     return f"""
     <style>
+      :root{{
+        --cp-label-color:{label_color};
+        --cp-track-color:{track_color};
+        --cp-badge-color:{badge_color};
+      }}
+      @media (prefers-color-scheme: dark){{
+        :root{{
+          --cp-label-color:{dark_label_color};
+          --cp-track-color:{dark_track_color};
+          --cp-badge-color:{dark_badge_color};
+        }}
+      }}
       .cp-row{{
         display:grid; grid-template-columns:110px 1fr; gap:8px;
         align-items:center; margin:{row_vmargin_px}px 0;
@@ -1741,21 +1757,21 @@ def color_progress_bars_html(
       .cp-label-text{{
         font-family:{label_font};
         font-size:{label_size_px}px;
-        color:{label_color};
+        color:var(--cp-label-color);
         font-weight:500;                /* lżej */
         letter-spacing:.0px;
       }}
       .cp-dot{{width:10px; height:10px; border-radius:50%; display:inline-block;}}
       .cp-track{{
         position:relative; height:{track_height_px}px; border-radius:999px;
-        background:{track_color}; box-shadow: inset 0 0 0 1px #e1e7f0;
+        background:var(--cp-track-color); box-shadow: inset 0 0 0 1px #e1e7f0;
       }}
       .cp-fill{{position:relative; height:100%; border-radius:999px; overflow:visible;}}
       .cp-badge{{
         position:absolute; top:50%; transform:translateY(-50%);
         font-family:{value_font}; font-size:{value_size_px}px;
         font-weight:700;               /* grube % */
-        color:#111; white-space:nowrap;
+        color:var(--cp-badge-color); white-space:nowrap;
       }}
       .cp-badge.in{{ right:12px; }}    /* do wewnętrznej krawędzi */
       .cp-badge.out{{ left:100%; margin-left:12px; }}
@@ -2317,28 +2333,51 @@ def color_explainer_one_html(name: str, pct: float, dark_mode: bool = False) -> 
     muted_color = "#cbd2dd" if dark_mode else "#444"
     pct_color = "#e9edf4" if dark_mode else "#333"
     return f"""
-      <div style="border:1px solid {card_border}; border-left:6px solid {meta['hex']};
-                  border-radius:12px; padding:20px 22px; margin:4px 0 6px 0;
-                  background:{card_bg};">
+      <style>
+        .ap-color-desc-card{{
+          --apc-bg:{card_bg};
+          --apc-border:{card_border};
+          --apc-title:{title_color};
+          --apc-body:{body_color};
+          --apc-muted:{muted_color};
+          --apc-pct:{pct_color};
+          border:1px solid var(--apc-border);
+          border-radius:12px;
+          padding:20px 22px;
+          margin:4px 0 6px 0;
+          background:var(--apc-bg);
+        }}
+        @media (prefers-color-scheme: dark){{
+          .ap-color-desc-card{{
+            --apc-bg:rgba(30, 30, 30, .96);
+            --apc-border:rgba(255,255,255,.15);
+            --apc-title:#f1f4f9;
+            --apc-body:#d7dde7;
+            --apc-muted:#cbd2dd;
+            --apc-pct:#e9edf4;
+          }}
+        }}
+      </style>
+      <div class="ap-color-desc-card" style="border-left:6px solid {meta['hex']};">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
           <span style="font-size:20px">{emoji}</span>
-          <div style="font:650 18px/1.2 'Segoe UI',system-ui;color:{title_color};">{meta['title']}</div>
-          <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:{pct_color}">{pct:.1f}%</div>
+          <div style="font:650 18px/1.2 'Segoe UI',system-ui;color:var(--apc-title);">{meta['title']}</div>
+          <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:var(--apc-pct)">{pct:.1f}%</div>
         </div>
 
-        <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:{muted_color};">
+        <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:var(--apc-muted);">
           • <b>Orientacja na:</b> {meta['orient']}
         </div>
         
-        <div style="font:510 14px/1.40 'Segoe UI',system-ui; color:{muted_color}; margin-top:6px;">
+        <div style="font:510 14px/1.40 'Segoe UI',system-ui; color:var(--apc-muted); margin-top:6px;">
           • <b>Archetypy:</b> {meta['arche']}
         </div>
 
-        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:{body_color};">
+        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:var(--apc-body);">
           {meta['body']}
         </div>
 
-        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:{body_color};">
+        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:var(--apc-body);">
           👉 {meta['politics']}
         </div>
       </div>
@@ -9078,7 +9117,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     elif n == supp_avg:
                         theta_labels.append(f"<b><span style='color:#40b900;'>{label}</span></b>")
                     else:
-                        theta_labels.append(f"<span style='color:{radar_base_label_color};'>{label}</span>")
+                        if public_view:
+                            theta_labels.append(f"<span style='color:var(--text-color,#d7e3f5);'>{label}</span>")
+                        else:
+                            theta_labels.append(f"<span style='color:{radar_base_label_color};'>{label}</span>")
 
                 # markery TOP-3 z mean_archetype_scores
                 highlight_r = []
@@ -9271,8 +9313,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     color_progress_bars_html(
                         color_pcts,
                         order="desc",
-                        label_color=("#d4e2f4" if public_dark_mode else "#31333F"),
-                        track_color=("#dbe2ec" if public_dark_mode else "#eef2f7"),
+                        label_color="#31333F",
+                        dark_label_color="#d7e3f5",
+                        track_color="#eef2f7",
+                        dark_track_color="#dbe2ec",
+                        badge_color="#111827",
+                        dark_badge_color="#0b1320",
                     ),
                     height=280,
                     scrolling=False,

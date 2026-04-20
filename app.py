@@ -1898,16 +1898,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         .ap-theme-image{{
           display:block;
         }}
-        .ap-theme-image-dark{{
-          display:none !important;
-        }}
         @media (prefers-color-scheme: dark){{
-          .ap-theme-image-light{{
-            display:none !important;
-          }}
-          .ap-theme-image-dark{{
-            display:block !important;
-          }}
           .ap-ext-card-modal-content{{
             background:rgba(30,30,30,.84) !important;
             border-color:rgba(255,255,255,.28) !important;
