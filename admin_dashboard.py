@@ -1459,82 +1459,78 @@ def intensity_icon_html(short_label: str) -> str:
     c = intensity_icon_color(short_label)
     return f"<span class='ap-int-ico' style='background:{c}'></span>{short_label or ''}"
 
-def intensity_help_modal_html() -> str:
+def intensity_help_modal_html(dark_mode: bool = False) -> str:
     """Modal 'Interpretacja natężenia' – 3 kolumny: Przedział; Interpretacja; Znaczenie i opis jakościowy."""
-    rows = "".join(
-        (
-            "<tr>"
-            f"<td>{lo}–{hi}%</td>"
-            f"<td><b>{full}</b></td>"
-            f"<td><span style='color:#4b5563'>{desc}</span></td>"
-            "</tr>"
-        )
-        for (lo, hi, short, full, desc) in AR_INTENSITY_SCHEME
-    )
+    modal_overlay = "rgba(3, 9, 20, .74)" if dark_mode else "rgba(0,0,0,.35)"
+    modal_bg = "#0f172a" if dark_mode else "#ffffff"
+    modal_border = "rgba(148,163,184,.36)" if dark_mode else "#e5e7eb"
+    modal_shadow = "0 26px 70px rgba(2,8,23,.62)" if dark_mode else "0 20px 60px rgba(0,0,0,.25)"
+    title_color = "#e8f1ff" if dark_mode else "#111827"
+    close_color = "#dbe7f8" if dark_mode else "#111"
+    head_color = "#d7e3f5" if dark_mode else "#374151"
+    body_color = "#e2ecfa" if dark_mode else "#111827"
+    desc_color = "#c2d2e9" if dark_mode else "#4b5563"
+    row_border = "rgba(148,163,184,.28)" if dark_mode else "#eef2f7"
+    icon_border = "rgba(148,163,184,.48)" if dark_mode else "#d1d5db"
     return f"""
     <style>
-      /* Modal + USTAWIENIA (tu zmieniasz marginesy i szerokości kolumn) */
       #ap-intensity-modal{{
-        display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:9999;
-    
-        /* 👉 marginesy wierszy tabeli w MODALU */
-        --ap-row-pad-top: 16px;     /* góra */
-        --ap-row-pad-bottom: 16px;  /* dół */
-        --ap-cell-pad-h: 12px;      /* lewo/prawo */
-    
-        /* 👉 szerokości kolumn (px lub %) */
-        --ap-col-w1: 110px;  /* „Przedział” */
-        --ap-col-w2: 250px;  /* „Interpretacja” */
-        --ap-col-w3: auto;   /* „Znaczenie i opis jakościowy” (reszta miejsca) */
-    
-        /* 👉 kolory kwadracików */
-        --ap-col-1: #9CA3AF;  /* 0–29%   */
-        --ap-col-2: #6B7280;  /* 30–49%  */
-        --ap-col-3: #FBBF24;  /* 50–59%  */
-        --ap-col-4: #F59E0B;  /* 60–69%  */
-        --ap-col-5: #EF4444;  /* 70–79%  */
-        --ap-col-6: #DC2626;  /* 80–89%  */
-        --ap-col-7: #7F1D1D;  /* 90–100% */
+        display:none; position:fixed; inset:0; background:{modal_overlay}; z-index:9999;
+        --ap-row-pad-top: 16px;
+        --ap-row-pad-bottom: 16px;
+        --ap-cell-pad-h: 12px;
+        --ap-col-w1: 110px;
+        --ap-col-w2: 250px;
+        --ap-col-w3: auto;
+        --ap-col-1: #9CA3AF;
+        --ap-col-2: #6B7280;
+        --ap-col-3: #FBBF24;
+        --ap-col-4: #F59E0B;
+        --ap-col-5: #EF4444;
+        --ap-col-6: #DC2626;
+        --ap-col-7: #7F1D1D;
       }}
       #ap-intensity-modal:target{{display:block;}}
-    
+
       #ap-intensity-modal .ap-int-modal{{
         position:fixed; left:50%; top:8%; transform:translateX(-50%);
-        max-width:980px; background:#fff; border-radius:16px;
-        box-shadow:0 20px 60px rgba(0,0,0,.25); padding:22px 24px;
+        width:min(980px, 96vw);
+        max-height:84vh;
+        overflow:auto;
+        background:{modal_bg};
+        border:1px solid {modal_border};
+        border-radius:16px;
+        box-shadow:{modal_shadow};
+        padding:22px 24px;
       }}
       #ap-intensity-modal .ap-int-head{{display:flex; align-items:center; gap:10px; margin-bottom:10px;}}
-      #ap-intensity-modal .ap-int-title{{font:700 18px/1.2 'Segoe UI',system-ui,Arial;}}
-      #ap-intensity-modal .ap-int-close{{margin-left:auto; text-decoration:none; cursor:pointer; font:700 18px/1 monospace; color:#111}}
-    
-      /* Tabela w MODALU – używa zmiennych powyżej */
+      #ap-intensity-modal .ap-int-title{{font:700 18px/1.2 'Segoe UI',system-ui,Arial; color:{title_color};}}
+      #ap-intensity-modal .ap-int-close{{margin-left:auto; text-decoration:none; cursor:pointer; font:700 18px/1 monospace; color:{close_color};}}
+
       .ap-int-table{{
-        width:100%; border-collapse:collapse; font:400 14px/1.45 'Segoe UI',system-ui;
-        table-layout: fixed;   /* trzyma szerokości kolumn */
+        width:100%;
+        border-collapse:collapse;
+        font:400 14px/1.45 'Segoe UI',system-ui;
+        table-layout:fixed;
       }}
       .ap-int-table th,
       .ap-int-table td{{
-        border-bottom:1px solid #eef2f7;
+        border-bottom:1px solid {row_border};
         padding: var(--ap-row-pad-top) var(--ap-cell-pad-h) var(--ap-row-pad-bottom) var(--ap-cell-pad-h);
         vertical-align:top;
       }}
-      .ap-int-table th{{text-align:left; font-weight:700; color:#374151;}}
-      .ap-intensity-modal .ap-int-table th:nth-child(1){{ font-weight:800; }}
-      .ap-intensity-modal .ap-int-table td:nth-child(1){{ font-weight:700; color:#111; }}
+      .ap-int-table th{{text-align:left; font-weight:700; color:{head_color};}}
+      #ap-intensity-modal .ap-int-table td{{color:{body_color};}}
+      #ap-intensity-modal .ap-int-table td:nth-child(1){{font-weight:700; color:{body_color};}}
+      #ap-intensity-modal .ap-int-table td:nth-child(3){{color:{desc_color};}}
 
-        /* POGRUBIENIE pierwszej kolumny w MODALU */
-        #ap-intensity-modal .ap-int-table th:nth-child(1){{ font-weight:800; }}
-        #ap-intensity-modal .ap-int-table td:nth-child(1){{ font-weight:700; color:#111; }}
-    
-      /* Szerokości kolumn (łatwe do zmiany wyżej) */
       .ap-int-table th:nth-child(1), .ap-int-table td:nth-child(1){{ width: var(--ap-col-w1); text-align:center; }}
       .ap-int-table th:nth-child(2), .ap-int-table td:nth-child(2){{ width: var(--ap-col-w2); }}
       .ap-int-table th:nth-child(3), .ap-int-table td:nth-child(3){{ width: var(--ap-col-w3); }}
-    
-      /* Kwadracik + jego kolory */
+
       .ap-int-ico{{
         display:inline-block; width:12px; height:12px; border-radius:3px;
-        border:1px solid #d1d5db; margin-right:6px; vertical-align:-2px;
+        border:1px solid {icon_border}; margin-right:6px; vertical-align:-2px;
       }}
       .ap-i--1{{ background:var(--ap-col-1); }}
       .ap-i--2{{ background:var(--ap-col-2); }}
@@ -1543,6 +1539,19 @@ def intensity_help_modal_html() -> str:
       .ap-i--5{{ background:var(--ap-col-5); }}
       .ap-i--6{{ background:var(--ap-col-6); }}
       .ap-i--7{{ background:var(--ap-col-7); border-color:var(--ap-col-7); }}
+
+      @media (max-width: 900px){{
+        #ap-intensity-modal .ap-int-modal{{
+          top:4%;
+          max-height:90vh;
+          padding:16px 14px;
+          border-radius:12px;
+        }}
+        #ap-intensity-modal .ap-int-title{{font-size:16px;}}
+        .ap-int-table{{font-size:13px;}}
+        .ap-int-table th:nth-child(1), .ap-int-table td:nth-child(1){{ width: 92px; }}
+        .ap-int-table th:nth-child(2), .ap-int-table td:nth-child(2){{ width: 170px; }}
+      }}
     </style>
 
     <div id="ap-intensity-modal">
@@ -8010,12 +8019,19 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --ap-heading-color:#e8f1ff;
               --text-color:#d7e3f5;
             }
-            [data-testid="stMarkdownContainer"],
-            [data-testid="stMarkdownContainer"] p,
-            [data-testid="stMarkdownContainer"] li{
+            [data-testid="stMarkdownContainer"]{
               color:var(--text-color,#d7e3f5) !important;
             }
+            .ap-heading-force,
+            .ap-heading-force span{
+              color:var(--ap-heading-color,#e8f1ff) !important;
+            }
             .ap-public-heading-title{
+              color:var(--ap-heading-color,#e8f1ff) !important;
+            }
+            .stHeading h1, .stHeading h2, .stHeading h3,
+            .stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
+            h1, h2, h3{
               color:var(--ap-heading-color,#e8f1ff) !important;
             }
             .ap-public-heading-count{
@@ -8992,7 +9008,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     {table_theme_override_css}
 
                 </style>
-                """ + f"<div class='ap-table-wrap'>{html_table}</div>" + intensity_help_modal_html()
+                """ + f"<div class='ap-table-wrap'>{html_table}</div>" + intensity_help_modal_html(dark_mode=public_dark_mode)
 
                 # jeśli masz nowe Streamlit: prawdziwy, „wbudowany” HTML bez iframa
                 if hasattr(st, "html"):

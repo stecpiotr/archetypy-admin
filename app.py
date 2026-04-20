@@ -1838,15 +1838,15 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         .main,
         [data-testid="stAppViewContainer"],
         [data-testid="stMain"]{
-          background:#0b1220 !important;
+          background:#111827 !important;
           color:#e2e8f0 !important;
         }
         .block-container{
           color:#e2e8f0 !important;
         }
         [data-testid="stMarkdownContainer"],
-        [data-testid="stMarkdownContainer"] p,
-        [data-testid="stMarkdownContainer"] li{
+        .ap-heading-force,
+        .ap-heading-force span{
           color:var(--text-color,#d7e3f5) !important;
         }
         """
@@ -11911,7 +11911,7 @@ def _render_public_gate(token: str) -> bool:
         }
         @media (prefers-color-scheme: dark){
           html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
-            background:#0b1220 !important;
+            background:#111827 !important;
             color:#e2e8f0 !important;
           }
           .block-container{
