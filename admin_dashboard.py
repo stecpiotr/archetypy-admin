@@ -556,13 +556,10 @@ def _theme_image_dual_html(
 ) -> str:
     extra = f" {extra_class.strip()}" if extra_class else ""
     return (
-        "<span class='ap-theme-image-wrap'>"
-        f"<img src='{light_uri}' "
-        f"data-light-src='{light_uri}' "
-        f"data-dark-src='{dark_uri}' "
-        f"class='ap-theme-image ap-theme-image-swap{extra}' "
-        f"style='{style}'/>"
-        "</span>"
+        "<picture class='ap-theme-image-wrap'>"
+        f"<source srcset='{dark_uri}' media='(prefers-color-scheme: dark)'/>"
+        f"<img src='{light_uri}' class='ap-theme-image{extra}' style='{style}'/>"
+        "</picture>"
     )
 
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
@@ -8233,6 +8230,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --text-color:#334155;
               --ap-public-count-color:#1f4f8d;
               --ap-public-count-label-color:#3f5873;
+              --ap-radar-label:#334155;
+              --ap-radar-radial:#475569;
+              --ap-radar-grid:rgba(148,163,184,0.35);
+              --ap-radar-marker:#1f2937;
             }
             html[data-ap-theme='light'],
             body[data-ap-theme='light']{
@@ -8240,6 +8241,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --text-color:#334155;
               --ap-public-count-color:#1f4f8d;
               --ap-public-count-label-color:#3f5873;
+              --ap-radar-label:#334155;
+              --ap-radar-radial:#475569;
+              --ap-radar-grid:rgba(148,163,184,0.35);
+              --ap-radar-marker:#1f2937;
             }
             html[data-ap-theme='dark'],
             body[data-ap-theme='dark']{
@@ -8247,6 +8252,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --text-color:#d7e3f5;
               --ap-public-count-color:#b8d5ff;
               --ap-public-count-label-color:#d2e1f4;
+              --ap-radar-label:#eaf2ff;
+              --ap-radar-radial:#deebfb;
+              --ap-radar-grid:rgba(148,163,184,0.46);
+              --ap-radar-marker:#dbe7f8;
             }
             .ap-public-heading-count{
               color:var(--ap-public-count-color,#1f4f8d) !important;
@@ -8260,6 +8269,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 --text-color:#d7e3f5;
                 --ap-public-count-color:#b8d5ff;
                 --ap-public-count-label-color:#d2e1f4;
+                --ap-radar-label:#eaf2ff;
+                --ap-radar-radial:#deebfb;
+                --ap-radar-grid:rgba(148,163,184,0.46);
+                --ap-radar-marker:#dbe7f8;
               }
             }
             [data-testid="stMarkdownContainer"]{
@@ -8863,9 +8876,17 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 # 3) budowa tabeli z nową kolumną „% natężenie archetypu”
                 # 1) nagłówek grupy + link „i” (bez JS – otwiera modal CSS)
+                _info_svg = (
+                    "<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none'>"
+                    "<circle cx='12' cy='12' r='10' stroke='#94a3b8' stroke-width='1.7'/>"
+                    "<circle cx='12' cy='7.4' r='1.25' fill='#94a3b8'/>"
+                    "<rect x='11.2' y='10.2' width='1.6' height='7.1' rx='0.8' fill='#94a3b8'/>"
+                    "</svg>"
+                )
+                _info_uri = "data:image/svg+xml;base64," + base64.b64encode(_info_svg.encode("utf-8")).decode("ascii")
                 NAT_GRP = (
                     "<a href='#ap-intensity-modal' class='ap-int-info' title='Co oznaczają progi?'>"
-                    "<img src='https://cdn3.iconfinder.com/data/icons/thunderstorm-5/80/5-32-512.png' "
+                    f"<img src='{_info_uri}' "
                     "alt='info' style='width:16px;height:16px'/>"
                     "</a>"
                 )
@@ -9275,18 +9296,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             with col2:
                 if public_view:
-                    if public_dark_mode:
-                        radar_base_label_color = "#c9d8ee"
-                        radar_marker_border_color = "#dbe7f8"
-                        radar_grid_color = "rgba(148,163,184,0.46)"
-                        radar_tick_color = "#eef6ff"
-                        radar_radial_tick_color = "#deebfb"
-                    else:
-                        radar_base_label_color = "#334155"
-                        radar_marker_border_color = "#1f2937"
-                        radar_grid_color = "rgba(148,163,184,0.35)"
-                        radar_tick_color = "#334155"
-                        radar_radial_tick_color = "#475569"
+                    radar_base_label_color = "var(--ap-radar-label,#334155)"
+                    radar_marker_border_color = "var(--ap-radar-marker,#1f2937)"
+                    radar_grid_color = "var(--ap-radar-grid,rgba(148,163,184,0.35))"
+                    radar_tick_color = "var(--ap-radar-label,#334155)"
+                    radar_radial_tick_color = "var(--ap-radar-radial,#475569)"
                 else:
                     radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
                     radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
