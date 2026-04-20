@@ -2027,19 +2027,31 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           var resolveTheme = function(){
             var qTheme = getQueryTheme();
             if (isSamsungBrowser) {
+              // Samsung Internet (szczególnie mobile) może mylić heurystykę tła
+              // przy dark mode, dlatego traktujemy URL i media query jako źródło prawdy.
+              if (qTheme === "dark" || qTheme === "light") {
+                currentThemeSignal = "query";
+                return qTheme;
+              }
+              if (mq) {
+                currentThemeSignal = mq.matches ? "mq-dark" : "mq-light";
+                return mq.matches ? "dark" : "light";
+              }
               var bgGuess = guessThemeFromBackground();
               if (bgGuess === "dark" || bgGuess === "light") {
                 currentThemeSignal = "bg";
                 return bgGuess;
               }
-            }
-            if (qTheme === "dark" || qTheme === "light") {
-              currentThemeSignal = "query";
-              return qTheme;
+              currentThemeSignal = "fallback";
+              return "light";
             }
             if (mq) {
               currentThemeSignal = mq.matches ? "mq-dark" : "mq-light";
               return mq.matches ? "dark" : "light";
+            }
+            if (qTheme === "dark" || qTheme === "light") {
+              currentThemeSignal = "query";
+              return qTheme;
             }
             currentThemeSignal = "fallback";
             return "light";
