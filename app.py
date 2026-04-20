@@ -1897,6 +1897,9 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         <script>
         (function(){
           var root = document.documentElement;
+          var ua = "";
+          try { ua = String((window.navigator && window.navigator.userAgent) || ""); } catch(_e) { ua = ""; }
+          var isSamsungBrowser = /SamsungBrowser/i.test(ua);
           var mq = null;
           try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
           var currentTheme = null;
@@ -1920,8 +1923,33 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
             syncThemeImages(theme);
           };
+          var guessThemeFromBackground = function(){
+            try {
+              var el = document.body || document.documentElement;
+              if (!el) { return null; }
+              var bg = String(window.getComputedStyle(el).backgroundColor || "");
+              var m = bg.match(/rgba?\(([^)]+)\)/i);
+              if (!m) { return null; }
+              var parts = m[1].split(",").map(function(x){ return parseFloat(String(x).trim()); });
+              if (parts.length < 3) { return null; }
+              var r = isNaN(parts[0]) ? 255 : parts[0];
+              var g = isNaN(parts[1]) ? 255 : parts[1];
+              var b = isNaN(parts[2]) ? 255 : parts[2];
+              var luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+              return luminance < 90 ? "dark" : "light";
+            } catch(_e) {
+              return null;
+            }
+          };
           var resolveTheme = function(){
-            if (mq) { return mq.matches ? "dark" : "light"; }
+            if (mq && mq.matches) { return "dark"; }
+            if (isSamsungBrowser) {
+              var bgGuess = guessThemeFromBackground();
+              if (bgGuess === "dark" || bgGuess === "light") {
+                return bgGuess;
+              }
+            }
+            if (mq) { return "light"; }
             return "light";
           };
           applyTheme(resolveTheme());

@@ -558,7 +558,10 @@ def _theme_image_dual_html(
     return (
         "<picture class='ap-theme-image-wrap'>"
         f"<source srcset='{dark_uri}' media='(prefers-color-scheme: dark)'/>"
-        f"<img src='{light_uri}' class='ap-theme-image{extra}' style='{style}'/>"
+        f"<img src='{light_uri}' "
+        f"data-light-src='{light_uri}' "
+        f"data-dark-src='{dark_uri}' "
+        f"class='ap-theme-image ap-theme-image-swap{extra}' style='{style}'/>"
         "</picture>"
     )
 
