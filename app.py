@@ -1823,36 +1823,7 @@ def _get_query_token() -> str:
 
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     public_css = ""
-    public_theme_sync_js = ""
     if public_mode:
-        public_theme_sync_js = """
-        <script>
-        (function(){
-          try{
-            const mql = window.matchMedia('(prefers-color-scheme: dark)');
-            const syncThemeParam = () => {
-              const next = mql.matches ? 'dark' : 'light';
-              const url = new URL(window.location.href);
-              const current = (url.searchParams.get('ap_theme') || '').toLowerCase();
-              if (current !== next){
-                url.searchParams.set('ap_theme', next);
-                window.location.replace(url.toString());
-              }
-            };
-            syncThemeParam();
-            if (!window.__apThemeSyncBound){
-              window.__apThemeSyncBound = true;
-              const onThemeChange = () => syncThemeParam();
-              if (typeof mql.addEventListener === 'function'){
-                mql.addEventListener('change', onThemeChange);
-              } else if (typeof mql.addListener === 'function'){
-                mql.addListener(onThemeChange);
-              }
-            }
-          } catch(e){}
-        })();
-        </script>
-        """
         public_css = """
         /* Public report: tło i kontrast zgodne z motywem urządzenia */
         :root{
@@ -1921,6 +1892,9 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           display:block;
           width:100%;
         }}
+        .ap-theme-image-wrap source{{
+          display:none;
+        }}
         .ap-theme-image{{
           display:block;
         }}
@@ -1941,7 +1915,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         }}
         {public_css}
         </style>
-        {public_theme_sync_js}
         """,
         unsafe_allow_html=True,
     )
@@ -12090,10 +12063,7 @@ def public_report_view(token: str) -> None:
     try:
         import admin_dashboard as AD
         if hasattr(AD, "show_report"):
-            try:
-                AD.show_report(sb, study, wide=True, public_view=True)
-            except TypeError:
-                AD.show_report(sb, study, wide=True)
+            AD.show_report(sb, study, wide=True, public_view=True)
         else:
             st.error("Brak funkcji renderującej raport.")
     except Exception as e:

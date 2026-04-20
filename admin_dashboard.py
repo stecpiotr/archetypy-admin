@@ -555,13 +555,11 @@ def _theme_image_dual_html(
     extra_class: str | None = None,
 ) -> str:
     extra = f" {extra_class.strip()}" if extra_class else ""
-    light_style = style
-    dark_style = f"{style};display:none;"
     return (
-        "<span class='ap-theme-image-wrap'>"
-        f"<img src='{light_uri}' class='ap-theme-image ap-theme-image-light{extra}' style='{light_style}'/>"
-        f"<img src='{dark_uri}' class='ap-theme-image ap-theme-image-dark{extra}' style='{dark_style}'/>"
-        "</span>"
+        "<picture class='ap-theme-image-wrap'>"
+        f"<source srcset='{dark_uri}' media='(prefers-color-scheme: dark)'/>"
+        f"<img src='{light_uri}' class='ap-theme-image ap-theme-image-light{extra}' style='{style}'/>"
+        "</picture>"
     )
 
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
@@ -7905,21 +7903,33 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     public_theme = "light"
     if public_view:
         try:
-            qp_theme = st.query_params.get("ap_theme", "")
-            if isinstance(qp_theme, list):
-                qp_theme = qp_theme[0] if qp_theme else ""
-            public_theme = str(qp_theme or "").strip().lower() or "light"
+            theme_ctx = st.context.theme
+            theme_base = ""
+            if hasattr(theme_ctx, "get"):
+                theme_base = theme_ctx.get("base", "") or ""
+            if (not theme_base) and hasattr(theme_ctx, "base"):
+                theme_base = getattr(theme_ctx, "base", "") or ""
+            public_theme = str(theme_base or "").strip().lower() or "light"
         except Exception:
+            public_theme = "light"
+        if public_theme not in {"dark", "light"}:
             try:
-                qp = st.experimental_get_query_params()
-                qp_theme = (qp.get("ap_theme") or [""])[0]
-                public_theme = str(qp_theme or "").strip().lower() or "light"
+                hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
+                if "dark" in hdr_theme:
+                    public_theme = "dark"
+                elif "light" in hdr_theme:
+                    public_theme = "light"
             except Exception:
-                public_theme = "light"
+                pass
     public_dark_mode = bool(public_view and public_theme == "dark")
-    mobile_table_bg = "transparent" if public_dark_mode else "#ffffff"
-    mobile_table_text = "#dce8f8" if public_dark_mode else "#0f172a"
-    mobile_table_border = "rgba(148,163,184,.34)" if public_dark_mode else "#e2e8f0"
+    if public_view:
+        mobile_table_bg = "transparent"
+        mobile_table_text = "var(--text-color,#334155)"
+        mobile_table_border = "rgba(148,163,184,.34)"
+    else:
+        mobile_table_bg = "transparent" if public_dark_mode else "#ffffff"
+        mobile_table_text = "#dce8f8" if public_dark_mode else "#0f172a"
+        mobile_table_border = "rgba(148,163,184,.34)" if public_dark_mode else "#e2e8f0"
     mobile_section_margin_top = 30 if is_mobile else 6
     mobile_profile_actions_margin_top = 32 if is_mobile else 8
     radar_plot_size = 430 if is_mobile else 560
@@ -8025,34 +8035,46 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         mobile_layout_css,
         unsafe_allow_html=True,
     )
-    if public_dark_mode:
+    if public_view:
         st.markdown(
             """
             <style>
             :root{
-              --ap-heading-color:#e8f1ff;
-              --text-color:#d7e3f5;
+              --ap-heading-color:#1f2937;
+              --text-color:#334155;
+            }
+            .ap-public-heading-count{
+              color:#1f4f8d !important;
+            }
+            .ap-public-heading-count-label{
+              color:#3f5873 !important;
+            }
+            @media (prefers-color-scheme: dark){
+              :root{
+                --ap-heading-color:#e8f1ff;
+                --text-color:#d7e3f5;
+              }
+              .ap-public-heading-count{
+                color:#b8d5ff !important;
+              }
+              .ap-public-heading-count-label{
+                color:#d2e1f4 !important;
+              }
             }
             [data-testid="stMarkdownContainer"]{
-              color:var(--text-color,#d7e3f5) !important;
+              color:var(--text-color,#334155) !important;
             }
             .ap-heading-force,
             .ap-heading-force span{
-              color:var(--ap-heading-color,#e8f1ff) !important;
+              color:var(--ap-heading-color,#1f2937) !important;
             }
             .ap-public-heading-title{
-              color:var(--ap-heading-color,#e8f1ff) !important;
+              color:var(--ap-heading-color,#1f2937) !important;
             }
             .stHeading h1, .stHeading h2, .stHeading h3,
             .stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
             h1, h2, h3{
-              color:var(--ap-heading-color,#e8f1ff) !important;
-            }
-            .ap-public-heading-count{
-              color:#b8d5ff !important;
-            }
-            .ap-public-heading-count-label{
-              color:#d2e1f4 !important;
+              color:var(--ap-heading-color,#1f2937) !important;
             }
             </style>
             """,
@@ -8725,8 +8747,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 # Wstrzykujemy thead przed <tbody>
                 html_table = _body.replace("<tbody>", thead_html + "<tbody>", 1)
                 table_theme_override_css = ""
-                if public_dark_mode:
+                if public_view:
                     table_theme_override_css = """
+                      @media (prefers-color-scheme: dark){
                       .ap-table{
                         background:transparent !important;
                         color:#dce8f8 !important;
@@ -8741,6 +8764,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       }
                       .ap-table .ap-int-ico{
                         border-color:rgba(148,163,184,.44) !important;
+                      }
                       }
                     """
 
@@ -9032,11 +9056,18 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     components.html(_html_block, height=_table_height, scrolling=False)
 
             with col2:
-                radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
-                radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
-                radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(148,163,184,0.35)"
-                radar_tick_color = "#eef6ff" if public_dark_mode else "#475569"
-                radar_radial_tick_color = "#deebfb" if public_dark_mode else "#64748b"
+                if public_view:
+                    radar_base_label_color = "#c9d8ee" if public_dark_mode else "#95a3b7"
+                    radar_marker_border_color = "#dbe7f8" if public_dark_mode else "#1f2937"
+                    radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(148,163,184,0.35)"
+                    radar_tick_color = "#eef6ff" if public_dark_mode else "#7b8a9f"
+                    radar_radial_tick_color = "#deebfb" if public_dark_mode else "#8797ac"
+                else:
+                    radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
+                    radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
+                    radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(148,163,184,0.35)"
+                    radar_tick_color = "#eef6ff" if public_dark_mode else "#475569"
+                    radar_radial_tick_color = "#deebfb" if public_dark_mode else "#64748b"
                 theta_labels = []
                 for n in archetype_names:
                     label = disp_name(n)
@@ -9246,9 +9277,22 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     height=280,
                     scrolling=False,
                 )
-                st.markdown("<style>.cp-row{margin:15px 0 !important}</style>", unsafe_allow_html=True)
                 st.markdown(
-                    f"<div style='text-align:center; font:680 20px/1.30 \"Roboto\",\"Segoe UI\",\"Arial\",system-ui,sans-serif; color:{'#dbe8f8' if public_dark_mode else '#222'}; margin: -15px 0 60px;'>"
+                    """
+                    <style>
+                      .cp-row{margin:15px 0 !important}
+                      .cp-label-text{color:var(--text-color,#31333F) !important;}
+                      .cp-track{box-shadow: inset 0 0 0 1px rgba(148,163,184,.28) !important;}
+                      .cp-badge{color:#111827 !important;}
+                      @media (prefers-color-scheme: dark){
+                        .cp-badge{color:#0b1320 !important;}
+                      }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f"<div class='ap-dom-color-title' style='text-align:center; font:680 20px/1.30 \"Roboto\",\"Segoe UI\",\"Arial\",system-ui,sans-serif; color:var(--text-color,#222); margin: -15px 0 60px;'>"
                     f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
                     unsafe_allow_html=True,
                 )
