@@ -1823,27 +1823,34 @@ def _get_query_token() -> str:
 
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     public_css = ""
+    public_script = ""
     if public_mode:
         public_css = """
-        /* Public report: tło i kontrast zgodne z motywem urządzenia */
+        /* Public report: spójne tło/kontrast z motywem urządzenia */
         :root{
           --ap-report-bg:#f5f5f5;
           --ap-report-text:#1f2937;
           --ap-heading-color:#1f2937;
           --text-color:#334155;
         }
-        html{
+        html[data-ap-theme='light'],
+        body[data-ap-theme='light']{
           color-scheme: light;
         }
+        html[data-ap-theme='dark'],
+        body[data-ap-theme='dark']{
+          --ap-report-bg:#1e1e1e;
+          --ap-report-text:#e2e8f0;
+          --ap-heading-color:#e8f1ff;
+          --text-color:#d7e3f5;
+          color-scheme: dark;
+        }
         @media (prefers-color-scheme: dark){
-          :root{
+          :root:not([data-ap-theme]){
             --ap-report-bg:#1e1e1e;
             --ap-report-text:#e2e8f0;
             --ap-heading-color:#e8f1ff;
             --text-color:#d7e3f5;
-          }
-          html{
-            color-scheme: dark;
           }
         }
         html, body,
@@ -1885,6 +1892,29 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           }
         }
         """
+        public_script = """
+        <script>
+        (function(){
+          if (window.__apThemeSyncBound) { return; }
+          window.__apThemeSyncBound = true;
+          var root = document.documentElement;
+          var applyTheme = function(isDark){
+            var theme = isDark ? "dark" : "light";
+            try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
+            try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
+          };
+          var mq = null;
+          try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
+          applyTheme(!!(mq && mq.matches));
+          if (!mq) { return; }
+          if (typeof mq.addEventListener === "function") {
+            mq.addEventListener("change", function(ev){ applyTheme(!!ev.matches); });
+          } else if (typeof mq.addListener === "function") {
+            mq.addListener(function(ev){ applyTheme(!!ev.matches); });
+          }
+        })();
+        </script>
+        """
     st.markdown(
         f"""
         <style>
@@ -1892,13 +1922,27 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           display:block;
           width:100%;
         }}
-        .ap-theme-image-wrap source{{
-          display:none;
+        .ap-theme-image-dark{{
+          display:none !important;
         }}
         .ap-theme-image{{
           display:block;
         }}
+        html[data-ap-theme='dark'] .ap-theme-image-light,
+        body[data-ap-theme='dark'] .ap-theme-image-light{{
+          display:none !important;
+        }}
+        html[data-ap-theme='dark'] .ap-theme-image-dark,
+        body[data-ap-theme='dark'] .ap-theme-image-dark{{
+          display:block !important;
+        }}
         @media (prefers-color-scheme: dark){{
+          html:not([data-ap-theme]) .ap-theme-image-light{{
+            display:none !important;
+          }}
+          html:not([data-ap-theme]) .ap-theme-image-dark{{
+            display:block !important;
+          }}
           .ap-ext-card-modal-content{{
             background:rgba(30,30,30,.84) !important;
             border-color:rgba(255,255,255,.28) !important;
@@ -1906,6 +1950,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         }}
         {public_css}
         </style>
+        {public_script}
         """,
         unsafe_allow_html=True,
     )

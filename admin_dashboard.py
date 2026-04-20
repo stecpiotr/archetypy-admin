@@ -556,10 +556,10 @@ def _theme_image_dual_html(
 ) -> str:
     extra = f" {extra_class.strip()}" if extra_class else ""
     return (
-        "<picture class='ap-theme-image-wrap'>"
-        f"<source srcset='{dark_uri}' media='(prefers-color-scheme: dark)'/>"
+        "<span class='ap-theme-image-wrap'>"
         f"<img src='{light_uri}' class='ap-theme-image ap-theme-image-light{extra}' style='{style}'/>"
-        "</picture>"
+        f"<img src='{dark_uri}' class='ap-theme-image ap-theme-image-dark{extra}' style='{style}'/>"
+        "</span>"
     )
 
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):
@@ -1459,21 +1459,69 @@ def intensity_icon_html(short_label: str) -> str:
 
 def intensity_help_modal_html(dark_mode: bool = False) -> str:
     """Modal 'Interpretacja natężenia' – 3 kolumny: Przedział; Interpretacja; Znaczenie i opis jakościowy."""
-    modal_overlay = "rgba(0,0,0,.62)" if dark_mode else "rgba(0,0,0,.35)"
-    modal_bg = "#1e1e1e" if dark_mode else "#ffffff"
-    modal_border = "rgba(255,255,255,.15)" if dark_mode else "#e5e7eb"
-    modal_shadow = "0 24px 62px rgba(0,0,0,.58)" if dark_mode else "0 20px 60px rgba(0,0,0,.25)"
-    title_color = "#f1f4f9" if dark_mode else "#111827"
-    close_color = "#d9dde5" if dark_mode else "#111"
-    head_color = "#d8dde6" if dark_mode else "#374151"
-    body_color = "#e2e7ef" if dark_mode else "#111827"
-    desc_color = "#c6ceda" if dark_mode else "#4b5563"
-    row_border = "rgba(255,255,255,.12)" if dark_mode else "#eef2f7"
-    icon_border = "rgba(255,255,255,.24)" if dark_mode else "#d1d5db"
+    light_overlay = "rgba(0,0,0,.35)"
+    light_bg = "#ffffff"
+    light_border = "#e5e7eb"
+    light_shadow = "0 20px 60px rgba(0,0,0,.25)"
+    light_title = "#111827"
+    light_close = "#111"
+    light_head = "#374151"
+    light_body = "#111827"
+    light_desc = "#4b5563"
+    light_row_border = "#eef2f7"
+    light_icon_border = "#d1d5db"
+
+    dark_overlay = "rgba(0,0,0,.62)"
+    dark_bg = "#1e1e1e"
+    dark_border = "rgba(255,255,255,.15)"
+    dark_shadow = "0 24px 62px rgba(0,0,0,.58)"
+    dark_title = "#f1f4f9"
+    dark_close = "#d9dde5"
+    dark_head = "#d8dde6"
+    dark_body = "#e2e7ef"
+    dark_desc = "#c6ceda"
+    dark_row_border = "rgba(255,255,255,.12)"
+    dark_icon_border = "rgba(255,255,255,.24)"
+
+    if dark_mode:
+        default_overlay = dark_overlay
+        default_bg = dark_bg
+        default_border = dark_border
+        default_shadow = dark_shadow
+        default_title = dark_title
+        default_close = dark_close
+        default_head = dark_head
+        default_body = dark_body
+        default_desc = dark_desc
+        default_row_border = dark_row_border
+        default_icon_border = dark_icon_border
+    else:
+        default_overlay = light_overlay
+        default_bg = light_bg
+        default_border = light_border
+        default_shadow = light_shadow
+        default_title = light_title
+        default_close = light_close
+        default_head = light_head
+        default_body = light_body
+        default_desc = light_desc
+        default_row_border = light_row_border
+        default_icon_border = light_icon_border
     return f"""
     <style>
       #ap-intensity-modal{{
-        display:none; position:fixed; inset:0; background:{modal_overlay}; z-index:9999;
+        --ap-int-overlay:{default_overlay};
+        --ap-int-bg:{default_bg};
+        --ap-int-border:{default_border};
+        --ap-int-shadow:{default_shadow};
+        --ap-int-title:{default_title};
+        --ap-int-close:{default_close};
+        --ap-int-head:{default_head};
+        --ap-int-body:{default_body};
+        --ap-int-desc:{default_desc};
+        --ap-int-row-border:{default_row_border};
+        --ap-int-icon-border:{default_icon_border};
+        display:none; position:fixed; inset:0; background:var(--ap-int-overlay); z-index:9999;
         --ap-row-pad-top: 16px;
         --ap-row-pad-bottom: 16px;
         --ap-cell-pad-h: 12px;
@@ -1488,6 +1536,49 @@ def intensity_help_modal_html(dark_mode: bool = False) -> str:
         --ap-col-6: #DC2626;
         --ap-col-7: #7F1D1D;
       }}
+      html[data-ap-theme='dark'] #ap-intensity-modal,
+      body[data-ap-theme='dark'] #ap-intensity-modal{{
+        --ap-int-overlay:{dark_overlay};
+        --ap-int-bg:{dark_bg};
+        --ap-int-border:{dark_border};
+        --ap-int-shadow:{dark_shadow};
+        --ap-int-title:{dark_title};
+        --ap-int-close:{dark_close};
+        --ap-int-head:{dark_head};
+        --ap-int-body:{dark_body};
+        --ap-int-desc:{dark_desc};
+        --ap-int-row-border:{dark_row_border};
+        --ap-int-icon-border:{dark_icon_border};
+      }}
+      html[data-ap-theme='light'] #ap-intensity-modal,
+      body[data-ap-theme='light'] #ap-intensity-modal{{
+        --ap-int-overlay:{light_overlay};
+        --ap-int-bg:{light_bg};
+        --ap-int-border:{light_border};
+        --ap-int-shadow:{light_shadow};
+        --ap-int-title:{light_title};
+        --ap-int-close:{light_close};
+        --ap-int-head:{light_head};
+        --ap-int-body:{light_body};
+        --ap-int-desc:{light_desc};
+        --ap-int-row-border:{light_row_border};
+        --ap-int-icon-border:{light_icon_border};
+      }}
+      @media (prefers-color-scheme: dark){{
+        html:not([data-ap-theme]) #ap-intensity-modal{{
+          --ap-int-overlay:{dark_overlay};
+          --ap-int-bg:{dark_bg};
+          --ap-int-border:{dark_border};
+          --ap-int-shadow:{dark_shadow};
+          --ap-int-title:{dark_title};
+          --ap-int-close:{dark_close};
+          --ap-int-head:{dark_head};
+          --ap-int-body:{dark_body};
+          --ap-int-desc:{dark_desc};
+          --ap-int-row-border:{dark_row_border};
+          --ap-int-icon-border:{dark_icon_border};
+        }}
+      }}
       #ap-intensity-modal:target{{display:block;}}
 
       #ap-intensity-modal .ap-int-modal{{
@@ -1495,15 +1586,15 @@ def intensity_help_modal_html(dark_mode: bool = False) -> str:
         width:min(980px, 96vw);
         max-height:84vh;
         overflow:auto;
-        background:{modal_bg};
-        border:1px solid {modal_border};
+        background:var(--ap-int-bg);
+        border:1px solid var(--ap-int-border);
         border-radius:16px;
-        box-shadow:{modal_shadow};
+        box-shadow:var(--ap-int-shadow);
         padding:22px 24px;
       }}
       #ap-intensity-modal .ap-int-head{{display:flex; align-items:center; gap:10px; margin-bottom:10px;}}
-      #ap-intensity-modal .ap-int-title{{font:700 18px/1.2 'Segoe UI',system-ui,Arial; color:{title_color};}}
-      #ap-intensity-modal .ap-int-close{{margin-left:auto; text-decoration:none; cursor:pointer; font:700 18px/1 monospace; color:{close_color};}}
+      #ap-intensity-modal .ap-int-title{{font:700 18px/1.2 'Segoe UI',system-ui,Arial; color:var(--ap-int-title);}}
+      #ap-intensity-modal .ap-int-close{{margin-left:auto; text-decoration:none; cursor:pointer; font:700 18px/1 monospace; color:var(--ap-int-close);}}
 
       .ap-int-table{{
         width:100%;
@@ -1513,14 +1604,14 @@ def intensity_help_modal_html(dark_mode: bool = False) -> str:
       }}
       .ap-int-table th,
       .ap-int-table td{{
-        border-bottom:1px solid {row_border};
+        border-bottom:1px solid var(--ap-int-row-border);
         padding: var(--ap-row-pad-top) var(--ap-cell-pad-h) var(--ap-row-pad-bottom) var(--ap-cell-pad-h);
         vertical-align:top;
       }}
-      .ap-int-table th{{text-align:left; font-weight:700; color:{head_color};}}
-      #ap-intensity-modal .ap-int-table td{{color:{body_color};}}
-      #ap-intensity-modal .ap-int-table td:nth-child(1){{font-weight:700; color:{body_color};}}
-      #ap-intensity-modal .ap-int-table td:nth-child(3){{color:{desc_color};}}
+      .ap-int-table th{{text-align:left; font-weight:700; color:var(--ap-int-head);}}
+      #ap-intensity-modal .ap-int-table td{{color:var(--ap-int-body);}}
+      #ap-intensity-modal .ap-int-table td:nth-child(1){{font-weight:700; color:var(--ap-int-body);}}
+      #ap-intensity-modal .ap-int-table td:nth-child(3){{color:var(--ap-int-desc);}}
 
       .ap-int-table th:nth-child(1), .ap-int-table td:nth-child(1){{ width: var(--ap-col-w1); text-align:center; }}
       .ap-int-table th:nth-child(2), .ap-int-table td:nth-child(2){{ width: var(--ap-col-w2); }}
@@ -1528,7 +1619,7 @@ def intensity_help_modal_html(dark_mode: bool = False) -> str:
 
       .ap-int-ico{{
         display:inline-block; width:12px; height:12px; border-radius:3px;
-        border:1px solid {icon_border}; margin-right:6px; vertical-align:-2px;
+        border:1px solid var(--ap-int-icon-border); margin-right:6px; vertical-align:-2px;
       }}
       .ap-i--1{{ background:var(--ap-col-1); }}
       .ap-i--2{{ background:var(--ap-col-2); }}
@@ -1737,16 +1828,25 @@ def color_progress_bars_html(
                 """)
     return f"""
     <style>
-      :root{{
+      .cp-wrap{{
         --cp-label-color:{label_color};
         --cp-track-color:{track_color};
         --cp-badge-color:{badge_color};
+        --cp-track-outline:#e1e7f0;
+      }}
+      html[data-ap-theme='dark'] .cp-wrap,
+      body[data-ap-theme='dark'] .cp-wrap{{
+        --cp-label-color:{dark_label_color};
+        --cp-track-color:{dark_track_color};
+        --cp-badge-color:{dark_badge_color};
+        --cp-track-outline:rgba(148,163,184,.28);
       }}
       @media (prefers-color-scheme: dark){{
-        :root{{
+        html:not([data-ap-theme]) .cp-wrap{{
           --cp-label-color:{dark_label_color};
           --cp-track-color:{dark_track_color};
           --cp-badge-color:{dark_badge_color};
+          --cp-track-outline:rgba(148,163,184,.28);
         }}
       }}
       .cp-row{{
@@ -1764,7 +1864,7 @@ def color_progress_bars_html(
       .cp-dot{{width:10px; height:10px; border-radius:50%; display:inline-block;}}
       .cp-track{{
         position:relative; height:{track_height_px}px; border-radius:999px;
-        background:var(--cp-track-color); box-shadow: inset 0 0 0 1px #e1e7f0;
+        background:var(--cp-track-color); box-shadow: inset 0 0 0 1px var(--cp-track-outline);
       }}
       .cp-fill{{position:relative; height:100%; border-radius:999px; overflow:visible;}}
       .cp-badge{{
@@ -2326,35 +2426,75 @@ def color_explainer_one_html(name: str, pct: float, dark_mode: bool = False) -> 
     """Jeden panel z opisem dominującego koloru."""
     meta = COLOR_LONG[name]
     emoji = COLOR_EMOJI[name]
-    card_bg = "rgba(30, 30, 30, .96)" if dark_mode else "rgba(255,255,255,.65)"
-    card_border = "rgba(255,255,255,.15)" if dark_mode else "#ececf3"
-    title_color = "#f1f4f9" if dark_mode else "#1f2937"
-    body_color = "#d7dde7" if dark_mode else "#2a2a2a"
-    muted_color = "#cbd2dd" if dark_mode else "#444"
-    pct_color = "#e9edf4" if dark_mode else "#333"
+    light_card_bg = "rgba(255,255,255,.65)"
+    light_card_border = "#ececf3"
+    light_title = "#1f2937"
+    light_body = "#2a2a2a"
+    light_muted = "#444"
+    light_pct = "#333"
+
+    dark_card_bg = "rgba(30, 30, 30, .96)"
+    dark_card_border = "rgba(255,255,255,.15)"
+    dark_title = "#f1f4f9"
+    dark_body = "#d7dde7"
+    dark_muted = "#cbd2dd"
+    dark_pct = "#e9edf4"
+
+    if dark_mode:
+        default_card_bg = dark_card_bg
+        default_card_border = dark_card_border
+        default_title = dark_title
+        default_body = dark_body
+        default_muted = dark_muted
+        default_pct = dark_pct
+    else:
+        default_card_bg = light_card_bg
+        default_card_border = light_card_border
+        default_title = light_title
+        default_body = light_body
+        default_muted = light_muted
+        default_pct = light_pct
     return f"""
       <style>
         .ap-color-desc-card{{
-          --apc-bg:{card_bg};
-          --apc-border:{card_border};
-          --apc-title:{title_color};
-          --apc-body:{body_color};
-          --apc-muted:{muted_color};
-          --apc-pct:{pct_color};
+          --apc-bg:{default_card_bg};
+          --apc-border:{default_card_border};
+          --apc-title:{default_title};
+          --apc-body:{default_body};
+          --apc-muted:{default_muted};
+          --apc-pct:{default_pct};
           border:1px solid var(--apc-border);
           border-radius:12px;
           padding:20px 22px;
           margin:4px 0 6px 0;
           background:var(--apc-bg);
         }}
+        html[data-ap-theme='dark'] .ap-color-desc-card,
+        body[data-ap-theme='dark'] .ap-color-desc-card{{
+          --apc-bg:{dark_card_bg};
+          --apc-border:{dark_card_border};
+          --apc-title:{dark_title};
+          --apc-body:{dark_body};
+          --apc-muted:{dark_muted};
+          --apc-pct:{dark_pct};
+        }}
+        html[data-ap-theme='light'] .ap-color-desc-card,
+        body[data-ap-theme='light'] .ap-color-desc-card{{
+          --apc-bg:{light_card_bg};
+          --apc-border:{light_card_border};
+          --apc-title:{light_title};
+          --apc-body:{light_body};
+          --apc-muted:{light_muted};
+          --apc-pct:{light_pct};
+        }}
         @media (prefers-color-scheme: dark){{
-          .ap-color-desc-card{{
-            --apc-bg:rgba(30, 30, 30, .96);
-            --apc-border:rgba(255,255,255,.15);
-            --apc-title:#f1f4f9;
-            --apc-body:#d7dde7;
-            --apc-muted:#cbd2dd;
-            --apc-pct:#e9edf4;
+          html:not([data-ap-theme]) .ap-color-desc-card{{
+            --apc-bg:{dark_card_bg};
+            --apc-border:{dark_card_border};
+            --apc-title:{dark_title};
+            --apc-body:{dark_body};
+            --apc-muted:{dark_muted};
+            --apc-pct:{dark_pct};
           }}
         }}
       </style>
@@ -8081,23 +8221,35 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             :root{
               --ap-heading-color:#1f2937;
               --text-color:#334155;
+              --ap-public-count-color:#1f4f8d;
+              --ap-public-count-label-color:#3f5873;
+            }
+            html[data-ap-theme='light'],
+            body[data-ap-theme='light']{
+              --ap-heading-color:#1f2937;
+              --text-color:#334155;
+              --ap-public-count-color:#1f4f8d;
+              --ap-public-count-label-color:#3f5873;
+            }
+            html[data-ap-theme='dark'],
+            body[data-ap-theme='dark']{
+              --ap-heading-color:#e8f1ff;
+              --text-color:#d7e3f5;
+              --ap-public-count-color:#b8d5ff;
+              --ap-public-count-label-color:#d2e1f4;
             }
             .ap-public-heading-count{
-              color:#1f4f8d !important;
+              color:var(--ap-public-count-color,#1f4f8d) !important;
             }
             .ap-public-heading-count-label{
-              color:#3f5873 !important;
+              color:var(--ap-public-count-label-color,#3f5873) !important;
             }
             @media (prefers-color-scheme: dark){
-              :root{
+              html:not([data-ap-theme]){
                 --ap-heading-color:#e8f1ff;
                 --text-color:#d7e3f5;
-              }
-              .ap-public-heading-count{
-                color:#b8d5ff !important;
-              }
-              .ap-public-heading-count-label{
-                color:#d2e1f4 !important;
+                --ap-public-count-color:#b8d5ff;
+                --ap-public-count-label-color:#d2e1f4;
               }
             }
             [data-testid="stMarkdownContainer"]{
@@ -8354,7 +8506,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         align-items:baseline;
                         gap:8px;
                         white-space:nowrap;
-                        color:__AP_PUBLIC_COUNT_COLOR__;
+                        color:var(--ap-public-count-color,#1f4f8d);
                         font-weight:700;
                       }
                       .ap-public-heading-count-value{
@@ -8364,7 +8516,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       }
                       .ap-public-heading-count-label{
                         font-size:0.98em;
-                        color:__AP_PUBLIC_COUNT_LABEL_COLOR__;
+                        color:var(--ap-public-count-label-color,#3f5873);
                       }
                       @media (max-width: 900px){
                         .ap-public-heading-row{
@@ -8379,11 +8531,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       }
                     </style>
                 """
-                public_heading_css = (
-                    public_heading_css
-                    .replace("__AP_PUBLIC_COUNT_COLOR__", "#b8d5ff" if public_dark_mode else "#1f4f8d")
-                    .replace("__AP_PUBLIC_COUNT_LABEL_COLOR__", "#d2e1f4" if public_dark_mode else "#3f5873")
-                )
                 st.markdown(
                     public_heading_css,
                     unsafe_allow_html=True,
@@ -8788,22 +8935,44 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 table_theme_override_css = ""
                 if public_view:
                     table_theme_override_css = """
-                      @media (prefers-color-scheme: dark){
-                      .ap-table{
+                      html[data-ap-theme='dark'] .ap-table,
+                      body[data-ap-theme='dark'] .ap-table{
                         background:transparent !important;
                         color:#dce8f8 !important;
                       }
-                      .ap-table th, .ap-table td{
+                      html[data-ap-theme='dark'] .ap-table th,
+                      html[data-ap-theme='dark'] .ap-table td,
+                      body[data-ap-theme='dark'] .ap-table th,
+                      body[data-ap-theme='dark'] .ap-table td{
                         color:#dce8f8 !important;
                         background:transparent !important;
                         border-bottom:1px solid rgba(148,163,184,.34) !important;
                       }
-                      .ap-table thead th{
+                      html[data-ap-theme='dark'] .ap-table thead th,
+                      body[data-ap-theme='dark'] .ap-table thead th{
                         color:#e9f2ff !important;
                       }
-                      .ap-table .ap-int-ico{
+                      html[data-ap-theme='dark'] .ap-table .ap-int-ico,
+                      body[data-ap-theme='dark'] .ap-table .ap-int-ico{
                         border-color:rgba(148,163,184,.44) !important;
                       }
+                      @media (prefers-color-scheme: dark){
+                        html:not([data-ap-theme]) .ap-table{
+                          background:transparent !important;
+                          color:#dce8f8 !important;
+                        }
+                        html:not([data-ap-theme]) .ap-table th,
+                        html:not([data-ap-theme]) .ap-table td{
+                          color:#dce8f8 !important;
+                          background:transparent !important;
+                          border-bottom:1px solid rgba(148,163,184,.34) !important;
+                        }
+                        html:not([data-ap-theme]) .ap-table thead th{
+                          color:#e9f2ff !important;
+                        }
+                        html:not([data-ap-theme]) .ap-table .ap-int-ico{
+                          border-color:rgba(148,163,184,.44) !important;
+                        }
                       }
                     """
 
@@ -9117,10 +9286,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     elif n == supp_avg:
                         theta_labels.append(f"<b><span style='color:#40b900;'>{label}</span></b>")
                     else:
-                        if public_view:
-                            theta_labels.append(f"<span style='color:var(--text-color,#d7e3f5);'>{label}</span>")
-                        else:
-                            theta_labels.append(f"<span style='color:{radar_base_label_color};'>{label}</span>")
+                        theta_labels.append(f"<span style='color:{radar_base_label_color};'>{label}</span>")
 
                 # markery TOP-3 z mean_archetype_scores
                 highlight_r = []
@@ -9360,7 +9526,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         segment_profile_png_path_dark,
                         width_px=None,
                         img_css_class="ap-strength-wheel-img",
-                        force_dark=public_dark_mode,
+                        force_dark=False,
                     )
                 else:
                     _render_theme_path_image(
@@ -9368,7 +9534,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         segment_profile_png_path_dark,
                         width_px=segment_profile_display_width_desktop,
                         img_css_class="ap-strength-wheel-img",
-                        force_dark=public_dark_mode,
+                        force_dark=False,
                     )
                 st.markdown(
                     """
@@ -9421,7 +9587,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
                             kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
-                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=public_dark_mode)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=False)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:var(--text-color,#64748b);text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -9466,7 +9632,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
                             kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
-                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=public_dark_mode)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=False)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:var(--text-color,#64748b);text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -9503,7 +9669,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         gender_code=report_gender_code,
                         dark_mode=True,
                     )
-                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=public_dark_mode)
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=False)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
                 else:
                     st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
@@ -9533,7 +9699,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         gender_code=report_gender_code,
                         dark_mode=True,
                     )
-                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=public_dark_mode)
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=False)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
 
             top_profile_archetypes: list[str] = [main_avg]
@@ -9589,9 +9755,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         ),
                         unsafe_allow_html=True,
                     )
-                    if public_dark_mode and dark_path and dark_path.exists():
-                        st.image(str(dark_path), use_column_width=True)
-                    elif dark_path and dark_path.exists():
+                    if dark_path and dark_path.exists():
                         light_uri = _img_data_uri_from_path(light_path)
                         dark_uri = _img_data_uri_from_path(dark_path)
                         st.markdown(
