@@ -1826,21 +1826,28 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     if public_mode:
         public_css = """
         /* Public report: zawsze spójny kontrast i ta sama paleta dark */
-        body[data-ap-view="public_report"]{
+        :root{
           --ap-heading-color:#e8f1ff;
           --text-color:#d7e3f5;
+        }
+        html{
           color-scheme: dark;
         }
-        body[data-ap-view="public_report"],
-        body[data-ap-view="public_report"] .stApp,
-        body[data-ap-view="public_report"] .main,
-        body[data-ap-view="public_report"] [data-testid="stAppViewContainer"],
-        body[data-ap-view="public_report"] [data-testid="stMain"]{
+        html, body,
+        .stApp,
+        .main,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"]{
           background:#0b1220 !important;
           color:#e2e8f0 !important;
         }
-        body[data-ap-view="public_report"] .block-container{
+        .block-container{
           color:#e2e8f0 !important;
+        }
+        [data-testid="stMarkdownContainer"],
+        [data-testid="stMarkdownContainer"] p,
+        [data-testid="stMarkdownContainer"] li{
+          color:var(--text-color,#d7e3f5) !important;
         }
         """
     st.markdown(

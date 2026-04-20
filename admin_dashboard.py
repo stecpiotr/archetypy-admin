@@ -7894,7 +7894,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     )
     is_mobile = _is_probably_mobile_client()
     public_dark_mode = bool(public_view)
-    mobile_table_bg = "#0b1b33" if public_dark_mode else "#ffffff"
+    mobile_table_bg = "transparent" if public_dark_mode else "#ffffff"
     mobile_table_text = "#dce8f8" if public_dark_mode else "#0f172a"
     mobile_table_border = "rgba(148,163,184,.34)" if public_dark_mode else "#e2e8f0"
     mobile_section_margin_top = 30 if is_mobile else 6
@@ -8006,22 +8006,22 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         st.markdown(
             """
             <style>
-            body[data-ap-view="public_report"]{
+            :root{
               --ap-heading-color:#e8f1ff;
               --text-color:#d7e3f5;
             }
-            body[data-ap-view="public_report"] [data-testid="stMarkdownContainer"],
-            body[data-ap-view="public_report"] [data-testid="stMarkdownContainer"] p,
-            body[data-ap-view="public_report"] [data-testid="stMarkdownContainer"] li{
+            [data-testid="stMarkdownContainer"],
+            [data-testid="stMarkdownContainer"] p,
+            [data-testid="stMarkdownContainer"] li{
               color:var(--text-color,#d7e3f5) !important;
             }
-            body[data-ap-view="public_report"] .ap-public-heading-title{
+            .ap-public-heading-title{
               color:var(--ap-heading-color,#e8f1ff) !important;
             }
-            body[data-ap-view="public_report"] .ap-public-heading-count{
+            .ap-public-heading-count{
               color:#b8d5ff !important;
             }
-            body[data-ap-view="public_report"] .ap-public-heading-count-label{
+            .ap-public-heading-count-label{
               color:#d2e1f4 !important;
             }
             </style>
@@ -8698,11 +8698,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 if public_dark_mode:
                     table_theme_override_css = """
                       .ap-table{
-                        background:rgba(10,22,40,.74) !important;
+                        background:transparent !important;
                         color:#dce8f8 !important;
                       }
                       .ap-table th, .ap-table td{
                         color:#dce8f8 !important;
+                        background:transparent !important;
                         border-bottom:1px solid rgba(148,163,184,.34) !important;
                       }
                       .ap-table thead th{
@@ -9004,8 +9005,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
                 radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
                 radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(148,163,184,0.35)"
-                radar_tick_color = "#deebfb" if public_dark_mode else "#475569"
-                radar_radial_tick_color = "#c7d7eb" if public_dark_mode else "#64748b"
+                radar_tick_color = "#eef6ff" if public_dark_mode else "#475569"
+                radar_radial_tick_color = "#deebfb" if public_dark_mode else "#64748b"
                 theta_labels = []
                 for n in archetype_names:
                     label = disp_name(n)
@@ -9461,7 +9462,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 for rank, role_label, title, light_path, dark_path in items:
                     st.markdown(
                         (
-                            f"<div style='font-size:.9em;font-weight:700;color:{'#c8d7eb' if public_dark_mode else '#475569'};"
+                            "<div style='font-size:.9em;font-weight:700;color:var(--text-color,#475569);"
                             "margin-top:14px;margin-bottom:10px;'>"
                             f"{html.escape(role_label)}: {html.escape(title)} - profil działania"
                             "</div>"
