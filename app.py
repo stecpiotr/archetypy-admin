@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import threading
 import time
 import warnings
+import hashlib
 import re
 import html
 import math
@@ -369,6 +370,21 @@ def _app_build_signature() -> str:
     if build_time:
         return f"build: {build_time} | commit: {commit_short}"
     return f"build: unknown-time | commit: {commit_short}"
+
+
+_REPORT_RENDER_VERSION_TOKEN: Optional[str] = None
+
+
+def _report_render_version_token() -> str:
+    """
+    Krótki token wersji renderu raportu do cache-bustingu publicznych linków.
+    """
+    global _REPORT_RENDER_VERSION_TOKEN
+    if _REPORT_RENDER_VERSION_TOKEN:
+        return _REPORT_RENDER_VERSION_TOKEN
+    sig = _app_build_signature()
+    _REPORT_RENDER_VERSION_TOKEN = hashlib.sha1(sig.encode("utf-8")).hexdigest()[:12]
+    return _REPORT_RENDER_VERSION_TOKEN
 
 
 def render_build_badge() -> None:
@@ -1722,7 +1738,9 @@ def _build_report_link(token: str) -> str:
     if not base:
         base = "https://raport.archetypy.badania.pro"
 
-    return f"{base}?token={token}"
+    token_safe = quote(str(token or "").strip(), safe="")
+    rv_safe = quote(_report_render_version_token(), safe="")
+    return f"{base}?token={token_safe}&rv={rv_safe}"
 
 
 def _access_validity_text(row: Dict, hours_value: Optional[int] = None, indefinite: Optional[bool] = None) -> str:
@@ -1807,18 +1825,22 @@ def _fetch_study_by_id(study_id: str) -> Optional[Dict]:
         return None
 
 
-def _get_query_token() -> str:
+def _get_query_param(name: str) -> str:
     try:
-        token = st.query_params.get("token", "")
-        if isinstance(token, list):
-            token = token[0] if token else ""
-        return str(token or "").strip()
+        value = st.query_params.get(name, "")
+        if isinstance(value, list):
+            value = value[0] if value else ""
+        return str(value or "").strip()
     except Exception:
         try:
             qp = st.experimental_get_query_params()
-            return str((qp.get("token") or [""])[0]).strip()
+            return str((qp.get(name) or [""])[0]).strip()
         except Exception:
             return ""
+
+
+def _get_query_token() -> str:
+    return _get_query_param("token")
 
 
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
@@ -1930,9 +1952,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           var syncThemeQueryForSamsung = function(theme){
             if (!isSamsungBrowser) { return false; }
             if (theme !== "dark" && theme !== "light") { return false; }
-            if (!(currentThemeSignal === "mq-dark" || currentThemeSignal === "mq-light" || currentThemeSignal === "bg")) {
-              return false;
-            }
             try {
               var url = new URL(window.location.href);
               var currentThemeParam = String(url.searchParams.get("ap_theme") || "").toLowerCase();
@@ -2024,10 +2043,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           };
           var resolveTheme = function(){
             var qTheme = getQueryTheme();
-            if (mq && mq.matches) {
-              currentThemeSignal = "mq-dark";
-              return "dark";
-            }
             if (isSamsungBrowser) {
               var bgGuess = guessThemeFromBackground();
               if (bgGuess === "dark" || bgGuess === "light") {
@@ -2040,8 +2055,8 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
               return qTheme;
             }
             if (mq) {
-              currentThemeSignal = "mq-light";
-              return "light";
+              currentThemeSignal = mq.matches ? "mq-dark" : "mq-light";
+              return mq.matches ? "dark" : "light";
             }
             currentThemeSignal = "fallback";
             return "light";
@@ -12306,6 +12321,25 @@ def public_report_view(token: str) -> None:
                 st.stop()
         except Exception:
             pass
+
+    # Wymuś spójną wersję renderu raportu w URL (cache-busting między urządzeniami).
+    expected_rv = _report_render_version_token()
+    current_rv = _get_query_param("rv")
+    if current_rv != expected_rv:
+        ap_theme = str(_get_query_param("ap_theme") or "").strip().lower()
+        params: Dict[str, str] = {"token": str(token or ""), "rv": expected_rv}
+        if ap_theme in {"dark", "light"}:
+            params["ap_theme"] = ap_theme
+        try:
+            for k, v in params.items():
+                st.query_params[k] = v
+            st.rerun()
+        except Exception:
+            try:
+                st.experimental_set_query_params(**params)
+                st.rerun()
+            except Exception:
+                pass
 
     _inject_report_dark_fix_css(public_mode=True)
 

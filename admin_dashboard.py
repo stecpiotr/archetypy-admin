@@ -22,6 +22,7 @@ def _sa_engine():
     return sa.create_engine(url, pool_pre_ping=True)
 
 import ast
+import importlib
 import plotly.graph_objects as go
 from fpdf import FPDF
 import unicodedata
@@ -60,6 +61,7 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
 from archetype_docx_loader import load_archetype_extended
+import archetype_interpretation as _archetype_interpretation_module
 from archetype_interpretation import generate_archetype_descriptions
 from metryczka_config import normalize_personal_metryczka_config
 from public_labels import (
@@ -124,6 +126,43 @@ def _build_sha():
     try: return open(os.path.join(os.path.dirname(__file__), ".deployed_sha")).read().strip()[:7]
     except Exception: return "dev"
 st.sidebar.caption(f"Build: {_build_sha()}")
+
+_ARCHETYPE_INTERPRETATION_MTIME_NS: int | None = None
+
+
+def _generate_descriptions_live(input_data: dict) -> dict[str, str]:
+    """
+    Generator opisów odporny na sytuację, w której proces trzyma stary moduł
+    w pamięci po deployu/reloadzie.
+    """
+    global _archetype_interpretation_module, _ARCHETYPE_INTERPRETATION_MTIME_NS
+
+    try:
+        module_path = Path(getattr(_archetype_interpretation_module, "__file__", ""))
+        if module_path.exists():
+            current_mtime = int(module_path.stat().st_mtime_ns)
+            if _ARCHETYPE_INTERPRETATION_MTIME_NS != current_mtime:
+                _archetype_interpretation_module = importlib.reload(_archetype_interpretation_module)
+                _ARCHETYPE_INTERPRETATION_MTIME_NS = current_mtime
+
+        generator = getattr(_archetype_interpretation_module, "generate_archetype_descriptions", None)
+        if callable(generator):
+            out = generator(input_data)
+            if isinstance(out, dict):
+                return {
+                    "valuesWheelDescription": str(out.get("valuesWheelDescription") or "").strip(),
+                    "needsWheelDescription": str(out.get("needsWheelDescription") or "").strip(),
+                    "actionProfileDescription": str(out.get("actionProfileDescription") or "").strip(),
+                }
+    except Exception:
+        pass
+
+    out = generate_archetype_descriptions(input_data)
+    return {
+        "valuesWheelDescription": str(out.get("valuesWheelDescription") or "").strip(),
+        "needsWheelDescription": str(out.get("needsWheelDescription") or "").strip(),
+        "actionProfileDescription": str(out.get("actionProfileDescription") or "").strip(),
+    }
 
 
 def _is_probably_mobile_client() -> bool:
@@ -560,11 +599,7 @@ def _theme_image_dual_html(
         f"<img src='{light_uri}' "
         f"data-light-src='{light_uri}' "
         f"data-dark-src='{dark_uri}' "
-        f"class='ap-theme-image ap-theme-image-light ap-theme-image-swap{extra}' style='{style}'/>"
-        f"<img src='{dark_uri}' "
-        f"data-light-src='{light_uri}' "
-        f"data-dark-src='{dark_uri}' "
-        f"class='ap-theme-image ap-theme-image-dark ap-theme-image-swap{extra}' style='{style};display:none;'/>"
+        f"class='ap-theme-image ap-theme-image-swap{extra}' style='{style}'/>"
         "</span>"
     )
 
@@ -3235,15 +3270,15 @@ def load_base_arche_img(gender_code: str = "M", dark_mode: bool = False):
     g = normalize_gender(gender_code)
     if g == "K":
         candidates = (
-            ["archetype_wheel_female_dark.png", "archetype_wheel_female.png", "archetype_wheel.png"]
+            ["archetype_wheel_female_dark.png"]
             if dark_mode
-            else ["archetype_wheel_female.png", "archetype_wheel_female_dark.png", "archetype_wheel.png"]
+            else ["archetype_wheel_female.png"]
         )
     else:
         candidates = (
-            ["archetype_wheel_male_dark.png", "archetype_wheel_male.png", "archetype_wheel.png"]
+            ["archetype_wheel_male_dark.png"]
             if dark_mode
-            else ["archetype_wheel_male.png", "archetype_wheel_male_dark.png", "archetype_wheel.png"]
+            else ["archetype_wheel_male.png"]
         )
     for name in candidates:
         p = assets_dir.joinpath(name)
@@ -3329,15 +3364,10 @@ def load_axes_wheel_img(gender_code: str = "M", dark_mode: bool = False):
                 ("png", "archetypy_kolo_female_dark.png_dark.png"),
                 ("svg", "archetypy_kolo2_dark.svg"),
                 ("png", "archetypy_kolo_dark.png"),
-                ("png", "archetypy_kolo_female.png"),
-                ("svg", "archetypy_kolo2.svg"),
-                ("png", "archetypy_kolo.png"),
             ]
         else:
             candidates = [
                 ("png", "archetypy_kolo_female.png"),
-                ("png", "archetypy_kolo_female_dark.png"),
-                ("png", "archetypy_kolo_female_dark.png_dark.png"),
                 ("svg", "archetypy_kolo2.svg"),
                 ("png", "archetypy_kolo.png"),
             ]
@@ -3347,16 +3377,12 @@ def load_axes_wheel_img(gender_code: str = "M", dark_mode: bool = False):
                 ("png", "archetypy_kolo_dark.png"),
                 ("svg", "archetypy_kolo2_male_dark.svg"),
                 ("svg", "archetypy_kolo2_dark.svg"),
-                ("png", "archetypy_kolo.png"),
-                ("svg", "archetypy_kolo2_male.svg"),
-                ("svg", "archetypy_kolo2.svg"),
             ]
         else:
             candidates = [
                 ("png", "archetypy_kolo.png"),
                 ("svg", "archetypy_kolo2_male.svg"),
                 ("svg", "archetypy_kolo2.svg"),
-                ("png", "archetypy_kolo_dark.png"),
             ]
     for ftype, name in candidates:
         p = base_dir / name
@@ -8327,7 +8353,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         .ap-strength-wheel-img {{
           width:min(100%, {segment_profile_display_width_desktop}px) !important;
           height:auto !important;
-          display:block !important;
           margin-left:0 !important;
           margin-right:0 !important;
         }}
@@ -8692,16 +8717,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             supporting_for_desc = _make_desc_result(supporting_name_for_desc) or {"label": "", "score": 0.0}
             tertiary_for_desc = _make_desc_result(supp_avg)
 
+            description_input = {
+                "allArchetypes": all_archetypes_for_desc,
+                "primary": primary_for_desc,
+                "supporting": supporting_for_desc,
+                "tertiary": tertiary_for_desc,
+                "personGenitive": personGen,
+            }
+
             try:
-                generated_descriptions = generate_archetype_descriptions(
-                    {
-                        "allArchetypes": all_archetypes_for_desc,
-                        "primary": primary_for_desc,
-                        "supporting": supporting_for_desc,
-                        "tertiary": tertiary_for_desc,
-                        "personGenitive": personGen,
-                    }
-                )
+                generated_descriptions = _generate_descriptions_live(description_input)
             except Exception:
                 generated_descriptions = {
                     "valuesWheelDescription": "",
