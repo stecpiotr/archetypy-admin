@@ -1923,19 +1923,39 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
             syncThemeImages(theme);
           };
+          var parseRgb = function(bg){
+            if (!bg) { return null; }
+            var m = String(bg).match(/rgba?\(([^)]+)\)/i);
+            if (!m) { return null; }
+            var parts = m[1].split(",").map(function(x){ return parseFloat(String(x).trim()); });
+            if (parts.length < 3) { return null; }
+            var a = (parts.length >= 4 && !isNaN(parts[3])) ? parts[3] : 1;
+            if (a === 0) { return null; }
+            return {
+              r: isNaN(parts[0]) ? 255 : parts[0],
+              g: isNaN(parts[1]) ? 255 : parts[1],
+              b: isNaN(parts[2]) ? 255 : parts[2]
+            };
+          };
           var guessThemeFromBackground = function(){
             try {
-              var el = document.body || document.documentElement;
-              if (!el) { return null; }
-              var bg = String(window.getComputedStyle(el).backgroundColor || "");
-              var m = bg.match(/rgba?\(([^)]+)\)/i);
-              if (!m) { return null; }
-              var parts = m[1].split(",").map(function(x){ return parseFloat(String(x).trim()); });
-              if (parts.length < 3) { return null; }
-              var r = isNaN(parts[0]) ? 255 : parts[0];
-              var g = isNaN(parts[1]) ? 255 : parts[1];
-              var b = isNaN(parts[2]) ? 255 : parts[2];
-              var luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+              var candidates = [
+                document.querySelector("[data-testid='stAppViewContainer']"),
+                document.querySelector(".stApp"),
+                document.querySelector("[data-testid='stMain']"),
+                document.querySelector(".main"),
+                document.body,
+                document.documentElement
+              ];
+              var rgb = null;
+              for (var i = 0; i < candidates.length; i++) {
+                var el = candidates[i];
+                if (!el) { continue; }
+                rgb = parseRgb(window.getComputedStyle(el).backgroundColor || "");
+                if (rgb) { break; }
+              }
+              if (!rgb) { return null; }
+              var luminance = (0.2126 * rgb.r) + (0.7152 * rgb.g) + (0.0722 * rgb.b);
               return luminance < 90 ? "dark" : "light";
             } catch(_e) {
               return null;
@@ -1952,7 +1972,10 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             if (mq) { return "light"; }
             return "light";
           };
-          applyTheme(resolveTheme());
+          var refreshTheme = function(){
+            applyTheme(resolveTheme());
+          };
+          refreshTheme();
 
           if (!window.__apThemeSyncBound) {
             window.__apThemeSyncBound = true;
@@ -1965,15 +1988,26 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             }
             var mo = null;
             try {
-              mo = new MutationObserver(function(){ syncThemeImages(currentTheme || resolveTheme()); });
+              mo = new MutationObserver(function(){ refreshTheme(); });
               mo.observe(document.body || root, {childList:true, subtree:true});
             } catch(_e) {}
           } else {
-            syncThemeImages(currentTheme || resolveTheme());
+            refreshTheme();
           }
-          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 120);
-          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 700);
-          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 1800);
+          window.setTimeout(function(){ refreshTheme(); }, 120);
+          window.setTimeout(function(){ refreshTheme(); }, 700);
+          window.setTimeout(function(){ refreshTheme(); }, 1800);
+          if (isSamsungBrowser) {
+            window.setTimeout(function(){ refreshTheme(); }, 3200);
+            var ticks = 0;
+            var iv = window.setInterval(function(){
+              refreshTheme();
+              ticks += 1;
+              if (ticks >= 14) {
+                window.clearInterval(iv);
+              }
+            }, 500);
+          }
         })();
         </script>
     """
