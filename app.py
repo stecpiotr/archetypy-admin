@@ -1835,19 +1835,41 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         }
         html, body,
         .stApp,
+        section.main,
         .main,
+        .stApp > header,
+        [data-testid="stHeader"],
         [data-testid="stAppViewContainer"],
-        [data-testid="stMain"]{
+        [data-testid="stMain"],
+        [data-testid="stMainBlockContainer"],
+        [data-testid="stMainBlockContainer"] > div{
           background:#1d1f24 !important;
+          background-image:none !important;
           color:#e2e8f0 !important;
         }
         .block-container{
+          background:#1d1f24 !important;
+          background-image:none !important;
           color:#e2e8f0 !important;
         }
         [data-testid="stMarkdownContainer"],
         .ap-heading-force,
         .ap-heading-force span{
           color:var(--text-color,#d7e3f5) !important;
+        }
+        @media (max-width: 900px){
+          html, body,
+          .stApp,
+          section.main,
+          .main,
+          [data-testid="stAppViewContainer"],
+          [data-testid="stMain"],
+          [data-testid="stMainBlockContainer"],
+          [data-testid="stMainBlockContainer"] > div,
+          .block-container{
+            background:#1d1f24 !important;
+            background-image:none !important;
+          }
         }
         """
     st.markdown(
@@ -11856,9 +11878,6 @@ def jst_stats_panel(studies: List[Dict[str, Any]], rows: List[Dict[str, Any]], t
 
 
 def _render_public_gate(token: str) -> bool:
-    if bool(st.session_state.get(f"public_ok_{token}", False)):
-        return True
-
     st.markdown(
         """
         <style>
@@ -11951,6 +11970,9 @@ def _render_public_gate(token: str) -> bool:
         """,
         unsafe_allow_html=True,
     )
+
+    if bool(st.session_state.get(f"public_ok_{token}", False)):
+        return True
 
     lock_l, lock_c, lock_r = st.columns([0.08, 0.84, 0.08], gap="small")
     with lock_c:
