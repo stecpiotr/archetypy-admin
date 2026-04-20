@@ -1824,6 +1824,17 @@ def _get_query_token() -> str:
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     public_css = ""
     public_script = ""
+    theme_base = ""
+    try:
+        ctx_theme = st.context.theme
+        if hasattr(ctx_theme, "get"):
+            theme_base = str(ctx_theme.get("base", "") or "").strip().lower()
+        if (not theme_base) and hasattr(ctx_theme, "base"):
+            theme_base = str(getattr(ctx_theme, "base", "") or "").strip().lower()
+    except Exception:
+        theme_base = ""
+    if theme_base not in {"dark", "light"}:
+        theme_base = ""
     if public_mode:
         public_css = """
         /* Public report: spójne tło/kontrast z motywem urządzenia */
@@ -1892,29 +1903,67 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           }
         }
         """
-        public_script = """
+        public_script = ""
+    theme_sync_script = """
         <script>
         (function(){
-          if (window.__apThemeSyncBound) { return; }
-          window.__apThemeSyncBound = true;
+          var SERVER_THEME = "__AP_SERVER_THEME__";
+          var hasServerTheme = (SERVER_THEME === "dark" || SERVER_THEME === "light");
           var root = document.documentElement;
-          var applyTheme = function(isDark){
-            var theme = isDark ? "dark" : "light";
-            try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
-            try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
-          };
           var mq = null;
           try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
-          applyTheme(!!(mq && mq.matches));
-          if (!mq) { return; }
-          if (typeof mq.addEventListener === "function") {
-            mq.addEventListener("change", function(ev){ applyTheme(!!ev.matches); });
-          } else if (typeof mq.addListener === "function") {
-            mq.addListener(function(ev){ applyTheme(!!ev.matches); });
+          var currentTheme = null;
+
+          var syncThemeImages = function(theme){
+            var isDark = theme === "dark";
+            var nodes = document.querySelectorAll("img.ap-theme-image-swap[data-light-src][data-dark-src]");
+            for (var i = 0; i < nodes.length; i++) {
+              var img = nodes[i];
+              var nextSrc = isDark ? img.getAttribute("data-dark-src") : img.getAttribute("data-light-src");
+              if (!nextSrc) { continue; }
+              if (img.getAttribute("src") !== nextSrc) {
+                img.setAttribute("src", nextSrc);
+              }
+            }
+          };
+          var applyTheme = function(theme){
+            if (theme !== "dark" && theme !== "light") { return; }
+            currentTheme = theme;
+            try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
+            try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
+            syncThemeImages(theme);
+          };
+          var resolveTheme = function(){
+            if (hasServerTheme) { return SERVER_THEME; }
+            if (mq) { return mq.matches ? "dark" : "light"; }
+            return "light";
+          };
+          applyTheme(resolveTheme());
+
+          if (!window.__apThemeSyncBound) {
+            window.__apThemeSyncBound = true;
+            if (!hasServerTheme && mq) {
+              if (typeof mq.addEventListener === "function") {
+                mq.addEventListener("change", function(ev){ applyTheme(ev.matches ? "dark" : "light"); });
+              } else if (typeof mq.addListener === "function") {
+                mq.addListener(function(ev){ applyTheme(ev.matches ? "dark" : "light"); });
+              }
+            }
+            var mo = null;
+            try {
+              mo = new MutationObserver(function(){ syncThemeImages(currentTheme || resolveTheme()); });
+              mo.observe(document.body || root, {childList:true, subtree:true});
+              window.setTimeout(function(){ try { mo && mo.disconnect(); } catch(_e){} }, 15000);
+            } catch(_e) {}
+          } else {
+            syncThemeImages(currentTheme || resolveTheme());
           }
+          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 120);
+          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 700);
+          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 1800);
         })();
         </script>
-        """
+    """.replace("__AP_SERVER_THEME__", theme_base)
     st.markdown(
         f"""
         <style>
@@ -1927,6 +1976,11 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         }}
         .ap-theme-image{{
           display:block;
+        }}
+        .ap-theme-image-swap{{
+          display:block;
+          width:100%;
+          height:auto;
         }}
         html[data-ap-theme='dark'] .ap-theme-image-light,
         body[data-ap-theme='dark'] .ap-theme-image-light{{
@@ -1950,7 +2004,8 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         }}
         {public_css}
         </style>
-        {public_script}
+        {theme_sync_script}
+        {public_script.replace("__AP_SERVER_THEME__", theme_base)}
         """,
         unsafe_allow_html=True,
     )
@@ -11980,31 +12035,76 @@ def _render_public_gate(token: str) -> bool:
             opacity:1 !important;
           }
         }
-        @media (prefers-color-scheme: dark){
-          html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
+        html[data-ap-theme='dark'] body,
+        html[data-ap-theme='dark'] .stApp,
+        html[data-ap-theme='dark'] [data-testid="stAppViewContainer"],
+        html[data-ap-theme='dark'] [data-testid="stMain"],
+        html[data-ap-theme='dark'] .main,
+        body[data-ap-theme='dark'],
+        body[data-ap-theme='dark'] .stApp,
+        body[data-ap-theme='dark'] [data-testid="stAppViewContainer"],
+        body[data-ap-theme='dark'] [data-testid="stMain"],
+        body[data-ap-theme='dark'] .main{
             background:#1e1e1e !important;
             color:#e2e8f0 !important;
           }
-          .block-container{
+          html[data-ap-theme='dark'] .block-container,
+          body[data-ap-theme='dark'] .block-container{
             color:#e2e8f0 !important;
           }
-          .public-unlock-note{
+          html[data-ap-theme='dark'] .public-unlock-note,
+          body[data-ap-theme='dark'] .public-unlock-note{
             color:#d9e4f0 !important;
           }
-          div[data-testid="stForm"] label{
+          html[data-ap-theme='dark'] div[data-testid="stForm"] label,
+          body[data-ap-theme='dark'] div[data-testid="stForm"] label{
             color:#d9e4f0 !important;
           }
-          div[data-testid="stForm"] [data-baseweb="input"]{
+          html[data-ap-theme='dark'] div[data-testid="stForm"] [data-baseweb="input"],
+          body[data-ap-theme='dark'] div[data-testid="stForm"] [data-baseweb="input"]{
             background:#2a2d33 !important;
             border:1px solid #3f4552 !important;
           }
-          div[data-testid="stForm"] input{
+          html[data-ap-theme='dark'] div[data-testid="stForm"] input,
+          body[data-ap-theme='dark'] div[data-testid="stForm"] input{
             background:#2a2d33 !important;
             color:#e2e8f0 !important;
             -webkit-text-fill-color:#e2e8f0 !important;
             caret-color:#e2e8f0 !important;
           }
-          div[data-testid="stForm"] input::placeholder{
+          html[data-ap-theme='dark'] div[data-testid="stForm"] input::placeholder,
+          body[data-ap-theme='dark'] div[data-testid="stForm"] input::placeholder{
+            color:#aab2bf !important;
+          }
+        @media (prefers-color-scheme: dark){
+          html:not([data-ap-theme]) body,
+          html:not([data-ap-theme]) .stApp,
+          html:not([data-ap-theme]) [data-testid="stAppViewContainer"],
+          html:not([data-ap-theme]) [data-testid="stMain"],
+          html:not([data-ap-theme]) .main{
+            background:#1e1e1e !important;
+            color:#e2e8f0 !important;
+          }
+          html:not([data-ap-theme]) .block-container{
+            color:#e2e8f0 !important;
+          }
+          html:not([data-ap-theme]) .public-unlock-note{
+            color:#d9e4f0 !important;
+          }
+          html:not([data-ap-theme]) div[data-testid="stForm"] label{
+            color:#d9e4f0 !important;
+          }
+          html:not([data-ap-theme]) div[data-testid="stForm"] [data-baseweb="input"]{
+            background:#2a2d33 !important;
+            border:1px solid #3f4552 !important;
+          }
+          html:not([data-ap-theme]) div[data-testid="stForm"] input{
+            background:#2a2d33 !important;
+            color:#e2e8f0 !important;
+            -webkit-text-fill-color:#e2e8f0 !important;
+            caret-color:#e2e8f0 !important;
+          }
+          html:not([data-ap-theme]) div[data-testid="stForm"] input::placeholder{
             color:#aab2bf !important;
           }
         }
@@ -12074,6 +12174,8 @@ def public_report_view(token: str) -> None:
         except Exception:
             pass
 
+    _inject_report_dark_fix_css(public_mode=True)
+
     if not _render_public_gate(token):
         st.stop()
 
@@ -12094,7 +12196,6 @@ def public_report_view(token: str) -> None:
         """,
         unsafe_allow_html=True,
     )
-    _inject_report_dark_fix_css(public_mode=True)
     st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     try:
         import admin_dashboard as AD

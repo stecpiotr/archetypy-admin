@@ -557,8 +557,11 @@ def _theme_image_dual_html(
     extra = f" {extra_class.strip()}" if extra_class else ""
     return (
         "<span class='ap-theme-image-wrap'>"
-        f"<img src='{light_uri}' class='ap-theme-image ap-theme-image-light{extra}' style='{style}'/>"
-        f"<img src='{dark_uri}' class='ap-theme-image ap-theme-image-dark{extra}' style='{style}'/>"
+        f"<img src='{light_uri}' "
+        f"data-light-src='{light_uri}' "
+        f"data-dark-src='{dark_uri}' "
+        f"class='ap-theme-image ap-theme-image-swap{extra}' "
+        f"style='{style}'/>"
         "</span>"
     )
 
@@ -9265,11 +9268,18 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             with col2:
                 if public_view:
-                    radar_base_label_color = "#c9d8ee" if public_dark_mode else "#95a3b7"
-                    radar_marker_border_color = "#dbe7f8" if public_dark_mode else "#1f2937"
-                    radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(148,163,184,0.35)"
-                    radar_tick_color = "#eef6ff" if public_dark_mode else "#7b8a9f"
-                    radar_radial_tick_color = "#deebfb" if public_dark_mode else "#8797ac"
+                    if public_dark_mode:
+                        radar_base_label_color = "#c9d8ee"
+                        radar_marker_border_color = "#dbe7f8"
+                        radar_grid_color = "rgba(148,163,184,0.46)"
+                        radar_tick_color = "#eef6ff"
+                        radar_radial_tick_color = "#deebfb"
+                    else:
+                        radar_base_label_color = "#334155"
+                        radar_marker_border_color = "#1f2937"
+                        radar_grid_color = "rgba(148,163,184,0.35)"
+                        radar_tick_color = "#334155"
+                        radar_radial_tick_color = "#475569"
                 else:
                     radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
                     radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
