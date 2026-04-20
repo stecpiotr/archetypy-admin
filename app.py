@@ -1903,6 +1903,17 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           var mq = null;
           try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
           var currentTheme = null;
+          var currentThemeSignal = "fallback";
+
+          var getQueryTheme = function(){
+            try {
+              var url = new URL(window.location.href);
+              var t = String(url.searchParams.get("ap_theme") || "").toLowerCase();
+              return (t === "dark" || t === "light") ? t : "";
+            } catch(_e) {
+              return "";
+            }
+          };
 
           var syncThemeImages = function(theme){
             var isDark = theme === "dark";
@@ -1919,6 +1930,9 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           var syncThemeQueryForSamsung = function(theme){
             if (!isSamsungBrowser) { return false; }
             if (theme !== "dark" && theme !== "light") { return false; }
+            if (!(currentThemeSignal === "mq-dark" || currentThemeSignal === "mq-light" || currentThemeSignal === "bg")) {
+              return false;
+            }
             try {
               var url = new URL(window.location.href);
               var currentThemeParam = String(url.searchParams.get("ap_theme") || "").toLowerCase();
@@ -1958,39 +1972,78 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
               b: isNaN(parts[2]) ? 255 : parts[2]
             };
           };
+          var colorLuminance = function(rgb){
+            if (!rgb) { return null; }
+            return (0.2126 * rgb.r) + (0.7152 * rgb.g) + (0.0722 * rgb.b);
+          };
           var guessThemeFromBackground = function(){
             try {
-              var candidates = [
-                document.querySelector("[data-testid='stAppViewContainer']"),
-                document.querySelector(".stApp"),
-                document.querySelector("[data-testid='stMain']"),
-                document.querySelector(".main"),
-                document.body,
-                document.documentElement
+              var selectors = [
+                "[data-testid='stAppViewContainer']",
+                ".stApp",
+                "[data-testid='stMain']",
+                "[data-testid='stMainBlockContainer']",
+                ".main",
+                ".block-container",
+                "section.main",
+                "body",
+                "html"
               ];
-              var rgb = null;
+              var seen = [];
+              var candidates = [];
+              for (var si = 0; si < selectors.length; si++) {
+                var found = document.querySelectorAll(selectors[si]);
+                for (var fi = 0; fi < found.length; fi++) {
+                  var node = found[fi];
+                  if (!node) { continue; }
+                  if (seen.indexOf(node) >= 0) { continue; }
+                  seen.push(node);
+                  candidates.push(node);
+                }
+              }
+              if (candidates.length === 0) {
+                candidates = [document.body, document.documentElement];
+              }
+              var minLum = null;
               for (var i = 0; i < candidates.length; i++) {
                 var el = candidates[i];
                 if (!el) { continue; }
-                rgb = parseRgb(window.getComputedStyle(el).backgroundColor || "");
-                if (rgb) { break; }
+                var rgb = parseRgb(window.getComputedStyle(el).backgroundColor || "");
+                if (!rgb) { continue; }
+                var lum = colorLuminance(rgb);
+                if (lum === null) { continue; }
+                if (minLum === null || lum < minLum) {
+                  minLum = lum;
+                }
               }
-              if (!rgb) { return null; }
-              var luminance = (0.2126 * rgb.r) + (0.7152 * rgb.g) + (0.0722 * rgb.b);
-              return luminance < 90 ? "dark" : "light";
+              if (minLum === null) { return null; }
+              return minLum < 118 ? "dark" : "light";
             } catch(_e) {
               return null;
             }
           };
           var resolveTheme = function(){
-            if (mq && mq.matches) { return "dark"; }
+            var qTheme = getQueryTheme();
+            if (mq && mq.matches) {
+              currentThemeSignal = "mq-dark";
+              return "dark";
+            }
             if (isSamsungBrowser) {
               var bgGuess = guessThemeFromBackground();
               if (bgGuess === "dark" || bgGuess === "light") {
+                currentThemeSignal = "bg";
                 return bgGuess;
               }
             }
-            if (mq) { return "light"; }
+            if (qTheme === "dark" || qTheme === "light") {
+              currentThemeSignal = "query";
+              return qTheme;
+            }
+            if (mq) {
+              currentThemeSignal = "mq-light";
+              return "light";
+            }
+            currentThemeSignal = "fallback";
             return "light";
           };
           var refreshTheme = function(){
@@ -2043,10 +2096,10 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           display:block;
         }}
         .ap-theme-image-light{{
-          display:block;
+          display:block !important;
         }}
         .ap-theme-image-dark{{
-          display:none;
+          display:none !important;
         }}
         html[data-ap-theme='dark'] .ap-theme-image-light,
         body[data-ap-theme='dark'] .ap-theme-image-light{{
@@ -2073,7 +2126,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           }}
         }}
         .ap-theme-image-swap{{
-          display:block;
           width:100%;
           height:auto;
         }}

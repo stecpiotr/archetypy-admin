@@ -8131,7 +8131,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             is_samsung_browser = "samsungbrowser" in ua_hdr
         except Exception:
             is_samsung_browser = False
-    force_dark_assets = bool(public_dark_mode and is_samsung_browser)
+    # W podglądzie publicznym renderujemy obrazy jednolicie po stronie serwera:
+    # dark -> tylko warianty _dark, light -> tylko warianty jasne.
+    # Dzięki temu unikamy różnic między silnikami przeglądarek mobilnych.
+    force_dark_assets = bool(public_view and public_dark_mode)
     if public_view:
         mobile_table_bg = "transparent"
         mobile_table_text = "var(--text-color,#334155)"
