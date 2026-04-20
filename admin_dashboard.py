@@ -2299,33 +2299,39 @@ COLOR_META = {
     for name in COLOR_LONG.keys()
 }
 
-def color_explainer_one_html(name: str, pct: float) -> str:
+def color_explainer_one_html(name: str, pct: float, dark_mode: bool = False) -> str:
     """Jeden panel z opisem dominującego koloru."""
     meta = COLOR_LONG[name]
     emoji = COLOR_EMOJI[name]
+    card_bg = "rgba(12, 23, 41, .72)" if dark_mode else "rgba(255,255,255,.65)"
+    card_border = "rgba(148,163,184,.38)" if dark_mode else "#ececf3"
+    title_color = "#e8f1ff" if dark_mode else "#1f2937"
+    body_color = "#d5e2f3" if dark_mode else "#2a2a2a"
+    muted_color = "#d2deef" if dark_mode else "#444"
+    pct_color = "#e8f1ff" if dark_mode else "#333"
     return f"""
-      <div style="border:1px solid #ececf3; border-left:6px solid {meta['hex']};
+      <div style="border:1px solid {card_border}; border-left:6px solid {meta['hex']};
                   border-radius:12px; padding:20px 22px; margin:4px 0 6px 0;
-                  background:rgba(255,255,255,.65);">
+                  background:{card_bg};">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
           <span style="font-size:20px">{emoji}</span>
-          <div style="font:650 18px/1.2 'Segoe UI',system-ui">{meta['title']}</div>
-          <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:#333">{pct:.1f}%</div>
+          <div style="font:650 18px/1.2 'Segoe UI',system-ui;color:{title_color};">{meta['title']}</div>
+          <div style="margin-left:auto;font:700 14px/1 'Segoe UI',system-ui;color:{pct_color}">{pct:.1f}%</div>
         </div>
 
-        <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:#444;">
+        <div style="font:600 16px/1.45 'Segoe UI',system-ui; color:{muted_color};">
           • <b>Orientacja na:</b> {meta['orient']}
         </div>
         
-        <div style="font:510 14px/1.40 'Segoe UI',system-ui; color:#444; margin-top:6px;">
+        <div style="font:510 14px/1.40 'Segoe UI',system-ui; color:{muted_color}; margin-top:6px;">
           • <b>Archetypy:</b> {meta['arche']}
         </div>
 
-        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">
+        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:{body_color};">
           {meta['body']}
         </div>
 
-        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:#2a2a2a;">
+        <div style="margin-top:12px; font:400 14px/1.6 'Segoe UI',system-ui; color:{body_color};">
           👉 {meta['politics']}
         </div>
       </div>
@@ -2789,7 +2795,7 @@ h1, h2, h3,
   font-weight: 600 !important;
   font-size: 1.23rem !important;
   line-height: 1.3 !important;
-  color:#1f2937 !important;
+  color:var(--ap-heading-color, #1f2937) !important;
   margin: 10px 0 25px 0 !important;
   letter-spacing: 0 !important;
 }
@@ -2820,7 +2826,7 @@ def ap_section_heading(
         f"<div class='ap-heading-force {align_class}' "
         f"style='font-family:\"Segoe UI\",system-ui,-apple-system,Arial,sans-serif !important;"
         f"font-weight:640 !important;font-size:1.34rem !important;line-height:1.27 !important;"
-        f"color:#1f2937 !important;letter-spacing:0 !important;"
+        f"color:var(--ap-heading-color, #1f2937) !important;letter-spacing:0 !important;"
         f"text-align:{align} !important;transform:translateX({int(shift_x_px)}px) !important;"
         f"margin:{int(margin_top_px)}px 0 {int(margin_bottom_px)}px 0 !important;'>"
         f"{html.escape(str(title))}</div>"
@@ -3259,9 +3265,9 @@ def _plot_segment_profile_wheel_from_scores(
         if dark_mode:
             arr = np.asarray(img).copy()
             mask = arr[..., 3] > 0
-            arr[..., 0][mask] = 222
-            arr[..., 1][mask] = 231
-            arr[..., 2][mask] = 247
+            arr[..., 0][mask] = 244
+            arr[..., 1][mask] = 249
+            arr[..., 2][mask] = 255
             img = Image.fromarray(arr, mode="RGBA")
         return np.asarray(img)
 
@@ -3298,7 +3304,7 @@ def _plot_segment_profile_wheel_from_scores(
                 rotation_mode="anchor",
                 fontsize=11.4,
                 fontweight="bold",
-                color="#DCE7F5" if dark_mode else "#363636",
+                color="#EDF4FF" if dark_mode else "#363636",
                 zorder=4,
             )
 
@@ -3317,13 +3323,13 @@ def _plot_segment_profile_wheel_from_scores(
     r_label_outer = 0.92
     r_accent_inner = 0.95
     r_accent_outer = 0.99
-    edgecolor = "#556376" if dark_mode else "#d4d4d4"
-    ring_grid_color = "#4E5E72" if dark_mode else "#dfdfdf"
-    radial_line_color = "#5A6E84" if dark_mode else "#d7d7d7"
-    score_color = "#E5EDF8" if dark_mode else "#2f2f2f"
-    score_bbox_fc = (0.06, 0.10, 0.18, 0.74) if dark_mode else "white"
-    hole_edge = "#6C819A" if dark_mode else "#d0d0d0"
-    cross_color = "#708196" if dark_mode else "#e1e1e1"
+    edgecolor = "#7C93AF" if dark_mode else "#d4d4d4"
+    ring_grid_color = "#6E84A1" if dark_mode else "#dfdfdf"
+    radial_line_color = "#7B92AF" if dark_mode else "#d7d7d7"
+    score_color = "#F4F8FF" if dark_mode else "#2f2f2f"
+    score_bbox_fc = (0.07, 0.12, 0.20, 0.88) if dark_mode else "white"
+    hole_edge = "#8EA5C1" if dark_mode else "#d0d0d0"
+    cross_color = "#90A6C1" if dark_mode else "#e1e1e1"
 
     icon_dir = Path(__file__).with_name("ikony")
     icon_cache: dict[str, np.ndarray] = {}
@@ -7887,6 +7893,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
+    public_dark_mode = bool(public_view)
+    mobile_table_bg = "#0b1b33" if public_dark_mode else "#ffffff"
+    mobile_table_text = "#dce8f8" if public_dark_mode else "#0f172a"
+    mobile_table_border = "rgba(148,163,184,.34)" if public_dark_mode else "#e2e8f0"
     mobile_section_margin_top = 30 if is_mobile else 6
     mobile_profile_actions_margin_top = 32 if is_mobile else 8
     radar_plot_size = 430 if is_mobile else 560
@@ -7902,8 +7912,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     # TU ZMIENISZ ROZMIAR tej sekcji dla mniejszych desktopów (np. <=1920x1200).
     segment_profile_display_width_mid_desktop = 680
     # Mobile-only: poprawa responsywności wykresów/obrazów i czytelności tabeli
-    st.markdown(
-        """
+    mobile_layout_css = """
         <style>
         @media (max-width: 900px){
           .block-container [data-testid="stHorizontalBlock"]{
@@ -7965,13 +7974,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             min-width:690px !important;
             width:max-content !important;
             table-layout:auto !important;
-            background:#ffffff !important;
+            background:__AP_MOBILE_TABLE_BG__ !important;
           }
           .ap-table,
           .ap-table thead th,
           .ap-table tbody td{
-            color:#0f172a !important;
-            background:#ffffff !important;
+            color:__AP_MOBILE_TABLE_TEXT__ !important;
+            background:__AP_MOBILE_TABLE_BG__ !important;
+            border-bottom:1px solid __AP_MOBILE_TABLE_BORDER__ !important;
           }
           .ap-table th, .ap-table td{
             font-size:11.6px !important;
@@ -7981,9 +7991,43 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
           }
         }
         </style>
-        """,
+    """
+    mobile_layout_css = (
+        mobile_layout_css
+        .replace("__AP_MOBILE_TABLE_BG__", mobile_table_bg)
+        .replace("__AP_MOBILE_TABLE_TEXT__", mobile_table_text)
+        .replace("__AP_MOBILE_TABLE_BORDER__", mobile_table_border)
+    )
+    st.markdown(
+        mobile_layout_css,
         unsafe_allow_html=True,
     )
+    if public_dark_mode:
+        st.markdown(
+            """
+            <style>
+            body[data-ap-view="public_report"]{
+              --ap-heading-color:#e8f1ff;
+              --text-color:#d7e3f5;
+            }
+            body[data-ap-view="public_report"] [data-testid="stMarkdownContainer"],
+            body[data-ap-view="public_report"] [data-testid="stMarkdownContainer"] p,
+            body[data-ap-view="public_report"] [data-testid="stMarkdownContainer"] li{
+              color:var(--text-color,#d7e3f5) !important;
+            }
+            body[data-ap-view="public_report"] .ap-public-heading-title{
+              color:var(--ap-heading-color,#e8f1ff) !important;
+            }
+            body[data-ap-view="public_report"] .ap-public-heading-count{
+              color:#b8d5ff !important;
+            }
+            body[data-ap-view="public_report"] .ap-public-heading-count-label{
+              color:#d2e1f4 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
     st.markdown(
         f"""
         <style>
@@ -8198,8 +8242,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             if public_view:
                 participants_label = "uczestnik badania" if int(num_ankiet or 0) == 1 else "uczestników badania"
-                st.markdown(
-                    """
+                public_heading_css = """
                     <style>
                       .ap-public-heading-row{
                         display:flex;
@@ -8213,13 +8256,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         font-size:2.1em;
                         font-weight:600;
                         line-height:1.15;
+                        color:var(--ap-heading-color,#1f2937);
                       }
                       .ap-public-heading-count{
                         display:flex;
                         align-items:baseline;
                         gap:8px;
                         white-space:nowrap;
-                        color:#1f4f8d;
+                        color:__AP_PUBLIC_COUNT_COLOR__;
                         font-weight:700;
                       }
                       .ap-public-heading-count-value{
@@ -8229,7 +8273,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       }
                       .ap-public-heading-count-label{
                         font-size:0.98em;
-                        color:#3f5873;
+                        color:__AP_PUBLIC_COUNT_LABEL_COLOR__;
                       }
                       @media (max-width: 900px){
                         .ap-public-heading-row{
@@ -8242,16 +8286,15 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                           width:100%;
                         }
                       }
-                      @media (prefers-color-scheme: dark){
-                        .ap-public-heading-count{
-                          color:#9dc6ff;
-                        }
-                        .ap-public-heading-count-label{
-                          color:#c2d6ec;
-                        }
-                      }
                     </style>
-                    """,
+                """
+                public_heading_css = (
+                    public_heading_css
+                    .replace("__AP_PUBLIC_COUNT_COLOR__", "#b8d5ff" if public_dark_mode else "#1f4f8d")
+                    .replace("__AP_PUBLIC_COUNT_LABEL_COLOR__", "#d2e1f4" if public_dark_mode else "#3f5873")
+                )
+                st.markdown(
+                    public_heading_css,
                     unsafe_allow_html=True,
                 )
                 st.markdown(
@@ -8448,9 +8491,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     unsafe_allow_html=True,
                 )
 
-            def _render_image_90pct(image_obj, dark_image_obj=None) -> None:
+            def _render_image_90pct(image_obj, dark_image_obj=None, force_dark: bool = False) -> None:
                 _pad_l, _img_col, _pad_r = st.columns([0.05, 0.90, 0.05], gap="small")
                 with _img_col:
+                    if force_dark and dark_image_obj is not None:
+                        st.image(dark_image_obj, use_column_width=True)
+                        return
                     if dark_image_obj is not None:
                         light_uri = _img_data_uri_from_pil(image_obj)
                         dark_uri = _img_data_uri_from_pil(dark_image_obj)
@@ -8470,9 +8516,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 dark_path: str | Path | None,
                 width_px: int | None = None,
                 img_css_class: str | None = None,
+                force_dark: bool = False,
             ) -> None:
                 light_path_obj = Path(light_path)
                 dark_path_obj = Path(dark_path) if dark_path else None
+                if force_dark and dark_path_obj and dark_path_obj.exists():
+                    if width_px:
+                        st.image(str(dark_path_obj), width=int(width_px))
+                    else:
+                        st.image(str(dark_path_obj), use_column_width=True)
+                    return
                 if dark_path_obj and dark_path_obj.exists() and light_path_obj.exists():
                     light_uri = _img_data_uri_from_path(light_path_obj)
                     dark_uri = _img_data_uri_from_path(dark_path_obj)
@@ -8641,6 +8694,24 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 # Wstrzykujemy thead przed <tbody>
                 html_table = _body.replace("<tbody>", thead_html + "<tbody>", 1)
+                table_theme_override_css = ""
+                if public_dark_mode:
+                    table_theme_override_css = """
+                      .ap-table{
+                        background:rgba(10,22,40,.74) !important;
+                        color:#dce8f8 !important;
+                      }
+                      .ap-table th, .ap-table td{
+                        color:#dce8f8 !important;
+                        border-bottom:1px solid rgba(148,163,184,.34) !important;
+                      }
+                      .ap-table thead th{
+                        color:#e9f2ff !important;
+                      }
+                      .ap-table .ap-int-ico{
+                        border-color:rgba(148,163,184,.44) !important;
+                      }
+                    """
 
                 st.markdown(f"""
                 <style>
@@ -8710,6 +8781,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       padding: 11px 7px !important;
                     }}
                   }}
+                  {table_theme_override_css}
                 </style>
                 """, unsafe_allow_html=True)
 
@@ -8916,6 +8988,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         font-size: 12px !important;
                       }}
                     }}
+                    {table_theme_override_css}
 
                 </style>
                 """ + f"<div class='ap-table-wrap'>{html_table}</div>" + intensity_help_modal_html()
@@ -8928,6 +9001,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     components.html(_html_block, height=_table_height, scrolling=False)
 
             with col2:
+                radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
+                radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
+                radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(148,163,184,0.35)"
+                radar_tick_color = "#deebfb" if public_dark_mode else "#475569"
+                radar_radial_tick_color = "#c7d7eb" if public_dark_mode else "#64748b"
                 theta_labels = []
                 for n in archetype_names:
                     label = disp_name(n)
@@ -8938,7 +9016,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     elif n == supp_avg:
                         theta_labels.append(f"<b><span style='color:#40b900;'>{label}</span></b>")
                     else:
-                        theta_labels.append(f"<span style='color:#656565;'>{label}</span>")
+                        theta_labels.append(f"<span style='color:{radar_base_label_color};'>{label}</span>")
 
                 # markery TOP-3 z mean_archetype_scores
                 highlight_r = []
@@ -8978,7 +9056,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                             theta=theta_display,
                             mode='markers',
                             marker=dict(size=18, color=highlight_marker_color, opacity=0.90,
-                                        line=dict(color="black", width=3)),
+                                        line=dict(color=radar_marker_border_color, width=3)),
                             name='Archetyp główny/wspierający/poboczny',
                             showlegend=False,
                             # 👇 spójny tooltip z 2 miejscami po przecinku
@@ -8987,13 +9065,22 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     ],
                     layout=go.Layout(
                         polar=dict(
-                            radialaxis=dict(visible=True, range=[0, 20]),
+                            radialaxis=dict(
+                                visible=True,
+                                range=[0, 20],
+                                gridcolor=radar_grid_color,
+                                linecolor=radar_grid_color,
+                                tickfont=dict(color=radar_radial_tick_color),
+                                tickcolor=radar_grid_color,
+                            ),
                             angularaxis=dict(
-                                tickfont=dict(size=19),
+                                tickfont=dict(size=19, color=radar_tick_color),
                                 tickvals=theta_display,
                                 ticktext=theta_labels,
                                 rotation=90,
                                 direction="clockwise",
+                                gridcolor=radar_grid_color,
+                                linecolor=radar_grid_color,
                             )
                         ),
                         width=400, height=400,
@@ -9008,13 +9095,22 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     polar=dict(
                         domain=radar_domain,
                         bgcolor="rgba(0,0,0,0)",
-                        radialaxis=dict(visible=True, range=[0, 20]),
+                        radialaxis=dict(
+                            visible=True,
+                            range=[0, 20],
+                            gridcolor=radar_grid_color,
+                            linecolor=radar_grid_color,
+                            tickfont=dict(color=radar_radial_tick_color),
+                            tickcolor=radar_grid_color,
+                        ),
                         angularaxis=dict(
-                            tickfont=dict(size=radar_tick_size),
+                            tickfont=dict(size=radar_tick_size, color=radar_tick_color),
                             tickvals=theta_display,
                             ticktext=theta_labels,
                             rotation=90,
                             direction="clockwise",
+                            gridcolor=radar_grid_color,
+                            linecolor=radar_grid_color,
                         ),
                     ),
                     autosize=True,
@@ -9110,17 +9206,22 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     unsafe_allow_html=True,
                 )
                 components.html(
-                    color_progress_bars_html(color_pcts, order="desc"),
+                    color_progress_bars_html(
+                        color_pcts,
+                        order="desc",
+                        label_color=("#d4e2f4" if public_dark_mode else "#31333F"),
+                        track_color=("#dbe2ec" if public_dark_mode else "#eef2f7"),
+                    ),
                     height=280,
                     scrolling=False,
                 )
                 st.markdown("<style>.cp-row{margin:15px 0 !important}</style>", unsafe_allow_html=True)
                 st.markdown(
-                    f"<div style='text-align:center; font:680 20px/1.30 \"Roboto\",\"Segoe UI\",\"Arial\",system-ui,sans-serif; color:#222; margin: -15px 0 60px;'>"
+                    f"<div style='text-align:center; font:680 20px/1.30 \"Roboto\",\"Segoe UI\",\"Arial\",system-ui,sans-serif; color:{'#dbe8f8' if public_dark_mode else '#222'}; margin: -15px 0 60px;'>"
                     f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
                     unsafe_allow_html=True,
                 )
-                st.markdown(color_explainer_one_html(dom_name, dom_pct), unsafe_allow_html=True)
+                st.markdown(color_explainer_one_html(dom_name, dom_pct, dark_mode=public_dark_mode), unsafe_allow_html=True)
 
                 st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
                 st.markdown(
@@ -9138,6 +9239,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         segment_profile_png_path_dark,
                         width_px=None,
                         img_css_class="ap-strength-wheel-img",
+                        force_dark=public_dark_mode,
                     )
                 else:
                     _render_theme_path_image(
@@ -9145,10 +9247,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         segment_profile_png_path_dark,
                         width_px=segment_profile_display_width_desktop,
                         img_css_class="ap-strength-wheel-img",
+                        force_dark=public_dark_mode,
                     )
                 st.markdown(
                     """
-                    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:#475569;">
+                    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:var(--text-color,#475569);">
                       <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#de4b43;border-radius:2px;display:inline-block;"></span>Zmiana</span>
                       <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2d5ad5;border-radius:2px;display:inline-block;"></span>Ludzie</span>
                       <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2f8a45;border-radius:2px;display:inline-block;"></span>Porządek</span>
@@ -9197,9 +9300,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
                             kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
-                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=public_dark_mode)
                         st.markdown(
-                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
+                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:var(--text-color,#64748b);text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
                             "</div>",
                             unsafe_allow_html=True,
@@ -9242,9 +9345,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
                             kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
-                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=public_dark_mode)
                         st.markdown(
-                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:#64748b;text-align:center;'>"
+                            "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:var(--text-color,#64748b);text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
                             "</div>",
                             unsafe_allow_html=True,
@@ -9279,7 +9382,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         gender_code=report_gender_code,
                         dark_mode=True,
                     )
-                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark)
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=public_dark_mode)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
                 else:
                     st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
@@ -9309,7 +9412,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         gender_code=report_gender_code,
                         dark_mode=True,
                     )
-                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark)
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=public_dark_mode)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
 
             top_profile_archetypes: list[str] = [main_avg]
@@ -9358,14 +9461,16 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 for rank, role_label, title, light_path, dark_path in items:
                     st.markdown(
                         (
-                            "<div style='font-size:.9em;font-weight:700;color:#475569;"
+                            f"<div style='font-size:.9em;font-weight:700;color:{'#c8d7eb' if public_dark_mode else '#475569'};"
                             "margin-top:14px;margin-bottom:10px;'>"
                             f"{html.escape(role_label)}: {html.escape(title)} - profil działania"
                             "</div>"
                         ),
                         unsafe_allow_html=True,
                     )
-                    if dark_path and dark_path.exists():
+                    if public_dark_mode and dark_path and dark_path.exists():
+                        st.image(str(dark_path), use_column_width=True)
+                    elif dark_path and dark_path.exists():
                         light_uri = _img_data_uri_from_path(light_path)
                         dark_uri = _img_data_uri_from_path(dark_path)
                         st.markdown(

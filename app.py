@@ -1825,27 +1825,22 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     public_css = ""
     if public_mode:
         public_css = """
-        :root{
-          color-scheme: light dark;
+        /* Public report: zawsze spójny kontrast i ta sama paleta dark */
+        body[data-ap-view="public_report"]{
+          --ap-heading-color:#e8f1ff;
+          --text-color:#d7e3f5;
+          color-scheme: dark;
         }
-        /* Public report: stabilizujemy kontrast wykresów między browserami.
-           Ciemne warianty PNG bywały niespójne (Samsung/Chrome mobile), więc
-           w podglądzie publicznym wymuszamy czytelny wariant light + jasne tło obrazu. */
-        .ap-theme-image-light{
-          display:block !important;
-          background:#ffffff !important;
+        body[data-ap-view="public_report"],
+        body[data-ap-view="public_report"] .stApp,
+        body[data-ap-view="public_report"] .main,
+        body[data-ap-view="public_report"] [data-testid="stAppViewContainer"],
+        body[data-ap-view="public_report"] [data-testid="stMain"]{
+          background:#0b1220 !important;
+          color:#e2e8f0 !important;
         }
-        .ap-theme-image-dark{
-          display:none !important;
-        }
-        @media (prefers-color-scheme: dark){
-          html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main{
-            background:#0b1220 !important;
-            color:#e2e8f0 !important;
-          }
-          .block-container{
-            color:#e2e8f0 !important;
-          }
+        body[data-ap-view="public_report"] .block-container{
+          color:#e2e8f0 !important;
         }
         """
     st.markdown(
