@@ -1916,12 +1916,33 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
               }
             }
           };
+          var syncThemeQueryForSamsung = function(theme){
+            if (!isSamsungBrowser) { return false; }
+            if (theme !== "dark" && theme !== "light") { return false; }
+            try {
+              var url = new URL(window.location.href);
+              var currentThemeParam = String(url.searchParams.get("ap_theme") || "").toLowerCase();
+              if (currentThemeParam === theme) { return false; }
+              var now = Date.now();
+              var key = "__apThemeReloadAt";
+              var last = 0;
+              try { last = parseInt(sessionStorage.getItem(key) || "0", 10) || 0; } catch(_e) { last = 0; }
+              if ((now - last) < 3000) { return false; }
+              try { sessionStorage.setItem(key, String(now)); } catch(_e2) {}
+              url.searchParams.set("ap_theme", theme);
+              window.location.replace(url.toString());
+              return true;
+            } catch(_e3) {
+              return false;
+            }
+          };
           var applyTheme = function(theme){
             if (theme !== "dark" && theme !== "light") { return; }
             currentTheme = theme;
             try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
             try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
             syncThemeImages(theme);
+            if (syncThemeQueryForSamsung(theme)) { return; }
           };
           var parseRgb = function(bg){
             if (!bg) { return null; }

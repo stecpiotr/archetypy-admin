@@ -8082,18 +8082,28 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         unsafe_allow_html=True,
     )
     is_mobile = _is_probably_mobile_client()
-    public_theme = "light"
+    public_theme = "" if public_view else "light"
     if public_view:
+        theme_from_qp = ""
         try:
-            hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
-            if "dark" in hdr_theme:
-                public_theme = "dark"
-            elif "light" in hdr_theme:
-                public_theme = "light"
-            else:
-                public_theme = ""
+            theme_from_qp = str(st.query_params.get("ap_theme", "") or "").strip().lower()
         except Exception:
-            public_theme = ""
+            theme_from_qp = ""
+        if theme_from_qp in {"dark", "light"}:
+            public_theme = theme_from_qp
+
+        try:
+            if public_theme not in {"dark", "light"}:
+                hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
+                if "dark" in hdr_theme:
+                    public_theme = "dark"
+                elif "light" in hdr_theme:
+                    public_theme = "light"
+                else:
+                    public_theme = ""
+        except Exception:
+            if public_theme not in {"dark", "light"}:
+                public_theme = ""
         if public_theme not in {"dark", "light"}:
             public_theme = "light"
         try:
@@ -8111,6 +8121,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         if public_theme not in {"dark", "light"}:
             public_theme = "light"
     public_dark_mode = bool(public_view and public_theme == "dark")
+    is_samsung_browser = False
+    if public_view:
+        try:
+            ua_hdr = str(st.context.headers.get("user-agent", "") or "").strip().lower()
+            is_samsung_browser = "samsungbrowser" in ua_hdr
+        except Exception:
+            is_samsung_browser = False
+    force_dark_assets = bool(public_dark_mode and is_samsung_browser)
     if public_view:
         mobile_table_bg = "transparent"
         mobile_table_text = "var(--text-color,#334155)"
@@ -9560,7 +9578,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         segment_profile_png_path_dark,
                         width_px=None,
                         img_css_class="ap-strength-wheel-img",
-                        force_dark=False,
+                        force_dark=force_dark_assets,
                     )
                 else:
                     _render_theme_path_image(
@@ -9568,7 +9586,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         segment_profile_png_path_dark,
                         width_px=segment_profile_display_width_desktop,
                         img_css_class="ap-strength-wheel-img",
-                        force_dark=False,
+                        force_dark=force_dark_assets,
                     )
                 st.markdown(
                     """
@@ -9621,7 +9639,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
                             kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
-                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=False)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=force_dark_assets)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:var(--text-color,#64748b);text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -9666,7 +9684,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         except Exception:
                             kola_img = load_base_arche_img(gender_code=report_gender_code, dark_mode=False)
                             kola_img_dark = load_base_arche_img(gender_code=report_gender_code, dark_mode=True)
-                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=False)
+                        _render_image_90pct(kola_img, dark_image_obj=kola_img_dark, force_dark=force_dark_assets)
                         st.markdown(
                             "<div style='margin:6px auto 6px auto;width:fit-content;max-width:100%;font-size:0.88em;color:var(--text-color,#64748b);text-align:center;'>"
                             "Podświetlenie: główny – czerwony, wspierający – żółty, poboczny – zielony"
@@ -9703,7 +9721,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         gender_code=report_gender_code,
                         dark_mode=True,
                     )
-                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=False)
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=force_dark_assets)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
                 else:
                     st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
@@ -9733,7 +9751,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         gender_code=report_gender_code,
                         dark_mode=True,
                     )
-                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=False)
+                    _render_image_90pct(kolo_axes_img, dark_image_obj=kolo_axes_img_dark, force_dark=force_dark_assets)
                     _render_auto_description(generated_descriptions["needsWheelDescription"])
 
             top_profile_archetypes: list[str] = [main_avg]
@@ -9789,7 +9807,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         ),
                         unsafe_allow_html=True,
                     )
-                    if dark_path and dark_path.exists():
+                    if force_dark_assets and dark_path and dark_path.exists():
+                        st.image(str(dark_path), use_column_width=True)
+                    elif dark_path and dark_path.exists():
                         light_uri = _img_data_uri_from_path(light_path)
                         dark_uri = _img_data_uri_from_path(dark_path)
                         st.markdown(
