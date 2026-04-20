@@ -1461,17 +1461,17 @@ def intensity_icon_html(short_label: str) -> str:
 
 def intensity_help_modal_html(dark_mode: bool = False) -> str:
     """Modal 'Interpretacja natężenia' – 3 kolumny: Przedział; Interpretacja; Znaczenie i opis jakościowy."""
-    modal_overlay = "rgba(3, 9, 20, .74)" if dark_mode else "rgba(0,0,0,.35)"
-    modal_bg = "#0f172a" if dark_mode else "#ffffff"
-    modal_border = "rgba(148,163,184,.36)" if dark_mode else "#e5e7eb"
-    modal_shadow = "0 26px 70px rgba(2,8,23,.62)" if dark_mode else "0 20px 60px rgba(0,0,0,.25)"
-    title_color = "#e8f1ff" if dark_mode else "#111827"
-    close_color = "#dbe7f8" if dark_mode else "#111"
-    head_color = "#d7e3f5" if dark_mode else "#374151"
-    body_color = "#e2ecfa" if dark_mode else "#111827"
-    desc_color = "#c2d2e9" if dark_mode else "#4b5563"
-    row_border = "rgba(148,163,184,.28)" if dark_mode else "#eef2f7"
-    icon_border = "rgba(148,163,184,.48)" if dark_mode else "#d1d5db"
+    modal_overlay = "rgba(0,0,0,.62)" if dark_mode else "rgba(0,0,0,.35)"
+    modal_bg = "#1d1f24" if dark_mode else "#ffffff"
+    modal_border = "rgba(255,255,255,.15)" if dark_mode else "#e5e7eb"
+    modal_shadow = "0 24px 62px rgba(0,0,0,.58)" if dark_mode else "0 20px 60px rgba(0,0,0,.25)"
+    title_color = "#f1f4f9" if dark_mode else "#111827"
+    close_color = "#d9dde5" if dark_mode else "#111"
+    head_color = "#d8dde6" if dark_mode else "#374151"
+    body_color = "#e2e7ef" if dark_mode else "#111827"
+    desc_color = "#c6ceda" if dark_mode else "#4b5563"
+    row_border = "rgba(255,255,255,.12)" if dark_mode else "#eef2f7"
+    icon_border = "rgba(255,255,255,.24)" if dark_mode else "#d1d5db"
     return f"""
     <style>
       #ap-intensity-modal{{
@@ -2312,12 +2312,12 @@ def color_explainer_one_html(name: str, pct: float, dark_mode: bool = False) -> 
     """Jeden panel z opisem dominującego koloru."""
     meta = COLOR_LONG[name]
     emoji = COLOR_EMOJI[name]
-    card_bg = "rgba(12, 23, 41, .72)" if dark_mode else "rgba(255,255,255,.65)"
-    card_border = "rgba(148,163,184,.38)" if dark_mode else "#ececf3"
-    title_color = "#e8f1ff" if dark_mode else "#1f2937"
-    body_color = "#d5e2f3" if dark_mode else "#2a2a2a"
-    muted_color = "#d2deef" if dark_mode else "#444"
-    pct_color = "#e8f1ff" if dark_mode else "#333"
+    card_bg = "rgba(29, 31, 36, .96)" if dark_mode else "rgba(255,255,255,.65)"
+    card_border = "rgba(255,255,255,.15)" if dark_mode else "#ececf3"
+    title_color = "#f1f4f9" if dark_mode else "#1f2937"
+    body_color = "#d7dde7" if dark_mode else "#2a2a2a"
+    muted_color = "#cbd2dd" if dark_mode else "#444"
+    pct_color = "#e9edf4" if dark_mode else "#333"
     return f"""
       <div style="border:1px solid {card_border}; border-left:6px solid {meta['hex']};
                   border-radius:12px; padding:20px 22px; margin:4px 0 6px 0;
