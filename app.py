@@ -12261,6 +12261,82 @@ def _render_public_gate(token: str) -> bool:
           background:#fecdd3;
           color:#7f1d1d;
         }
+        /* Fallback czytelności formularza (gdy data-ap-theme nie zostanie ustawione) */
+        :root{
+          --ap-unlock-title:#1f2937;
+          --ap-unlock-note:#334155;
+          --ap-unlock-label:#334155;
+          --ap-unlock-input-bg:#ffffff;
+          --ap-unlock-input-text:#0f172a;
+          --ap-unlock-input-placeholder:#64748b;
+          --ap-unlock-input-border:#cbd5e1;
+        }
+        html[data-ap-theme='light']{
+          --ap-unlock-title:#1f2937;
+          --ap-unlock-note:#334155;
+          --ap-unlock-label:#334155;
+          --ap-unlock-input-bg:#ffffff;
+          --ap-unlock-input-text:#0f172a;
+          --ap-unlock-input-placeholder:#64748b;
+          --ap-unlock-input-border:#cbd5e1;
+        }
+        html[data-ap-theme='dark']{
+          --ap-unlock-title:#f1f5fb;
+          --ap-unlock-note:#d9e4f0;
+          --ap-unlock-label:#d9e4f0;
+          --ap-unlock-input-bg:#2a2d33;
+          --ap-unlock-input-text:#e2e8f0;
+          --ap-unlock-input-placeholder:#aab2bf;
+          --ap-unlock-input-border:#3f4552;
+        }
+        @media (prefers-color-scheme: dark){
+          html:not([data-ap-theme]){
+            --ap-unlock-title:#f1f5fb;
+            --ap-unlock-note:#d9e4f0;
+            --ap-unlock-label:#d9e4f0;
+            --ap-unlock-input-bg:#2a2d33;
+            --ap-unlock-input-text:#e2e8f0;
+            --ap-unlock-input-placeholder:#aab2bf;
+            --ap-unlock-input-border:#3f4552;
+          }
+        }
+        .public-unlock-title{
+          color:var(--ap-unlock-title) !important;
+        }
+        .public-unlock-note{
+          color:var(--ap-unlock-note) !important;
+        }
+        div[data-testid="stForm"] label{
+          color:var(--ap-unlock-label) !important;
+        }
+        div[data-testid="stForm"] [data-baseweb="input"],
+        div[data-testid="stTextInput"] [data-baseweb="input"],
+        div[data-testid="stPasswordInput"] [data-baseweb="input"]{
+          background:var(--ap-unlock-input-bg) !important;
+          border:1px solid var(--ap-unlock-input-border) !important;
+        }
+        div[data-testid="stForm"] input,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stPasswordInput"] input{
+          background:var(--ap-unlock-input-bg) !important;
+          color:var(--ap-unlock-input-text) !important;
+          -webkit-text-fill-color:var(--ap-unlock-input-text) !important;
+          caret-color:var(--ap-unlock-input-text) !important;
+          text-shadow:none !important;
+        }
+        div[data-testid="stForm"] input::placeholder,
+        div[data-testid="stTextInput"] input::placeholder,
+        div[data-testid="stPasswordInput"] input::placeholder{
+          color:var(--ap-unlock-input-placeholder) !important;
+          opacity:1 !important;
+        }
+        div[data-testid="stForm"] input:-webkit-autofill,
+        div[data-testid="stTextInput"] input:-webkit-autofill,
+        div[data-testid="stPasswordInput"] input:-webkit-autofill{
+          -webkit-text-fill-color:var(--ap-unlock-input-text) !important;
+          box-shadow:0 0 0 1000px var(--ap-unlock-input-bg) inset !important;
+          transition: background-color 5000s ease-in-out 0s !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
