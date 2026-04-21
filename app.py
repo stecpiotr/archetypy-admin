@@ -2169,20 +2169,20 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
               return null;
             }}
           }};
-          var resolveTheme = function(){{
-            if (forcedTheme === "dark" || forcedTheme === "light") {{
-              return forcedTheme;
-            }}
-            if (mobileMode) {{
-              var qTheme = getQueryTheme();
-              if (qTheme === "dark" || qTheme === "light") {{
-                return qTheme;
-              }}
-              var storedTheme = getStoredTheme();
-              if (storedTheme === "dark" || storedTheme === "light") {{
-                return storedTheme;
-              }}
-              return "light";
+	          var resolveTheme = function(){{
+	            if (forcedTheme === "dark" || forcedTheme === "light") {{
+	              return forcedTheme;
+	            }}
+	            var qTheme = getQueryTheme();
+	            if (qTheme === "dark" || qTheme === "light") {{
+	              return qTheme;
+	            }}
+	            if (mobileMode) {{
+	              var storedTheme = getStoredTheme();
+	              if (storedTheme === "dark" || storedTheme === "light") {{
+	                return storedTheme;
+	              }}
+	              return "light";
             }}
             if (mq && mq.matches) {{
               return "dark";
