@@ -8272,6 +8272,25 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
         mobile_table_border = "rgba(148,163,184,.34)" if public_dark_mode else "#e2e8f0"
     mobile_section_margin_top = 30 if is_mobile else 6
     mobile_profile_actions_margin_top = 32 if is_mobile else 8
+    # Mobilne proporcje tabeli "Liczebność i natężenie archetypów"
+    # Samsung Internet: węższa kolumna "Archetyp", szersza "opis"
+    # Chrome mobile: "Archetyp" odrobinę szersza.
+    if is_mobile and public_view:
+        if is_samsung_browser:
+            mobile_table_min_w = "560px"
+            mobile_col1_w = "74px"
+            mobile_col5_w = "52px"
+            mobile_col6_w = "126px"
+        else:
+            mobile_table_min_w = "560px"
+            mobile_col1_w = "84px"
+            mobile_col5_w = "54px"
+            mobile_col6_w = "112px"
+    else:
+        mobile_table_min_w = "540px"
+        mobile_col1_w = "88px"
+        mobile_col5_w = "54px"
+        mobile_col6_w = "106px"
     radar_plot_size = 430 if is_mobile else 560
     radar_tick_size = 10 if is_mobile else 15
     radar_hover_size = 12 if is_mobile else 14
@@ -8344,7 +8363,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             -webkit-overflow-scrolling:touch !important;
           }
           .ap-table{
-            min-width:540px !important;
+            min-width:__AP_MOBILE_TABLE_MIN_W__ !important;
             width:max-content !important;
             table-layout:auto !important;
             background:__AP_MOBILE_TABLE_BG__ !important;
@@ -8364,9 +8383,20 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
           }
           .ap-table thead th:nth-child(1),
           .ap-table tbody td:nth-child(1){
-            width:88px !important;
-            min-width:88px !important;
-            max-width:88px !important;
+            width:__AP_MOBILE_COL1_W__ !important;
+            min-width:__AP_MOBILE_COL1_W__ !important;
+            max-width:__AP_MOBILE_COL1_W__ !important;
+          }
+          .ap-table thead th:nth-child(5),
+          .ap-table tbody td:nth-child(5){
+            width:__AP_MOBILE_COL5_W__ !important;
+            min-width:__AP_MOBILE_COL5_W__ !important;
+            max-width:__AP_MOBILE_COL5_W__ !important;
+          }
+          .ap-table thead th:nth-child(6),
+          .ap-table tbody td:nth-child(6){
+            width:__AP_MOBILE_COL6_W__ !important;
+            min-width:__AP_MOBILE_COL6_W__ !important;
           }
           .ap-table tbody td:nth-child(1){
             white-space:normal !important;
@@ -8386,9 +8416,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     """
     mobile_layout_css = (
         mobile_layout_css
+        .replace("__AP_MOBILE_TABLE_MIN_W__", mobile_table_min_w)
         .replace("__AP_MOBILE_TABLE_BG__", mobile_table_bg)
         .replace("__AP_MOBILE_TABLE_TEXT__", mobile_table_text)
         .replace("__AP_MOBILE_TABLE_BORDER__", mobile_table_border)
+        .replace("__AP_MOBILE_COL1_W__", mobile_col1_w)
+        .replace("__AP_MOBILE_COL5_W__", mobile_col5_w)
+        .replace("__AP_MOBILE_COL6_W__", mobile_col6_w)
     )
     st.markdown(
         mobile_layout_css,
@@ -9421,7 +9455,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
 	                    @media (max-width: 900px){{
 	                      .ap-table {{
-	                        min-width: 500px !important;
+	                        min-width: {mobile_table_min_w} !important;
 	                        width: max-content !important;
 	                        table-layout: fixed !important;
 	                      }}
@@ -9441,15 +9475,20 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 	                      }}
 	                      .ap-table thead th:nth-child(1),
 	                      .ap-table tbody td:nth-child(1) {{
-	                        width: 72px !important;
-	                        min-width: 72px !important;
-	                        max-width: 72px !important;
+	                        width: {mobile_col1_w} !important;
+	                        min-width: {mobile_col1_w} !important;
+	                        max-width: {mobile_col1_w} !important;
 	                      }}
 	                      .ap-table thead th:nth-child(5),
 	                      .ap-table tbody td:nth-child(5) {{
-	                        width: 54px !important;
-	                        min-width: 54px !important;
-	                        max-width: 54px !important;
+	                        width: {mobile_col5_w} !important;
+	                        min-width: {mobile_col5_w} !important;
+	                        max-width: {mobile_col5_w} !important;
+	                      }}
+	                      .ap-table thead th:nth-child(6),
+	                      .ap-table tbody td:nth-child(6) {{
+	                        width: {mobile_col6_w} !important;
+	                        min-width: {mobile_col6_w} !important;
 	                      }}
 	                      .ap-table tbody td:nth-child(1),
 	                      .ap-table tbody td:nth-child(6) {{
