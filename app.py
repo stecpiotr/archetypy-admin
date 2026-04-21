@@ -1996,6 +1996,160 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
     forced_theme_js = json.dumps(forced)
     mobile_mode_js = "true" if bool(mobile_mode) else "false"
 
+    # Desktop public report: przywrócony stabilny mechanizm z wersji referencyjnej
+    # (desktop jasny/ciemny ma działać dokładnie jak wcześniej).
+    if public_mode and (not bool(mobile_mode)) and (forced not in {"dark", "light"}):
+        public_css = """
+        :root{
+          --ap-report-bg:#f5f5f5;
+          --ap-report-text:#1f2937;
+          --ap-heading-color:#1f2937;
+          --text-color:#334155;
+        }
+        html[data-ap-theme='light'],
+        body[data-ap-theme='light']{
+          color-scheme: light;
+        }
+        html[data-ap-theme='dark'],
+        body[data-ap-theme='dark']{
+          --ap-report-bg:#1e1e1e;
+          --ap-report-text:#e2e8f0;
+          --ap-heading-color:#e8f1ff;
+          --text-color:#d7e3f5;
+          color-scheme: dark;
+        }
+        @media (prefers-color-scheme: dark){
+          :root:not([data-ap-theme]){
+            --ap-report-bg:#1e1e1e;
+            --ap-report-text:#e2e8f0;
+            --ap-heading-color:#e8f1ff;
+            --text-color:#d7e3f5;
+          }
+        }
+        html, body,
+        .stApp,
+        section.main,
+        .main,
+        .stApp > header,
+        [data-testid="stHeader"],
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        [data-testid="stMainBlockContainer"],
+        [data-testid="stMainBlockContainer"] > div{
+          background:var(--ap-report-bg,#f5f5f5) !important;
+          background-image:none !important;
+          color:var(--ap-report-text,#1f2937) !important;
+        }
+        .block-container{
+          background:var(--ap-report-bg,#f5f5f5) !important;
+          background-image:none !important;
+          color:var(--ap-report-text,#1f2937) !important;
+        }
+        [data-testid="stMarkdownContainer"],
+        .ap-heading-force,
+        .ap-heading-force span{
+          color:var(--text-color,#334155) !important;
+        }
+        @media (max-width: 900px){
+          html, body,
+          .stApp,
+          section.main,
+          .main,
+          [data-testid="stAppViewContainer"],
+          [data-testid="stMain"],
+          [data-testid="stMainBlockContainer"],
+          [data-testid="stMainBlockContainer"] > div,
+          .block-container{
+            background:var(--ap-report-bg,#f5f5f5) !important;
+            background-image:none !important;
+          }
+        }
+        """
+        theme_sync_script = """
+        <script>
+        (function(){
+          var root = document.documentElement;
+          var mq = null;
+          try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
+          var currentTheme = null;
+
+          var syncThemeImages = function(theme){
+            var isDark = theme === "dark";
+            var nodes = document.querySelectorAll("img.ap-theme-image-swap[data-light-src][data-dark-src]");
+            for (var i = 0; i < nodes.length; i++) {
+              var img = nodes[i];
+              var nextSrc = isDark ? img.getAttribute("data-dark-src") : img.getAttribute("data-light-src");
+              if (!nextSrc) { continue; }
+              if (img.getAttribute("src") !== nextSrc) {
+                img.setAttribute("src", nextSrc);
+              }
+            }
+          };
+          var applyTheme = function(theme){
+            if (theme !== "dark" && theme !== "light") { return; }
+            currentTheme = theme;
+            try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
+            try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
+            syncThemeImages(theme);
+          };
+          var resolveTheme = function(){
+            if (mq) { return mq.matches ? "dark" : "light"; }
+            return "light";
+          };
+          applyTheme(resolveTheme());
+
+          if (!window.__apThemeSyncBound) {
+            window.__apThemeSyncBound = true;
+            if (mq) {
+              if (typeof mq.addEventListener === "function") {
+                mq.addEventListener("change", function(ev){ applyTheme(ev.matches ? "dark" : "light"); });
+              } else if (typeof mq.addListener === "function") {
+                mq.addListener(function(ev){ applyTheme(ev.matches ? "dark" : "light"); });
+              }
+            }
+            var mo = null;
+            try {
+              mo = new MutationObserver(function(){ syncThemeImages(currentTheme || resolveTheme()); });
+              mo.observe(document.body || root, {childList:true, subtree:true});
+            } catch(_e) {}
+          } else {
+            syncThemeImages(currentTheme || resolveTheme());
+          }
+          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 120);
+          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 700);
+          window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 1800);
+        })();
+        </script>
+        """
+        st.markdown(
+            f"""
+            <style>
+            .ap-theme-image-wrap{{
+              display:block;
+              width:100%;
+            }}
+            .ap-theme-image{{
+              display:block;
+            }}
+            .ap-theme-image-swap{{
+              display:block;
+              width:100%;
+              height:auto;
+            }}
+            @media (prefers-color-scheme: dark){{
+              .ap-ext-card-modal-content{{
+                background:rgba(30,30,30,.84) !important;
+                border-color:rgba(255,255,255,.28) !important;
+              }}
+            }}
+            {public_css}
+            </style>
+            {theme_sync_script}
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
     public_css = ""
     public_script = ""
     forced_static_css = ""
