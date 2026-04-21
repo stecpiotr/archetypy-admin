@@ -17,7 +17,7 @@ import uuid
 import textwrap
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, quote, parse_qs
 import shutil
 import urllib.request
 import urllib.error
@@ -1810,17 +1810,51 @@ def _fetch_study_by_id(study_id: str) -> Optional[Dict]:
 
 
 def _get_query_param(name: str) -> str:
+    value = ""
     try:
         value = st.query_params.get(name, "")
         if isinstance(value, list):
             value = value[0] if value else ""
-        return str(value or "").strip()
+        value = str(value or "").strip()
     except Exception:
-        try:
-            qp = st.experimental_get_query_params()
-            return str((qp.get(name) or [""])[0]).strip()
-        except Exception:
-            return ""
+        value = ""
+    if value:
+        return value
+    try:
+        qp = st.experimental_get_query_params()
+        exp_val = str((qp.get(name) or [""])[0]).strip()
+        if exp_val:
+            return exp_val
+    except Exception:
+        pass
+    try:
+        ctx_qp = getattr(getattr(st, "context", None), "query_params", None)
+        if ctx_qp:
+            ctx_val = ctx_qp.get(name, "")
+            if isinstance(ctx_val, list):
+                ctx_val = ctx_val[0] if ctx_val else ""
+            ctx_val = str(ctx_val or "").strip()
+            if ctx_val:
+                return ctx_val
+    except Exception:
+        pass
+    try:
+        headers = getattr(getattr(st, "context", None), "headers", {}) or {}
+        for hdr in ("x-original-uri", "x-rewrite-url", "x-forwarded-uri", "x-request-uri"):
+            raw_uri = str(headers.get(hdr, "") or "").strip()
+            if not raw_uri:
+                continue
+            query_part = raw_uri.split("?", 1)[1] if "?" in raw_uri else ""
+            if not query_part:
+                continue
+            parsed = parse_qs(query_part, keep_blank_values=True)
+            if name in parsed and parsed[name]:
+                uri_val = str(parsed[name][0] or "").strip()
+                if uri_val:
+                    return uri_val
+    except Exception:
+        pass
+    return ""
 
 
 def _get_query_token() -> str:
