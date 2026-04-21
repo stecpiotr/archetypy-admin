@@ -1825,6 +1825,89 @@ def _get_query_param(name: str) -> str:
 def _get_query_token() -> str:
     return _get_query_param("token")
 
+def _get_query_theme() -> str:
+    t = _get_query_param("ap_theme").strip().lower()
+    return t if t in {"light", "dark"} else ""
+
+def _detect_prefers_theme_from_headers(default: str = "light") -> str:
+    try:
+        hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
+        if "dark" in hdr_theme:
+            return "dark"
+        if "light" in hdr_theme:
+            return "light"
+    except Exception:
+        pass
+    return default
+
+def _set_public_theme_query(token: str, theme: str) -> None:
+    t = str(theme or "").strip().lower()
+    if t not in {"light", "dark"}:
+        return
+    tok = str(token or "").strip()
+    if not tok:
+        return
+    try:
+        st.query_params["token"] = tok
+        st.query_params["ap_theme"] = t
+    except Exception:
+        try:
+            st.experimental_set_query_params(token=tok, ap_theme=t)
+        except Exception:
+            pass
+
+def _render_public_theme_switch(token: str) -> None:
+    st.markdown(
+        """
+        <style>
+        .ap-public-theme-shell{
+          margin:2px 0 8px 0;
+          padding:8px 10px;
+          border:1px solid rgba(148,163,184,.35);
+          border-radius:10px;
+          background:rgba(255,255,255,.72);
+        }
+        .ap-public-theme-caption{
+          font:600 0.93rem/1.2 'Segoe UI', Arial, sans-serif;
+          color:var(--text-color,#334155);
+          margin:2px 0 2px 0;
+        }
+        html[data-ap-theme='dark'] .ap-public-theme-shell,
+        body[data-ap-theme='dark'] .ap-public-theme-shell{
+          background:rgba(30,30,30,.72);
+          border-color:rgba(148,163,184,.45);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    query_theme = _get_query_theme()
+    start_theme = query_theme or _detect_prefers_theme_from_headers(default="light")
+    label_for_theme = {"light": "Jasny", "dark": "Ciemny"}
+    theme_for_label = {"Jasny": "light", "Ciemny": "dark"}
+    key = f"public_theme_switch_{token}"
+    if st.session_state.get(key) not in theme_for_label:
+        st.session_state[key] = label_for_theme.get(start_theme, "Jasny")
+
+    st.markdown("<div class='ap-public-theme-shell'>", unsafe_allow_html=True)
+    col_l, col_r = st.columns([0.48, 0.52], gap="small")
+    with col_l:
+        st.markdown("<div class='ap-public-theme-caption'>Tryb raportu</div>", unsafe_allow_html=True)
+    with col_r:
+        picked = st.radio(
+            "Tryb raportu",
+            options=["Jasny", "Ciemny"],
+            key=key,
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    desired_theme = theme_for_label.get(str(picked or "").strip(), start_theme)
+    if query_theme != desired_theme:
+        _set_public_theme_query(token, desired_theme)
+        st.rerun()
+
 
 def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
     public_css = ""
@@ -2097,7 +2180,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             try { root.style.colorScheme = theme; } catch(_e) {}
             try { document.body && (document.body.style.colorScheme = theme); } catch(_e) {}
             syncThemeImages(theme);
-            ensurePublicThemeToggle();
             if (syncThemeQueryForPublic(theme)) { return; }
           };
           var parseRgb = function(bg){
@@ -2165,12 +2247,16 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             }
           };
           var resolveTheme = function(){
+            var qTheme = getQueryTheme();
+            if (qTheme === "dark" || qTheme === "light") {
+              currentThemeSignal = "query";
+              return qTheme;
+            }
             var storedTheme = getStoredTheme();
             if (storedTheme === "dark" || storedTheme === "light") {
               currentThemeSignal = "stored";
               return storedTheme;
             }
-            var qTheme = getQueryTheme();
             var samsungBgGuess = null;
             if (isSamsungBrowser) {
               samsungBgGuess = guessThemeFromBackground();
@@ -12392,6 +12478,22 @@ def _render_public_gate(token: str) -> bool:
           background:#ff3b4c !important;
           border-color:#ff3b4c !important;
         }
+        .public-unlock-error{
+          margin-top:12px;
+          border-radius:10px;
+          padding:12px 14px;
+          border:1px solid #fca5a5;
+          background:#ffe4e6;
+          color:#7f1d1d;
+          font-weight:600;
+          line-height:1.35;
+        }
+        html[data-ap-theme='dark'] .public-unlock-error,
+        body[data-ap-theme='dark'] .public-unlock-error{
+          border-color:#fda4af;
+          background:#fecdd3;
+          color:#7f1d1d;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -12424,7 +12526,11 @@ def _render_public_gate(token: str) -> bool:
         if res.ok:
             st.session_state[f"public_ok_{token}"] = True
             st.rerun()
-        st.error(res.message or "Brak dostępu.")
+        msg = html.escape(str(res.message or "Brak dostępu."))
+        st.markdown(
+            f"<div class='public-unlock-error notranslate' translate='no'>{msg}</div>",
+            unsafe_allow_html=True,
+        )
     return bool(st.session_state.get(f"public_ok_{token}", False))
 
 
@@ -12457,6 +12563,8 @@ def public_report_view(token: str) -> None:
 
     if not _render_public_gate(token):
         st.stop()
+
+    _render_public_theme_switch(token)
 
     study = _fetch_study_by_id(str(grant.get("study_id") or ""))
     if not study:

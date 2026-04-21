@@ -1500,7 +1500,11 @@ def intensity_icon_color(short_label: str) -> str:
 def intensity_icon_html(short_label: str) -> str:
     """Zwraca HTML: [kolorowy KWADRAT] + tekst (np. 'umiarkowane')."""
     c = intensity_icon_color(short_label)
-    return f"<span class='ap-int-ico' style='background:{c}'></span>{short_label or ''}"
+    safe_txt = html.escape(short_label or "")
+    return (
+        f"<span class='ap-int-ico' style='background:{c}'></span>"
+        f"<span class='ap-int-txt notranslate' translate='no'>{safe_txt}</span>"
+    )
 
 def intensity_help_modal_html(dark_mode: bool = False) -> str:
     """Modal 'Interpretacja natężenia' – 3 kolumny: Przedział; Interpretacja; Znaczenie i opis jakościowy."""
@@ -8364,6 +8368,25 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             white-space:nowrap !important;
             word-break:normal !important;
           }
+          .ap-table thead th:nth-child(1),
+          .ap-table tbody td:nth-child(1){
+            width:88px !important;
+            min-width:88px !important;
+            max-width:88px !important;
+          }
+          .ap-table tbody td:nth-child(1){
+            white-space:normal !important;
+            word-break:break-word !important;
+            line-height:1.2 !important;
+          }
+          .ap-table tbody td:nth-child(6){
+            white-space:normal !important;
+            word-break:break-word !important;
+            line-height:1.2 !important;
+          }
+          .ap-table .ap-int-txt{
+            white-space:nowrap !important;
+          }
         }
         </style>
     """
@@ -9406,16 +9429,26 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         min-height: 66px !important;
                         font-size: 12px !important;
                       }}
+                      .ap-table thead th:nth-child(1),
+                      .ap-table tbody td:nth-child(1) {{
+                        width: 88px !important;
+                        min-width: 88px !important;
+                        max-width: 88px !important;
+                      }}
                       .ap-table tbody td:nth-child(1),
                       .ap-table tbody td:nth-child(6) {{
                         white-space: normal !important;
+                        word-break: break-word !important;
                         line-height: 1.25 !important;
+                      }}
+                      .ap-table .ap-int-txt {{
+                        white-space: nowrap !important;
                       }}
                     }}
                     {table_theme_override_css}
 
                 </style>
-                """ + f"<div class='ap-table-wrap'>{html_table}</div>" + intensity_help_modal_html(dark_mode=(public_dark_mode if not public_view else False))
+                """ + f"<div class='ap-table-wrap notranslate' translate='no'>{html_table}</div>" + intensity_help_modal_html(dark_mode=(public_dark_mode if not public_view else False))
 
                 # jeśli masz nowe Streamlit: prawdziwy, „wbudowany” HTML bez iframa
                 if hasattr(st, "html"):
