@@ -1964,6 +1964,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
 
     public_css = ""
     public_script = ""
+    forced_static_css = ""
     if public_mode:
         public_css = """
         :root{
@@ -2056,6 +2057,67 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
         })();
         </script>
         """
+        if forced == "dark":
+            forced_static_css = """
+            html, body,
+            .stApp,
+            section.main,
+            .main,
+            .stApp > header,
+            [data-testid="stHeader"],
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"],
+            [data-testid="stMainBlockContainer"],
+            [data-testid="stMainBlockContainer"] > div,
+            .block-container{
+              background:#1e1e1e !important;
+              background-image:none !important;
+              color:#e2e8f0 !important;
+            }
+            [data-testid="stMarkdownContainer"],
+            .ap-heading-force,
+            .ap-heading-force span{
+              color:#d7e3f5 !important;
+            }
+            .ap-theme-image-light{ display:none !important; }
+            .ap-theme-image-dark{ display:block !important; }
+            div[data-testid="stForm"] label{
+              color:#d9e4f0 !important;
+            }
+            div[data-testid="stForm"] [data-baseweb="input"]{
+              background:#2a2d33 !important;
+              border:1px solid #3f4552 !important;
+            }
+            div[data-testid="stForm"] input{
+              background:#2a2d33 !important;
+              color:#e2e8f0 !important;
+              -webkit-text-fill-color:#e2e8f0 !important;
+              caret-color:#e2e8f0 !important;
+            }
+            div[data-testid="stForm"] input::placeholder{
+              color:#aab2bf !important;
+            }
+            """
+        elif forced == "light":
+            forced_static_css = """
+            html, body,
+            .stApp,
+            section.main,
+            .main,
+            .stApp > header,
+            [data-testid="stHeader"],
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"],
+            [data-testid="stMainBlockContainer"],
+            [data-testid="stMainBlockContainer"] > div,
+            .block-container{
+              background:#f5f5f5 !important;
+              background-image:none !important;
+              color:#1f2937 !important;
+            }
+            .ap-theme-image-light{ display:block !important; }
+            .ap-theme-image-dark{ display:none !important; }
+            """
 
     theme_sync_script = f"""
         <script>
@@ -2282,6 +2344,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
           }}
         }}
         {public_css}
+        {forced_static_css}
         </style>
         """
     ).strip()
@@ -12474,7 +12537,10 @@ def public_report_view(token: str) -> None:
             pass
 
     is_mobile = _is_mobile_request()
-    forced_public_theme = _get_public_theme_override(token) if is_mobile else ""
+    if is_mobile:
+        forced_public_theme = _get_public_theme_override(token)
+    else:
+        forced_public_theme = _normalize_theme_value(_get_query_theme(), default="")
     _inject_report_dark_fix_css(public_mode=True, forced_theme=forced_public_theme, mobile_mode=is_mobile)
 
     if is_mobile:
