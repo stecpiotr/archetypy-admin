@@ -2319,19 +2319,19 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
             }}
           }};
 	          var resolveTheme = function(){{
-	            if (forcedTheme === "dark" || forcedTheme === "light") {{
-	              return forcedTheme;
-	            }}
-	            var qTheme = getQueryTheme();
-	            if (qTheme === "dark" || qTheme === "light") {{
-	              return qTheme;
-	            }}
-	            if (mobileMode) {{
-	              var storedTheme = getStoredTheme();
-	              if (storedTheme === "dark" || storedTheme === "light") {{
-	                return storedTheme;
-	              }}
-	              return "light";
+            if (forcedTheme === "dark" || forcedTheme === "light") {{
+              return forcedTheme;
+            }}
+            if (mobileMode) {{
+              var qTheme = getQueryTheme();
+              if (qTheme === "dark" || qTheme === "light") {{
+                return qTheme;
+              }}
+              var storedTheme = getStoredTheme();
+              if (storedTheme === "dark" || storedTheme === "light") {{
+                return storedTheme;
+              }}
+              return "light";
             }}
             if (mq && mq.matches) {{
               return "dark";
@@ -12626,7 +12626,12 @@ def public_report_view(token: str) -> None:
     if is_mobile:
         forced_public_theme = _get_public_theme_override(token)
     else:
-        forced_public_theme = _normalize_theme_value(_get_query_theme(), default="")
+        forced_public_theme = ""
+        try:
+            if "ap_theme" in st.query_params:
+                del st.query_params["ap_theme"]
+        except Exception:
+            pass
     _inject_report_dark_fix_css(public_mode=True, forced_theme=forced_public_theme, mobile_mode=is_mobile)
 
     if is_mobile:
@@ -13164,3 +13169,4 @@ else:
         jst_analysis_view()
     else:
         home_root_view()
+
