@@ -595,12 +595,10 @@ def _theme_image_dual_html(
 ) -> str:
     extra = f" {extra_class.strip()}" if extra_class else ""
     return (
-        "<span class='ap-theme-image-wrap'>"
-        f"<img src='{light_uri}' "
-        f"data-light-src='{light_uri}' "
-        f"data-dark-src='{dark_uri}' "
-        f"class='ap-theme-image ap-theme-image-swap{extra}' style='{style}'/>"
-        "</span>"
+        "<picture class='ap-theme-image-wrap'>"
+        f"<source media='(prefers-color-scheme: dark)' srcset='{dark_uri}'/>"
+        f"<img src='{light_uri}' class='ap-theme-image{extra}' style='{style}'/>"
+        "</picture>"
     )
 
 def arche_icon_inline_for_word(doc, archetype_name: str, gender_code: str = "M", height_mm: float = 18):

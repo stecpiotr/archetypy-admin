@@ -1991,15 +1991,12 @@ def _render_public_theme_switch(token: str) -> str:
     return _get_public_theme_override(token)
 
 
-def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "", mobile_mode: bool = False) -> None:
-    forced = _normalize_theme_value(forced_theme, default="")
-    forced_theme_js = json.dumps(forced)
-    mobile_mode_js = "true" if bool(mobile_mode) else "false"
-
-    # Desktop public report: przywrócony stabilny mechanizm z wersji referencyjnej
-    # (desktop jasny/ciemny ma działać dokładnie jak wcześniej).
-    if public_mode and (not bool(mobile_mode)) and (forced not in {"dark", "light"}):
+def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
+    public_css = ""
+    public_script = ""
+    if public_mode:
         public_css = """
+        /* Public report: spjne to/kontrast z motywem urzdzenia */
         :root{
           --ap-report-bg:#f5f5f5;
           --ap-report-text:#1f2937;
@@ -2065,7 +2062,8 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
           }
         }
         """
-        theme_sync_script = """
+        public_script = ""
+    theme_sync_script = """
         <script>
         (function(){
           var root = document.documentElement;
@@ -2120,439 +2118,8 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
           window.setTimeout(function(){ syncThemeImages(currentTheme || resolveTheme()); }, 1800);
         })();
         </script>
-        """
-        st.markdown(
-            f"""
-            <style>
-            .ap-theme-image-wrap{{
-              display:block;
-              width:100%;
-            }}
-            .ap-theme-image{{
-              display:block;
-            }}
-            .ap-theme-image-swap{{
-              display:block;
-              width:100%;
-              height:auto;
-            }}
-            @media (prefers-color-scheme: dark){{
-              .ap-ext-card-modal-content{{
-                background:rgba(30,30,30,.84) !important;
-                border-color:rgba(255,255,255,.28) !important;
-              }}
-            }}
-            {public_css}
-            </style>
-            {theme_sync_script}
-            """,
-            unsafe_allow_html=True,
-        )
-        return
-
-    public_css = ""
-    public_script = ""
-    forced_static_css = ""
-    if public_mode:
-        public_css = """
-        :root{
-          --ap-report-bg:var(--background-color,#f5f5f5);
-          --ap-report-text:var(--text-color,#1f2937);
-          --ap-heading-color:var(--text-color,#1f2937);
-        }
-        html[data-ap-theme='light'],
-        body[data-ap-theme='light']{
-          --ap-report-bg:#f5f5f5;
-          --ap-report-text:#1f2937;
-          --ap-heading-color:#1f2937;
-          --text-color:#334155;
-          color-scheme: light;
-        }
-        html[data-ap-theme='dark'],
-        body[data-ap-theme='dark']{
-          --ap-report-bg:#1e1e1e;
-          --ap-report-text:#e2e8f0;
-          --ap-heading-color:#e8f1ff;
-          --text-color:#d7e3f5;
-          color-scheme: dark;
-        }
-        html, body,
-        .stApp,
-        section.main,
-        .main,
-        .stApp > header,
-        [data-testid="stHeader"],
-        [data-testid="stAppViewContainer"],
-        [data-testid="stMain"],
-        [data-testid="stMainBlockContainer"],
-        [data-testid="stMainBlockContainer"] > div{
-          background:var(--ap-report-bg,#f5f5f5) !important;
-          background-image:none !important;
-          color:var(--ap-report-text,#1f2937) !important;
-        }
-        .block-container{
-          background:var(--ap-report-bg,#f5f5f5) !important;
-          background-image:none !important;
-          color:var(--ap-report-text,#1f2937) !important;
-        }
-        [data-testid="stMarkdownContainer"],
-        .ap-heading-force,
-        .ap-heading-force span{
-          color:var(--text-color,#334155) !important;
-        }
-        @media (max-width: 900px){
-          html, body,
-          .stApp,
-          section.main,
-          .main,
-          [data-testid="stAppViewContainer"],
-          [data-testid="stMain"],
-          [data-testid="stMainBlockContainer"],
-          [data-testid="stMainBlockContainer"] > div,
-          .block-container{
-            background:var(--ap-report-bg,#f5f5f5) !important;
-            background-image:none !important;
-          }
-        }
-        """
-        public_script = """
-        <script>
-        (function(){
-          try {
-            var html = document.documentElement;
-            if (html) {
-              html.setAttribute("lang", "pl");
-              html.setAttribute("translate", "no");
-              html.classList.add("notranslate");
-            }
-            if (document.body) {
-              document.body.setAttribute("lang", "pl");
-              document.body.setAttribute("translate", "no");
-              document.body.classList.add("notranslate");
-            }
-            var existing = document.querySelector("meta[name='google'][content='notranslate']");
-            if (!existing) {
-              var meta = document.createElement("meta");
-              meta.setAttribute("name", "google");
-              meta.setAttribute("content", "notranslate");
-              document.head && document.head.appendChild(meta);
-            }
-            var langMeta = document.querySelector("meta[http-equiv='Content-Language']");
-            if (!langMeta) {
-              var cl = document.createElement("meta");
-              cl.setAttribute("http-equiv", "Content-Language");
-              cl.setAttribute("content", "pl");
-              document.head && document.head.appendChild(cl);
-            }
-          } catch(_e) {}
-        })();
-        </script>
-        """
-        if forced == "dark":
-            forced_static_css = """
-            :root,
-            html,
-            body{
-              --ap-report-bg:#1e1e1e !important;
-              --ap-report-text:#e2e8f0 !important;
-              --ap-heading-color:#e8f1ff !important;
-              --text-color:#d7e3f5 !important;
-              --ap-public-count-color:#b8d5ff !important;
-              --ap-public-count-label-color:#d2e1f4 !important;
-              --ap-radar-label:#eaf2ff !important;
-              --ap-radar-radial:#deebfb !important;
-              --ap-radar-grid:rgba(148,163,184,0.46) !important;
-              --ap-radar-marker:#dbe7f8 !important;
-              color-scheme:dark !important;
-            }
-            html, body,
-            .stApp,
-            section.main,
-            .main,
-            .stApp > header,
-            [data-testid="stHeader"],
-            [data-testid="stAppViewContainer"],
-            [data-testid="stMain"],
-            [data-testid="stMainBlockContainer"],
-            [data-testid="stMainBlockContainer"] > div,
-            .block-container{
-              background:#1e1e1e !important;
-              background-image:none !important;
-              color:#e2e8f0 !important;
-            }
-            [data-testid="stMarkdownContainer"],
-            .ap-heading-force,
-            .ap-heading-force span{
-              color:#d7e3f5 !important;
-            }
-            .ap-public-heading-title,
-            .ap-public-heading-count,
-            .ap-public-heading-count-label{
-              color:var(--ap-heading-color,#e8f1ff) !important;
-            }
-            .public-unlock-title{
-              color:#f1f5fb !important;
-            }
-            .public-unlock-note{
-              color:#d9e4f0 !important;
-            }
-            .ap-theme-image-light{ display:none !important; }
-            .ap-theme-image-dark{ display:block !important; }
-            div[data-testid="stForm"] label{
-              color:#d9e4f0 !important;
-            }
-            div[data-testid="stForm"] [data-baseweb="input"]{
-              background:#2a2d33 !important;
-              border:1px solid #3f4552 !important;
-            }
-            div[data-testid="stForm"] input{
-              background:#2a2d33 !important;
-              color:#e2e8f0 !important;
-              -webkit-text-fill-color:#e2e8f0 !important;
-              caret-color:#e2e8f0 !important;
-            }
-            div[data-testid="stForm"] input::placeholder{
-              color:#aab2bf !important;
-            }
-            .public-unlock-error{
-              border-color:#fda4af !important;
-              background:#fecdd3 !important;
-              color:#7f1d1d !important;
-            }
-            """
-        elif forced == "light":
-            forced_static_css = """
-            :root,
-            html,
-            body{
-              --ap-report-bg:#f5f5f5 !important;
-              --ap-report-text:#1f2937 !important;
-              --ap-heading-color:#1f2937 !important;
-              --text-color:#334155 !important;
-              --ap-public-count-color:#1f4f8d !important;
-              --ap-public-count-label-color:#3f5873 !important;
-              --ap-radar-label:#24364d !important;
-              --ap-radar-radial:#334155 !important;
-              --ap-radar-grid:rgba(71,85,105,0.62) !important;
-              --ap-radar-marker:#1f2937 !important;
-              color-scheme:light !important;
-            }
-            html, body,
-            .stApp,
-            section.main,
-            .main,
-            .stApp > header,
-            [data-testid="stHeader"],
-            [data-testid="stAppViewContainer"],
-            [data-testid="stMain"],
-            [data-testid="stMainBlockContainer"],
-            [data-testid="stMainBlockContainer"] > div,
-            .block-container{
-              background:#f5f5f5 !important;
-              background-image:none !important;
-              color:#1f2937 !important;
-            }
-            .public-unlock-title{
-              color:#1f2937 !important;
-            }
-            .public-unlock-note{
-              color:#334155 !important;
-            }
-            .ap-theme-image-light{ display:block !important; }
-            .ap-theme-image-dark{ display:none !important; }
-            """
-
-    theme_sync_script = f"""
-        <script>
-        (function(){{
-          var root = document.documentElement;
-          var forcedTheme = {forced_theme_js};
-          var mobileMode = {mobile_mode_js};
-          var ua = "";
-          try {{ ua = String((window.navigator && window.navigator.userAgent) || ""); }} catch(_e) {{ ua = ""; }}
-          var isSamsungBrowser = /SamsungBrowser/i.test(ua);
-          var mq = null;
-          try {{ mq = window.matchMedia("(prefers-color-scheme: dark)"); }} catch(_e) {{ mq = null; }}
-          var THEME_STORAGE_KEY = "__apPublicThemeOverrideV1";
-
-          var getQueryTheme = function(){{
-            try {{
-              var url = new URL(window.location.href);
-              var t = String(url.searchParams.get("ap_theme") || "").toLowerCase();
-              return (t === "dark" || t === "light") ? t : "";
-            }} catch(_e) {{
-              return "";
-            }}
-          }};
-          var getStoredTheme = function(){{
-            try {{
-              var raw = String(localStorage.getItem(THEME_STORAGE_KEY) || "").toLowerCase();
-              return (raw === "dark" || raw === "light") ? raw : "";
-            }} catch(_e) {{
-              return "";
-            }}
-          }};
-          var setStoredTheme = function(theme){{
-            try {{
-              if (theme === "dark" || theme === "light") {{
-                localStorage.setItem(THEME_STORAGE_KEY, theme);
-              }}
-            }} catch(_e) {{}}
-          }};
-          var syncThemeImages = function(theme){{
-            var isDark = theme === "dark";
-            var nodes = document.querySelectorAll("img.ap-theme-image-swap[data-light-src][data-dark-src]");
-            for (var i = 0; i < nodes.length; i++) {{
-              var img = nodes[i];
-              var nextSrc = isDark ? img.getAttribute("data-dark-src") : img.getAttribute("data-light-src");
-              if (!nextSrc) {{ continue; }}
-              if (img.getAttribute("src") !== nextSrc) {{
-                img.setAttribute("src", nextSrc);
-              }}
-            }}
-          }};
-          var parseRgb = function(bg){{
-            if (!bg) {{ return null; }}
-            var m = String(bg).match(/rgba?\(([^)]+)\)/i);
-            if (!m) {{ return null; }}
-            var parts = m[1].split(",").map(function(x){{ return parseFloat(String(x).trim()); }});
-            if (parts.length < 3) {{ return null; }}
-            var a = (parts.length >= 4 && !isNaN(parts[3])) ? parts[3] : 1;
-            if (a === 0) {{ return null; }}
-            return {{
-              r: isNaN(parts[0]) ? 255 : parts[0],
-              g: isNaN(parts[1]) ? 255 : parts[1],
-              b: isNaN(parts[2]) ? 255 : parts[2]
-            }};
-          }};
-          var colorLuminance = function(rgb){{
-            if (!rgb) {{ return null; }}
-            return (0.2126 * rgb.r) + (0.7152 * rgb.g) + (0.0722 * rgb.b);
-          }};
-          var guessThemeFromBackground = function(){{
-            try {{
-              var selectors = [
-                "[data-testid='stAppViewContainer']",
-                ".stApp",
-                "[data-testid='stMain']",
-                "[data-testid='stMainBlockContainer']",
-                ".main",
-                ".block-container",
-                "section.main",
-                "body",
-                "html"
-              ];
-              var seen = [];
-              var candidates = [];
-              for (var si = 0; si < selectors.length; si++) {{
-                var found = document.querySelectorAll(selectors[si]);
-                for (var fi = 0; fi < found.length; fi++) {{
-                  var node = found[fi];
-                  if (!node) {{ continue; }}
-                  if (seen.indexOf(node) >= 0) {{ continue; }}
-                  seen.push(node);
-                  candidates.push(node);
-                }}
-              }}
-              if (candidates.length === 0) {{
-                candidates = [document.body, document.documentElement];
-              }}
-              var minLum = null;
-              for (var i = 0; i < candidates.length; i++) {{
-                var el = candidates[i];
-                if (!el) {{ continue; }}
-                var rgb = parseRgb(window.getComputedStyle(el).backgroundColor || "");
-                if (!rgb) {{ continue; }}
-                var lum = colorLuminance(rgb);
-                if (lum === null) {{ continue; }}
-                if (minLum === null || lum < minLum) {{
-                  minLum = lum;
-                }}
-              }}
-              if (minLum === null) {{ return null; }}
-              return minLum < 118 ? "dark" : "light";
-            }} catch(_e) {{
-              return null;
-            }}
-          }};
-	          var resolveTheme = function(){{
-            if (forcedTheme === "dark" || forcedTheme === "light") {{
-              return forcedTheme;
-            }}
-            if (mobileMode) {{
-              var qThemeMobile = getQueryTheme();
-              if (qThemeMobile === "dark" || qThemeMobile === "light") {{
-                return qThemeMobile;
-              }}
-              var storedTheme = getStoredTheme();
-              if (storedTheme === "dark" || storedTheme === "light") {{
-                return storedTheme;
-              }}
-              return "light";
-            }}
-            var qThemeDesktop = getQueryTheme();
-            if (qThemeDesktop === "dark" || qThemeDesktop === "light") {{
-              return qThemeDesktop;
-            }}
-            if (mq && mq.matches) {{
-              return "dark";
-            }}
-            var guessedTheme = guessThemeFromBackground();
-            if (guessedTheme === "dark" || guessedTheme === "light") {{
-              return guessedTheme;
-            }}
-            return "light";
-          }};
-          var applyTheme = function(theme){{
-            if (theme !== "dark" && theme !== "light") {{ return; }}
-            try {{ root.setAttribute("data-ap-theme", theme); }} catch(_e) {{}}
-            try {{ document.body && document.body.setAttribute("data-ap-theme", theme); }} catch(_e) {{}}
-            try {{ root.style.colorScheme = theme; }} catch(_e) {{}}
-            try {{ document.body && (document.body.style.colorScheme = theme); }} catch(_e) {{}}
-            syncThemeImages(theme);
-            if (mobileMode && !(forcedTheme === "dark" || forcedTheme === "light")) {{
-              setStoredTheme(theme);
-            }}
-          }};
-          var refreshTheme = function(){{
-            applyTheme(resolveTheme());
-          }};
-
-          refreshTheme();
-          if (!window.__apThemeSyncBoundV4) {{
-            window.__apThemeSyncBoundV4 = true;
-            if (!mobileMode && mq && !(forcedTheme === "dark" || forcedTheme === "light")) {{
-              if (typeof mq.addEventListener === "function") {{
-                mq.addEventListener("change", function(){{ refreshTheme(); }});
-              }} else if (typeof mq.addListener === "function") {{
-                mq.addListener(function(){{ refreshTheme(); }});
-              }}
-            }}
-            try {{
-              var mo = new MutationObserver(function(){{ refreshTheme(); }});
-              mo.observe(document.body || root, {{childList:true, subtree:true}});
-              window.setTimeout(function(){{ try {{ mo.disconnect(); }} catch(_e) {{}} }}, 12000);
-            }} catch(_e) {{}}
-            try {{
-              document.addEventListener("visibilitychange", function(){{ refreshTheme(); }});
-              window.addEventListener("pageshow", function(){{ refreshTheme(); }});
-              window.addEventListener("focus", function(){{ refreshTheme(); }});
-            }} catch(_e) {{}}
-          }} else {{
-            refreshTheme();
-          }}
-
-          window.setTimeout(function(){{ refreshTheme(); }}, 120);
-          window.setTimeout(function(){{ refreshTheme(); }}, 700);
-          window.setTimeout(function(){{ refreshTheme(); }}, 1800);
-          if (isSamsungBrowser && !mobileMode) {{
-            window.setTimeout(function(){{ refreshTheme(); }}, 3200);
-          }}
-        }})();
-        </script>
     """
-
-    style_block = textwrap.dedent(
+    st.markdown(
         f"""
         <style>
         .ap-theme-image-wrap{{
@@ -2562,29 +2129,8 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
         .ap-theme-image{{
           display:block;
         }}
-        .ap-theme-image-light{{
-          display:block !important;
-        }}
-        .ap-theme-image-dark{{
-          display:none !important;
-        }}
-        html[data-ap-theme='dark'] .ap-theme-image-light,
-        body[data-ap-theme='dark'] .ap-theme-image-light{{
-          display:none !important;
-        }}
-        html[data-ap-theme='dark'] .ap-theme-image-dark,
-        body[data-ap-theme='dark'] .ap-theme-image-dark{{
-          display:block !important;
-        }}
-        html[data-ap-theme='light'] .ap-theme-image-light,
-        body[data-ap-theme='light'] .ap-theme-image-light{{
-          display:block !important;
-        }}
-        html[data-ap-theme='light'] .ap-theme-image-dark,
-        body[data-ap-theme='light'] .ap-theme-image-dark{{
-          display:none !important;
-        }}
         .ap-theme-image-swap{{
+          display:block;
           width:100%;
           height:auto;
         }}
@@ -2595,19 +2141,12 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
           }}
         }}
         {public_css}
-        {forced_static_css}
         </style>
-        """
-    ).strip()
-    theme_sync_script = textwrap.dedent(theme_sync_script).strip()
-    public_script = textwrap.dedent(public_script).strip()
-    injected_html = style_block
-    if theme_sync_script:
-        injected_html += "\n" + theme_sync_script
-    if public_script:
-        injected_html += "\n" + public_script
-    st.markdown(injected_html, unsafe_allow_html=True)
-
+        {theme_sync_script}
+        {public_script}
+        """,
+        unsafe_allow_html=True,
+    )
 
 def _require_jst_ready() -> bool:
     if _ensure_jst_schema_initialized():
@@ -12787,15 +12326,7 @@ def public_report_view(token: str) -> None:
         except Exception:
             pass
 
-    is_mobile = _is_mobile_request()
-    if is_mobile:
-        forced_public_theme = _get_public_theme_override(token)
-    else:
-        forced_public_theme = ""
-    _inject_report_dark_fix_css(public_mode=True, forced_theme=forced_public_theme, mobile_mode=is_mobile)
-
-    if is_mobile:
-        _render_public_theme_switch(token)
+    _inject_report_dark_fix_css(public_mode=True)
 
     if not _render_public_gate(token):
         st.stop()
