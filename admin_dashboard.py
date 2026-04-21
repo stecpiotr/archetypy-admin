@@ -8423,12 +8423,24 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             body[data-ap-theme='dark']{
               --ap-heading-color:#e8f1ff;
               --text-color:#d7e3f5;
-              --ap-public-count-color:#b8d5ff;
-              --ap-public-count-label-color:#d2e1f4;
-              --ap-radar-label:#eaf2ff;
-              --ap-radar-radial:#deebfb;
-              --ap-radar-grid:rgba(148,163,184,0.46);
-              --ap-radar-marker:#dbe7f8;
+              --ap-public-count-color:#dbe9ff;
+              --ap-public-count-label-color:#eef5ff;
+              --ap-radar-label:#ffffff;
+              --ap-radar-radial:#ffffff;
+              --ap-radar-grid:rgba(255,255,255,0.58);
+              --ap-radar-marker:#ffffff;
+            }
+            @media (prefers-color-scheme: dark){
+              html:not([data-ap-theme]){
+                --ap-heading-color:#e8f1ff;
+                --text-color:#d7e3f5;
+                --ap-public-count-color:#dbe9ff;
+                --ap-public-count-label-color:#eef5ff;
+                --ap-radar-label:#ffffff;
+                --ap-radar-radial:#ffffff;
+                --ap-radar-grid:rgba(255,255,255,0.58);
+                --ap-radar-marker:#ffffff;
+              }
             }
             .ap-public-heading-count{
               color:var(--ap-public-count-color,#1f4f8d) !important;
