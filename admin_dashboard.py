@@ -9071,12 +9071,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 # 5) HTML + CSS tabeli -> tabela: Liczebność i natężenie archetypów
                 # --- ŁATWE DO ZMIANY SZEROKOŚCI (procenty) ---
-                COL_W = {"c1": "22%",
-                         "c2": "10%",
-                         "c3": "10%",
-                         "c4": "10%",
-                         "c5": "4%",
-                         "c6": "44%"}
+                COL_W = {"c1": "27%",
+                         "c2": "7%",
+                         "c3": "7%",
+                         "c4": "7%",
+                         "c5": "3%",
+                         "c6": "52%"}
 
                 # Budujemy body tabeli bez nagłówka (header=False), a nagłówek zrobimy ręcznie (rowspan/colspan).
                 _body = (
