@@ -8282,10 +8282,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             mobile_col5_w = "15px"
             mobile_col6_w = "260px"
         else:
-            mobile_table_min_w = "560px"
-            mobile_col1_w = "74px"
-            mobile_col5_w = "54px"
-            mobile_col6_w = "124px"
+            mobile_table_min_w = "460px"
+            mobile_col1_w = "80px"
+            mobile_col5_w = "30px"
+            mobile_col6_w = "120px"
     else:
         mobile_table_min_w = "540px"
         mobile_col1_w = "88px"
