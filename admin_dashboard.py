@@ -8116,22 +8116,27 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     )
     is_mobile = _is_probably_mobile_client()
     public_theme = "" if public_view else "light"
+    theme_from_qp = ""
+    theme_header_hint = ""
+    has_client_theme_signal = False
     if public_view:
-        theme_from_qp = ""
         try:
             theme_from_qp = str(st.query_params.get("ap_theme", "") or "").strip().lower()
         except Exception:
             theme_from_qp = ""
         if theme_from_qp in {"dark", "light"}:
             public_theme = theme_from_qp
+            has_client_theme_signal = True
 
         try:
             if public_theme not in {"dark", "light"}:
-                hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
-                if "dark" in hdr_theme:
+                theme_header_hint = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
+                if "dark" in theme_header_hint:
                     public_theme = "dark"
-                elif "light" in hdr_theme:
+                    has_client_theme_signal = True
+                elif "light" in theme_header_hint:
                     public_theme = "light"
+                    has_client_theme_signal = True
                 else:
                     public_theme = ""
         except Exception:
@@ -8153,7 +8158,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             pass
         if public_theme not in {"dark", "light"}:
             public_theme = "light"
-    public_dark_mode = bool(public_view and public_theme == "dark")
     is_samsung_browser = False
     if public_view:
         try:
@@ -8161,9 +8165,22 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             is_samsung_browser = "samsungbrowser" in ua_hdr
         except Exception:
             is_samsung_browser = False
+    # Samsung Internet (mobile) bywa niespójny przy wykrywaniu dark mode.
+    # Jeśli brak sygnału motywu z klienta (query/header), wymuszamy dark,
+    # ale respektujemy jawne `ap_theme=light`.
+    samsung_mobile_dark_fallback = bool(
+        public_view
+        and is_mobile
+        and is_samsung_browser
+        and (theme_from_qp != "light")
+        and (not has_client_theme_signal)
+    )
+    if samsung_mobile_dark_fallback:
+        public_theme = "dark"
     # W podglądzie publicznym renderujemy obrazy jednolicie po stronie serwera:
     # dark -> tylko warianty _dark, light -> tylko warianty jasne.
     # Dzięki temu unikamy różnic między silnikami przeglądarek mobilnych.
+    public_dark_mode = bool(public_view and public_theme == "dark")
     force_dark_assets = bool(public_view and public_dark_mode)
     if public_view:
         mobile_table_bg = "transparent"

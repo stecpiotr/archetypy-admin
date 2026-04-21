@@ -1938,14 +1938,21 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             try {
               var url = new URL(window.location.href);
               var currentThemeParam = String(url.searchParams.get("ap_theme") || "").toLowerCase();
-              if (currentThemeParam === theme) { return false; }
+              // Samsung: utrwalamy tylko dark. Dla light czyścimy parametr,
+              // żeby nie blokować fallbacków po stronie serwera.
+              var desiredThemeParam = (theme === "dark") ? "dark" : "";
+              if (currentThemeParam === desiredThemeParam) { return false; }
               var now = Date.now();
               var key = "__apThemeReloadAt";
               var last = 0;
               try { last = parseInt(sessionStorage.getItem(key) || "0", 10) || 0; } catch(_e) { last = 0; }
               if ((now - last) < 3000) { return false; }
               try { sessionStorage.setItem(key, String(now)); } catch(_e2) {}
-              url.searchParams.set("ap_theme", theme);
+              if (theme === "dark") {
+                url.searchParams.set("ap_theme", "dark");
+              } else {
+                url.searchParams.delete("ap_theme");
+              }
               window.location.replace(url.toString());
               return true;
             } catch(_e3) {
