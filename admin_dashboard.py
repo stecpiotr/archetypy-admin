@@ -9413,32 +9413,42 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       transform: translateY(2px);
                     }}
 
-                    @media (max-width: 900px){{
-                      .ap-table {{
-                        min-width: 540px !important;
-                        width: max-content !important;
-                        table-layout: fixed !important;
-                      }}
-                      .ap-table th, .ap-table td {{
-                        padding: 6px 4px !important;
-                        font-size: 10.8px !important;
-                        white-space: nowrap !important;
-                        word-break: normal !important;
-                      }}
-                      .ap-table .ap-vert-col {{
-                        min-height: 66px !important;
-                        font-size: 12px !important;
-                      }}
-                      .ap-table thead th:nth-child(1),
-                      .ap-table tbody td:nth-child(1) {{
-                        width: 88px !important;
-                        min-width: 88px !important;
-                        max-width: 88px !important;
-                      }}
-                      .ap-table tbody td:nth-child(1),
-                      .ap-table tbody td:nth-child(6) {{
-                        white-space: normal !important;
-                        word-break: break-word !important;
+	                    @media (max-width: 900px){{
+	                      .ap-table {{
+	                        min-width: 500px !important;
+	                        width: max-content !important;
+	                        table-layout: fixed !important;
+	                      }}
+	                      .ap-table th, .ap-table td {{
+	                        padding: 6px 4px !important;
+	                        font-size: 10.6px !important;
+	                        white-space: nowrap !important;
+	                        word-break: normal !important;
+	                      }}
+	                      .ap-table thead th {{
+	                        font-size: 10.6px !important;
+	                        font-weight: 700 !important;
+	                      }}
+	                      .ap-table .ap-vert-col {{
+	                        min-height: 62px !important;
+	                        font-size: 10.6px !important;
+	                      }}
+	                      .ap-table thead th:nth-child(1),
+	                      .ap-table tbody td:nth-child(1) {{
+	                        width: 72px !important;
+	                        min-width: 72px !important;
+	                        max-width: 72px !important;
+	                      }}
+	                      .ap-table thead th:nth-child(5),
+	                      .ap-table tbody td:nth-child(5) {{
+	                        width: 54px !important;
+	                        min-width: 54px !important;
+	                        max-width: 54px !important;
+	                      }}
+	                      .ap-table tbody td:nth-child(1),
+	                      .ap-table tbody td:nth-child(6) {{
+	                        white-space: normal !important;
+	                        word-break: break-word !important;
                         line-height: 1.25 !important;
                       }}
                       .ap-table .ap-int-txt {{

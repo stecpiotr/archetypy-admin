@@ -1856,65 +1856,99 @@ def _set_public_theme_query(token: str, theme: str) -> None:
         except Exception:
             pass
 
-def _render_public_theme_switch(token: str) -> None:
+def _normalize_theme_value(theme: str, default: str = "") -> str:
+    t = str(theme or "").strip().lower()
+    return t if t in {"light", "dark"} else default
+
+
+def _get_public_theme_override(token: str) -> str:
+    key = f"public_theme_override_{token}"
+    session_theme = _normalize_theme_value(st.session_state.get(key, ""))
+    if session_theme:
+        return session_theme
+    query_theme = _get_query_theme()
+    if query_theme:
+        st.session_state[key] = query_theme
+        return query_theme
+    return ""
+
+
+def _get_public_theme_display(token: str) -> str:
+    forced = _get_public_theme_override(token)
+    if forced:
+        return forced
+    detected = _normalize_theme_value(_detect_prefers_theme_from_headers(default=""))
+    return detected or "light"
+
+
+def _render_public_theme_switch(token: str) -> str:
     st.markdown(
         """
         <style>
-        .ap-public-theme-shell{
-          margin:2px 0 8px 0;
-          padding:8px 10px;
-          border:1px solid rgba(148,163,184,.35);
-          border-radius:10px;
-          background:rgba(255,255,255,.72);
-        }
         .ap-public-theme-caption{
-          font:600 0.93rem/1.2 'Segoe UI', Arial, sans-serif;
+          font:700 1.0rem/1.2 'Segoe UI', Arial, sans-serif;
           color:var(--text-color,#334155);
-          margin:2px 0 2px 0;
+          margin:0 0 4px 0;
         }
-        html[data-ap-theme='dark'] .ap-public-theme-shell,
-        body[data-ap-theme='dark'] .ap-public-theme-shell{
-          background:rgba(30,30,30,.72);
-          border-color:rgba(148,163,184,.45);
+        .ap-public-theme-wrap{
+          margin:0 0 2px 0;
+          padding:0;
+        }
+        .ap-public-theme-wrap div[data-testid="stRadio"]{
+          margin-top:-2px;
+          margin-bottom:2px;
+        }
+        @media (max-width: 900px){
+          .ap-public-theme-caption{
+            margin:0 0 2px 0;
+          }
+          .ap-public-theme-wrap{
+            margin:0 0 1px 0;
+          }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-    query_theme = _get_query_theme()
-    start_theme = query_theme or _detect_prefers_theme_from_headers(default="light")
+
+    current_theme = _get_public_theme_display(token)
     label_for_theme = {"light": "Jasny", "dark": "Ciemny"}
     theme_for_label = {"Jasny": "light", "Ciemny": "dark"}
-    key = f"public_theme_switch_{token}"
-    if st.session_state.get(key) not in theme_for_label:
-        st.session_state[key] = label_for_theme.get(start_theme, "Jasny")
 
-    st.markdown("<div class='ap-public-theme-shell'>", unsafe_allow_html=True)
-    col_l, col_r = st.columns([0.48, 0.52], gap="small")
-    with col_l:
-        st.markdown("<div class='ap-public-theme-caption'>Tryb raportu</div>", unsafe_allow_html=True)
-    with col_r:
-        picked = st.radio(
-            "Tryb raportu",
-            options=["Jasny", "Ciemny"],
-            key=key,
-            horizontal=True,
-            label_visibility="collapsed",
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
+    switch_key = f"public_theme_switch_{token}"
+    if st.session_state.get(switch_key) not in theme_for_label:
+        st.session_state[switch_key] = label_for_theme.get(current_theme, "Jasny")
 
-    desired_theme = theme_for_label.get(str(picked or "").strip(), start_theme)
-    if query_theme != desired_theme:
+    st.markdown("<div class='ap-public-theme-wrap'><div class='ap-public-theme-caption'>Tryb raportu</div></div>", unsafe_allow_html=True)
+    picked = st.radio(
+        "Tryb raportu",
+        options=["Jasny", "Ciemny"],
+        key=switch_key,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    desired_theme = theme_for_label.get(str(picked or "").strip(), current_theme)
+    current_override = _get_public_theme_override(token)
+    if desired_theme != current_override:
+        st.session_state[f"public_theme_override_{token}"] = desired_theme
         _set_public_theme_query(token, desired_theme)
         st.rerun()
 
+    if current_override and _get_query_theme() != current_override:
+        _set_public_theme_query(token, current_override)
 
-def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
+    return _get_public_theme_override(token)
+
+
+def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "") -> None:
+    forced = _normalize_theme_value(forced_theme, default="")
+    forced_theme_js = json.dumps(forced)
+
     public_css = ""
     public_script = ""
     if public_mode:
         public_css = """
-        /* Public report: spójne tło/kontrast z motywem urządzenia */
         :root{
           --ap-report-bg:#f5f5f5;
           --ap-report-text:#1f2937;
@@ -1971,79 +2005,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             background-image:none !important;
           }
         }
-        .ap-public-theme-toggle{
-          position:fixed;
-          top:calc(74px + env(safe-area-inset-top, 0px));
-          right:12px;
-          z-index:2147483646;
-          display:inline-flex;
-          align-items:center;
-          gap:6px;
-          background:rgba(255,255,255,.92);
-          border:1px solid rgba(148,163,184,.45);
-          border-radius:999px;
-          padding:4px 6px;
-          box-shadow:0 6px 18px rgba(15,23,42,.12);
-          backdrop-filter:saturate(140%) blur(4px);
-          -webkit-backdrop-filter:saturate(140%) blur(4px);
-        }
-        .ap-public-theme-toggle .ap-lbl{
-          font:600 12px/1.1 'Segoe UI', Arial, sans-serif;
-          color:#334155;
-          margin:0 2px 0 4px;
-          user-select:none;
-        }
-        .ap-public-theme-toggle .ap-theme-btn{
-          appearance:none;
-          border:1px solid #cbd5e1;
-          background:#ffffff;
-          color:#334155;
-          font:700 12px/1 'Segoe UI', Arial, sans-serif;
-          border-radius:999px;
-          padding:6px 10px;
-          cursor:pointer;
-        }
-        .ap-public-theme-toggle .ap-theme-btn.is-active{
-          background:#0f172a;
-          border-color:#0f172a;
-          color:#ffffff;
-        }
-        html[data-ap-theme='dark'] .ap-public-theme-toggle,
-        body[data-ap-theme='dark'] .ap-public-theme-toggle{
-          background:rgba(30,30,30,.92);
-          border-color:rgba(148,163,184,.46);
-          box-shadow:0 8px 22px rgba(0,0,0,.42);
-        }
-        html[data-ap-theme='dark'] .ap-public-theme-toggle .ap-lbl,
-        body[data-ap-theme='dark'] .ap-public-theme-toggle .ap-lbl{
-          color:#dbe7f8;
-        }
-        html[data-ap-theme='dark'] .ap-public-theme-toggle .ap-theme-btn,
-        body[data-ap-theme='dark'] .ap-public-theme-toggle .ap-theme-btn{
-          border-color:#445067;
-          background:#242a35;
-          color:#d7e3f5;
-        }
-        html[data-ap-theme='dark'] .ap-public-theme-toggle .ap-theme-btn.is-active,
-        body[data-ap-theme='dark'] .ap-public-theme-toggle .ap-theme-btn.is-active{
-          background:#e8f1ff;
-          border-color:#e8f1ff;
-          color:#111827;
-        }
-        @media (max-width: 900px){
-          .ap-public-theme-toggle{
-            top:calc(66px + env(safe-area-inset-top, 0px));
-            right:10px;
-            padding:4px 6px;
-          }
-          .ap-public-theme-toggle .ap-theme-btn{
-            padding:6px 9px;
-            font-size:11.5px;
-          }
-          .ap-public-theme-toggle .ap-lbl{
-            font-size:11.5px;
-          }
-        }
         """
         public_script = """
         <script>
@@ -2078,130 +2039,75 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         })();
         </script>
         """
-    theme_sync_script = """
+
+    theme_sync_script = f"""
         <script>
-        (function(){
+        (function(){{
           var root = document.documentElement;
+          var forcedTheme = {forced_theme_js};
           var ua = "";
-          try { ua = String((window.navigator && window.navigator.userAgent) || ""); } catch(_e) { ua = ""; }
+          try {{ ua = String((window.navigator && window.navigator.userAgent) || ""); }} catch(_e) {{ ua = ""; }}
           var isSamsungBrowser = /SamsungBrowser/i.test(ua);
-          var isPublicReport = /(?:^|[?&])token=/.test(String(window.location.search || ""));
           var mq = null;
-          try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
-          var currentTheme = null;
-          var currentThemeSignal = "fallback";
+          try {{ mq = window.matchMedia("(prefers-color-scheme: dark)"); }} catch(_e) {{ mq = null; }}
           var THEME_STORAGE_KEY = "__apPublicThemeOverrideV1";
 
-          var getQueryTheme = function(){
-            try {
+          var getQueryTheme = function(){{
+            try {{
               var url = new URL(window.location.href);
               var t = String(url.searchParams.get("ap_theme") || "").toLowerCase();
               return (t === "dark" || t === "light") ? t : "";
-            } catch(_e) {
+            }} catch(_e) {{
               return "";
-            }
-          };
-          var getStoredTheme = function(){
-            try {
+            }}
+          }};
+          var getStoredTheme = function(){{
+            try {{
               var raw = String(localStorage.getItem(THEME_STORAGE_KEY) || "").toLowerCase();
               return (raw === "dark" || raw === "light") ? raw : "";
-            } catch(_e) {
+            }} catch(_e) {{
               return "";
-            }
-          };
-          var setStoredTheme = function(theme){
-            try {
-              if (theme === "dark" || theme === "light") {
+            }}
+          }};
+          var setStoredTheme = function(theme){{
+            try {{
+              if (theme === "dark" || theme === "light") {{
                 localStorage.setItem(THEME_STORAGE_KEY, theme);
-              }
-            } catch(_e) {}
-          };
-          var syncThemeImages = function(theme){
+              }}
+            }} catch(_e) {{}}
+          }};
+          var syncThemeImages = function(theme){{
             var isDark = theme === "dark";
             var nodes = document.querySelectorAll("img.ap-theme-image-swap[data-light-src][data-dark-src]");
-            for (var i = 0; i < nodes.length; i++) {
+            for (var i = 0; i < nodes.length; i++) {{
               var img = nodes[i];
               var nextSrc = isDark ? img.getAttribute("data-dark-src") : img.getAttribute("data-light-src");
-              if (!nextSrc) { continue; }
-              if (img.getAttribute("src") !== nextSrc) {
+              if (!nextSrc) {{ continue; }}
+              if (img.getAttribute("src") !== nextSrc) {{
                 img.setAttribute("src", nextSrc);
-              }
-            }
-          };
-          var ensurePublicThemeToggle = function(){
-            if (!isPublicReport) { return; }
-            var wrap = document.getElementById("ap-public-theme-toggle");
-            if (!wrap) {
-              wrap = document.createElement("div");
-              wrap.id = "ap-public-theme-toggle";
-              wrap.className = "ap-public-theme-toggle notranslate";
-              wrap.setAttribute("translate", "no");
-              wrap.innerHTML = "" +
-                "<span class='ap-lbl' translate='no'>Tryb:</span>" +
-                "<button type='button' class='ap-theme-btn' data-theme='light' translate='no'>Jasny</button>" +
-                "<button type='button' class='ap-theme-btn' data-theme='dark' translate='no'>Ciemny</button>";
-              (document.body || document.documentElement).appendChild(wrap);
-              wrap.addEventListener("click", function(ev){
-                try {
-                  var tgt = ev.target;
-                  var btn = tgt && (tgt.closest ? tgt.closest("button[data-theme]") : null);
-                  if (!btn) { return; }
-                  var t = String(btn.getAttribute("data-theme") || "").toLowerCase();
-                  if (t !== "dark" && t !== "light") { return; }
-                  setStoredTheme(t);
-                  applyTheme(t);
-                } catch(_e) {}
-              });
-            }
-            try {
-              var btns = wrap.querySelectorAll("button[data-theme]");
-              for (var i = 0; i < btns.length; i++) {
-                var b = btns[i];
-                var t = String(b.getAttribute("data-theme") || "").toLowerCase();
-                if (t === currentTheme) {
-                  b.classList.add("is-active");
-                  b.setAttribute("aria-pressed", "true");
-                } else {
-                  b.classList.remove("is-active");
-                  b.setAttribute("aria-pressed", "false");
-                }
-              }
-            } catch(_e2) {}
-          };
-
-          var syncThemeQueryForPublic = function(theme){
-            return false;
-          };
-          var applyTheme = function(theme){
-            if (theme !== "dark" && theme !== "light") { return; }
-            currentTheme = theme;
-            try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
-            try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
-            try { root.style.colorScheme = theme; } catch(_e) {}
-            try { document.body && (document.body.style.colorScheme = theme); } catch(_e) {}
-            syncThemeImages(theme);
-            if (syncThemeQueryForPublic(theme)) { return; }
-          };
-          var parseRgb = function(bg){
-            if (!bg) { return null; }
+              }}
+            }}
+          }};
+          var parseRgb = function(bg){{
+            if (!bg) {{ return null; }}
             var m = String(bg).match(/rgba?\(([^)]+)\)/i);
-            if (!m) { return null; }
-            var parts = m[1].split(",").map(function(x){ return parseFloat(String(x).trim()); });
-            if (parts.length < 3) { return null; }
+            if (!m) {{ return null; }}
+            var parts = m[1].split(",").map(function(x){{ return parseFloat(String(x).trim()); }});
+            if (parts.length < 3) {{ return null; }}
             var a = (parts.length >= 4 && !isNaN(parts[3])) ? parts[3] : 1;
-            if (a === 0) { return null; }
-            return {
+            if (a === 0) {{ return null; }}
+            return {{
               r: isNaN(parts[0]) ? 255 : parts[0],
               g: isNaN(parts[1]) ? 255 : parts[1],
               b: isNaN(parts[2]) ? 255 : parts[2]
-            };
-          };
-          var colorLuminance = function(rgb){
-            if (!rgb) { return null; }
+            }};
+          }};
+          var colorLuminance = function(rgb){{
+            if (!rgb) {{ return null; }}
             return (0.2126 * rgb.r) + (0.7152 * rgb.g) + (0.0722 * rgb.b);
-          };
-          var guessThemeFromBackground = function(){
-            try {
+          }};
+          var guessThemeFromBackground = function(){{
+            try {{
               var selectors = [
                 "[data-testid='stAppViewContainer']",
                 ".stApp",
@@ -2215,121 +2121,109 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
               ];
               var seen = [];
               var candidates = [];
-              for (var si = 0; si < selectors.length; si++) {
+              for (var si = 0; si < selectors.length; si++) {{
                 var found = document.querySelectorAll(selectors[si]);
-                for (var fi = 0; fi < found.length; fi++) {
+                for (var fi = 0; fi < found.length; fi++) {{
                   var node = found[fi];
-                  if (!node) { continue; }
-                  if (seen.indexOf(node) >= 0) { continue; }
+                  if (!node) {{ continue; }}
+                  if (seen.indexOf(node) >= 0) {{ continue; }}
                   seen.push(node);
                   candidates.push(node);
-                }
-              }
-              if (candidates.length === 0) {
+                }}
+              }}
+              if (candidates.length === 0) {{
                 candidates = [document.body, document.documentElement];
-              }
+              }}
               var minLum = null;
-              for (var i = 0; i < candidates.length; i++) {
+              for (var i = 0; i < candidates.length; i++) {{
                 var el = candidates[i];
-                if (!el) { continue; }
+                if (!el) {{ continue; }}
                 var rgb = parseRgb(window.getComputedStyle(el).backgroundColor || "");
-                if (!rgb) { continue; }
+                if (!rgb) {{ continue; }}
                 var lum = colorLuminance(rgb);
-                if (lum === null) { continue; }
-                if (minLum === null || lum < minLum) {
+                if (lum === null) {{ continue; }}
+                if (minLum === null || lum < minLum) {{
                   minLum = lum;
-                }
-              }
-              if (minLum === null) { return null; }
+                }}
+              }}
+              if (minLum === null) {{ return null; }}
               return minLum < 118 ? "dark" : "light";
-            } catch(_e) {
+            }} catch(_e) {{
               return null;
-            }
-          };
-          var resolveTheme = function(){
+            }}
+          }};
+          var resolveTheme = function(){{
+            if (forcedTheme === "dark" || forcedTheme === "light") {{
+              return forcedTheme;
+            }}
             var qTheme = getQueryTheme();
-            if (qTheme === "dark" || qTheme === "light") {
-              currentThemeSignal = "query";
+            if (qTheme === "dark" || qTheme === "light") {{
               return qTheme;
-            }
+            }}
             var storedTheme = getStoredTheme();
-            if (storedTheme === "dark" || storedTheme === "light") {
-              currentThemeSignal = "stored";
+            if (storedTheme === "dark" || storedTheme === "light") {{
               return storedTheme;
-            }
-            var samsungBgGuess = null;
-            if (isSamsungBrowser) {
-              samsungBgGuess = guessThemeFromBackground();
-            }
-            if (mq && mq.matches) {
-              currentThemeSignal = "mq-dark";
+            }}
+            if (mq && mq.matches) {{
               return "dark";
-            }
-            if (isSamsungBrowser) {
-              if (samsungBgGuess === "dark") {
-                currentThemeSignal = "bg";
+            }}
+            if (isSamsungBrowser) {{
+              var samsungBgGuess = guessThemeFromBackground();
+              if (samsungBgGuess === "dark" || samsungBgGuess === "light") {{
                 return samsungBgGuess;
-              }
-            }
-            if (mq) {
-              currentThemeSignal = "mq-light";
-              return "light";
-            }
-            if (isSamsungBrowser && (samsungBgGuess === "dark" || samsungBgGuess === "light")) {
-              currentThemeSignal = "bg";
-              return samsungBgGuess;
-            }
-            if (qTheme === "dark" || qTheme === "light") {
-              currentThemeSignal = "query";
-              return qTheme;
-            }
-            currentThemeSignal = "fallback";
+              }}
+            }}
             return "light";
-          };
-          var refreshTheme = function(){
+          }};
+          var applyTheme = function(theme){{
+            if (theme !== "dark" && theme !== "light") {{ return; }}
+            try {{ root.setAttribute("data-ap-theme", theme); }} catch(_e) {{}}
+            try {{ document.body && document.body.setAttribute("data-ap-theme", theme); }} catch(_e) {{}}
+            try {{ root.style.colorScheme = theme; }} catch(_e) {{}}
+            try {{ document.body && (document.body.style.colorScheme = theme); }} catch(_e) {{}}
+            syncThemeImages(theme);
+            if (!(forcedTheme === "dark" || forcedTheme === "light")) {{
+              setStoredTheme(theme);
+            }}
+          }};
+          var refreshTheme = function(){{
             applyTheme(resolveTheme());
-          };
-          refreshTheme();
+          }};
 
-            if (!window.__apThemeSyncBound) {
-              window.__apThemeSyncBound = true;
-              if (mq) {
-                if (typeof mq.addEventListener === "function") {
-                  mq.addEventListener("change", function(){ refreshTheme(); });
-                } else if (typeof mq.addListener === "function") {
-                  mq.addListener(function(){ refreshTheme(); });
-                }
-              }
-            var mo = null;
-            try {
-              mo = new MutationObserver(function(){ refreshTheme(); });
-              mo.observe(document.body || root, {childList:true, subtree:true});
-            } catch(_e) {}
-          } else {
+          refreshTheme();
+          if (!window.__apThemeSyncBoundV4) {{
+            window.__apThemeSyncBoundV4 = true;
+            if (mq && !(forcedTheme === "dark" || forcedTheme === "light")) {{
+              if (typeof mq.addEventListener === "function") {{
+                mq.addEventListener("change", function(){{ refreshTheme(); }});
+              }} else if (typeof mq.addListener === "function") {{
+                mq.addListener(function(){{ refreshTheme(); }});
+              }}
+            }}
+            try {{
+              var mo = new MutationObserver(function(){{ refreshTheme(); }});
+              mo.observe(document.body || root, {{childList:true, subtree:true}});
+              window.setTimeout(function(){{ try {{ mo.disconnect(); }} catch(_e) {{}} }}, 12000);
+            }} catch(_e) {{}}
+            try {{
+              document.addEventListener("visibilitychange", function(){{ refreshTheme(); }});
+              window.addEventListener("pageshow", function(){{ refreshTheme(); }});
+              window.addEventListener("focus", function(){{ refreshTheme(); }});
+            }} catch(_e) {{}}
+          }} else {{
             refreshTheme();
-          }
-          window.setTimeout(function(){ refreshTheme(); }, 120);
-          window.setTimeout(function(){ refreshTheme(); }, 700);
-          window.setTimeout(function(){ refreshTheme(); }, 1800);
-          try {
-            document.addEventListener("visibilitychange", function(){ refreshTheme(); });
-            window.addEventListener("pageshow", function(){ refreshTheme(); });
-            window.addEventListener("focus", function(){ refreshTheme(); });
-          } catch(_e) {}
-          if (isSamsungBrowser) {
-            window.setTimeout(function(){ refreshTheme(); }, 3200);
-            var ticks = 0;
-            var iv = window.setInterval(function(){
-              refreshTheme();
-              ticks += 1;
-              if (ticks >= 14) {
-                window.clearInterval(iv);
-              }
-            }, 500);
-          }
-        })();
+          }}
+
+          window.setTimeout(function(){{ refreshTheme(); }}, 120);
+          window.setTimeout(function(){{ refreshTheme(); }}, 700);
+          window.setTimeout(function(){{ refreshTheme(); }}, 1800);
+          if (isSamsungBrowser) {{
+            window.setTimeout(function(){{ refreshTheme(); }}, 3200);
+          }}
+        }})();
         </script>
     """
+
     st.markdown(
         f"""
         <style>
@@ -12504,7 +12398,7 @@ def _render_public_gate(token: str) -> bool:
 
     lock_l, lock_c, lock_r = st.columns([0.08, 0.84, 0.08], gap="small")
     with lock_c:
-        st.markdown("<div style='height:10vh;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:2vh;'></div>", unsafe_allow_html=True)
         st.markdown("<div class='notranslate' translate='no'>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown(
@@ -12559,12 +12453,13 @@ def public_report_view(token: str) -> None:
         except Exception:
             pass
 
-    _inject_report_dark_fix_css(public_mode=True)
+    forced_public_theme = _get_public_theme_override(token)
+    _inject_report_dark_fix_css(public_mode=True, forced_theme=forced_public_theme)
+
+    _render_public_theme_switch(token)
 
     if not _render_public_gate(token):
         st.stop()
-
-    _render_public_theme_switch(token)
 
     study = _fetch_study_by_id(str(grant.get("study_id") or ""))
     if not study:
@@ -12583,7 +12478,6 @@ def public_report_view(token: str) -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
     try:
         import admin_dashboard as AD
         if hasattr(AD, "show_report"):
