@@ -1840,6 +1840,22 @@ def _detect_prefers_theme_from_headers(default: str = "light") -> str:
         pass
     return default
 
+def _is_mobile_request() -> bool:
+    try:
+        ch_mobile = str(st.context.headers.get("sec-ch-ua-mobile", "") or "").strip().lower()
+        if ch_mobile in {"?1", "1", "true"}:
+            return True
+    except Exception:
+        pass
+    try:
+        ua = str(st.context.headers.get("user-agent", "") or "").lower()
+    except Exception:
+        ua = ""
+    if not ua:
+        return False
+    mobile_tokens = ("android", "iphone", "ipad", "ipod", "mobile", "opera mini", "iemobile")
+    return any(tok in ua for tok in mobile_tokens)
+
 def _set_public_theme_query(token: str, theme: str) -> None:
     t = str(theme or "").strip().lower()
     if t not in {"light", "dark"}:
@@ -1875,13 +1891,12 @@ def _get_public_theme_override(token: str) -> str:
 
 def _get_public_theme_display(token: str) -> str:
     forced = _get_public_theme_override(token)
-    if forced:
-        return forced
-    detected = _normalize_theme_value(_detect_prefers_theme_from_headers(default=""))
-    return detected or "light"
+    return forced or "light"
 
 
 def _render_public_theme_switch(token: str) -> str:
+    if not _is_mobile_request():
+        return ""
     st.markdown(
         """
         <style>
@@ -1941,9 +1956,10 @@ def _render_public_theme_switch(token: str) -> str:
     return _get_public_theme_override(token)
 
 
-def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "") -> None:
+def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "", mobile_mode: bool = False) -> None:
     forced = _normalize_theme_value(forced_theme, default="")
     forced_theme_js = json.dumps(forced)
+    mobile_mode_js = "true" if bool(mobile_mode) else "false"
 
     public_css = ""
     public_script = ""
@@ -2045,6 +2061,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
         (function(){{
           var root = document.documentElement;
           var forcedTheme = {forced_theme_js};
+          var mobileMode = {mobile_mode_js};
           var ua = "";
           try {{ ua = String((window.navigator && window.navigator.userAgent) || ""); }} catch(_e) {{ ua = ""; }}
           var isSamsungBrowser = /SamsungBrowser/i.test(ua);
@@ -2156,22 +2173,19 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
             if (forcedTheme === "dark" || forcedTheme === "light") {{
               return forcedTheme;
             }}
-            var qTheme = getQueryTheme();
-            if (qTheme === "dark" || qTheme === "light") {{
-              return qTheme;
-            }}
-            var storedTheme = getStoredTheme();
-            if (storedTheme === "dark" || storedTheme === "light") {{
-              return storedTheme;
+            if (mobileMode) {{
+              var qTheme = getQueryTheme();
+              if (qTheme === "dark" || qTheme === "light") {{
+                return qTheme;
+              }}
+              var storedTheme = getStoredTheme();
+              if (storedTheme === "dark" || storedTheme === "light") {{
+                return storedTheme;
+              }}
+              return "light";
             }}
             if (mq && mq.matches) {{
               return "dark";
-            }}
-            if (isSamsungBrowser) {{
-              var samsungBgGuess = guessThemeFromBackground();
-              if (samsungBgGuess === "dark" || samsungBgGuess === "light") {{
-                return samsungBgGuess;
-              }}
             }}
             return "light";
           }};
@@ -2182,7 +2196,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
             try {{ root.style.colorScheme = theme; }} catch(_e) {{}}
             try {{ document.body && (document.body.style.colorScheme = theme); }} catch(_e) {{}}
             syncThemeImages(theme);
-            if (!(forcedTheme === "dark" || forcedTheme === "light")) {{
+            if (mobileMode && !(forcedTheme === "dark" || forcedTheme === "light")) {{
               setStoredTheme(theme);
             }}
           }};
@@ -2193,7 +2207,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
           refreshTheme();
           if (!window.__apThemeSyncBoundV4) {{
             window.__apThemeSyncBoundV4 = true;
-            if (mq && !(forcedTheme === "dark" || forcedTheme === "light")) {{
+            if (!mobileMode && mq && !(forcedTheme === "dark" || forcedTheme === "light")) {{
               if (typeof mq.addEventListener === "function") {{
                 mq.addEventListener("change", function(){{ refreshTheme(); }});
               }} else if (typeof mq.addListener === "function") {{
@@ -2217,7 +2231,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
           window.setTimeout(function(){{ refreshTheme(); }}, 120);
           window.setTimeout(function(){{ refreshTheme(); }}, 700);
           window.setTimeout(function(){{ refreshTheme(); }}, 1800);
-          if (isSamsungBrowser) {{
+          if (isSamsungBrowser && !mobileMode) {{
             window.setTimeout(function(){{ refreshTheme(); }}, 3200);
           }}
         }})();
@@ -12453,10 +12467,12 @@ def public_report_view(token: str) -> None:
         except Exception:
             pass
 
-    forced_public_theme = _get_public_theme_override(token)
-    _inject_report_dark_fix_css(public_mode=True, forced_theme=forced_public_theme)
+    is_mobile = _is_mobile_request()
+    forced_public_theme = _get_public_theme_override(token) if is_mobile else ""
+    _inject_report_dark_fix_css(public_mode=True, forced_theme=forced_public_theme, mobile_mode=is_mobile)
 
-    _render_public_theme_switch(token)
+    if is_mobile:
+        _render_public_theme_switch(token)
 
     if not _render_public_gate(token):
         st.stop()
