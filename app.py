@@ -2340,12 +2340,12 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
             if (qThemeDesktop === "dark" || qThemeDesktop === "light") {{
               return qThemeDesktop;
             }}
+            if (mq && mq.matches) {{
+              return "dark";
+            }}
             var guessedTheme = guessThemeFromBackground();
             if (guessedTheme === "dark" || guessedTheme === "light") {{
               return guessedTheme;
-            }}
-            if (mq && mq.matches) {{
-              return "dark";
             }}
             return "light";
           }};
