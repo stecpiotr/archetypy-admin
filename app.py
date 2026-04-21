@@ -14,6 +14,7 @@ import inspect
 import base64
 import subprocess
 import uuid
+import textwrap
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse, quote
@@ -2238,7 +2239,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
         </script>
     """
 
-    st.markdown(
+    style_block = textwrap.dedent(
         f"""
         <style>
         .ap-theme-image-wrap{{
@@ -2282,11 +2283,16 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
         }}
         {public_css}
         </style>
-        {theme_sync_script}
-        {public_script}
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    ).strip()
+    theme_sync_script = textwrap.dedent(theme_sync_script).strip()
+    public_script = textwrap.dedent(public_script).strip()
+    injected_html = style_block
+    if theme_sync_script:
+        injected_html += "\n" + theme_sync_script
+    if public_script:
+        injected_html += "\n" + public_script
+    st.markdown(injected_html, unsafe_allow_html=True)
 
 
 def _require_jst_ready() -> bool:
