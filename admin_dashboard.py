@@ -1834,6 +1834,7 @@ def color_bubbles_html(pcts: dict[str, float],
 
 def color_progress_bars_html(
     pcts: dict[str, float],
+    gender_code: str = "M",
     order: str = "desc",
     label_font: str = "'Roboto','Segoe UI',system-ui,Arial,sans-serif",
     label_size_px: int = 15,                  # mniejsze niż było
@@ -1856,6 +1857,8 @@ def color_progress_bars_html(
         pct_int = int(round(pct))
         width_css = f"{pct:.3f}%"
         color = COLOR_HEX[name]
+        color_meta = color_long_for_gender(name, gender_code)
+        title = color_meta.get("title", "").replace('"', '&quot;')
         inside = pct >= 10.0
         rows.append(f"""
                   <div class="cp-row">
@@ -1863,9 +1866,9 @@ def color_progress_bars_html(
                       <span class="cp-dot" style="background:{color}"></span>
                       <span class="cp-label-text">{name}</span>
                     </div>
-                    <div class="cp-track" title="{COLOR_LONG.get(name, {}).get('title', '').replace('"', '&quot;')}">
+                    <div class="cp-track" title="{title}">
                       <div class="cp-fill" style="width:{width_css}; background:{color}"
-                           title="{COLOR_LONG.get(name, {}).get('title', '').replace('"', '&quot;')}">
+                           title="{title}">
                         <div class="cp-badge {'in' if inside else 'out'}">{pct_int}%</div>
                       </div>
                     </div>
@@ -2456,6 +2459,96 @@ COLOR_LONG = {
     },
 }
 
+COLOR_LONG_FEMALE_OVERRIDES = {
+    "Niebieski": {
+        "title": "Niebieski – analityczna, proceduralna, precyzyjna",
+        "body": (
+            "Ceni fakty, logikę i stabilne procedury. Działa najlepiej, gdy ma jasno określone zasady, "
+            "harmonogram i dostęp do danych. Nie lubi chaosu, nagłych zmian i improwizacji – woli działać "
+            "według planu. Może sprawiać wrażenie zdystansowanej i nadmiernie ostrożnej, ale wnosi do "
+            "zespołu rzetelność, sumienność i dbałość o szczegóły. Niebieski to myślenie."
+        ),
+        "politics": (
+            "W polityce to typ ekspertki – skrupulatna analityczka, która zamiast haseł pokazuje liczby i tabele. "
+            "Budzi zaufanie dzięki przygotowaniu merytorycznemu i pragmatycznym rozwiązaniom. Może być odbierana "
+            "jako mało charyzmatyczna, ale daje wyborcom poczucie przewidywalności i bezpieczeństwa instytucjonalnego."
+        ),
+    },
+    "Zielony": {
+        "title": "Zielony – empatyczna, harmonijna, wspierająca",
+        "body": (
+            "Kieruje się wartościami, relacjami i potrzebą budowania poczucia bezpieczeństwa. Jest empatyczna, "
+            "uważna na innych i dąży do zgody. Nie lubi gwałtownych zmian i konfrontacji, czasem brakuje jej "
+            "asertywności, ale potrafi tworzyć atmosferę zaufania i współpracy. Wnosi do zespołu stabilność, "
+            "lojalność i umiejętność łagodzenia napięć. Zielony to uczucia."
+        ),
+        "politics": (
+            "W polityce to typ mediatorki-społeczniczki, która stawia na dialog, kompromis i dobro wspólne. Potrafi "
+            "przekonać elektorat stylem „opiekuńczej liderki”, akcentując wartości społeczne, wspólnotowe i "
+            "solidarnościowe. Może unikać ostrych sporów, ale umiejętnie buduje mosty i zdobywa poparcie przez "
+            "bliskość i troskę o codzienne sprawy ludzi."
+        ),
+    },
+    "Żółty": {
+        "title": "Żółty – kreatywna, pełna energii i spontaniczna",
+        "body": (
+            "Osoba wizjonerska i entuzjastyczna – pełna pomysłów, które inspirują innych. Najlepiej czuje się w "
+            "środowisku swobodnym, otwartym na eksperymenty i innowacje. Nie przepada za rutyną, schematami i "
+            "nadmierną kontrolą. Jej mocną stroną jest umiejętność rozbudzania energii zespołu, improwizacja i "
+            "znajdowanie nowych możliwości tam, gdzie inni widzą bariery. Żółty to intuicja."
+        ),
+        "politics": (
+            "W polityce to typ showmanki i wizjonerki, która potrafi porwać tłumy hasłami zmiany i nowego otwarcia. "
+            "Umie przekuć abstrakcyjne idee w obrazowe narracje, które przemawiają do emocji. Bywa odbierana jako "
+            "idealistka lub ryzykantka, ale świetnie nadaje dynamikę kampanii i kreuje „nową nadzieję”."
+        ),
+    },
+    "Czerwony": {
+        "title": "Czerwony – decyzyjna, nastawiona na wynik, dominująca",
+        "body": (
+            "Ma naturalne zdolności przywódcze i skłonność do szybkiego podejmowania decyzji. Jest niezależna, "
+            "ambitna i skoncentrowana na rezultatach. Może być niecierpliwa, zbyt stanowcza i mało elastyczna, "
+            "ale dzięki determinacji potrafi przeprowadzić projekt do końca mimo przeszkód. To osoba, która nadaje "
+            "kierunek i mobilizuje innych do działania. Czerwony to doświadczenie."
+        ),
+        "politics": (
+            "W polityce to typ liderki-wojowniczki, która buduje swoją pozycję na sile, determinacji i zdolności "
+            "„dowiezienia” obietnic. Sprawdza się w kampaniach, gdzie liczy się mocne przywództwo i szybkie decyzje. "
+            "Może odstraszać swoją twardością, ale równocześnie daje poczucie, że „trzyma ster”."
+        ),
+    },
+}
+
+
+def _color_arche_for_gender(arche_csv: str, gender_code: str = "M") -> str:
+    raw_items = [item.strip() for item in str(arche_csv or "").split(",") if item and item.strip()]
+    gender = normalize_gender(gender_code)
+    if gender != "K":
+        return ", ".join(raw_items)
+
+    out: list[str] = []
+    for item in raw_items:
+        base_name = base_masc_from_any(item)
+        out.append(display_name_for_gender(base_name, gender))
+    return ", ".join(out)
+
+
+def color_long_for_gender(name: str, gender_code: str = "M") -> dict:
+    meta = dict(COLOR_LONG.get(name) or {})
+    if not meta:
+        return meta
+
+    if normalize_gender(gender_code) != "K":
+        return meta
+
+    fem_overrides = COLOR_LONG_FEMALE_OVERRIDES.get(name, {})
+    for key in ("title", "body", "politics"):
+        if key in fem_overrides:
+            meta[key] = fem_overrides[key]
+    meta["arche"] = _color_arche_for_gender(meta.get("arche", ""), gender_code="K")
+    return meta
+
+
 COLOR_META = {
     name: {
         "emoji": COLOR_EMOJI[name],
@@ -2467,9 +2560,14 @@ COLOR_META = {
     for name in COLOR_LONG.keys()
 }
 
-def color_explainer_one_html(name: str, pct: float, dark_mode: bool = False) -> str:
+def color_explainer_one_html(
+    name: str,
+    pct: float,
+    dark_mode: bool = False,
+    gender_code: str = "M",
+) -> str:
     """Jeden panel z opisem dominującego koloru."""
-    meta = COLOR_LONG[name]
+    meta = color_long_for_gender(name, gender_code)
     emoji = COLOR_EMOJI[name]
     light_card_bg = "rgba(255,255,255,.65)"
     light_card_border = "#ececf3"
@@ -2569,12 +2667,12 @@ def color_explainer_one_html(name: str, pct: float, dark_mode: bool = False) -> 
     """
 
 
-def color_explainer_html(pcts: dict[str, float]) -> str:
+def color_explainer_html(pcts: dict[str, float], gender_code: str = "M") -> str:
     """Render 4 akapity pod wykresem – kolejność wg udziału (%)."""
     items = sorted(pcts.items(), key=lambda kv: kv[1], reverse=True)
     blocks = []
     for name, val in items:
-        meta = COLOR_LONG[name]
+        meta = color_long_for_gender(name, gender_code)
         emoji = COLOR_EMOJI[name]
         blocks.append(f"""
         <div style="border:1px solid #ececf3; border-left:6px solid {meta['hex']};
@@ -6143,8 +6241,10 @@ def export_word_docxtpl(
         context["DOM_COLOR_ORIENT"] = dom_color["orient"]
         context["DOM_COLOR_BODY"] = dom_color["body"]
         context["DOM_COLOR_POLITICS"] = dom_color["politics"]
-        context["DOM_COLOR_ARCHE"] = dom_color.get("arche") or COLOR_LONG.get(dom_color["name"],
-                                                                              {}).get("arche", "")
+        context["DOM_COLOR_ARCHE"] = (
+            dom_color.get("arche")
+            or color_long_for_gender(dom_color["name"], gender_code=gender_code).get("arche", "")
+        )
     else:
         # Bezpieczne puste wartości, gdyby kiedyś nie było danych
         for k in ("DOM_COLOR_NAME", "DOM_COLOR_EMOJI", "DOM_COLOR_TITLE",
@@ -8160,11 +8260,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             is_samsung_browser = "samsungbrowser" in ua_hdr
         except Exception:
             is_samsung_browser = False
-    # W podglądzie publicznym renderujemy obrazy jednolicie po stronie serwera:
-    # dark -> tylko warianty _dark, light -> tylko warianty jasne.
-    # Dzięki temu unikamy różnic między silnikami przeglądarek mobilnych.
     public_dark_mode = bool(public_view and public_theme == "dark")
-    force_dark_assets = bool(public_view and is_mobile and is_samsung_browser and public_dark_mode)
+    # Renderujemy zawsze wariant dual (light+dark), a wybór robimy po stronie CSS/JS.
+    # To stabilizuje przełączanie motywu między dark/light bez „zawieszania” wersji obrazów.
+    force_dark_assets = False
     if public_view:
         mobile_table_bg = "transparent"
         mobile_table_text = "var(--text-color,#334155)"
@@ -8247,7 +8346,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             -webkit-overflow-scrolling:touch !important;
           }
           .ap-table{
-            min-width:620px !important;
+            min-width:540px !important;
             width:max-content !important;
             table-layout:auto !important;
             background:__AP_MOBILE_TABLE_BG__ !important;
@@ -8260,8 +8359,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             border-bottom:1px solid __AP_MOBILE_TABLE_BORDER__ !important;
           }
           .ap-table th, .ap-table td{
-            font-size:11.6px !important;
-            padding:7px 5px !important;
+            font-size:10.8px !important;
+            padding:6px 4px !important;
             white-space:nowrap !important;
             word-break:normal !important;
           }
@@ -8289,7 +8388,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --ap-public-count-label-color:#3f5873;
               --ap-radar-label:#24364d;
               --ap-radar-radial:#334155;
-              --ap-radar-grid:rgba(71,85,105,0.40);
+              --ap-radar-grid:rgba(71,85,105,0.62);
               --ap-radar-marker:#1f2937;
             }
             html[data-ap-theme='light'],
@@ -8300,7 +8399,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --ap-public-count-label-color:#3f5873;
               --ap-radar-label:#24364d;
               --ap-radar-radial:#334155;
-              --ap-radar-grid:rgba(71,85,105,0.40);
+              --ap-radar-grid:rgba(71,85,105,0.62);
               --ap-radar-marker:#1f2937;
             }
             html[data-ap-theme='dark'],
@@ -8319,18 +8418,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             }
             .ap-public-heading-count-label{
               color:var(--ap-public-count-label-color,#3f5873) !important;
-            }
-            @media (prefers-color-scheme: dark){
-              html:not([data-ap-theme]){
-                --ap-heading-color:#e8f1ff;
-                --text-color:#d7e3f5;
-                --ap-public-count-color:#b8d5ff;
-                --ap-public-count-label-color:#d2e1f4;
-                --ap-radar-label:#eaf2ff;
-                --ap-radar-radial:#deebfb;
-                --ap-radar-grid:rgba(148,163,184,0.46);
-                --ap-radar-marker:#dbe7f8;
-              }
             }
             [data-testid="stMarkdownContainer"]{
               color:var(--text-color,#334155) !important;
@@ -9043,24 +9130,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       body[data-ap-theme='dark'] .ap-table .ap-int-ico{
                         border-color:rgba(148,163,184,.44) !important;
                       }
-                      @media (prefers-color-scheme: dark){
-                        html:not([data-ap-theme]) .ap-table{
-                          background:transparent !important;
-                          color:#dce8f8 !important;
-                        }
-                        html:not([data-ap-theme]) .ap-table th,
-                        html:not([data-ap-theme]) .ap-table td{
-                          color:#dce8f8 !important;
-                          background:transparent !important;
-                          border-bottom:1px solid rgba(148,163,184,.34) !important;
-                        }
-                        html:not([data-ap-theme]) .ap-table thead th{
-                          color:#e9f2ff !important;
-                        }
-                        html:not([data-ap-theme]) .ap-table .ap-int-ico{
-                          border-color:rgba(148,163,184,.44) !important;
-                        }
-                      }
                     """
 
                 st.markdown(f"""
@@ -9323,13 +9392,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                     @media (max-width: 900px){{
                       .ap-table {{
-                        min-width: 620px !important;
+                        min-width: 540px !important;
                         width: max-content !important;
                         table-layout: fixed !important;
                       }}
                       .ap-table th, .ap-table td {{
-                        padding: 7px 5px !important;
-                        font-size: 11.6px !important;
+                        padding: 6px 4px !important;
+                        font-size: 10.8px !important;
                         white-space: nowrap !important;
                         word-break: normal !important;
                       }}
@@ -9346,7 +9415,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     {table_theme_override_css}
 
                 </style>
-                """ + f"<div class='ap-table-wrap'>{html_table}</div>" + intensity_help_modal_html(dark_mode=public_dark_mode)
+                """ + f"<div class='ap-table-wrap'>{html_table}</div>" + intensity_help_modal_html(dark_mode=(public_dark_mode if not public_view else False))
 
                 # jeśli masz nowe Streamlit: prawdziwy, „wbudowany” HTML bez iframa
                 if hasattr(st, "html"):
@@ -9359,13 +9428,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 if public_view:
                     radar_base_label_color = "var(--ap-radar-label,#334155)"
                     radar_marker_border_color = "var(--ap-radar-marker,#1f2937)"
-                    radar_grid_color = "var(--ap-radar-grid,rgba(148,163,184,0.35))"
+                    radar_grid_color = "var(--ap-radar-grid,rgba(71,85,105,0.62))"
                     radar_tick_color = "var(--ap-radar-label,#334155)"
                     radar_radial_tick_color = "var(--ap-radar-radial,#475569)"
                 else:
                     radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
                     radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
-                    radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(71,85,105,0.34)"
+                    radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(71,85,105,0.62)"
                     radar_tick_color = "#eef6ff" if public_dark_mode else "#475569"
                     radar_radial_tick_color = "#deebfb" if public_dark_mode else "#64748b"
                 theta_labels = []
@@ -9531,13 +9600,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             dom_name, dom_pct = max(color_pcts.items(), key=lambda kv: kv[1])
 
             # Dane opisowe dominującego koloru do Worda
-            dom_meta = COLOR_LONG[dom_name]  # masz już COLOR_LONG w pliku
+            dom_meta = color_long_for_gender(dom_name, report_gender_code)
             dom_color = {
                 "name": dom_name,
                 "pct": dom_pct,
                 "emoji": COLOR_EMOJI[dom_name],
                 "title": dom_meta["title"],
                 "orient": dom_meta["orient"],
+                "arche": dom_meta["arche"],
                 "body": dom_meta["body"],
                 "politics": dom_meta["politics"],
                 "hex": dom_meta["hex"],
@@ -9570,6 +9640,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 components.html(
                     color_progress_bars_html(
                         color_pcts,
+                        gender_code=report_gender_code,
                         order="desc",
                         label_color="#31333F",
                         dark_label_color="#d7e3f5",
@@ -9602,7 +9673,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 )
                 color_card_dark_default = public_dark_mode if not public_view else False
                 st.markdown(
-                    color_explainer_one_html(dom_name, dom_pct, dark_mode=color_card_dark_default),
+                    color_explainer_one_html(
+                        dom_name,
+                        dom_pct,
+                        dark_mode=color_card_dark_default,
+                        gender_code=report_gender_code,
+                    ),
                     unsafe_allow_html=True,
                 )
 

@@ -1850,14 +1850,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           --text-color:#d7e3f5;
           color-scheme: dark;
         }
-        @media (prefers-color-scheme: dark){
-          :root:not([data-ap-theme]){
-            --ap-report-bg:#1e1e1e;
-            --ap-report-text:#e2e8f0;
-            --ap-heading-color:#e8f1ff;
-            --text-color:#d7e3f5;
-          }
-        }
         html, body,
         .stApp,
         section.main,
@@ -1953,45 +1945,14 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             }
           };
 
-          var syncThemeImages = function(theme){
-            var isDark = theme === "dark";
-            var nodes = document.querySelectorAll("img.ap-theme-image-swap[data-light-src][data-dark-src]");
-            for (var i = 0; i < nodes.length; i++) {
-              var img = nodes[i];
-              var nextSrc = isDark ? img.getAttribute("data-dark-src") : img.getAttribute("data-light-src");
-              if (!nextSrc) { continue; }
-              if (img.getAttribute("src") !== nextSrc) {
-                img.setAttribute("src", nextSrc);
-              }
-            }
-          };
           var syncThemeQueryForPublic = function(theme){
-            if (!isPublicReport) { return false; }
-            if (theme !== "dark" && theme !== "light") { return false; }
-            try {
-              var url = new URL(window.location.href);
-              var currentThemeParam = String(url.searchParams.get("ap_theme") || "").toLowerCase();
-              var desiredThemeParam = theme;
-              if (currentThemeParam === desiredThemeParam) { return false; }
-              var now = Date.now();
-              var key = "__apThemeReloadAt";
-              var last = 0;
-              try { last = parseInt(sessionStorage.getItem(key) || "0", 10) || 0; } catch(_e) { last = 0; }
-              if ((now - last) < 3000) { return false; }
-              try { sessionStorage.setItem(key, String(now)); } catch(_e2) {}
-              url.searchParams.set("ap_theme", desiredThemeParam);
-              window.location.replace(url.toString());
-              return true;
-            } catch(_e3) {
-              return false;
-            }
+            return false;
           };
           var applyTheme = function(theme){
             if (theme !== "dark" && theme !== "light") { return; }
             currentTheme = theme;
             try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
             try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
-            syncThemeImages(theme);
             if (syncThemeQueryForPublic(theme)) { return; }
           };
           var parseRgb = function(bg){
@@ -2060,16 +2021,27 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           };
           var resolveTheme = function(){
             var qTheme = getQueryTheme();
-            if (mq) {
-              currentThemeSignal = mq.matches ? "mq-dark" : "mq-light";
-              return mq.matches ? "dark" : "light";
+            var samsungBgGuess = null;
+            if (isSamsungBrowser) {
+              samsungBgGuess = guessThemeFromBackground();
+            }
+            if (mq && mq.matches) {
+              currentThemeSignal = "mq-dark";
+              return "dark";
             }
             if (isSamsungBrowser) {
-              var bgGuess = guessThemeFromBackground();
-              if (bgGuess === "dark" || bgGuess === "light") {
+              if (samsungBgGuess === "dark") {
                 currentThemeSignal = "bg";
-                return bgGuess;
+                return samsungBgGuess;
               }
+            }
+            if (mq) {
+              currentThemeSignal = "mq-light";
+              return "light";
+            }
+            if (isSamsungBrowser && (samsungBgGuess === "dark" || samsungBgGuess === "light")) {
+              currentThemeSignal = "bg";
+              return samsungBgGuess;
             }
             if (qTheme === "dark" || qTheme === "light") {
               currentThemeSignal = "query";
@@ -2103,6 +2075,11 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           window.setTimeout(function(){ refreshTheme(); }, 120);
           window.setTimeout(function(){ refreshTheme(); }, 700);
           window.setTimeout(function(){ refreshTheme(); }, 1800);
+          try {
+            document.addEventListener("visibilitychange", function(){ refreshTheme(); });
+            window.addEventListener("pageshow", function(){ refreshTheme(); });
+            window.addEventListener("focus", function(){ refreshTheme(); });
+          } catch(_e) {}
           if (isSamsungBrowser) {
             window.setTimeout(function(){ refreshTheme(); }, 3200);
             var ticks = 0;
@@ -2148,14 +2125,6 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
         html[data-ap-theme='light'] .ap-theme-image-dark,
         body[data-ap-theme='light'] .ap-theme-image-dark{{
           display:none !important;
-        }}
-        @media (prefers-color-scheme: dark){{
-          html:not([data-ap-theme]) .ap-theme-image-light{{
-            display:none !important;
-          }}
-          html:not([data-ap-theme]) .ap-theme-image-dark{{
-            display:block !important;
-          }}
         }}
         .ap-theme-image-swap{{
           width:100%;
@@ -12255,41 +12224,6 @@ def _render_public_gate(token: str) -> bool:
           body[data-ap-theme='dark'] div[data-testid="stForm"] input::placeholder{
             color:#aab2bf !important;
           }
-        @media (prefers-color-scheme: dark){
-          html:not([data-ap-theme]) body,
-          html:not([data-ap-theme]) .stApp,
-          html:not([data-ap-theme]) [data-testid="stAppViewContainer"],
-          html:not([data-ap-theme]) [data-testid="stMain"],
-          html:not([data-ap-theme]) .main{
-            background:#1e1e1e !important;
-            color:#e2e8f0 !important;
-          }
-          html:not([data-ap-theme]) .block-container{
-            color:#e2e8f0 !important;
-          }
-          html:not([data-ap-theme]) .public-unlock-note{
-            color:#d9e4f0 !important;
-          }
-          html:not([data-ap-theme]) .public-unlock-title{
-            color:#f1f5fb !important;
-          }
-          html:not([data-ap-theme]) div[data-testid="stForm"] label{
-            color:#d9e4f0 !important;
-          }
-          html:not([data-ap-theme]) div[data-testid="stForm"] [data-baseweb="input"]{
-            background:#2a2d33 !important;
-            border:1px solid #3f4552 !important;
-          }
-          html:not([data-ap-theme]) div[data-testid="stForm"] input{
-            background:#2a2d33 !important;
-            color:#e2e8f0 !important;
-            -webkit-text-fill-color:#e2e8f0 !important;
-            caret-color:#e2e8f0 !important;
-          }
-          html:not([data-ap-theme]) div[data-testid="stForm"] input::placeholder{
-            color:#aab2bf !important;
-          }
-        }
         div[data-testid="stForm"] button[kind="primaryFormSubmit"]{
           background:#ff4d5b !important;
           color:#ffffff !important;
