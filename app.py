@@ -1897,7 +1897,39 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           }
         }
         """
-        public_script = ""
+        public_script = """
+        <script>
+        (function(){
+          try {
+            var html = document.documentElement;
+            if (html) {
+              html.setAttribute("lang", "pl");
+              html.setAttribute("translate", "no");
+              html.classList.add("notranslate");
+            }
+            if (document.body) {
+              document.body.setAttribute("lang", "pl");
+              document.body.setAttribute("translate", "no");
+              document.body.classList.add("notranslate");
+            }
+            var existing = document.querySelector("meta[name='google'][content='notranslate']");
+            if (!existing) {
+              var meta = document.createElement("meta");
+              meta.setAttribute("name", "google");
+              meta.setAttribute("content", "notranslate");
+              document.head && document.head.appendChild(meta);
+            }
+            var langMeta = document.querySelector("meta[http-equiv='Content-Language']");
+            if (!langMeta) {
+              var cl = document.createElement("meta");
+              cl.setAttribute("http-equiv", "Content-Language");
+              cl.setAttribute("content", "pl");
+              document.head && document.head.appendChild(cl);
+            }
+          } catch(_e) {}
+        })();
+        </script>
+        """
     theme_sync_script = """
         <script>
         (function(){
@@ -1905,6 +1937,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           var ua = "";
           try { ua = String((window.navigator && window.navigator.userAgent) || ""); } catch(_e) { ua = ""; }
           var isSamsungBrowser = /SamsungBrowser/i.test(ua);
+          var isPublicReport = /(?:^|[?&])token=/.test(String(window.location.search || ""));
           var mq = null;
           try { mq = window.matchMedia("(prefers-color-scheme: dark)"); } catch(_e) { mq = null; }
           var currentTheme = null;
@@ -1932,15 +1965,13 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
               }
             }
           };
-          var syncThemeQueryForSamsung = function(theme){
-            if (!isSamsungBrowser) { return false; }
+          var syncThemeQueryForPublic = function(theme){
+            if (!isPublicReport) { return false; }
             if (theme !== "dark" && theme !== "light") { return false; }
             try {
               var url = new URL(window.location.href);
               var currentThemeParam = String(url.searchParams.get("ap_theme") || "").toLowerCase();
-              // Samsung: utrwalamy tylko dark. Dla light czyścimy parametr,
-              // żeby nie blokować fallbacków po stronie serwera.
-              var desiredThemeParam = (theme === "dark") ? "dark" : "";
+              var desiredThemeParam = theme;
               if (currentThemeParam === desiredThemeParam) { return false; }
               var now = Date.now();
               var key = "__apThemeReloadAt";
@@ -1948,11 +1979,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
               try { last = parseInt(sessionStorage.getItem(key) || "0", 10) || 0; } catch(_e) { last = 0; }
               if ((now - last) < 3000) { return false; }
               try { sessionStorage.setItem(key, String(now)); } catch(_e2) {}
-              if (theme === "dark") {
-                url.searchParams.set("ap_theme", "dark");
-              } else {
-                url.searchParams.delete("ap_theme");
-              }
+              url.searchParams.set("ap_theme", desiredThemeParam);
               window.location.replace(url.toString());
               return true;
             } catch(_e3) {
@@ -1965,7 +1992,7 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
             try { root.setAttribute("data-ap-theme", theme); } catch(_e) {}
             try { document.body && document.body.setAttribute("data-ap-theme", theme); } catch(_e) {}
             syncThemeImages(theme);
-            if (syncThemeQueryForSamsung(theme)) { return; }
+            if (syncThemeQueryForPublic(theme)) { return; }
           };
           var parseRgb = function(bg){
             if (!bg) { return null; }
@@ -2033,28 +2060,16 @@ def _inject_report_dark_fix_css(public_mode: bool = False) -> None:
           };
           var resolveTheme = function(){
             var qTheme = getQueryTheme();
+            if (mq) {
+              currentThemeSignal = mq.matches ? "mq-dark" : "mq-light";
+              return mq.matches ? "dark" : "light";
+            }
             if (isSamsungBrowser) {
-              // Samsung Internet (szczególnie mobile) może mylić heurystykę tła
-              // przy dark mode, dlatego traktujemy URL i media query jako źródło prawdy.
-              if (qTheme === "dark" || qTheme === "light") {
-                currentThemeSignal = "query";
-                return qTheme;
-              }
-              if (mq) {
-                currentThemeSignal = mq.matches ? "mq-dark" : "mq-light";
-                return mq.matches ? "dark" : "light";
-              }
               var bgGuess = guessThemeFromBackground();
               if (bgGuess === "dark" || bgGuess === "light") {
                 currentThemeSignal = "bg";
                 return bgGuess;
               }
-              currentThemeSignal = "fallback";
-              return "light";
-            }
-            if (mq) {
-              currentThemeSignal = mq.matches ? "mq-dark" : "mq-light";
-              return mq.matches ? "dark" : "light";
             }
             if (qTheme === "dark" || qTheme === "light") {
               currentThemeSignal = "query";
@@ -12156,8 +12171,18 @@ def _render_public_gate(token: str) -> bool:
           line-height:1.45;
           font-size:0.98rem;
         }
+        .public-unlock-title{
+          margin:0 0 10px 0;
+          color:#1f2937;
+          font-size:1.72rem;
+          line-height:1.2;
+          font-weight:700;
+        }
         /* mobile-only: poprawa czytelności formularza odblokowania na iPhone */
         @media (max-width: 900px){
+          .public-unlock-title{
+            font-size:1.55rem;
+          }
           .public-unlock-note{
             font-size:1.04rem;
             color:#334155;
@@ -12206,6 +12231,10 @@ def _render_public_gate(token: str) -> bool:
           body[data-ap-theme='dark'] .public-unlock-note{
             color:#d9e4f0 !important;
           }
+          html[data-ap-theme='dark'] .public-unlock-title,
+          body[data-ap-theme='dark'] .public-unlock-title{
+            color:#f1f5fb !important;
+          }
           html[data-ap-theme='dark'] div[data-testid="stForm"] label,
           body[data-ap-theme='dark'] div[data-testid="stForm"] label{
             color:#d9e4f0 !important;
@@ -12241,6 +12270,9 @@ def _render_public_gate(token: str) -> bool:
           html:not([data-ap-theme]) .public-unlock-note{
             color:#d9e4f0 !important;
           }
+          html:not([data-ap-theme]) .public-unlock-title{
+            color:#f1f5fb !important;
+          }
           html:not([data-ap-theme]) div[data-testid="stForm"] label{
             color:#d9e4f0 !important;
           }
@@ -12261,8 +12293,16 @@ def _render_public_gate(token: str) -> bool:
         div[data-testid="stForm"] button[kind="primaryFormSubmit"]{
           background:#ff4d5b !important;
           color:#ffffff !important;
+          -webkit-text-fill-color:#ffffff !important;
           border:1px solid #ff4d5b !important;
           font-weight:700 !important;
+        }
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"] span,
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"] p,
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"] div{
+          color:#ffffff !important;
+          -webkit-text-fill-color:#ffffff !important;
+          text-shadow:none !important;
         }
         div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover{
           background:#ff3b4c !important;
@@ -12279,16 +12319,21 @@ def _render_public_gate(token: str) -> bool:
     lock_l, lock_c, lock_r = st.columns([0.08, 0.84, 0.08], gap="small")
     with lock_c:
         st.markdown("<div style='height:10vh;'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='notranslate' translate='no'>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("### Podgląd raportu jest zabezpieczony")
             st.markdown(
-                "<p class='public-unlock-note'>Podaj e-mail, na który wysłano link, oraz hasło dostępu.</p>",
+                "<h3 class='public-unlock-title notranslate' translate='no'>Podgląd raportu jest zabezpieczony</h3>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<p class='public-unlock-note notranslate' translate='no'>Podaj e-mail, na który wysłano link, oraz hasło dostępu.</p>",
                 unsafe_allow_html=True,
             )
             with st.form(f"public_unlock_{token}", clear_on_submit=False):
                 email = st.text_input("E-mail", key=f"public_email_{token}", autocomplete="off")
                 password = st.text_input("Hasło dostępu", type="password", key=f"public_pwd_{token}", autocomplete="new-password")
                 unlock = st.form_submit_button("Odblokuj raport", type="primary")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if unlock:
         res = verify_report_token_credentials(token, email, password)

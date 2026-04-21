@@ -8117,8 +8117,6 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     is_mobile = _is_probably_mobile_client()
     public_theme = "" if public_view else "light"
     theme_from_qp = ""
-    theme_header_hint = ""
-    has_client_theme_signal = False
     if public_view:
         try:
             theme_from_qp = str(st.query_params.get("ap_theme", "") or "").strip().lower()
@@ -8126,17 +8124,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             theme_from_qp = ""
         if theme_from_qp in {"dark", "light"}:
             public_theme = theme_from_qp
-            has_client_theme_signal = True
 
         try:
             if public_theme not in {"dark", "light"}:
-                theme_header_hint = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
-                if "dark" in theme_header_hint:
+                hdr_theme = str(st.context.headers.get("sec-ch-prefers-color-scheme", "") or "").strip().lower()
+                if "dark" in hdr_theme:
                     public_theme = "dark"
-                    has_client_theme_signal = True
-                elif "light" in theme_header_hint:
+                elif "light" in hdr_theme:
                     public_theme = "light"
-                    has_client_theme_signal = True
                 else:
                     public_theme = ""
         except Exception:
@@ -8165,23 +8160,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             is_samsung_browser = "samsungbrowser" in ua_hdr
         except Exception:
             is_samsung_browser = False
-    # Samsung Internet (mobile) bywa niespójny przy wykrywaniu dark mode.
-    # Jeśli brak sygnału motywu z klienta (query/header), wymuszamy dark,
-    # ale respektujemy jawne `ap_theme=light`.
-    samsung_mobile_dark_fallback = bool(
-        public_view
-        and is_mobile
-        and is_samsung_browser
-        and (theme_from_qp != "light")
-        and (not has_client_theme_signal)
-    )
-    if samsung_mobile_dark_fallback:
-        public_theme = "dark"
     # W podglądzie publicznym renderujemy obrazy jednolicie po stronie serwera:
     # dark -> tylko warianty _dark, light -> tylko warianty jasne.
     # Dzięki temu unikamy różnic między silnikami przeglądarek mobilnych.
     public_dark_mode = bool(public_view and public_theme == "dark")
-    force_dark_assets = bool(public_view and public_dark_mode)
+    force_dark_assets = bool(public_view and is_mobile and is_samsung_browser and public_dark_mode)
     if public_view:
         mobile_table_bg = "transparent"
         mobile_table_text = "var(--text-color,#334155)"
@@ -8264,7 +8247,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
             -webkit-overflow-scrolling:touch !important;
           }
           .ap-table{
-            min-width:690px !important;
+            min-width:620px !important;
             width:max-content !important;
             table-layout:auto !important;
             background:__AP_MOBILE_TABLE_BG__ !important;
@@ -8304,9 +8287,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --text-color:#334155;
               --ap-public-count-color:#1f4f8d;
               --ap-public-count-label-color:#3f5873;
-              --ap-radar-label:#334155;
-              --ap-radar-radial:#475569;
-              --ap-radar-grid:rgba(148,163,184,0.35);
+              --ap-radar-label:#24364d;
+              --ap-radar-radial:#334155;
+              --ap-radar-grid:rgba(71,85,105,0.40);
               --ap-radar-marker:#1f2937;
             }
             html[data-ap-theme='light'],
@@ -8315,9 +8298,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
               --text-color:#334155;
               --ap-public-count-color:#1f4f8d;
               --ap-public-count-label-color:#3f5873;
-              --ap-radar-label:#334155;
-              --ap-radar-radial:#475569;
-              --ap-radar-grid:rgba(148,163,184,0.35);
+              --ap-radar-label:#24364d;
+              --ap-radar-radial:#334155;
+              --ap-radar-grid:rgba(71,85,105,0.40);
               --ap-radar-marker:#1f2937;
             }
             html[data-ap-theme='dark'],
@@ -9001,12 +8984,12 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 # 5) HTML + CSS tabeli -> tabela: Liczebność i natężenie archetypów
                 # --- ŁATWE DO ZMIANY SZEROKOŚCI (procenty) ---
-                COL_W = {"c1": "27%",
-                         "c2": "7%",
-                         "c3": "7%",
-                         "c4": "7%",
-                         "c5": "3%",
-                         "c6": "52%"}
+                COL_W = {"c1": "22%",
+                         "c2": "10%",
+                         "c3": "10%",
+                         "c4": "10%",
+                         "c5": "4%",
+                         "c6": "44%"}
 
                 # Budujemy body tabeli bez nagłówka (header=False), a nagłówek zrobimy ręcznie (rowspan/colspan).
                 _body = (
@@ -9340,7 +9323,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                     @media (max-width: 900px){{
                       .ap-table {{
-                        min-width: 680px !important;
+                        min-width: 620px !important;
                         width: max-content !important;
                         table-layout: fixed !important;
                       }}
@@ -9353,6 +9336,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                       .ap-table .ap-vert-col {{
                         min-height: 66px !important;
                         font-size: 12px !important;
+                      }}
+                      .ap-table tbody td:nth-child(1),
+                      .ap-table tbody td:nth-child(6) {{
+                        white-space: normal !important;
+                        line-height: 1.25 !important;
                       }}
                     }}
                     {table_theme_override_css}
@@ -9377,7 +9365,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 else:
                     radar_base_label_color = "#c9d8ee" if public_dark_mode else "#656565"
                     radar_marker_border_color = "#dbe7f8" if public_dark_mode else "black"
-                    radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(148,163,184,0.35)"
+                    radar_grid_color = "rgba(148,163,184,0.46)" if public_dark_mode else "rgba(71,85,105,0.34)"
                     radar_tick_color = "#eef6ff" if public_dark_mode else "#475569"
                     radar_radial_tick_color = "#deebfb" if public_dark_mode else "#64748b"
                 theta_labels = []
@@ -9612,7 +9600,11 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     f"Dominujący kolor: <span style='color:{COLOR_HEX[dom_name]}'>{dom_name}</span></div>",
                     unsafe_allow_html=True,
                 )
-                st.markdown(color_explainer_one_html(dom_name, dom_pct, dark_mode=public_dark_mode), unsafe_allow_html=True)
+                color_card_dark_default = public_dark_mode if not public_view else False
+                st.markdown(
+                    color_explainer_one_html(dom_name, dom_pct, dark_mode=color_card_dark_default),
+                    unsafe_allow_html=True,
+                )
 
                 st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
                 st.markdown(
