@@ -2093,6 +2093,21 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
         """
         if forced == "dark":
             forced_static_css = """
+            :root,
+            html,
+            body{
+              --ap-report-bg:#1e1e1e !important;
+              --ap-report-text:#e2e8f0 !important;
+              --ap-heading-color:#e8f1ff !important;
+              --text-color:#d7e3f5 !important;
+              --ap-public-count-color:#b8d5ff !important;
+              --ap-public-count-label-color:#d2e1f4 !important;
+              --ap-radar-label:#eaf2ff !important;
+              --ap-radar-radial:#deebfb !important;
+              --ap-radar-grid:rgba(148,163,184,0.46) !important;
+              --ap-radar-marker:#dbe7f8 !important;
+              color-scheme:dark !important;
+            }
             html, body,
             .stApp,
             section.main,
@@ -2113,6 +2128,17 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
             .ap-heading-force span{
               color:#d7e3f5 !important;
             }
+            .ap-public-heading-title,
+            .ap-public-heading-count,
+            .ap-public-heading-count-label{
+              color:var(--ap-heading-color,#e8f1ff) !important;
+            }
+            .public-unlock-title{
+              color:#f1f5fb !important;
+            }
+            .public-unlock-note{
+              color:#d9e4f0 !important;
+            }
             .ap-theme-image-light{ display:none !important; }
             .ap-theme-image-dark{ display:block !important; }
             div[data-testid="stForm"] label{
@@ -2131,9 +2157,29 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
             div[data-testid="stForm"] input::placeholder{
               color:#aab2bf !important;
             }
+            .public-unlock-error{
+              border-color:#fda4af !important;
+              background:#fecdd3 !important;
+              color:#7f1d1d !important;
+            }
             """
         elif forced == "light":
             forced_static_css = """
+            :root,
+            html,
+            body{
+              --ap-report-bg:#f5f5f5 !important;
+              --ap-report-text:#1f2937 !important;
+              --ap-heading-color:#1f2937 !important;
+              --text-color:#334155 !important;
+              --ap-public-count-color:#1f4f8d !important;
+              --ap-public-count-label-color:#3f5873 !important;
+              --ap-radar-label:#24364d !important;
+              --ap-radar-radial:#334155 !important;
+              --ap-radar-grid:rgba(71,85,105,0.62) !important;
+              --ap-radar-marker:#1f2937 !important;
+              color-scheme:light !important;
+            }
             html, body,
             .stApp,
             section.main,
@@ -2148,6 +2194,12 @@ def _inject_report_dark_fix_css(public_mode: bool = False, forced_theme: str = "
               background:#f5f5f5 !important;
               background-image:none !important;
               color:#1f2937 !important;
+            }
+            .public-unlock-title{
+              color:#1f2937 !important;
+            }
+            .public-unlock-note{
+              color:#334155 !important;
             }
             .ap-theme-image-light{ display:block !important; }
             .ap-theme-image-dark{ display:none !important; }
