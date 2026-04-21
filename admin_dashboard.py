@@ -8278,9 +8278,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     if is_mobile and public_view:
         if is_samsung_browser:
             mobile_table_min_w = "400px"
-            mobile_col1_w = "25px"
+            mobile_col1_w = "10px"
             mobile_col5_w = "20px"
-            mobile_col6_w = "200px"
+            mobile_col6_w = "250px"
         else:
             mobile_table_min_w = "560px"
             mobile_col1_w = "74px"
