@@ -8278,9 +8278,9 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     if is_mobile and public_view:
         if is_samsung_browser:
             mobile_table_min_w = "560px"
-            mobile_col1_w = "74px"
+            mobile_col1_w = "60px"
             mobile_col5_w = "52px"
-            mobile_col6_w = "126px"
+            mobile_col6_w = "138px"
         else:
             mobile_table_min_w = "560px"
             mobile_col1_w = "84px"
@@ -9134,12 +9134,33 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
                 # 5) HTML + CSS tabeli -> tabela: Liczebność i natężenie archetypów
                 # --- ŁATWE DO ZMIANY SZEROKOŚCI (procenty) ---
-                COL_W = {"c1": "27%",
-                         "c2": "7%",
-                         "c3": "7%",
-                         "c4": "7%",
-                         "c5": "3%",
-                         "c6": "52%"}
+                if is_mobile and public_view and is_samsung_browser:
+                    # Samsung Internet mobile: wyraźnie węższy "Archetyp", szerszy "opis"
+                    COL_W = {
+                        "c1": "18%",
+                        "c2": "7%",
+                        "c3": "7%",
+                        "c4": "7%",
+                        "c5": "8%",
+                        "c6": "53%",
+                    }
+                elif is_mobile and public_view:
+                    # Chrome mobile: Archetyp lekko szerszy względem Samsunga
+                    COL_W = {
+                        "c1": "21%",
+                        "c2": "7%",
+                        "c3": "7%",
+                        "c4": "7%",
+                        "c5": "6%",
+                        "c6": "52%",
+                    }
+                else:
+                    COL_W = {"c1": "27%",
+                             "c2": "7%",
+                             "c3": "7%",
+                             "c4": "7%",
+                             "c5": "3%",
+                             "c6": "52%"}
 
                 # Budujemy body tabeli bez nagłówka (header=False), a nagłówek zrobimy ręcznie (rowspan/colspan).
                 _body = (
