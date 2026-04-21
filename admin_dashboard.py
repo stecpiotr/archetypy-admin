@@ -8278,14 +8278,14 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
     if is_mobile and public_view:
         if is_samsung_browser:
             mobile_table_min_w = "560px"
-            mobile_col1_w = "60px"
+            mobile_col1_w = "52px"
             mobile_col5_w = "52px"
-            mobile_col6_w = "138px"
+            mobile_col6_w = "152px"
         else:
             mobile_table_min_w = "560px"
-            mobile_col1_w = "84px"
+            mobile_col1_w = "74px"
             mobile_col5_w = "54px"
-            mobile_col6_w = "112px"
+            mobile_col6_w = "124px"
     else:
         mobile_table_min_w = "540px"
         mobile_col1_w = "88px"
@@ -9137,21 +9137,21 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 if is_mobile and public_view and is_samsung_browser:
                     # Samsung Internet mobile: wyraźnie węższy "Archetyp", szerszy "opis"
                     COL_W = {
-                        "c1": "18%",
+                        "c1": "15%",
                         "c2": "7%",
                         "c3": "7%",
                         "c4": "7%",
-                        "c5": "8%",
-                        "c6": "53%",
+                        "c5": "9%",
+                        "c6": "55%",
                     }
                 elif is_mobile and public_view:
                     # Chrome mobile: Archetyp lekko szerszy względem Samsunga
                     COL_W = {
-                        "c1": "21%",
+                        "c1": "19%",
                         "c2": "7%",
                         "c3": "7%",
                         "c4": "7%",
-                        "c5": "6%",
+                        "c5": "8%",
                         "c6": "52%",
                     }
                 else:
