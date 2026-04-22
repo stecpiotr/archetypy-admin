@@ -12,6 +12,7 @@ from public_labels import (
     PREFERENCES_P_DISPLAY_BY_INTERNAL_KEY,
     PREFERENCES_P_LABEL_ORDER,
 )
+import re
 
 
 def _result(label: str, score: float) -> dict[str, object]:
@@ -106,7 +107,7 @@ def test_4_profil_dzialania_bohater_wladca_odkrywca():
     txt = out["actionProfileDescription"].lower()
     assert "sprawczości" in txt
     assert "niezależności" in txt
-    assert "racjonalności" in txt
+    assert "racjonalność" in txt
     assert "po dołożeniu odkrywcy wyraźniej zaznacza się komponent kreatywności" in txt
     assert "a niezależność pozostaje jednym z głównych filarów tego układu" in txt
     assert "w praktyce daje to profil oparty przede wszystkim na sprawczości i niezależności" in txt
@@ -333,6 +334,7 @@ def test_15_top3_zmienia_opis_wiecej_niz_o_dopisek_o_trzecim_archetypie():
     assert "a niezależność pozostaje jednym z głównych filarów tego układu" in txt_3.lower()
     assert "kreatywność pozostaje słabszym wymiarem działania" in txt_2.lower()
     assert "kreatywność pozostaje obecna w wyraźnym, ale niedominującym stopniu" in txt_3.lower()
+    assert "dodatkowym ważnym komponentem pozostaje racjonalność" in txt_3.lower()
     assert "to wzmacnia obraz" not in txt_3.lower()
     assert "\n\ncałość wzmacnia obraz" in txt_3.lower()
     assert txt_3.replace(" Dodatkowy ton wnosi Odkrywca.", "") != txt_2
@@ -350,7 +352,7 @@ def test_16_niewinny_medrzec_tworca_rozdziela_role_wymiarow_bez_dublowania():
     txt = out["actionProfileDescription"]
     txt_l = txt.lower()
     assert "oparty przede wszystkim na niezależności i racjonalności" in txt_l
-    assert "z dodatkowym ważnym komponentem sprawczości i kreatywności" in txt_l
+    assert "dodatkowymi ważnymi komponentami pozostają sprawczość i kreatywność" in txt_l
     assert "przy solidnym wsparciu niezależności, racjonalności" not in txt_l
     assert "empatia pozostaje obecna w wyraźnym, ale niedominującym stopniu" in txt_l
     assert "\n\nCałość wzmacnia obraz" in txt
@@ -379,3 +381,51 @@ def test_17_split_action_dimension_roles_jest_rozlaczny_i_bez_duplikatow():
         + roles["weakestDims"]
     )
     assert len(all_dims) == len(set(all_dims))
+
+
+def test_18_redakcyjny_brak_urwanych_pseudo_zdan():
+    cases = [
+        _input(
+            _result("Niewinny", 82.0),
+            _result("Mędrzec", 79.0),
+            _result("Twórca", 71.0),
+            subject_forms={"fullGen": "Emila Steca"},
+        ),
+        _input(
+            _result("Bohater", 76.0),
+            _result("Władca", 75.9),
+            _result("Odkrywca", 70.1),
+            subject_forms={"fullGen": "Krzysztofa Hetmana"},
+        ),
+    ]
+    forbidden_starts = re.compile(r"(?:^|[.\n]\s*)(Z |Przy |Oraz |Podczas gdy )", flags=re.IGNORECASE)
+
+    for payload in cases:
+        txt = generate_archetype_descriptions(payload)["actionProfileDescription"]
+        assert forbidden_starts.search(txt) is None
+
+
+def test_19_emil_i_hetman_drugi_akapit_ma_pelne_zdanie_syntetyzujace():
+    emil = generate_archetype_descriptions(
+        _input(
+            _result("Niewinny", 82.0),
+            _result("Mędrzec", 79.0),
+            _result("Twórca", 71.0),
+            subject_forms={"fullGen": "Emila Steca"},
+        )
+    )["actionProfileDescription"]
+    hetman = generate_archetype_descriptions(
+        _input(
+            _result("Bohater", 76.0),
+            _result("Władca", 75.9),
+            _result("Odkrywca", 70.1),
+            subject_forms={"fullGen": "Krzysztofa Hetmana"},
+        )
+    )["actionProfileDescription"]
+
+    emil_parts = [p.strip() for p in emil.split("\n\n") if p.strip()]
+    hetman_parts = [p.strip() for p in hetman.split("\n\n") if p.strip()]
+    assert len(emil_parts) >= 2
+    assert len(hetman_parts) >= 2
+    assert emil_parts[1].startswith("Całość wzmacnia")
+    assert hetman_parts[1].startswith("Całość wzmacnia")

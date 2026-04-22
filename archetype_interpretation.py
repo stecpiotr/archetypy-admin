@@ -625,11 +625,17 @@ def buildActionProfileNarrative(
 
     sentence_support = ""
     if supporting_dims:
-        support_text = _format_dimension_names(supporting_dims, "genitive")
+        support_text = _format_dimension_names(supporting_dims, "nominative")
         if min(float(blendedDims.get(dim, 0.0)) for dim in supporting_dims) >= 60.0:
-            sentence_support = f"Przy solidnym wsparciu {support_text}."
+            if len(supporting_dims) == 1:
+                sentence_support = f"Istotne wsparcie w tym układzie daje {support_text}."
+            else:
+                sentence_support = f"Istotne wsparcie w tym układzie dają {support_text}."
         else:
-            sentence_support = f"Z dodatkowym ważnym komponentem {support_text}."
+            if len(supporting_dims) == 1:
+                sentence_support = f"Dodatkowym ważnym komponentem pozostaje {support_text}."
+            else:
+                sentence_support = f"Dodatkowymi ważnymi komponentami pozostają {support_text}."
 
     sentence_visible = ""
     if visible_dims:
