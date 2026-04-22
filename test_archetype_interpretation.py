@@ -107,7 +107,7 @@ def test_4_profil_dzialania_bohater_wladca_odkrywca():
     assert "niezależności" in txt
     assert "racjonalności" in txt
     assert "po dołożeniu odkrywcy wyraźniej zaznacza się komponent kreatywności" in txt
-    assert "przy utrzymaniu niezależności jako jednego z głównych filarów tego układu" in txt
+    assert "a niezależność pozostaje jednym z głównych filarów tego układu" in txt
     assert "w praktyce daje to profil oparty przede wszystkim na sprawczości i niezależności" in txt
     assert "kreatywnością obecną w wyraźnym, ale niedominującym stopniu" in txt
     assert "najsłabszym wymiarem pozostaje empatia" in txt
@@ -329,7 +329,7 @@ def test_15_top3_zmienia_opis_wiecej_niz_o_dopisek_o_trzecim_archetypie():
     txt_3 = out["actionProfileDescription"]
     assert "Dodatkowy ton wnosi Odkrywca." in txt_3
     assert "po dołożeniu odkrywcy wyraźniej zaznacza się komponent kreatywności" in txt_3.lower()
-    assert "przy utrzymaniu niezależności jako jednego z głównych filarów tego układu" in txt_3.lower()
+    assert "a niezależność pozostaje jednym z głównych filarów tego układu" in txt_3.lower()
     assert "kreatywność pozostaje słabszym wymiarem działania" in txt_2.lower()
     assert "kreatywnością obecną w wyraźnym, ale niedominującym stopniu" in txt_3.lower()
     assert "to wzmacnia obraz" not in txt_3.lower()

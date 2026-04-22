@@ -595,8 +595,8 @@ def buildActionProfileNarrative(
                     )
                 if anchor_dim is not None:
                     sentence1 += (
-                        f", przy utrzymaniu {DIM_LABELS[anchor_dim]} "
-                        "jako jednego z głównych filarów tego układu."
+                        f", a {DIM_LABELS_NOMINATIVE[anchor_dim]} "
+                        "pozostaje jednym z głównych filarów tego układu."
                     )
                 else:
                     sentence1 += "."
