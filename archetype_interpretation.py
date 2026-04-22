@@ -505,15 +505,21 @@ def compareTwoVsThreeArchetypes(blend2: dict[str, float], blend3: dict[str, floa
     for dim in ACTION_DIMENSIONS:
         value2 = float(blend2.get(dim, 0.0))
         value3 = float(blend3.get(dim, 0.0))
-        if abs(value3 - value2) >= 5.0:
+        if (value3 - value2) >= 5.0:
             changed_by_5_or_more.append(dim)
         band2 = classifyDimensionBand(value2)
         band3 = classifyDimensionBand(value3)
         if ACTION_BAND_RANK[band3] > ACTION_BAND_RANK[band2]:
             changed_band.append(dim)
 
-    changed_by_5_or_more.sort(key=lambda dim: abs(float(blend3.get(dim, 0.0)) - float(blend2.get(dim, 0.0))), reverse=True)
-    changed_band.sort(key=lambda dim: ACTION_BAND_RANK[classifyDimensionBand(float(blend3.get(dim, 0.0)))], reverse=True)
+    changed_by_5_or_more.sort(key=lambda dim: float(blend3.get(dim, 0.0)) - float(blend2.get(dim, 0.0)), reverse=True)
+    changed_band.sort(
+        key=lambda dim: (
+            ACTION_BAND_RANK[classifyDimensionBand(float(blend3.get(dim, 0.0)))],
+            float(blend3.get(dim, 0.0)) - float(blend2.get(dim, 0.0)),
+        ),
+        reverse=True,
+    )
     return {
         "changed_by_5_or_more": changed_by_5_or_more,
         "changed_band": changed_band,
@@ -536,25 +542,29 @@ def buildActionProfileNarrative(
         sentence1 += f" Dodatkowy ton wnosi {tertiary.label}."
         tertiary_gen = _label_genitive(tertiary.label)
         if maybeComparisonToTwoArchetypes:
-            changed_dims = _join_with_and(
-                [
-                    DIM_LABELS_NOMINATIVE[dim]
-                    for dim in sorted(
-                        set(
-                            list(maybeComparisonToTwoArchetypes.get("changed_by_5_or_more", []))
-                            + list(maybeComparisonToTwoArchetypes.get("changed_band", []))
-                        ),
-                        key=lambda name: blendedDims.get(name, 0.0),
-                        reverse=True,
-                    )
-                    if dim in DIM_LABELS_NOMINATIVE
-                ]
-            )
-            if changed_dims:
-                sentence1 += (
-                    f" Po dołożeniu {tertiary_gen} wyraźnie zmieniają się proporcje wymiarów, "
-                    f"szczególnie w obszarze {changed_dims}."
+            changed_dims_list = [
+                dim
+                for dim in sorted(
+                    set(
+                        list(maybeComparisonToTwoArchetypes.get("changed_by_5_or_more", []))
+                        + list(maybeComparisonToTwoArchetypes.get("changed_band", []))
+                    ),
+                    key=lambda name: blendedDims.get(name, 0.0),
+                    reverse=True,
                 )
+                if dim in DIM_LABELS
+            ]
+            if changed_dims_list:
+                if len(changed_dims_list) == 1:
+                    sentence1 += (
+                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznacza się komponent "
+                        f"{DIM_LABELS[changed_dims_list[0]]}."
+                    )
+                else:
+                    sentence1 += (
+                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznaczają się komponenty "
+                        f"{_format_dimension_names(changed_dims_list, 'genitive')}."
+                    )
 
     ranked = sorted(blendedDims.items(), key=lambda item: item[1], reverse=True)
     dominant_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "dominant"]
@@ -602,18 +612,19 @@ def buildActionProfileNarrative(
             sentence3 = f"{_sentence_case(weak_text)} {verb}."
 
     top_dim_a, top_dim_b = ranked[0][0], ranked[1][0]
-    sentence4 = _pair_interpretation(top_dim_a, top_dim_b)
+    summary_base = _pair_interpretation(top_dim_a, top_dim_b)
     if primary.id == "buntownik" and {top_dim_a, top_dim_b} == {"empatia", "sprawczosc"}:
-        sentence4 = (
+        summary_base = (
             "To wzmacnia obraz przywództwa wyrazistego, społecznie zakorzenionego "
             "i gotowego przekuwać energię zmiany w konkretne działanie."
         )
+    summary_sentence = _build_action_summary_sentence(top_dim_a, top_dim_b, summary_base)
 
-    segments = [sentence1, sentence2]
+    first_paragraph_segments = [sentence1, sentence2]
     if sentence3:
-        segments.append(sentence3)
-    segments.append(sentence4)
-    return " ".join(segment.strip() for segment in segments if segment.strip())
+        first_paragraph_segments.append(sentence3)
+    first_paragraph = " ".join(segment.strip() for segment in first_paragraph_segments if segment.strip())
+    return f"{first_paragraph}\n\n{summary_sentence}"
 
 
 def validateGeneratedActionDescription(meta: dict[str, object]) -> ActionDescriptionValidationResult:
@@ -879,6 +890,38 @@ def _pair_interpretation(dim_a: str, dim_b: str) -> str:
         f"To daje układ, który łączy {DIM_LABELS[dim_a]} z {DIM_LABELS[dim_b]} "
         "i dzięki temu działa w sposób wyraźny oraz rozpoznawalny."
     )
+
+
+def _build_action_summary_sentence(dim_a: str, dim_b: str, base_text: str) -> str:
+    raw = str(base_text or "").strip()
+    if not raw:
+        return (
+            "Całość wzmacnia obraz przywództwa, które łączy "
+            f"{DIM_LABELS[dim_a]} z {DIM_LABELS[dim_b]} i działa w sposób wyraźny oraz rozpoznawalny."
+        )
+
+    raw_l = raw.lower()
+    if raw_l.startswith("to wzmacnia obraz"):
+        tail = raw[len("To wzmacnia obraz") :].strip()
+        sentence = f"Całość wzmacnia obraz {tail}" if tail else "Całość wzmacnia obraz przywództwa."
+    elif raw_l.startswith("to daje układ, który"):
+        tail = raw[len("To daje układ, który") :].strip()
+        if tail:
+            sentence = f"Całość wzmacnia obraz przywództwa, które {tail}"
+        else:
+            sentence = "Całość wzmacnia obraz przywództwa."
+    elif raw_l.startswith("całość wzmacnia obraz") or raw_l.startswith("taki układ wzmacnia obraz") or raw_l.startswith("ten profil wzmacnia obraz"):
+        sentence = raw
+    else:
+        sentence = (
+            "Całość wzmacnia obraz przywództwa, które łączy "
+            f"{DIM_LABELS[dim_a]} z {DIM_LABELS[dim_b]} i działa w sposób wyraźny oraz rozpoznawalny."
+        )
+
+    sentence = sentence.strip()
+    if sentence and not sentence.endswith("."):
+        sentence += "."
+    return sentence
 
 
 def _generate_values_description(

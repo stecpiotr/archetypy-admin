@@ -110,6 +110,8 @@ def test_4_profil_dzialania_bohater_wladca_odkrywca():
     assert "kreatywność obecną w wyraźnym, ale niedominującym stopniu" in txt
     assert "najsłabszym wymiarem pozostaje empatia" in txt
     assert "empatia i kreatywność pozostają słabszymi wymiarami działania" not in txt
+    assert "\n\ncałość wzmacnia obraz" in txt
+    assert "to wzmacnia obraz" not in txt
     assert "umiarkowanej racjonalności" not in txt
     assert "bardzo niskiej kreatywności" not in txt
 
@@ -284,6 +286,8 @@ def test_13_buntownik_top_empatia_sprawczosc_ma_mocniejsza_puente():
     txt_action = out["actionProfileDescription"]
     assert "przywództwa wyrazistego, społecznie zakorzenionego" in txt_action
     assert "gotowego przekuwać energię zmiany w konkretne działanie" in txt_action
+    assert "\n\nCałość wzmacnia obraz" in txt_action
+    assert " To wzmacnia obraz" not in txt_action
 
 
 def test_14_bohater_wladca_bez_top3_ma_empatie_i_kreatywnosc_jako_slabsze():
@@ -298,6 +302,8 @@ def test_14_bohater_wladca_bez_top3_ma_empatie_i_kreatywnosc_jako_slabsze():
     txt_action = out["actionProfileDescription"].lower()
     assert "najsłabszym wymiarem pozostaje empatia" in txt_action
     assert "kreatywność pozostaje słabszym wymiarem działania" in txt_action
+    assert "\n\ncałość wzmacnia obraz" in txt_action
+    assert "to wzmacnia obraz" not in txt_action
 
 
 def test_15_top3_zmienia_opis_wiecej_niz_o_dopisek_o_trzecim_archetypie():
@@ -320,7 +326,9 @@ def test_15_top3_zmienia_opis_wiecej_niz_o_dopisek_o_trzecim_archetypie():
     txt_2 = out_2["actionProfileDescription"]
     txt_3 = out["actionProfileDescription"]
     assert "Dodatkowy ton wnosi Odkrywca." in txt_3
-    assert "po dołożeniu odkrywcy wyraźnie zmieniają się proporcje wymiarów" in txt_3.lower()
+    assert "po dołożeniu odkrywcy wyraźniej zaznaczają się komponenty" in txt_3.lower()
     assert "kreatywność pozostaje słabszym wymiarem działania" in txt_2.lower()
     assert "kreatywność obecną w wyraźnym, ale niedominującym stopniu" in txt_3.lower()
+    assert "to wzmacnia obraz" not in txt_3.lower()
+    assert "\n\ncałość wzmacnia obraz" in txt_3.lower()
     assert txt_3.replace(" Dodatkowy ton wnosi Odkrywca.", "") != txt_2
