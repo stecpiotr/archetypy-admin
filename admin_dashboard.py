@@ -3563,6 +3563,9 @@ SEGMENT_PROFILE_ITEMS = [
     ("Odkrywca", ARCHETYPE_PUBLIC_VALUES["Odkrywca"], "odkrywca.png", "#8e0000"),
 ]
 
+SEGMENT_PROFILE_ROLE_ICON_COLORS = {"main": "#ef4444", "aux": "#facc15", "supp": "#22c55e"}
+SEGMENT_PROFILE_ROLE_ICON_COLORS_DARK = {"main": "#fb7185", "aux": "#fde047", "supp": "#4ade80"}
+
 
 def _plot_segment_profile_wheel_from_scores(
     outpath: Path,
@@ -3572,18 +3575,44 @@ def _plot_segment_profile_wheel_from_scores(
     dark_mode: bool = False,
 ) -> None:
     from matplotlib.patches import Wedge, Circle
+    from PIL import ImageColor
     import math
 
     values = np.asarray([float(mean_scores.get(name, 0.0)) for name, *_ in SEGMENT_PROFILE_ITEMS], dtype=float)
     values = np.where(np.isfinite(values), np.clip(values, 0.0, 100.0), 0.0)
+    score_by_name = {name: float(values[idx]) for idx, (name, *_rest) in enumerate(SEGMENT_PROFILE_ITEMS)}
 
-    def _load_icon(path: Path):
+    def _priority_top_for_wheel(profile_100: dict[str, float], order: list[str]) -> list[str]:
+        ordered = sorted(order, key=lambda a: (-float(profile_100.get(a, 0.0)), order.index(a)))
+        top3 = ordered[:3]
+        if len(top3) >= 3 and float(profile_100.get(top3[2], 0.0)) < 70.0:
+            return top3[:2]
+        return top3
+
+    role_palette = SEGMENT_PROFILE_ROLE_ICON_COLORS_DARK if dark_mode else SEGMENT_PROFILE_ROLE_ICON_COLORS
+    top_for_icons = _priority_top_for_wheel(score_by_name, [name for name, *_ in SEGMENT_PROFILE_ITEMS])
+    role_keys = ("main", "aux", "supp")
+    icon_role_tints = {
+        arch_name: role_palette[role_keys[idx]]
+        for idx, arch_name in enumerate(top_for_icons)
+        if idx < len(role_keys) and role_keys[idx] in role_palette
+    }
+
+    def _load_icon(path: Path, tint_hex: str | None = None):
         img = Image.open(path).convert("RGBA")
         alpha = img.getchannel("A")
         bbox = alpha.getbbox()
         if bbox:
             img = img.crop(bbox)
-        if dark_mode:
+        if tint_hex:
+            arr = np.asarray(img).copy()
+            mask = arr[..., 3] > 0
+            tint_rgb = ImageColor.getrgb(str(tint_hex))
+            arr[..., 0][mask] = int(tint_rgb[0])
+            arr[..., 1][mask] = int(tint_rgb[1])
+            arr[..., 2][mask] = int(tint_rgb[2])
+            img = Image.fromarray(arr, mode="RGBA")
+        if dark_mode and not tint_hex:
             arr = np.asarray(img).copy()
             mask = arr[..., 3] > 0
             arr[..., 0][mask] = 244
@@ -3654,11 +3683,15 @@ def _plot_segment_profile_wheel_from_scores(
 
     icon_dir = Path(__file__).with_name("ikony")
     icon_cache: dict[str, np.ndarray] = {}
+    icon_highlight_cache: dict[str, np.ndarray] = {}
     for arch, _value, icon_file, _color in SEGMENT_PROFILE_ITEMS:
         icon_path = icon_dir / icon_file
         if icon_path.exists():
             try:
                 icon_cache[arch] = _load_icon(icon_path)
+                role_tint = icon_role_tints.get(arch)
+                if role_tint:
+                    icon_highlight_cache[arch] = _load_icon(icon_path, tint_hex=role_tint)
             except Exception:
                 pass
 
@@ -3748,10 +3781,11 @@ def _plot_segment_profile_wheel_from_scores(
         _draw_text_on_arc(ax=ax, text=ring_label, center_deg=center, radius=(r_label_inner + r_label_outer) / 2)
 
         ang = math.radians(center)
-        if arch in icon_cache:
+        icon_arr = icon_highlight_cache.get(arch, icon_cache.get(arch))
+        if icon_arr is not None:
             ax.add_artist(
                 AnnotationBbox(
-                    OffsetImage(icon_cache[arch], zoom=0.26),
+                    OffsetImage(icon_arr, zoom=0.26),
                     (1.14 * math.cos(ang), 1.14 * math.sin(ang)),
                     frameon=False,
                     zorder=5,
@@ -5950,7 +5984,7 @@ def _append_segment_profile_page(doc_tpl, segment_profile_img_path: str | None, 
         return
     doc_obj = doc_tpl.docx
     doc_obj.add_page_break()
-    title = re.sub(r"\s{2,}", " ", f"Profil siły archetypów {subject_gen} (skala: 0-100)").strip()
+    title = re.sub(r"\s{2,}", " ", f"Profil siły archetypów {subject_gen} (skala: 0-100%)").strip()
     _doc_add_paragraph(doc_obj, title, "Heading 1")
     p = doc_obj.add_paragraph()
     add_image(p, segment_profile_img_path, width=Mm(170))
