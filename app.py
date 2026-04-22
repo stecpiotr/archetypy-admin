@@ -11286,7 +11286,16 @@ def personal_metryczka_view() -> None:
     render_titlebar(["Panel", "Badania personalne", "Metryczka"])
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
 
-    studies = fetch_studies(sb)
+    try:
+        studies = fetch_studies(sb)
+    except Exception as exc:
+        st.error(
+            "Nie udało się pobrać listy badań personalnych. "
+            "To zwykle chwilowy problem z połączeniem z bazą. "
+            "Odśwież stronę za kilka sekund."
+        )
+        st.caption(f"Szczegóły techniczne: {exc}")
+        return
     if not studies:
         st.info("Brak badań personalnych.")
         return
@@ -11446,7 +11455,16 @@ def personal_settings_view() -> None:
     render_titlebar(["Panel", "Badania personalne", "Ustawienia ankiety"])
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
 
-    studies = fetch_studies(sb)
+    try:
+        studies = fetch_studies(sb)
+    except Exception as exc:
+        st.error(
+            "Nie udało się pobrać listy badań personalnych. "
+            "To zwykle chwilowy problem z połączeniem z bazą. "
+            "Odśwież stronę za kilka sekund."
+        )
+        st.caption(f"Szczegóły techniczne: {exc}")
+        return
     if not studies:
         st.info("Brak badań personalnych.")
         return

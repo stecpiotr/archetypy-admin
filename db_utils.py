@@ -1,10 +1,11 @@
 # db_utils.py
 
 from __future__ import annotations
-from typing import Dict, List, Optional, Any
+from typing import Callable, Dict, List, Optional, Any, TypeVar
 import ast
 import json
 import os
+import time
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -147,10 +148,54 @@ PERSONAL_QUESTION_COLUMNS: List[str] = [f"Q{i}" for i in range(1, 49)]
 PERSONAL_TEMPLATE_LEGACY_COLUMNS: List[str] = ["respondent_id", *PERSONAL_QUESTION_COLUMNS]
 PERSONAL_TEMPLATE_BASE_COLUMNS: List[str] = ["respondent_id", "created_at", "response_id"]
 PERSONAL_METRY_PREFIX = "M_"
+_T = TypeVar("_T")
+_TRANSIENT_DB_ERROR_TOKENS: tuple[str, ...] = (
+    "remoteprotocolerror",
+    "server disconnected",
+    "connection reset",
+    "connection aborted",
+    "connection refused",
+    "broken pipe",
+    "remote end closed connection",
+    "read timed out",
+    "timed out",
+    "timeout",
+    "temporarily unavailable",
+    "temporary failure",
+    "econnreset",
+)
 
 
 def _utc_now_iso() -> str:
     return datetime.utcnow().isoformat()
+
+
+def _is_transient_db_error(exc: Exception) -> bool:
+    msg = f"{type(exc).__name__}: {exc}".strip().lower()
+    if not msg:
+        return False
+    return any(token in msg for token in _TRANSIENT_DB_ERROR_TOKENS)
+
+
+def _execute_with_retry(
+    call_fn: Callable[[], _T],
+    *,
+    max_attempts: int = 4,
+    base_sleep_seconds: float = 0.35,
+) -> _T:
+    attempts = max(1, int(max_attempts))
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return call_fn()
+        except Exception as exc:
+            last_exc = exc
+            if (not _is_transient_db_error(exc)) or attempt >= attempts:
+                raise
+            time.sleep(float(base_sleep_seconds) * (2 ** (attempt - 1)))
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Nie udało się wykonać zapytania do bazy.")
 
 
 def normalize_study_status(raw: Optional[str], *, is_active: Optional[bool] = None, deleted_at: Optional[str] = None) -> str:
@@ -165,12 +210,14 @@ def normalize_study_status(raw: Optional[str], *, is_active: Optional[bool] = No
 
 
 def fetch_studies(sb: Client) -> List[Dict]:
-    res = (
-        sb.table("studies")
-        .select("*")
-        .or_("is_active.is.true,is_active.is.null")  # tylko aktywne
-        .order("created_at", desc=True)
-        .execute()
+    res = _execute_with_retry(
+        lambda: (
+            sb.table("studies")
+            .select("*")
+            .or_("is_active.is.true,is_active.is.null")  # tylko aktywne
+            .order("created_at", desc=True)
+            .execute()
+        )
     )
     out: List[Dict[str, Any]] = []
     for row in (res.data or []):
