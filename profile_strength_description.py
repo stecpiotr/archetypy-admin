@@ -122,7 +122,7 @@ _GROUP_WEAK_CONTRAST: dict[str, str] = {
 _GROUP_WEAK_CONTRAST_SOFT: dict[str, str] = {
     "zmiana": "wyraziście zmianowy",
     "ludzie": "wyraziście wspólnotowy",
-    "porzadek": "czysto administracyjno-porządkujący",
+    "porzadek": "nadmiernie administracyjno-porządkujący",
     "niezaleznosc": "skrajnie autonomiczny",
 }
 
@@ -356,7 +356,7 @@ def _pair_style_phrase(top: str, second: str) -> str:
     if pair == {"niezaleznosc", "zmiana"}:
         return "autonomiczny i nastawiony na uruchamianie ruchu"
     if pair == {"ludzie", "porzadek"}:
-        return "wspólnotowy, relacyjny i porządkujący"
+        return "uporządkowany, wspólnotowy i osadzony w jasnych regułach"
     if pair == {"zmiana", "ludzie"}:
         return "zmianowy i relacyjny"
     if pair == {"niezaleznosc", "porzadek"}:
@@ -417,7 +417,7 @@ def _needs_balance_sentence(
         if {top, second} == {"niezaleznosc", "zmiana"}:
             practical_txt = (
                 "W praktyce oznacza to profil bardziej autonomiczny i nastawiony na uruchamianie ruchu "
-                "niż czysto administracyjno-porządkujący, przy zachowaniu wyraźnego komponentu porządkowego i relacyjnego."
+                "niż profil nadmiernie administracyjno-porządkujący, przy zachowaniu wyraźnego komponentu porządkowego i relacyjnego."
             )
         else:
             practical_txt = (
@@ -443,10 +443,18 @@ def _needs_balance_sentence(
                 f"W praktyce oznacza to profil bardziej {pair_style} niż {weak_contrast}."
             )
         else:
-            balance_txt = (
-                "Układ jest wyraźnie przechylony. "
-                f"W praktyce oznacza to profil bardziej {_GROUP_STYLE[top]} niż {weak_contrast}."
-            )
+            if {top, second} == {"porzadek", "ludzie"} and weakest == "niezaleznosc":
+                balance_txt = (
+                    "Układ jest wyraźnie przechylony. "
+                    "W praktyce oznacza to profil bardziej uporządkowany, wspólnotowy i osadzony w jasnych regułach "
+                    "niż skrajnie autonomiczny, przy zachowaniu gotowości do rozwoju i korekty."
+                )
+            else:
+                balance_txt = (
+                    "Układ jest wyraźnie przechylony. "
+                    f"W praktyce oznacza to profil bardziej {pair_style} niż {weak_contrast}, "
+                    "przy zachowaniu obecności pozostałych obszarów."
+                )
     return intro_txt, balance_txt
 
 

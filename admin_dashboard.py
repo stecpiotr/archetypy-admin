@@ -6029,10 +6029,11 @@ def _append_generated_descriptions_page(
 ):
     if not isinstance(generated_descriptions, dict):
         return
+    strength_desc = str(generated_descriptions.get("strengthProfileDescription") or "").strip()
     values_desc = str(generated_descriptions.get("valuesWheelDescription") or "").strip()
     needs_desc = str(generated_descriptions.get("needsWheelDescription") or "").strip()
     action_desc = str(generated_descriptions.get("actionProfileDescription") or "").strip()
-    if not any((values_desc, needs_desc, action_desc)):
+    if not any((strength_desc, values_desc, needs_desc, action_desc)):
         return
 
     doc_obj = doc_tpl.docx
@@ -6051,6 +6052,15 @@ def _append_generated_descriptions_page(
         title = re.sub(r"\s{2,}", " ", f"Profile działania archetypów {subject_gen}").strip()
         _doc_add_paragraph(doc_obj, title, "Heading 2")
         _doc_add_paragraph(doc_obj, action_desc)
+
+    if strength_desc:
+        strength_title = re.sub(
+            r"\s{2,}",
+            " ",
+            f"Profil siły archetypów {subject_gen} (skala: 0-100)",
+        ).strip()
+        _doc_add_paragraph(doc_obj, strength_title, "Heading 2")
+        _doc_add_paragraph(doc_obj, strength_desc)
 
 
 def export_word_metrics_only(
@@ -9862,15 +9872,28 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         img_css_class="ap-strength-wheel-img",
                         force_dark=force_dark_assets,
                     )
+                role_legend_items = [
+                    ("#ff1d1d", "Archetyp główny"),
+                    ("#f4cc2c", "Archetyp wspierający"),
+                ]
+                if bool(SHOW_SUPP):
+                    role_legend_items.append(("#4ac10f", "Archetyp poboczny"))
+                role_legend_html = "".join(
+                    (
+                        "<span style=\"display:inline-flex;align-items:center;gap:11px;\">"
+                        f"<span style=\"width:24px;height:24px;border-radius:50%;border:2px solid #1f2937;background:{dot_color};display:inline-block;\"></span>"
+                        f"<span>{html.escape(dot_label)}</span>"
+                        "</span>"
+                    )
+                    for dot_color, dot_label in role_legend_items
+                )
                 st.markdown(
-                    """
-                    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:flex-start;margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:var(--text-color,#475569);">
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#de4b43;border-radius:2px;display:inline-block;"></span>Zmiana</span>
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2d5ad5;border-radius:2px;display:inline-block;"></span>Ludzie</span>
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#2f8a45;border-radius:2px;display:inline-block;"></span>Porządek</span>
-                      <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;background:#6f53d4;border-radius:2px;display:inline-block;"></span>Niezależność</span>
-                    </div>
-                    """,
+                    (
+                        "<div style=\"display:flex;gap:28px;flex-wrap:wrap;align-items:center;justify-content:flex-start;"
+                        "margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:var(--text-color,#475569);\">"
+                        f"{role_legend_html}"
+                        "</div>"
+                    ),
                     unsafe_allow_html=True,
                 )
                 _render_auto_description(generated_descriptions["strengthProfileDescription"])
