@@ -508,6 +508,7 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
 
     status_marked = False
     completed_marked = False
+    rpc_marked = False
 
     other_table = "email_logs" if table_name == "sms_messages" else ("sms_messages" if table_name == "email_logs" else "")
     tables_to_try: List[str] = [table_name] + ([other_table] if other_table else [])
@@ -535,6 +536,14 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
             last_err = exc
             return False
 
+    try:
+        sb.rpc("mark_token_completed", {"p_token": tok}).execute()
+        rpc_marked = True
+    except Exception as exc:
+        last_err = exc
+
+    # WAŻNE: po mark_token_completed ustawiamy revoked jako stan końcowy
+    # (RPC może nadpisywać status na "completed").
     revoke_payloads = (
         {"rejected_at": now_iso, "status": "revoked"},
         {"status": "revoked"},
@@ -549,11 +558,6 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
                 break
         if status_marked:
             break
-
-    try:
-        sb.rpc("mark_token_completed", {"p_token": tok}).execute()
-    except Exception as exc:
-        last_err = exc
 
     if status_marked:
         return True, ""
@@ -573,6 +577,9 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
             break
 
     if completed_marked:
+        return True, ""
+
+    if rpc_marked:
         return True, ""
 
     return False, str(last_err or "Nie udało się unieważnić tokenu.")
