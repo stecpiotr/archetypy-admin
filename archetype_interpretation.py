@@ -21,6 +21,7 @@ ArchetypeId = Literal[
 
 ArchetypeIntensityBand = Literal["marginal", "weak", "moderate", "significant", "high", "very_high", "extreme"]
 DimensionBand = Literal["very_high", "high", "mid_high", "mid", "low_mid", "low"]
+ActionDimensionBand = Literal["dominant", "supporting", "visible_non_dominant", "weaker"]
 
 
 class SubjectForms(TypedDict, total=False):
@@ -76,6 +77,18 @@ class DimensionStrengthResult(TypedDict):
 class ActionDescriptionValidationResult(TypedDict):
     ok: bool
     issues: list[str]
+
+
+class ActionProfileComparison(TypedDict):
+    changed_by_5_or_more: list[str]
+    changed_band: list[str]
+
+
+class ActionTopArchetypes(TypedDict):
+    primary: "_ResolvedResult"
+    supporting: "_ResolvedResult"
+    tertiary: "_ResolvedResult | None"
+    subjectForms: SubjectForms | None
 
 
 ARCHETYPE_META: dict[ArchetypeId, ArchetypeMeta] = {
@@ -328,6 +341,21 @@ DIM_LABELS_NOMINATIVE: dict[str, str] = {
     "kreatywnosc": "kreatywność",
 }
 
+ACTION_DIMENSIONS: tuple[str, ...] = (
+    "empatia",
+    "sprawczosc",
+    "racjonalnosc",
+    "niezaleznosc",
+    "kreatywnosc",
+)
+
+ACTION_BAND_RANK: dict[ActionDimensionBand, int] = {
+    "weaker": 0,
+    "visible_non_dominant": 1,
+    "supporting": 2,
+    "dominant": 3,
+}
+
 PAIR_INTERPRETATION: dict[str, str] = {
     "sprawczosc+niezaleznosc": "To wzmacnia obraz przywództwa decyzyjnego, samodzielnego i odpowiedzialnego za wynik.",
     "sprawczosc+racjonalnosc": "To wzmacnia obraz przywództwa rzeczowego, uporządkowanego i zdolnego przekładać diagnozę na działanie.",
@@ -429,6 +457,163 @@ def getDimensionPhrase(value: float, role: Literal["top", "middle", "low"]) -> s
         "low_mid": "obniżonej",
         "low": "obniżonej",
     }[band]
+
+
+def classifyDimensionBand(value: float) -> ActionDimensionBand:
+    v = float(value)
+    if v >= 70:
+        return "dominant"
+    if v >= 50:
+        return "supporting"
+    if v >= 40:
+        return "visible_non_dominant"
+    return "weaker"
+
+
+def _blend_action_dimensions(active: list[_ResolvedResult]) -> dict[str, float]:
+    total = sum(item.score for item in active) or 1.0
+    return {
+        dim: sum(item.score * ARCHETYPE_META[item.id]["dimensions"][dim] for item in active) / total for dim in ACTION_DIMENSIONS
+    }
+
+
+def _join_with_and(parts: list[str]) -> str:
+    cleaned = [str(item).strip() for item in parts if str(item).strip()]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return f"{cleaned[0]} i {cleaned[1]}"
+    return f"{', '.join(cleaned[:-1])} i {cleaned[-1]}"
+
+
+def _format_dimension_names(dims: list[str], case: Literal["genitive", "nominative"]) -> str:
+    labels = DIM_LABELS if case == "genitive" else DIM_LABELS_NOMINATIVE
+    return _join_with_and([labels[dim] for dim in dims if dim in labels])
+
+
+def _sentence_case(text: str) -> str:
+    if not text:
+        return text
+    return text[0].upper() + text[1:]
+
+
+def compareTwoVsThreeArchetypes(blend2: dict[str, float], blend3: dict[str, float]) -> ActionProfileComparison:
+    changed_by_5_or_more: list[str] = []
+    changed_band: list[str] = []
+    for dim in ACTION_DIMENSIONS:
+        value2 = float(blend2.get(dim, 0.0))
+        value3 = float(blend3.get(dim, 0.0))
+        if abs(value3 - value2) >= 5.0:
+            changed_by_5_or_more.append(dim)
+        band2 = classifyDimensionBand(value2)
+        band3 = classifyDimensionBand(value3)
+        if ACTION_BAND_RANK[band3] > ACTION_BAND_RANK[band2]:
+            changed_band.append(dim)
+
+    changed_by_5_or_more.sort(key=lambda dim: abs(float(blend3.get(dim, 0.0)) - float(blend2.get(dim, 0.0))), reverse=True)
+    changed_band.sort(key=lambda dim: ACTION_BAND_RANK[classifyDimensionBand(float(blend3.get(dim, 0.0)))], reverse=True)
+    return {
+        "changed_by_5_or_more": changed_by_5_or_more,
+        "changed_band": changed_band,
+    }
+
+
+def buildActionProfileNarrative(
+    blendedDims: dict[str, float],
+    topArchetypes: ActionTopArchetypes,
+    maybeComparisonToTwoArchetypes: ActionProfileComparison | None = None,
+) -> str:
+    primary = topArchetypes["primary"]
+    supporting = topArchetypes["supporting"]
+    tertiary = topArchetypes["tertiary"]
+    subject_forms = topArchetypes.get("subjectForms")
+    subject = getPreferredGenitive(subject_forms) or "tego układu"
+
+    sentence1 = f"Rdzeń działania {subject} tworzą {primary.label} i {supporting.label}."
+    if tertiary is not None:
+        sentence1 += f" Dodatkowy ton wnosi {tertiary.label}."
+        tertiary_gen = _label_genitive(tertiary.label)
+        if maybeComparisonToTwoArchetypes:
+            changed_dims = _join_with_and(
+                [
+                    DIM_LABELS_NOMINATIVE[dim]
+                    for dim in sorted(
+                        set(
+                            list(maybeComparisonToTwoArchetypes.get("changed_by_5_or_more", []))
+                            + list(maybeComparisonToTwoArchetypes.get("changed_band", []))
+                        ),
+                        key=lambda name: blendedDims.get(name, 0.0),
+                        reverse=True,
+                    )
+                    if dim in DIM_LABELS_NOMINATIVE
+                ]
+            )
+            if changed_dims:
+                sentence1 += (
+                    f" Po dołożeniu {tertiary_gen} wyraźnie zmieniają się proporcje wymiarów, "
+                    f"szczególnie w obszarze {changed_dims}."
+                )
+
+    ranked = sorted(blendedDims.items(), key=lambda item: item[1], reverse=True)
+    dominant_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "dominant"]
+    supporting_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "supporting"]
+    visible_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "visible_non_dominant"]
+    weaker_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "weaker"]
+
+    if dominant_dims:
+        dominant_list = dominant_dims[:2] if len(dominant_dims) >= 2 else dominant_dims
+    else:
+        dominant_list = [ranked[0][0], ranked[1][0]]
+
+    sentence2 = f"W praktyce daje to układ oparty przede wszystkim na {_format_dimension_names(dominant_list, 'genitive')}"
+
+    if supporting_dims:
+        if len(supporting_dims) == 1 and blendedDims[supporting_dims[0]] < 60:
+            sentence2 += f", z dodatkowym ważnym komponentem {DIM_LABELS[supporting_dims[0]]}"
+        else:
+            sentence2 += f", przy solidnym wsparciu {_format_dimension_names(supporting_dims, 'genitive')}"
+
+    if visible_dims:
+        if len(visible_dims) == 1:
+            sentence2 += f", oraz {DIM_LABELS_NOMINATIVE[visible_dims[0]]} obecną w wyraźnym, ale niedominującym stopniu"
+        else:
+            sentence2 += f", a {_format_dimension_names(visible_dims, 'nominative')} obecne w wyraźnym, ale niedominującym stopniu"
+    sentence2 += "."
+
+    sentence3 = ""
+    weak_sorted = sorted(weaker_dims, key=lambda dim: blendedDims.get(dim, 0.0))
+    if len(weak_sorted) == 1:
+        sentence3 = f"Najsłabszym wymiarem pozostaje {DIM_LABELS_NOMINATIVE[weak_sorted[0]]}."
+    elif len(weak_sorted) >= 2:
+        lowest = weak_sorted[0]
+        second_lowest = weak_sorted[1]
+        if blendedDims.get(second_lowest, 0.0) - blendedDims.get(lowest, 0.0) >= 5.0:
+            sentence3 = f"Najsłabszym wymiarem pozostaje {DIM_LABELS_NOMINATIVE[lowest]}."
+            remaining = weak_sorted[1:]
+            if remaining:
+                remaining_text = _format_dimension_names(remaining, "nominative")
+                verb = "pozostaje słabszym wymiarem działania" if len(remaining) == 1 else "pozostają słabszymi wymiarami działania"
+                sentence3 += f" {_sentence_case(remaining_text)} {verb}."
+        else:
+            weak_text = _format_dimension_names(weak_sorted, "nominative")
+            verb = "pozostaje słabszym wymiarem działania" if len(weak_sorted) == 1 else "pozostają słabszymi wymiarami działania"
+            sentence3 = f"{_sentence_case(weak_text)} {verb}."
+
+    top_dim_a, top_dim_b = ranked[0][0], ranked[1][0]
+    sentence4 = _pair_interpretation(top_dim_a, top_dim_b)
+    if primary.id == "buntownik" and {top_dim_a, top_dim_b} == {"empatia", "sprawczosc"}:
+        sentence4 = (
+            "To wzmacnia obraz przywództwa wyrazistego, społecznie zakorzenionego "
+            "i gotowego przekuwać energię zmiany w konkretne działanie."
+        )
+
+    segments = [sentence1, sentence2]
+    if sentence3:
+        segments.append(sentence3)
+    segments.append(sentence4)
+    return " ".join(segment.strip() for segment in segments if segment.strip())
 
 
 def validateGeneratedActionDescription(meta: dict[str, object]) -> ActionDescriptionValidationResult:
@@ -799,119 +984,20 @@ def _generate_action_description(
     tertiary: _ResolvedResult | None,
     dominance_type: str,
 ) -> str:
-    subject = getPreferredGenitive(subject_forms) or "tego układu"
-    if dominance_type == "co_dominant":
-        sentence1 = f"Rdzeń działania {subject} tworzą {primary.label} i {supporting.label}."
-    elif dominance_type == "dominant_with_strong_support":
-        sentence1 = (
-            f"Rdzeń działania {subject} buduje przede wszystkim archetyp {_label_genitive(primary.label)}, "
-            f"wyraźnie wzmacniany przez {_label_accusative(supporting.label)}."
-        )
-    else:
-        sentence1 = f"Dominującym archetypem {subject} jest {primary.label}, a {supporting.label} pełni rolę wspierającą."
-
-    if tertiary is not None:
-        sentence1 += f" Dodatkowy ton wnosi {tertiary.label}."
-
-    active = [primary, supporting] + ([tertiary] if tertiary else [])
-    total = sum(item.score for item in active) or 1.0
-    dims = ("empatia", "sprawczosc", "racjonalnosc", "niezaleznosc", "kreatywnosc")
-    blended = {dim: sum(item.score * ARCHETYPE_META[item.id]["dimensions"][dim] for item in active) / total for dim in dims}
-    ranked = sorted(blended.items(), key=lambda item: item[1], reverse=True)
-
-    top1, top2 = ranked[0], ranked[1]
-    third = ranked[2]
-    low2, low1 = ranked[-2], ranked[-1]
-
-    top1_phrase = getDimensionPhrase(top1[1], "top")
-    top2_phrase = getDimensionPhrase(top2[1], "top")
-    low1_phrase = getDimensionPhrase(low1[1], "low")
-    low2_phrase = getDimensionPhrase(low2[1], "low")
-
-    joint_dominance = abs(top1[1] - top2[1]) <= 7
-    if joint_dominance:
-        sentence2 = (
-            f"W praktyce daje to układ oparty przede wszystkim na {DIM_LABELS[top1[0]]} i {DIM_LABELS[top2[0]]}"
-        )
-        used_top_phrase = "dominujące"
-    else:
-        sentence2 = (
-            f"W praktyce daje to układ oparty przede wszystkim na {top1_phrase} {DIM_LABELS[top1[0]]} "
-            f"i {top2_phrase} {DIM_LABELS[top2[0]]}"
-        )
-        used_top_phrase = f"{top1_phrase} / {top2_phrase}"
-
-    third_support_used = False
-    if third[1] >= 55:
-        sentence2 += f", przy solidnym wsparciu {DIM_LABELS[third[0]]}"
-        third_support_used = True
-    elif third[1] >= 50:
-        sentence2 += f", z dodatkowym ważnym komponentem {DIM_LABELS[third[0]]}"
-        third_support_used = True
-
-    low_prefix = ", przy "
-
-    if low1[1] >= 45 and low2[1] >= 45:
-        if third_support_used:
-            sentence2 += (
-                f", podczas gdy {DIM_LABELS_NOMINATIVE[low1[0]]} i {DIM_LABELS_NOMINATIVE[low2[0]]} "
-                "pozostają obecne w wyraźnym, ale niedominującym stopniu."
-            )
-        else:
-            sentence2 += (
-                f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
-                "obecnych w wyraźnym, ale niedominującym stopniu."
-            )
-    else:
-        if third_support_used:
-            sentence2 += (
-                f", podczas gdy {DIM_LABELS_NOMINATIVE[low1[0]]} i {DIM_LABELS_NOMINATIVE[low2[0]]} "
-                "pozostają słabszymi wymiarami działania."
-            )
-        elif low1_phrase == low2_phrase:
-            if low1_phrase == "obniżonej":
-                sentence2 += (
-                    f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
-                    "pozostających słabszymi wymiarami działania."
-                )
-            elif low1_phrase == "obecnej w wyraźnym, ale niedominującym stopniu":
-                sentence2 += (
-                    f"{low_prefix}{DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]} "
-                    "obecnych w wyraźnym, ale niedominującym stopniu."
-                )
-            else:
-                sentence2 += f"{low_prefix}{low1_phrase} {DIM_LABELS[low1[0]]} i {DIM_LABELS[low2[0]]}."
-        else:
-            sentence2 += f"{low_prefix}{low1_phrase} {DIM_LABELS[low1[0]]} i {low2_phrase} {DIM_LABELS[low2[0]]}."
-
-    validation = validateGeneratedActionDescription(
+    _ = dominance_type
+    blend_2 = _blend_action_dimensions([primary, supporting])
+    blend_current = _blend_action_dimensions([primary, supporting] + ([tertiary] if tertiary else []))
+    comparison = compareTwoVsThreeArchetypes(blend_2, blend_current) if tertiary is not None else None
+    return buildActionProfileNarrative(
+        blend_current,
         {
-            "blended": blended,
-            "used_phrases": {
-                top1[0]: used_top_phrase,
-                top2[0]: used_top_phrase,
-                low1[0]: low1_phrase,
-                low2[0]: low2_phrase,
-            },
-            "top_dims": [top1[0], top2[0]],
-            "joint_dominance": joint_dominance,
-            "third_support_used": third_support_used,
-            "third_value": third[1],
-        }
+            "primary": primary,
+            "supporting": supporting,
+            "tertiary": tertiary,
+            "subjectForms": subject_forms,
+        },
+        comparison,
     )
-    if not validation["ok"]:
-        sentence2 = (
-            f"W praktyce daje to układ oparty przede wszystkim na {DIM_LABELS[top1[0]]} i {DIM_LABELS[top2[0]]}, "
-            f"z dodatkowym wsparciem {DIM_LABELS[third[0]]}."
-        )
-
-    sentence3 = _pair_interpretation(top1[0], top2[0])
-    if primary.id == "buntownik" and {top1[0], top2[0]} == {"empatia", "sprawczosc"}:
-        sentence3 = (
-            "To wzmacnia obraz przywództwa wyrazistego, społecznie zakorzenionego "
-            "i gotowego przekuwać energię zmiany w konkretne działanie."
-        )
-    return f"{sentence1} {sentence2} {sentence3}"
 
 
 def generate_archetype_descriptions(input_data: InputData) -> GeneratedDescriptions:

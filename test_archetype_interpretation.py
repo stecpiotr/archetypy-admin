@@ -1,5 +1,6 @@
 from archetype_interpretation import (
     classifyArchetypeIntensity,
+    classifyDimensionBand,
     classifyDimensionStrength,
     generate_archetype_descriptions,
     getNameAwareOpening,
@@ -105,8 +106,10 @@ def test_4_profil_dzialania_bohater_wladca_odkrywca():
     assert "sprawczości" in txt
     assert "niezależności" in txt
     assert "racjonalności" in txt
-    assert "wspólnie dominujących" not in txt
-    assert "obniżonej empatii" in txt
+    assert "po dołożeniu odkrywcy" in txt
+    assert "kreatywność obecną w wyraźnym, ale niedominującym stopniu" in txt
+    assert "najsłabszym wymiarem pozostaje empatia" in txt
+    assert "empatia i kreatywność pozostają słabszymi wymiarami działania" not in txt
     assert "umiarkowanej racjonalności" not in txt
     assert "bardzo niskiej kreatywności" not in txt
 
@@ -161,7 +164,9 @@ def test_6b_odkrywczyni_tworczyni_nie_zawyza_racjonalnosci():
     action = out["actionProfileDescription"].lower()
     assert "kreatywności" in action
     assert "niezależności" in action
-    assert "empatii i racjonalności pozostających słabszymi wymiarami działania" in action
+    assert "racjonalność obecną w wyraźnym, ale niedominującym stopniu" in action
+    assert "najsłabszym wymiarem pozostaje empatia" in action
+    assert "racjonalności pozostających słabszymi wymiarami działania" not in action
     assert "umiarkowanej racjonalności" not in action
 
 
@@ -189,6 +194,8 @@ def test_8_fallback_personalizacji_i_helpery():
     assert classifyDimensionStrength(88)["band"] == "very_high"
     assert classifyDimensionStrength(52)["band"] == "mid"
     assert classifyDimensionStrength(27)["band"] == "low"
+    assert classifyDimensionBand(48) == "visible_non_dominant"
+    assert classifyDimensionBand(28) == "weaker"
 
     out = generate_archetype_descriptions(
         _input(
@@ -206,7 +213,7 @@ def test_8_fallback_personalizacji_i_helpery():
     assert "wnosi tu Odnowę" in txt_values
     assert "budowaniu wspólnoty" in txt_needs
     assert "niż na dystansie i pełnej autonomii" in txt_needs
-    assert "Dominującym archetypem tego układu jest Kochanka" in txt_action
+    assert "Rdzeń działania tego układu tworzą Kochanka i Buntowniczka" in txt_action
     assert "Kochanki i Buntowniczki" in txt_needs
     assert "None" not in txt_values + txt_needs + txt_action
 
@@ -262,7 +269,7 @@ def test_12_dominant_with_support_ma_naturalne_otwarcie_i_wartosc_publiczna():
     txt_action = out["actionProfileDescription"]
     assert "na wartości Relacje" in txt_values
     assert "wzmacnianej przez Odnowę" in txt_values
-    assert "archetyp Kochanki, wyraźnie wzmacniany przez Buntowniczkę" in txt_action
+    assert "Rdzeń działania Kornelii Lemańskiej tworzą Kochanka i Buntowniczka" in txt_action
 
 
 def test_13_buntownik_top_empatia_sprawczosc_ma_mocniejsza_puente():
@@ -279,7 +286,29 @@ def test_13_buntownik_top_empatia_sprawczosc_ma_mocniejsza_puente():
     assert "gotowego przekuwać energię zmiany w konkretne działanie" in txt_action
 
 
-def test_14_przy_trzecim_wymiarze_unika_podwojnego_przy():
+def test_14_bohater_wladca_bez_top3_ma_empatie_i_kreatywnosc_jako_slabsze():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Bohater", 76.0),
+            _result("Władca", 75.9),
+            None,
+            subject_forms={"fullGen": "Krzysztofa Hetmana"},
+        )
+    )
+    txt_action = out["actionProfileDescription"].lower()
+    assert "najsłabszym wymiarem pozostaje empatia" in txt_action
+    assert "kreatywność pozostaje słabszym wymiarem działania" in txt_action
+
+
+def test_15_top3_zmienia_opis_wiecej_niz_o_dopisek_o_trzecim_archetypie():
+    out_2 = generate_archetype_descriptions(
+        _input(
+            _result("Bohater", 76.0),
+            _result("Władca", 75.9),
+            None,
+            subject_forms={"fullGen": "Krzysztofa Hetmana"},
+        )
+    )
     out = generate_archetype_descriptions(
         _input(
             _result("Bohater", 76.0),
@@ -288,6 +317,10 @@ def test_14_przy_trzecim_wymiarze_unika_podwojnego_przy():
             subject_forms={"fullGen": "Krzysztofa Hetmana"},
         )
     )
-    txt_action = out["actionProfileDescription"]
-    assert "przy solidnym wsparciu racjonalności, podczas gdy" in txt_action
-    assert "empatia i kreatywność pozostają słabszymi wymiarami działania" in txt_action
+    txt_2 = out_2["actionProfileDescription"]
+    txt_3 = out["actionProfileDescription"]
+    assert "Dodatkowy ton wnosi Odkrywca." in txt_3
+    assert "po dołożeniu odkrywcy wyraźnie zmieniają się proporcje wymiarów" in txt_3.lower()
+    assert "kreatywność pozostaje słabszym wymiarem działania" in txt_2.lower()
+    assert "kreatywność obecną w wyraźnym, ale niedominującym stopniu" in txt_3.lower()
+    assert txt_3.replace(" Dodatkowy ton wnosi Odkrywca.", "") != txt_2
