@@ -351,6 +351,8 @@ def _status_icon(row: Dict) -> str:
     """
     status = (row.get("status") or "").lower()
 
+    if row.get("rejected_at"):
+        return "🚫"
     if row.get("completed_at"):
         return "✅"
     if row.get("started_at"):
@@ -460,6 +462,63 @@ def _resend_email_row(sb, row: Dict, slug: str, fn_gen: str, ln_gen: str) -> Tup
         return True, ""
     _mark_email_failed(sb, email_id=email_id, error_text=err or "unknown error")
     return False, str(err or "unknown error")
+
+
+def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tuple[bool, str]:
+    """
+    Unieważnij dostęp dla konkretnego tokenu.
+    Priorytet:
+    1) rejected_at (gdy kolumna istnieje),
+    2) fallback przez RPC mark_token_completed (blokada tokenu w ankiecie),
+    3) completed_at (gdy dostępna kolumna).
+    """
+    rid = str(row_id or "").strip()
+    tok = str(token or "").strip()
+    if not rid or not tok:
+        return False, "Brak danych rekordu (id/token)."
+
+    now_iso = pd.Timestamp.utcnow().isoformat()
+    last_err: Optional[Exception] = None
+
+    for payload in (
+        {"rejected_at": now_iso, "status": "revoked"},
+        {"rejected_at": now_iso},
+    ):
+        try:
+            sb.table(table_name).update(payload).eq("id", rid).execute()
+            return True, ""
+        except Exception as exc:
+            last_err = exc
+
+    try:
+        sb.rpc("mark_token_completed", {"p_token": tok}).execute()
+        return True, ""
+    except Exception as exc:
+        last_err = exc
+
+    for payload in (
+        {"completed_at": now_iso, "status": "completed"},
+        {"completed_at": now_iso},
+    ):
+        try:
+            sb.table(table_name).update(payload).eq("id", rid).execute()
+            return True, ""
+        except Exception as exc:
+            last_err = exc
+
+    return False, str(last_err or "Nie udało się unieważnić tokenu.")
+
+
+def _revoke_sms_row(sb, row: Dict) -> Tuple[bool, str]:
+    sms_id = str(row.get("id") or "").strip()
+    token = str(row.get("token") or "").strip()
+    return _revoke_token_access(sb, table_name="sms_messages", row_id=sms_id, token=token)
+
+
+def _revoke_email_row(sb, row: Dict) -> Tuple[bool, str]:
+    email_id = str(row.get("id") or "").strip()
+    token = str(row.get("token") or "").strip()
+    return _revoke_token_access(sb, table_name="email_logs", row_id=email_id, token=token)
 
 
 def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = None) -> pd.DataFrame:
@@ -1356,6 +1415,7 @@ def render(back_btn: Callable[[], None]) -> None:
 
     def _status_icon_fixed(row: Dict) -> str:
         status = (row.get("status") or "").lower()
+        if row.get("rejected_at"): return "🚫"
         if status == "failed": return "✖"
         if row.get("completed_at"): return "✅"
         if row.get("started_at"): return "🏁"
@@ -1395,7 +1455,10 @@ def render(back_btn: Callable[[], None]) -> None:
 
     resend_rows = [r for r in raw_rows if _can_resend_row(r)]
     if resend_rows:
-        st.caption("🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku).")
+        st.caption(
+            "🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku) "
+            "lub 🚫 unieważnić ten konkretny link."
+        )
         label_to_row: Dict[str, Dict] = {}
         for r in resend_rows:
             recipient = str(r.get("phone") or "") if mode == "sms" else str(r.get("email") or "")
@@ -1410,7 +1473,8 @@ def render(back_btn: Callable[[], None]) -> None:
             list(label_to_row.keys()),
             key=f"resend_pick_{mode}_{study['id']}",
         )
-        if st.button("🔁 Wyślij ponownie (ten sam link)", key=f"resend_btn_{mode}_{study['id']}"):
+        c_resend, c_revoke = st.columns([1, 1], gap="small")
+        if c_resend.button("🔁 Wyślij ponownie (ten sam link)", key=f"resend_btn_{mode}_{study['id']}"):
             picked = label_to_row.get(chosen_resend) or {}
             if mode == "sms":
                 ok, err = _resend_sms_row(sb, picked, slug=slug)
@@ -1421,6 +1485,17 @@ def render(back_btn: Callable[[], None]) -> None:
                 st.rerun()
             else:
                 st.error(f"Nie udało się ponowić wysyłki: {err}")
+        if c_revoke.button("🚫 Usuń dostęp (unieważnij link)", key=f"revoke_btn_{mode}_{study['id']}"):
+            picked = label_to_row.get(chosen_resend) or {}
+            if mode == "sms":
+                ok, err = _revoke_sms_row(sb, picked)
+            else:
+                ok, err = _revoke_email_row(sb, picked)
+            if ok:
+                st.success("Dostęp został unieważniony dla wybranego rekordu.")
+                st.rerun()
+            else:
+                st.error(f"Nie udało się unieważnić dostępu: {err}")
 
     # Eksport
     who = _safe_name(ln, fn)
@@ -1455,6 +1530,7 @@ def render(back_btn: Callable[[], None]) -> None:
           🔗 – Odbiorca kliknął w link<br>
           🏁 – Ankieta rozpoczęta<br>
           ✅ – Ankieta zakończona<br>
+          🚫 – Dostęp usunięty (link unieważniony)<br>
           ✖ – Błąd wysyłki<br>
           ⏳ – Oczekuje w kolejce<br>
           • – Inny / nieznany status
@@ -1466,6 +1542,7 @@ def render(back_btn: Callable[[], None]) -> None:
           🔗 – Odbiorca kliknął w link<br>
           🏁 – Ankieta rozpoczęta<br>
           ✅ – Ankieta zakończona<br>
+          🚫 – Dostęp usunięty (link unieważniony)<br>
           ✖ – Błąd wysyłki<br>
           ⏳ – Oczekuje w kolejce (wysłanie w toku)<br>
           • – Inny / nieznany status
