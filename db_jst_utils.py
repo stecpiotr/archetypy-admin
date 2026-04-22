@@ -1162,10 +1162,17 @@ def ensure_jst_schema() -> None:
           m.completed_at,
           CASE
             WHEN lower(coalesce(m.status, '')) = 'revoked'
-              THEN COALESCE(m.updated_at, m.completed_at, m.created_at)
+              THEN COALESCE(m.completed_at, m.created_at)
+            WHEN NULLIF(to_jsonb(m)->>'rejected_at', '') IS NOT NULL
+              THEN (to_jsonb(m)->>'rejected_at')::timestamptz
             ELSE NULL::timestamptz
           END AS revoked_at,
-          CASE WHEN lower(coalesce(m.status, '')) = 'revoked' THEN 0 ELSE 1 END AS revoked_rank,
+          CASE
+            WHEN lower(coalesce(m.status, '')) = 'revoked'
+              OR NULLIF(to_jsonb(m)->>'rejected_at', '') IS NOT NULL
+              THEN 0
+            ELSE 1
+          END AS revoked_rank,
           CASE WHEN m.completed_at IS NOT NULL THEN 0 ELSE 1 END AS completed_rank,
           m.created_at
         FROM public.sms_messages m
@@ -1182,10 +1189,17 @@ def ensure_jst_schema() -> None:
           e.completed_at,
           CASE
             WHEN lower(coalesce(e.status, '')) = 'revoked'
-              THEN COALESCE(e.updated_at, e.completed_at, e.created_at)
+              THEN COALESCE(e.completed_at, e.created_at)
+            WHEN NULLIF(to_jsonb(e)->>'rejected_at', '') IS NOT NULL
+              THEN (to_jsonb(e)->>'rejected_at')::timestamptz
             ELSE NULL::timestamptz
           END AS revoked_at,
-          CASE WHEN lower(coalesce(e.status, '')) = 'revoked' THEN 0 ELSE 1 END AS revoked_rank,
+          CASE
+            WHEN lower(coalesce(e.status, '')) = 'revoked'
+              OR NULLIF(to_jsonb(e)->>'rejected_at', '') IS NOT NULL
+              THEN 0
+            ELSE 1
+          END AS revoked_rank,
           CASE WHEN e.completed_at IS NOT NULL THEN 0 ELSE 1 END AS completed_rank,
           e.created_at
         FROM public.email_logs e

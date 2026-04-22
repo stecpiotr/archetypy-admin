@@ -494,34 +494,61 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
     """
     Unieważnij dostęp dla konkretnego tokenu.
     Priorytet:
-    1) rejected_at (gdy kolumna istnieje),
-    2) fallback przez RPC mark_token_completed (blokada tokenu w ankiecie),
-    3) completed_at (gdy dostępna kolumna).
+    1) status='revoked' (po id i po tokenie),
+    2) fallback mark_token_completed (twarda blokada tokenu),
+    3) awaryjnie completed_at (gdy dostępna kolumna).
     """
     rid = str(row_id or "").strip()
     tok = str(token or "").strip()
-    if not rid or not tok:
-        return False, "Brak danych rekordu (id/token)."
+    if not tok:
+        return False, "Brak tokenu rekordu."
 
     now_iso = pd.Timestamp.utcnow().isoformat()
     last_err: Optional[Exception] = None
 
     status_marked = False
+    completed_marked = False
 
-    for payload in (
-        {"rejected_at": now_iso, "status": "revoked"},
-        {"status": "revoked"},
-    ):
+    other_table = "email_logs" if table_name == "sms_messages" else ("sms_messages" if table_name == "email_logs" else "")
+    tables_to_try: List[str] = [table_name] + ([other_table] if other_table else [])
+    matchers: List[Tuple[str, str]] = []
+    if rid:
+        matchers.append(("id", rid))
+    matchers.append(("token", tok))
+
+    def _try_update(tbl: str, payload: Dict[str, Any], *, field: str, value: str) -> bool:
+        nonlocal last_err
         try:
-            sb.table(table_name).update(payload).eq("id", rid).execute()
-            status_marked = True
-            break
+            res = (
+                sb.table(tbl)
+                .update(payload)
+                .eq(field, value)
+                .select("id")
+                .execute()
+            )
+            data = getattr(res, "data", None) or []
+            return bool(data)
         except Exception as exc:
             last_err = exc
+            return False
+
+    revoke_payloads = (
+        {"rejected_at": now_iso, "status": "revoked"},
+        {"status": "revoked"},
+    )
+    for payload in revoke_payloads:
+        for tbl in tables_to_try:
+            for field, value in matchers:
+                if _try_update(tbl, payload, field=field, value=value):
+                    status_marked = True
+                    break
+            if status_marked:
+                break
+        if status_marked:
+            break
 
     try:
         sb.rpc("mark_token_completed", {"p_token": tok}).execute()
-        return True, ""
     except Exception as exc:
         last_err = exc
 
@@ -532,11 +559,18 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
         {"completed_at": now_iso, "status": "revoked"},
         {"completed_at": now_iso},
     ):
-        try:
-            sb.table(table_name).update(payload).eq("id", rid).execute()
-            return True, ""
-        except Exception as exc:
-            last_err = exc
+        for tbl in tables_to_try:
+            for field, value in matchers:
+                if _try_update(tbl, payload, field=field, value=value):
+                    completed_marked = True
+                    break
+            if completed_marked:
+                break
+        if completed_marked:
+            break
+
+    if completed_marked:
+        return True, ""
 
     return False, str(last_err or "Nie udało się unieważnić tokenu.")
 
@@ -1519,14 +1553,17 @@ def render(back_btn: Callable[[], None]) -> None:
     st.dataframe(df_logs, hide_index=True, column_config=col_cfg, height=table_height)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    resend_rows = [r for r in raw_rows if _can_resend_row(r)]
-    if resend_rows:
+    action_rows = [
+        r for r in raw_rows
+        if str(r.get("token") or "").strip() and str(r.get("status") or "").strip().lower() != "revoked"
+    ]
+    if action_rows:
         st.caption(
             "🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku) "
             "lub ⛔ unieważnić ten konkretny link."
         )
         label_to_row: Dict[str, Dict] = {}
-        for r in resend_rows:
+        for r in action_rows:
             recipient = str(r.get("phone") or "") if mode == "sms" else str(r.get("email") or "")
             created_at = _fmt_dt(r.get("created_at") or r.get("created_at_pl"))
             token = str(r.get("token") or "")
@@ -1540,8 +1577,13 @@ def render(back_btn: Callable[[], None]) -> None:
             key=f"resend_pick_{mode}_{study['id']}",
         )
         c_resend, c_revoke = st.columns([1, 1], gap="small")
-        if c_resend.button("🔁 Wyślij ponownie (ten sam link)", key=f"resend_btn_{mode}_{study['id']}"):
-            picked = label_to_row.get(chosen_resend) or {}
+        picked = label_to_row.get(chosen_resend) or {}
+        can_resend_picked = _can_resend_row(picked)
+        if c_resend.button(
+            "🔁 Wyślij ponownie (ten sam link)",
+            key=f"resend_btn_{mode}_{study['id']}",
+            disabled=not can_resend_picked,
+        ):
             if mode == "sms":
                 ok, err = _resend_sms_row(sb, picked, slug=slug)
             else:
@@ -1552,7 +1594,6 @@ def render(back_btn: Callable[[], None]) -> None:
             else:
                 st.error(f"Nie udało się ponowić wysyłki: {err}")
         if c_revoke.button("⛔ Usuń dostęp (unieważnij link)", key=f"revoke_btn_{mode}_{study['id']}"):
-            picked = label_to_row.get(chosen_resend) or {}
             if mode == "sms":
                 ok, err = _revoke_sms_row(sb, picked)
             else:
