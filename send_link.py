@@ -167,6 +167,81 @@ def _strip_pl_diacritics(text: str) -> str:
     """Zamień polskie znaki diakrytyczne na ASCII."""
     return (text or "").translate(_PL_MAP)
 
+
+def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
+    """Licznik SMS aktualizowany live (input), bez czekania na blur/rerun Streamlit."""
+    ascii_msg = _strip_pl_diacritics(current_body or "")
+    seg_len = 160
+    msg_len = len(ascii_msg)
+    segments = (msg_len + seg_len - 1) // seg_len
+    remain = seg_len - (msg_len % seg_len or seg_len)
+    coding = "GSM-7" if all(ord(c) < 128 for c in ascii_msg) else "Unicode"
+    initial_line = (
+        f"Długość: {msg_len} znaków • Segmenty: {segments} • "
+        f"Pozostało w bieżącym: {remain} • Kodowanie: {coding}"
+    )
+    counter_id_json = json.dumps(str(counter_id or "sms_counter_live"))
+    st.markdown(
+        f"""
+        <div id="{counter_id}" class="sms-counter">{initial_line}</div>
+        <script>
+        (function() {{
+          const COUNTER_ID = {counter_id_json};
+          const rootDoc = window.parent?.document || document;
+          const plMap = {{
+            "ą":"a","ć":"c","ę":"e","ł":"l","ń":"n","ó":"o","ś":"s","ż":"z","ź":"z",
+            "Ą":"A","Ć":"C","Ę":"E","Ł":"L","Ń":"N","Ó":"O","Ś":"S","Ż":"Z","Ź":"Z"
+          }};
+          const toAscii = (txt) => Array.from(String(txt || "")).map((ch) => plMap[ch] || ch).join("");
+          const countPoints = (txt) => Array.from(String(txt || "")).length;
+          const buildLine = (txt) => {{
+            const ascii = toAscii(txt || "");
+            const chars = Array.from(ascii);
+            const msgLen = chars.length;
+            const segLen = 160;
+            const segments = Math.floor((msgLen + segLen - 1) / segLen);
+            const remain = segLen - ((msgLen % segLen) || segLen);
+            const coding = chars.every((ch) => (ch.codePointAt(0) || 0) < 128) ? "GSM-7" : "Unicode";
+            return `Długość: ${{msgLen}} znaków • Segmenty: ${{segments}} • Pozostało w bieżącym: ${{remain}} • Kodowanie: ${{coding}}`;
+          }};
+          const getCounterNode = () => rootDoc.getElementById(COUNTER_ID) || document.getElementById(COUNTER_ID);
+          const getTargetTextarea = () => {{
+            const areas = rootDoc.querySelectorAll('textarea[aria-label="Treść wiadomości"]');
+            return areas && areas.length ? areas[areas.length - 1] : null;
+          }};
+          const refresh = () => {{
+            const counter = getCounterNode();
+            const ta = getTargetTextarea();
+            if (!counter || !ta) return false;
+            counter.textContent = buildLine(ta.value || "");
+            const bindMark = `smsCounterBound:${{COUNTER_ID}}`;
+            if (ta.dataset.smsCounterBound !== bindMark) {{
+              ta.dataset.smsCounterBound = bindMark;
+              ta.addEventListener("input", () => {{
+                const node = getCounterNode();
+                if (node) node.textContent = buildLine(ta.value || "");
+              }}, {{ passive: true }});
+            }}
+            return true;
+          }};
+          try {{
+            window.__apSmsCounterIntervals = window.__apSmsCounterIntervals || {{}};
+            const prev = window.__apSmsCounterIntervals[COUNTER_ID];
+            if (prev) window.clearInterval(prev);
+            refresh();
+            window.setTimeout(refresh, 80);
+            window.setTimeout(refresh, 240);
+            window.__apSmsCounterIntervals[COUNTER_ID] = window.setInterval(refresh, 450);
+          }} catch (e) {{
+            /* no-op */
+          }}
+        }})();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _safe_name(ln: str, fn: str) -> str:
     base = _strip_pl_diacritics(f"{(ln or '').strip()}-{(fn or '').strip()}").lower()
     base = re.sub(r"[^a-z0-9\-]+", "", base.replace(" ", "-"))
@@ -729,6 +804,9 @@ def render(back_btn: Callable[[], None]) -> None:
     st.markdown('<div class="field-label">Odbiorcy</div>', unsafe_allow_html=True)
     placeholder = "48500123456, 48600111222" if method == "SMS" else "jan@firma.pl, ola@urzad.gov.pl"
     recipients_key = "sendlink_recipients"
+    clear_recipients_flag_key = "sendlink_clear_recipients_pending"
+    if st.session_state.pop(clear_recipients_flag_key, False):
+        st.session_state[recipients_key] = ""
     recipients = st.text_area(
         "Odbiorcy",
         key=recipients_key,
@@ -845,15 +923,9 @@ def render(back_btn: Callable[[], None]) -> None:
 
         # licznik tylko dla SMS; e-mail nie pokazuje licznika i zachowuje polskie znaki
         if method == "SMS":
-            ascii_msg = _strip_pl_diacritics(st.session_state.sms_body)
-            seg_len = 160
-            msg_len = len(ascii_msg)
-            segments = (msg_len + seg_len - 1) // seg_len
-            remain = seg_len - (msg_len % seg_len or seg_len)
-            coding = "GSM-7" if all(ord(c) < 128 for c in ascii_msg) else "Unicode"
-            st.markdown(
-                f'<div class="sms-counter">Długość: {msg_len} znaków • Segmenty: {segments} • Pozostało w bieżącym: {remain} • Kodowanie: {coding}</div>',
-                unsafe_allow_html=True,
+            _render_live_sms_counter(
+                str(st.session_state.get("sms_body") or ""),
+                counter_id="sendlink_sms_counter_live",
             )
 
         # przyciski – „Przywróć” wyżej, „Wyślij” dużo niżej
@@ -1136,7 +1208,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano do {ph}: {err or 'unknown error'}")
-            st.session_state[recipients_key] = ""
+            st.session_state[clear_recipients_flag_key] = True
             st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(phones)}."
             st.rerun()
 
@@ -1208,7 +1280,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano do {em}: {err or 'unknown error'}")
-            st.session_state[recipients_key] = ""
+            st.session_state[clear_recipients_flag_key] = True
             st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(emails)}."
             st.rerun()
 

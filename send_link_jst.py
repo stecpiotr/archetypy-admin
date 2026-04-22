@@ -20,6 +20,7 @@ from send_link import (
     _df_to_pdf_bytes,
     _load_mockup_prefs,
     _mockup_css_bg,
+    _render_live_sms_counter,
     _save_mockup_prefs,
     _strip_pl_diacritics,
     EMAIL_HEIGHT,
@@ -619,6 +620,9 @@ def render(back_btn: Callable[[], None]) -> None:
 
     st.markdown('<div class="field-label">Odbiorcy</div>', unsafe_allow_html=True)
     recipients_key = "jst_send_recipients"
+    clear_recipients_flag_key = "jst_send_clear_recipients_pending"
+    if st.session_state.pop(clear_recipients_flag_key, False):
+        st.session_state[recipients_key] = ""
     recipients = st.text_area(
         "Odbiorcy",
         key=recipients_key,
@@ -675,13 +679,9 @@ def render(back_btn: Callable[[], None]) -> None:
         st.text_area("Treść wiadomości", key="jst_send_body", height=240, label_visibility="collapsed")
 
         if method == "SMS":
-            msg_len = len(str(st.session_state.get("jst_send_body") or ""))
-            seg_len = 160
-            segments = (msg_len + seg_len - 1) // seg_len
-            remain = seg_len - (msg_len % seg_len or seg_len)
-            st.markdown(
-                f'<div class="sms-counter">Długość: {msg_len} znaków • Segmenty: {segments} • Pozostało w bieżącym: {remain}</div>',
-                unsafe_allow_html=True,
+            _render_live_sms_counter(
+                str(st.session_state.get("jst_send_body") or ""),
+                counter_id="jst_send_sms_counter_live",
             )
 
         st.markdown('<div class="btn-stack">', unsafe_allow_html=True)
@@ -1008,7 +1008,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano SMS do {phone}: {err or 'unknown error'}")
-            st.session_state[recipients_key] = ""
+            st.session_state[clear_recipients_flag_key] = True
             st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(recipients_list)}."
             st.rerun()
         else:
@@ -1063,7 +1063,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     sent_ok += 1
                 else:
                     st.error(f"Nie wysłano e-maila do {email}: {err or 'unknown error'}")
-            st.session_state[recipients_key] = ""
+            st.session_state[clear_recipients_flag_key] = True
             st.session_state[flash_key] = f"Wysłano {sent_ok} / {len(recipients_list)}."
             st.rerun()
 
