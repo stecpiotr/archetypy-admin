@@ -268,8 +268,8 @@ def _roles_sentence(
     if shape == "tri" and tertiary is not None and _to_score(tertiary.get("score")) >= 70.0:
         tertiary_label = str(tertiary.get("label") or "").strip() or "archetyp poboczny"
         return (
-            f"Archetypem głównym jest {primary_label}, archetypem wspierającym {supporting_label}, "
-            f"a archetypem pobocznym {tertiary_label} — wszystkie trzy współtworzą wyraźny rdzeń profilu."
+            f"Archetypem głównym jest {primary_label}, archetypem wspierającym jest {supporting_label}, "
+            f"a archetypem pobocznym jest {tertiary_label} — wszystkie trzy współtworzą wyraźny rdzeń profilu."
         )
 
     def _intensity_locative(label: str) -> str:
@@ -321,9 +321,11 @@ def _should_mention_weakest(shape: str, spread: float, top_gap: float) -> bool:
 def _needs_balance_sentence(group_values: NeedGroupsResult, ordered_keys: list[str], shape: str) -> tuple[str, str]:
     top = ordered_keys[0]
     second = ordered_keys[1]
+    third = ordered_keys[2]
     weakest = ordered_keys[-1]
     spread = float(group_values[top] - group_values[weakest])
     top_gap = float(group_values[top] - group_values[second])
+    top_to_third_gap = float(group_values[top] - group_values[third])
     top_label = _ID_TO_DISPLAY_LABEL[top]
     second_label = _ID_TO_DISPLAY_LABEL[second]
     top_gen = _GROUP_LABEL_GENITIVE[top]
@@ -367,7 +369,15 @@ def _needs_balance_sentence(group_values: NeedGroupsResult, ordered_keys: list[s
             f"{practical_txt}"
         )
     else:
-        if top_gap <= 3.0:
+        # Jeśli TOP1/TOP2 są bardzo blisko, a TOP3 nadal jest blisko czołówki,
+        # unikamy opisu „wyraźnie przechylony” mimo większego rozstępu TOP1->najsłabsza grupa.
+        if top_gap <= 3.0 and top_to_third_gap <= 6.5:
+            weak_contrast_soft = _GROUP_WEAK_CONTRAST_SOFT[weakest]
+            balance_txt = (
+                "Układ jest lekko przechylony i bez jednego całkowicie dominującego obszaru. "
+                f"W praktyce oznacza to profil bardziej {pair_style} niż {weak_contrast_soft}, przy zachowaniu obecności pozostałych obszarów."
+            )
+        elif top_gap <= 3.0:
             balance_txt = (
                 "Układ jest wyraźnie przechylony, ale bez jednego całkowicie dominującego obszaru. "
                 f"W praktyce oznacza to profil bardziej {pair_style} niż {weak_contrast}."

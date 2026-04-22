@@ -184,6 +184,7 @@ def test_profile_b_kornelia_rdzen_i_bliskie_zmiana_ludzie():
     assert "Zmiana i Ludzie" in txt
     assert "drugi w kolejności" not in txt_l
     assert "wyraźnie dominuje zmiana" not in txt_l
+    assert "wyraźnie przechylony" not in txt_l
 
 
 def test_profile_c_hetman_trojbiegunowy_bez_degradacji_pobocznego():
@@ -215,8 +216,8 @@ def test_profile_c_hetman_trojbiegunowy_bez_degradacji_pobocznego():
     assert "silny i trójbiegunowy" in first_paragraph
     assert first_paragraph.count("silny i trójbiegunowy") == 1
     assert "archetypem głównym" in txt_l
-    assert "archetypem wspierającym" in txt_l
-    assert "archetypem pobocznym" in txt_l
+    assert "archetypem wspierającym jest" in txt_l
+    assert "archetypem pobocznym jest" in txt_l
     assert "wzmacnia profil pobocznie" not in txt_l
     assert "drugi w kolejności" not in txt_l
     assert "Niezależność i Zmiana" in txt
