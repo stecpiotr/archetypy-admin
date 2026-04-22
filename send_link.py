@@ -519,15 +519,18 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
     def _try_update(tbl: str, payload: Dict[str, Any], *, field: str, value: str) -> bool:
         nonlocal last_err
         try:
-            res = (
+            chk = (
                 sb.table(tbl)
-                .update(payload)
-                .eq(field, value)
                 .select("id")
+                .eq(field, value)
+                .limit(1)
                 .execute()
             )
-            data = getattr(res, "data", None) or []
-            return bool(data)
+            if not (getattr(chk, "data", None) or []):
+                return False
+
+            sb.table(tbl).update(payload).eq(field, value).execute()
+            return True
         except Exception as exc:
             last_err = exc
             return False
