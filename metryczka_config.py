@@ -271,6 +271,7 @@ def default_jst_metryczka_config() -> Dict[str, Any]:
     ordered = [deepcopy(defaults[qid]) for qid in CORE_QUESTION_ORDER]
     return {
         "version": 1,
+        "enabled": True,
         "questions": ordered,
     }
 
@@ -521,6 +522,7 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
         version = max(1, int(raw.get("version") or 1))
     except Exception:
         version = 1
+    enabled = _safe_bool(raw.get("enabled"), True)
 
     raw_questions = raw.get("questions")
     by_id: Dict[str, Dict[str, Any]] = {}
@@ -610,6 +612,7 @@ def normalize_jst_metryczka_config(raw: Any) -> Dict[str, Any]:
 
     return {
         "version": version,
+        "enabled": bool(enabled),
         "questions": normalized_questions,
     }
 
@@ -618,8 +621,15 @@ def normalize_personal_metryczka_config(raw: Any) -> Dict[str, Any]:
     return normalize_jst_metryczka_config(raw)
 
 
+def metryczka_enabled(config: Any) -> bool:
+    cfg = normalize_jst_metryczka_config(config)
+    return _safe_bool(cfg.get("enabled"), True)
+
+
 def metryczka_questions(config: Any) -> List[Dict[str, Any]]:
     cfg = normalize_jst_metryczka_config(config)
+    if not _safe_bool(cfg.get("enabled"), True):
+        return []
     return list(cfg.get("questions") or [])
 
 

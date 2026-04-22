@@ -3134,7 +3134,7 @@ def _xlsx_bytes_from_df(df: pd.DataFrame, sheet_name: str = "Dane") -> bytes:
 def _metryczka_schema_df(config: Any) -> pd.DataFrame:
     cfg = normalize_jst_metryczka_config(config)
     rows: List[Dict[str, Any]] = []
-    questions = list(cfg.get("questions") or [])
+    questions = list(cfg.get("questions") or []) if bool(cfg.get("enabled", True)) else []
     for idx, q in enumerate(questions, start=1):
         if not isinstance(q, dict):
             continue
@@ -11344,8 +11344,11 @@ def personal_metryczka_view() -> None:
     study = _apply_scheduled_survey_transitions(study, kind="personal")
     current_slug = str(study.get("slug") or "").strip()
     base_cfg = _metryczka_normalize_config("personal", study.get("metryczka_config"))
+    no_metry_key = f"personal_metryczka_no_metry_{study_id or current_slug}"
     editor_state_key = _metryczka_editor_state_key("personal", study_id or current_slug)
     back_slot = st.empty()
+    if no_metry_key not in st.session_state:
+        st.session_state[no_metry_key] = not bool(base_cfg.get("enabled", True))
 
     def _current_cfg() -> Dict[str, Any]:
         return _metryczka_normalize_config(
@@ -11362,6 +11365,7 @@ def personal_metryczka_view() -> None:
             st.error("Brak identyfikatora badania.")
             return False
         cfg_work = _metryczka_normalize_config("personal", cfg_candidate or _current_cfg())
+        cfg_work["enabled"] = not bool(st.session_state.get(no_metry_key, False))
         valid, msg = _validate_metryczka_before_save(cfg_work)
         if not valid:
             st.error(msg)
@@ -11400,15 +11404,29 @@ def personal_metryczka_view() -> None:
         ]
     )
     st.dataframe(info_rows, use_container_width=True, hide_index=True)
-    st.caption("W ankiecie personalnej metryczka będzie częścią flow po ekranie powitalnym.")
+    no_metry = st.checkbox(
+        "Brak metryczki",
+        key=no_metry_key,
+        help="Po zaznaczeniu ankieta pominie metryczkę i od razu przejdzie do 48 pytań archetypowych.",
+    )
+    if no_metry:
+        st.caption("Metryczka jest wyłączona. Ankieta rozpocznie się od razu od 48 pytań archetypowych.")
+    else:
+        st.caption("W ankiecie personalnej metryczka będzie częścią flow po ekranie powitalnym.")
 
     st.markdown('<div class="section-gap-big"></div>', unsafe_allow_html=True)
     st.markdown("### Konfiguracja metryczki")
-    edited_cfg = _render_metryczka_editor(
-        "personal",
-        study_id or slug,
-        base_cfg,
-    )
+    if no_metry:
+        st.info("Metryczka jest wyłączona dla tego badania.")
+        edited_cfg = _current_cfg()
+    else:
+        edited_cfg = _render_metryczka_editor(
+            "personal",
+            study_id or slug,
+            base_cfg,
+        )
+    edited_cfg = _metryczka_normalize_config("personal", edited_cfg)
+    edited_cfg["enabled"] = not bool(no_metry)
     is_dirty = (
         _stable_json_repr(_metryczka_normalize_config("personal", edited_cfg))
         != _stable_json_repr(base_cfg)

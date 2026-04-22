@@ -3916,6 +3916,8 @@ def _extract_personal_metry_payload(raw_scores: object) -> dict[str, str]:
 
 def _build_personal_metry_questions(study: dict) -> list[dict[str, object]]:
     cfg = normalize_personal_metryczka_config((study or {}).get("metryczka_config"))
+    if not bool(cfg.get("enabled", True)):
+        return []
     out: list[dict[str, object]] = []
     for q in list(cfg.get("questions") or []):
         if not isinstance(q, dict):
