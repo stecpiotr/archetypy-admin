@@ -12935,6 +12935,15 @@ def results_view() -> None:
 
 def send_link_view() -> None:
     require_auth()
+    send_link_schema_key = "_send_link_schema_refreshed_once"
+    force_retry = not bool(st.session_state.get(send_link_schema_key))
+    ok_schema = _ensure_jst_schema_initialized(force_retry=force_retry)
+    st.session_state[send_link_schema_key] = True
+    if not ok_schema:
+        st.warning(
+            "Nie udało się potwierdzić schematu tokenów/linków. "
+            "Status unieważnienia może być chwilowo niepełny."
+        )
     header("✉️ Wyślij link do ankiety")
     render_titlebar(["Panel", "Wyślij link do ankiety"])
     render_send_link(back_button)
