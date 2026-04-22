@@ -333,6 +333,9 @@ def _inject_link_into_message(body: str, expected_link: str, token: str) -> str:
 
 
 def _can_resend_row(row: Dict[str, Any]) -> bool:
+    status = str(row.get("status") or "").strip().lower()
+    if status == "revoked":
+        return False
     if row.get("completed_at") or row.get("rejected_at"):
         return False
     if not str(row.get("token") or "").strip():
@@ -431,8 +434,66 @@ def _resend_email_row(sb, row: Dict[str, Any], selected_study: Dict[str, Any]) -
     return False, str(err or "unknown error")
 
 
+def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tuple[bool, str]:
+    rid = str(row_id or "").strip()
+    tok = str(token or "").strip()
+    if not rid or not tok:
+        return False, "Brak danych rekordu (id/token)."
+
+    now_iso = pd.Timestamp.utcnow().isoformat()
+    last_err: Optional[Exception] = None
+    status_marked = False
+
+    for payload in (
+        {"status": "revoked", "updated_at": now_iso},
+        {"status": "revoked"},
+    ):
+        try:
+            sb.table(table_name).update(payload).eq("id", rid).execute()
+            status_marked = True
+            break
+        except Exception as exc:
+            last_err = exc
+
+    try:
+        sb.rpc("mark_token_completed", {"p_token": tok}).execute()
+        return True, ""
+    except Exception as exc:
+        last_err = exc
+
+    if status_marked:
+        return True, ""
+
+    for payload in (
+        {"completed_at": now_iso, "status": "revoked", "updated_at": now_iso},
+        {"completed_at": now_iso, "status": "revoked"},
+        {"completed_at": now_iso},
+    ):
+        try:
+            sb.table(table_name).update(payload).eq("id", rid).execute()
+            return True, ""
+        except Exception as exc:
+            last_err = exc
+
+    return False, str(last_err or "Nie udało się unieważnić tokenu.")
+
+
+def _revoke_sms_row(sb, row: Dict[str, Any]) -> Tuple[bool, str]:
+    sms_id = str(row.get("id") or "").strip()
+    token = str(row.get("token") or "").strip()
+    return _revoke_token_access(sb, table_name="jst_sms_messages", row_id=sms_id, token=token)
+
+
+def _revoke_email_row(sb, row: Dict[str, Any]) -> Tuple[bool, str]:
+    email_id = str(row.get("id") or "").strip()
+    token = str(row.get("token") or "").strip()
+    return _revoke_token_access(sb, table_name="jst_email_logs", row_id=email_id, token=token)
+
+
 def _status_icon(row: Dict[str, Any]) -> str:
     status = str(row.get("status") or "").lower()
+    if status == "revoked":
+        return "🚫"
     if row.get("rejected_at"):
         return "🚫"
     if row.get("completed_at"):
@@ -467,6 +528,18 @@ def _fmt_dt(val: Optional[str]) -> str:
 def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
     rows = (_list_jst_sms_for_study if mode == "sms" else _list_jst_email_for_study)(sb, study_id) or []
 
+    def _is_revoked(row: Dict[str, Any]) -> bool:
+        return str(row.get("status") or "").strip().lower() == "revoked"
+
+    def _revoked_at(row: Dict[str, Any]) -> str:
+        if not _is_revoked(row):
+            return ""
+        for key in ("updated_at", "status_changed_at", "completed_at", "created_at"):
+            txt = _fmt_dt(row.get(key))
+            if txt:
+                return txt
+        return ""
+
     def _dur_str(click_iso, done_iso) -> str:
         try:
             c1 = pd.to_datetime(click_iso, utc=True)
@@ -481,18 +554,21 @@ def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
 
     out: List[Dict[str, str]] = []
     for r in rows:
+        status_txt = str(r.get("status") or "").strip().lower()
+        revoked = _is_revoked(r)
         out.append(
             {
                 "Data": _fmt_dt(r.get("created_at") or r.get("created_at_pl")),
                 ("Telefon" if mode == "sms" else "E-mail"): r.get("phone", "") if mode == "sms" else r.get("email", ""),
                 "Status": _status_icon(r),
                 "Czas wyp.": _dur_str(r.get("clicked_at"), r.get("completed_at")),
-                "Wysłano": "✓" if str(r.get("status") or "").lower() in ("sent", "delivered") else "",
+                "Wysłano": "✓" if status_txt in ("sent", "delivered") else "",
                 "Kliknięto": _fmt_dt(r.get("clicked_at")),
                 "Rozpoczęto": _fmt_dt(r.get("started_at")),
-                "Zakończono": _fmt_dt(r.get("completed_at")),
+                "Zakończono": "" if revoked else _fmt_dt(r.get("completed_at")),
+                "Usunięto": _revoked_at(r) if revoked else "",
                 "Nie spełnia": _fmt_dt(r.get("rejected_at")),
-                "Błąd": "✖" if str(r.get("status") or "").lower() == "failed" else "",
+                "Błąd": "✖" if status_txt == "failed" else "",
             }
         )
 
@@ -505,6 +581,7 @@ def _logs_dataframe(sb, study_id: str, mode: str) -> pd.DataFrame:
         "Kliknięto",
         "Rozpoczęto",
         "Zakończono",
+        "Usunięto",
         "Nie spełnia",
         "Błąd",
     ]
@@ -1093,6 +1170,7 @@ def render(back_btn: Callable[[], None]) -> None:
             "Kliknięto",
             "Rozpoczęto",
             "Zakończono",
+            "Usunięto",
             "Nie spełnia",
             "Błąd",
         ]
@@ -1105,6 +1183,8 @@ def render(back_btn: Callable[[], None]) -> None:
 
         def _status_icon_fixed(row: Dict[str, Any]) -> str:
             status = str(row.get("status") or "").lower()
+            if status == "revoked":
+                return "🚫"
             if row.get("rejected_at"):
                 return "🚫"
             if status == "failed":
@@ -1147,7 +1227,10 @@ def render(back_btn: Callable[[], None]) -> None:
 
         resend_rows = [r for r in raw_rows if _can_resend_row(r)]
         if resend_rows:
-            st.caption("🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku).")
+            st.caption(
+                "🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku) "
+                "lub 🚫 unieważnić ten konkretny link."
+            )
             label_to_row: Dict[str, Dict[str, Any]] = {}
             for r in resend_rows:
                 recipient = str(r.get("phone") or "") if mode == "sms" else str(r.get("email") or "")
@@ -1158,11 +1241,12 @@ def render(back_btn: Callable[[], None]) -> None:
                 label = f"{recipient} • {created_at} • status: {status_txt} • token: {short_token}"
                 label_to_row[label] = r
             chosen_row_label = st.selectbox(
-                "Wybierz rekord do ponownej wysyłki",
+                "Wybierz rekord do ponownej wysyłki / unieważnienia linku",
                 list(label_to_row.keys()),
                 key=f"jst_resend_pick_{mode}_{study['id']}",
             )
-            if st.button("🔁 Wyślij ponownie (ten sam link)", key=f"jst_resend_btn_{mode}_{study['id']}"):
+            c_resend, c_revoke = st.columns([1, 1], gap="small")
+            if c_resend.button("🔁 Wyślij ponownie (ten sam link)", key=f"jst_resend_btn_{mode}_{study['id']}"):
                 picked = label_to_row.get(chosen_row_label) or {}
                 if mode == "sms":
                     ok, err = _resend_sms_row(sb, picked, selected_study=study)
@@ -1173,6 +1257,17 @@ def render(back_btn: Callable[[], None]) -> None:
                     st.rerun()
                 else:
                     st.error(f"Nie udało się ponowić wysyłki: {err}")
+            if c_revoke.button("🚫 Usuń dostęp (unieważnij link)", key=f"jst_revoke_btn_{mode}_{study['id']}"):
+                picked = label_to_row.get(chosen_row_label) or {}
+                if mode == "sms":
+                    ok, err = _revoke_sms_row(sb, picked)
+                else:
+                    ok, err = _revoke_email_row(sb, picked)
+                if ok:
+                    st.success("Dostęp został unieważniony dla wybranego rekordu.")
+                    st.rerun()
+                else:
+                    st.error(f"Nie udało się unieważnić dostępu: {err}")
 
         export_df = df_logs.drop(columns=["Ponów"], errors="ignore")
         out_name = slug or "jst"
@@ -1205,7 +1300,7 @@ def render(back_btn: Callable[[], None]) -> None:
       🔗 – odbiorca kliknął w link<br>
       🏁 – ankieta rozpoczęta<br>
       ✅ – ankieta zakończona<br>
-      🚫 – odbiorca nie spełnia warunków udziału<br>
+      🚫 – dostęp usunięty (link unieważniony) lub odbiorca nie spełnia warunków udziału<br>
       ✖ – błąd wysyłki<br>
       ⏳ – oczekuje w kolejce<br>
       • – inny / nieznany status
