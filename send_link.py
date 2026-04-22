@@ -372,10 +372,10 @@ def _status_icon(row: Dict) -> str:
     """
     status = (row.get("status") or "").lower()
 
-    if row.get("rejected_at"):
-        return "🚫"
     if status == "revoked":
-        return "🚫"
+        return "⛔"
+    if row.get("rejected_at"):
+        return "⛔"
     if row.get("completed_at"):
         return "✅"
     if row.get("started_at"):
@@ -701,7 +701,8 @@ def _df_to_pdf_bytes(df: pd.DataFrame, title: str = "Statusy") -> bytes | None:
             "🔗": "kliknięto",
             "🏁": "rozpoczęto",
             "✅": "zakończono",
-            "🚫": "usunięto",
+            "⛔": "usunięto",
+            "🚫": "nie spełnia warunków",
             "✖": "błąd",
             "⏳": "w kolejce",
             "•":  "inny",
@@ -1479,8 +1480,8 @@ def render(back_btn: Callable[[], None]) -> None:
 
     def _status_icon_fixed(row: Dict) -> str:
         status = (row.get("status") or "").lower()
-        if row.get("rejected_at"): return "🚫"
-        if status == "revoked": return "🚫"
+        if status == "revoked": return "⛔"
+        if row.get("rejected_at"): return "⛔"
         if status == "failed": return "✖"
         if row.get("completed_at"): return "✅"
         if row.get("started_at"): return "🏁"
@@ -1522,7 +1523,7 @@ def render(back_btn: Callable[[], None]) -> None:
     if resend_rows:
         st.caption(
             "🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku) "
-            "lub 🚫 unieważnić ten konkretny link."
+            "lub ⛔ unieważnić ten konkretny link."
         )
         label_to_row: Dict[str, Dict] = {}
         for r in resend_rows:
@@ -1550,7 +1551,7 @@ def render(back_btn: Callable[[], None]) -> None:
                 st.rerun()
             else:
                 st.error(f"Nie udało się ponowić wysyłki: {err}")
-        if c_revoke.button("🚫 Usuń dostęp (unieważnij link)", key=f"revoke_btn_{mode}_{study['id']}"):
+        if c_revoke.button("⛔ Usuń dostęp (unieważnij link)", key=f"revoke_btn_{mode}_{study['id']}"):
             picked = label_to_row.get(chosen_resend) or {}
             if mode == "sms":
                 ok, err = _revoke_sms_row(sb, picked)
@@ -1595,7 +1596,7 @@ def render(back_btn: Callable[[], None]) -> None:
           🔗 – Odbiorca kliknął w link<br>
           🏁 – Ankieta rozpoczęta<br>
           ✅ – Ankieta zakończona<br>
-          🚫 – Dostęp usunięty (link unieważniony)<br>
+          ⛔ – Dostęp usunięty (link unieważniony)<br>
           ✖ – Błąd wysyłki<br>
           ⏳ – Oczekuje w kolejce<br>
           • – Inny / nieznany status
@@ -1607,7 +1608,7 @@ def render(back_btn: Callable[[], None]) -> None:
           🔗 – Odbiorca kliknął w link<br>
           🏁 – Ankieta rozpoczęta<br>
           ✅ – Ankieta zakończona<br>
-          🚫 – Dostęp usunięty (link unieważniony)<br>
+          ⛔ – Dostęp usunięty (link unieważniony)<br>
           ✖ – Błąd wysyłki<br>
           ⏳ – Oczekuje w kolejce (wysłanie w toku)<br>
           • – Inny / nieznany status

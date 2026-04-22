@@ -493,7 +493,7 @@ def _revoke_email_row(sb, row: Dict[str, Any]) -> Tuple[bool, str]:
 def _status_icon(row: Dict[str, Any]) -> str:
     status = str(row.get("status") or "").lower()
     if status == "revoked":
-        return "🚫"
+        return "⛔"
     if row.get("rejected_at"):
         return "🚫"
     if row.get("completed_at"):
@@ -1184,7 +1184,7 @@ def render(back_btn: Callable[[], None]) -> None:
         def _status_icon_fixed(row: Dict[str, Any]) -> str:
             status = str(row.get("status") or "").lower()
             if status == "revoked":
-                return "🚫"
+                return "⛔"
             if row.get("rejected_at"):
                 return "🚫"
             if status == "failed":
@@ -1229,7 +1229,7 @@ def render(back_btn: Callable[[], None]) -> None:
         if resend_rows:
             st.caption(
                 "🔁 Możesz ponowić wysyłkę dla rekordu (bez tworzenia nowego tokenu i bez zmiany linku) "
-                "lub 🚫 unieważnić ten konkretny link."
+                "lub ⛔ unieważnić ten konkretny link."
             )
             label_to_row: Dict[str, Dict[str, Any]] = {}
             for r in resend_rows:
@@ -1257,7 +1257,7 @@ def render(back_btn: Callable[[], None]) -> None:
                     st.rerun()
                 else:
                     st.error(f"Nie udało się ponowić wysyłki: {err}")
-            if c_revoke.button("🚫 Usuń dostęp (unieważnij link)", key=f"jst_revoke_btn_{mode}_{study['id']}"):
+            if c_revoke.button("⛔ Usuń dostęp (unieważnij link)", key=f"jst_revoke_btn_{mode}_{study['id']}"):
                 picked = label_to_row.get(chosen_row_label) or {}
                 if mode == "sms":
                     ok, err = _revoke_sms_row(sb, picked)
@@ -1300,7 +1300,8 @@ def render(back_btn: Callable[[], None]) -> None:
       🔗 – odbiorca kliknął w link<br>
       🏁 – ankieta rozpoczęta<br>
       ✅ – ankieta zakończona<br>
-      🚫 – dostęp usunięty (link unieważniony) lub odbiorca nie spełnia warunków udziału<br>
+      ⛔ – dostęp usunięty (link unieważniony)<br>
+      🚫 – odbiorca nie spełnia warunków udziału<br>
       ✖ – błąd wysyłki<br>
       ⏳ – oczekuje w kolejce<br>
       • – inny / nieznany status
