@@ -12,6 +12,7 @@ import time  # ⬅️ do auto-odświeżania (sleep + rerun)
 import pandas as pd
 import streamlit as st
 import re
+from streamlit.components.v1 import html as html_component
 
 # Importy bezwzględne (plik leży obok app.py)
 from db_utils import get_supabase, fetch_studies
@@ -180,20 +181,36 @@ def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
         f"Długość: {msg_len} znaków • Segmenty: {segments} • "
         f"Pozostało w bieżącym: {remain} • Kodowanie: {coding}"
     )
-    counter_id_json = json.dumps(str(counter_id or "sms_counter_live"))
-    st.markdown(
+    html_component(
         f"""
-        <div id="{counter_id}" class="sms-counter">{initial_line}</div>
+        <div id="sms-live-counter" class="sms-counter">{initial_line}</div>
+        <style>
+          html, body {{
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+          }}
+          .sms-counter {{
+            text-align: right;
+            color: #6b7280;
+            font-size: 13px;
+            margin-top: 4px;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+            white-space: nowrap;
+          }}
+        </style>
         <script>
         (function() {{
-          const COUNTER_ID = {counter_id_json};
+          const COUNTER_ID = {json.dumps(str(counter_id or "sms_counter_live"))};
           const rootDoc = window.parent?.document || document;
+          const counter = document.getElementById("sms-live-counter");
+          let boundTextarea = null;
           const plMap = {{
             "ą":"a","ć":"c","ę":"e","ł":"l","ń":"n","ó":"o","ś":"s","ż":"z","ź":"z",
             "Ą":"A","Ć":"C","Ę":"E","Ł":"L","Ń":"N","Ó":"O","Ś":"S","Ż":"Z","Ź":"Z"
           }};
           const toAscii = (txt) => Array.from(String(txt || "")).map((ch) => plMap[ch] || ch).join("");
-          const countPoints = (txt) => Array.from(String(txt || "")).length;
           const buildLine = (txt) => {{
             const ascii = toAscii(txt || "");
             const chars = Array.from(ascii);
@@ -204,41 +221,54 @@ def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
             const coding = chars.every((ch) => (ch.codePointAt(0) || 0) < 128) ? "GSM-7" : "Unicode";
             return `Długość: ${{msgLen}} znaków • Segmenty: ${{segments}} • Pozostało w bieżącym: ${{remain}} • Kodowanie: ${{coding}}`;
           }};
-          const getCounterNode = () => rootDoc.getElementById(COUNTER_ID) || document.getElementById(COUNTER_ID);
-          const getTargetTextarea = () => {{
-            const areas = rootDoc.querySelectorAll('textarea[aria-label="Treść wiadomości"]');
-            return areas && areas.length ? areas[areas.length - 1] : null;
+          const isVisible = (el) => !!el && el.offsetParent !== null;
+          const pickTargetTextarea = () => {{
+            const byLabel = Array.from(rootDoc.querySelectorAll('textarea[aria-label="Treść wiadomości"]')).filter(isVisible);
+            if (byLabel.length) return byLabel[byLabel.length - 1];
+            const allVisible = Array.from(rootDoc.querySelectorAll("textarea")).filter(isVisible);
+            if (!allVisible.length) return null;
+            allVisible.sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight));
+            return allVisible[0];
           }};
-          const refresh = () => {{
-            const counter = getCounterNode();
-            const ta = getTargetTextarea();
-            if (!counter || !ta) return false;
-            counter.textContent = buildLine(ta.value || "");
-            const bindMark = `smsCounterBound:${{COUNTER_ID}}`;
-            if (ta.dataset.smsCounterBound !== bindMark) {{
-              ta.dataset.smsCounterBound = bindMark;
-              ta.addEventListener("input", () => {{
-                const node = getCounterNode();
-                if (node) node.textContent = buildLine(ta.value || "");
-              }}, {{ passive: true }});
-            }}
+          const renderFromText = (txt) => {{
+            if (!counter) return false;
+            counter.textContent = buildLine(txt || "");
             return true;
+          }};
+          const onInput = () => {{
+            if (!boundTextarea) return;
+            renderFromText(boundTextarea.value || "");
+          }};
+          const bindAndRefresh = () => {{
+            const ta = pickTargetTextarea();
+            if (!counter || !ta) return false;
+            if (boundTextarea !== ta) {{
+              if (boundTextarea) {{
+                boundTextarea.removeEventListener("input", onInput);
+                boundTextarea.removeEventListener("keyup", onInput);
+              }}
+              boundTextarea = ta;
+              boundTextarea.addEventListener("input", onInput, {{ passive: true }});
+              boundTextarea.addEventListener("keyup", onInput, {{ passive: true }});
+            }}
+            return renderFromText(boundTextarea.value || "");
           }};
           try {{
             window.__apSmsCounterIntervals = window.__apSmsCounterIntervals || {{}};
             const prev = window.__apSmsCounterIntervals[COUNTER_ID];
             if (prev) window.clearInterval(prev);
-            refresh();
-            window.setTimeout(refresh, 80);
-            window.setTimeout(refresh, 240);
-            window.__apSmsCounterIntervals[COUNTER_ID] = window.setInterval(refresh, 450);
+            bindAndRefresh();
+            window.setTimeout(bindAndRefresh, 40);
+            window.setTimeout(bindAndRefresh, 120);
+            window.setTimeout(bindAndRefresh, 260);
+            window.__apSmsCounterIntervals[COUNTER_ID] = window.setInterval(bindAndRefresh, 220);
           }} catch (e) {{
             /* no-op */
           }}
         }})();
         </script>
         """,
-        unsafe_allow_html=True,
+        height=28,
     )
 
 
