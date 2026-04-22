@@ -63,6 +63,7 @@ import numpy as np
 from archetype_docx_loader import load_archetype_extended
 import archetype_interpretation as _archetype_interpretation_module
 from archetype_interpretation import generate_archetype_descriptions
+from profile_strength_description import generate_strength_profile_description
 from metryczka_config import normalize_personal_metryczka_config
 from public_labels import (
     ARCHETYPE_PUBLIC_VALUES,
@@ -153,6 +154,7 @@ def _generate_descriptions_live(input_data: dict) -> dict[str, str]:
                     "valuesWheelDescription": str(out.get("valuesWheelDescription") or "").strip(),
                     "needsWheelDescription": str(out.get("needsWheelDescription") or "").strip(),
                     "actionProfileDescription": str(out.get("actionProfileDescription") or "").strip(),
+                    "strengthProfileDescription": str(out.get("strengthProfileDescription") or "").strip(),
                 }
     except Exception:
         pass
@@ -162,6 +164,7 @@ def _generate_descriptions_live(input_data: dict) -> dict[str, str]:
         "valuesWheelDescription": str(out.get("valuesWheelDescription") or "").strip(),
         "needsWheelDescription": str(out.get("needsWheelDescription") or "").strip(),
         "actionProfileDescription": str(out.get("actionProfileDescription") or "").strip(),
+        "strengthProfileDescription": str(out.get("strengthProfileDescription") or "").strip(),
     }
 
 
@@ -8883,11 +8886,13 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
 
             try:
                 generated_descriptions = _generate_descriptions_live(description_input)
+                generated_descriptions["strengthProfileDescription"] = generate_strength_profile_description(description_input)
             except Exception:
                 generated_descriptions = {
                     "valuesWheelDescription": "",
                     "needsWheelDescription": "",
                     "actionProfileDescription": "",
+                    "strengthProfileDescription": "",
                 }
 
             def _render_auto_description(text: str) -> None:
@@ -9834,6 +9839,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                     """,
                     unsafe_allow_html=True,
                 )
+                _render_auto_description(generated_descriptions["strengthProfileDescription"])
 
 
             with col3:
