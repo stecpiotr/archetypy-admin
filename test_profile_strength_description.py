@@ -22,6 +22,21 @@ ARCHETYPE_ORDER = [
     "Władca",
 ]
 
+FEMALE_ARCHETYPE_ORDER = [
+    "Niewinna",
+    "Mędrczyni",
+    "Odkrywczyni",
+    "Kochanka",
+    "Towarzyszka",
+    "Komiczka",
+    "Bohaterka",
+    "Buntowniczka",
+    "Czarodziejka",
+    "Opiekunka",
+    "Twórczyni",
+    "Władczyni",
+]
+
 
 def _payload(
     scores: dict[str, float],
@@ -30,8 +45,10 @@ def _payload(
     supporting: str,
     tertiary: tuple[str, float] | None = None,
     subject: str = "Miłosława Mirosława",
+    label_order: list[str] | None = None,
 ) -> dict[str, object]:
-    archetypes = [{"label": label, "score": float(scores.get(label, 0.0))} for label in ARCHETYPE_ORDER]
+    labels = label_order or ARCHETYPE_ORDER
+    archetypes = [{"label": label, "score": float(scores.get(label, 0.0))} for label in labels]
     tertiary_obj = None
     if tertiary:
         tertiary_obj = {"label": tertiary[0], "score": float(tertiary[1])}
@@ -114,76 +131,99 @@ def test_profile_a_miloslaw_rozproszony_bez_pobocznego():
             subject="Miłosława Mirosława",
         )
     )
+    first_paragraph = txt.split("\n\n")[0]
+    txt_l = txt.lower()
     assert "umiarkowany" in txt
-    assert "rozproszony" in txt
+    assert "rozproszony" in first_paragraph
+    assert first_paragraph.lower().count("rozproszony") == 1
+    assert "archetypem głównym" in txt_l
+    assert "archetypem wspierającym" in txt_l
     assert "Opiekun" in txt
     assert "Towarzysz" in txt
     assert "Ludzie i Porządek" in txt
-    assert "Zmiana" in txt
-    assert "Towarzyszy mu jeszcze archetyp" not in txt
-    assert "napięcie" not in txt.lower()
-    assert "tożsamość" not in txt.lower()
-    assert "osobowość" not in txt.lower()
+    assert "Zmiany" in txt
+    assert "drugi w kolejności" not in txt_l
+    assert "towarzyszy mu jeszcze archetyp" not in txt_l
+    assert "napięcie" not in txt_l
+    assert "tożsamość" not in txt_l
+    assert "osobowość" not in txt_l
 
 
-def test_profile_b_silny_top1_ge_70_and_no_tertiary_below_70():
+def test_profile_b_kornelia_rdzen_i_bliskie_zmiana_ludzie():
     scores = {
-        "Opiekun": 74.0,
-        "Towarzysz": 61.0,
-        "Władca": 69.4,
-        "Bohater": 55.0,
-        "Mędrzec": 50.0,
-        "Niewinny": 48.0,
-        "Buntownik": 45.0,
-        "Czarodziej": 43.0,
-        "Kochanek": 46.0,
-        "Twórca": 47.0,
-        "Odkrywca": 42.0,
-        "Błazen": 40.0,
+        "Kochanka": 64.0,
+        "Buntowniczka": 58.0,
+        "Odkrywczyni": 62.0,
+        "Komiczka": 57.0,
+        "Opiekunka": 56.0,
+        "Towarzyszka": 55.0,
+        "Niewinna": 44.0,
+        "Władczyni": 51.0,
+        "Mędrczyni": 46.0,
+        "Twórczyni": 54.0,
+        "Bohaterka": 53.0,
+        "Czarodziejka": 52.0,
     }
     txt = generate_strength_profile_description(
         _payload(
             scores,
-            primary="Opiekun",
-            supporting="Towarzysz",
-            tertiary=("Władca", 69.4),
-            subject="Adama Krawca",
+            primary="Kochanka",
+            supporting="Buntowniczka",
+            tertiary=None,
+            subject="Kornelii Lemańskiej",
+            label_order=FEMALE_ARCHETYPE_ORDER,
         )
     )
-    assert "silny" in txt
-    assert "rdzeń" in txt.lower()
-    assert "Towarzyszy mu jeszcze archetyp Władca" not in txt
+    txt_l = txt.lower()
+    assert "wyraźny" in txt_l
+    assert "czytelny rdzeń" in txt_l
+    assert "archetypem głównym" in txt_l
+    assert "archetypem wspierającym" in txt_l
+    assert "Kochanka" in txt
+    assert "Buntowniczka" in txt
+    assert "Zmiana i Ludzie" in txt
+    assert "drugi w kolejności" not in txt_l
+    assert "wyraźnie dominuje zmiana" not in txt_l
 
 
-def test_profile_c_dwubiegunowy_when_top1_top2_are_close():
+def test_profile_c_hetman_trojbiegunowy_bez_degradacji_pobocznego():
     scores = {
-        "Bohater": 67.0,
-        "Władca": 64.0,
-        "Mędrzec": 58.0,
-        "Opiekun": 52.0,
-        "Towarzysz": 50.0,
-        "Niewinny": 47.0,
-        "Buntownik": 42.0,
-        "Czarodziej": 40.0,
-        "Kochanek": 39.0,
-        "Twórca": 45.0,
-        "Odkrywca": 41.0,
-        "Błazen": 38.0,
+        "Bohater": 76.0,
+        "Władca": 75.9,
+        "Odkrywca": 70.1,
+        "Twórca": 58.0,
+        "Czarodziej": 60.0,
+        "Buntownik": 60.0,
+        "Błazen": 59.0,
+        "Niewinny": 45.0,
+        "Mędrzec": 47.0,
+        "Kochanek": 61.0,
+        "Opiekun": 62.0,
+        "Towarzysz": 60.0,
     }
     txt = generate_strength_profile_description(
         _payload(
             scores,
             primary="Bohater",
             supporting="Władca",
-            tertiary=None,
-            subject="Jana Nowaka",
+            tertiary=("Odkrywca", 70.1),
+            subject="Krzysztofa Hetmana",
         )
     )
-    assert "dwubiegunowy" in txt
-    assert "trójbiegunowy" not in txt
+    txt_l = txt.lower()
+    first_paragraph = txt.split("\n\n")[0].lower()
+    assert "silny i trójbiegunowy" in first_paragraph
+    assert first_paragraph.count("silny i trójbiegunowy") == 1
+    assert "archetypem głównym" in txt_l
+    assert "archetypem wspierającym" in txt_l
+    assert "archetypem pobocznym" in txt_l
+    assert "wzmacnia profil pobocznie" not in txt_l
+    assert "drugi w kolejności" not in txt_l
+    assert "Niezależność i Zmiana" in txt
+    assert "różnice między czterema grupami nie są duże" in txt_l
 
 
-def test_profile_d_trojbiegunowy_when_top3_ge_70():
+def test_profile_d_bardzo_silny_bez_powtorzenia_oceny():
     scores = {
         "Twórca": 82.0,
         "Bohater": 79.0,
@@ -207,6 +247,7 @@ def test_profile_d_trojbiegunowy_when_top3_ge_70():
             subject="Anny Lis",
         )
     )
-    assert "trójbiegunowy" in txt
-    assert "Towarzyszy mu jeszcze archetyp Czarodziej" in txt
-    assert "wzmacnia profil pobocznie" in txt
+    first_paragraph = txt.split("\n\n")[0].lower()
+    assert "bardzo silny i trójbiegunowy" in first_paragraph
+    assert first_paragraph.count("bardzo silny i trójbiegunowy") == 1
+    assert "drugi w kolejności" not in first_paragraph

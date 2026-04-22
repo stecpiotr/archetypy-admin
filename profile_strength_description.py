@@ -84,7 +84,35 @@ _GROUP_STYLE: dict[str, str] = {
     "zmiana": "zmianowy i nastawiony na przełamywanie schematów",
     "ludzie": "wspólnotowy i relacyjny",
     "porzadek": "uporządkowany i instytucjonalny",
-    "niezaleznosc": "autonomiczny i samosterowny",
+    "niezaleznosc": "autonomiczny i samodzielny",
+}
+
+_GROUP_LABEL_GENITIVE: dict[str, str] = {
+    "zmiana": "Zmiany",
+    "ludzie": "Ludzi",
+    "porzadek": "Porządku",
+    "niezaleznosc": "Niezależności",
+}
+
+_GROUP_STYLE_SHORT: dict[str, str] = {
+    "zmiana": "zmianowy",
+    "ludzie": "relacyjny i wspólnotowy",
+    "porzadek": "porządkujący",
+    "niezaleznosc": "autonomiczny i samodzielny",
+}
+
+_GROUP_WEAK_CONTRAST: dict[str, str] = {
+    "zmiana": "wyraziście zmianowy",
+    "ludzie": "wyraziście wspólnotowy",
+    "porzadek": "uporządkowany i instytucjonalny",
+    "niezaleznosc": "skrajnie autonomiczny",
+}
+
+_GROUP_WEAK_CONTRAST_SOFT: dict[str, str] = {
+    "zmiana": "wyraziście zmianowy",
+    "ludzie": "wyraziście wspólnotowy",
+    "porzadek": "czysto administracyjno-porządkujący",
+    "niezaleznosc": "skrajnie autonomiczny",
 }
 
 
@@ -208,11 +236,11 @@ def _profile_shape(top1: float, top2: float, tertiary: ArchetypeStrength | None)
     has_tri_core = bool(tertiary and _to_score(tertiary.get("score")) >= 70.0)
     if has_tri_core:
         return "tri"
-    if diff <= 5.0 and top1 < 55.0:
+    if diff <= 5.0 and top1 < 60.0:
         return "soft"
     if diff <= 5.0:
         return "bi"
-    if top1 < 50.0 and diff <= 7.0:
+    if top1 < 50.0:
         return "spread"
     return "core"
 
@@ -220,53 +248,136 @@ def _profile_shape(top1: float, top2: float, tertiary: ArchetypeStrength | None)
 def _opening_sentence(subject_genitive: str | None, strength: str, shape: str) -> str:
     subject_txt = str(subject_genitive or "").strip()
     base = f"Układ siły archetypów {subject_txt}" if subject_txt else "Układ siły archetypów"
-    if shape == "core":
-        return f"{base} jest {strength} i ma wyraźny rdzeń."
-    if shape == "bi":
-        return f"{base} jest {strength} i dwubiegunowy."
     if shape == "tri":
         return f"{base} jest {strength} i trójbiegunowy."
+    if shape == "bi":
+        return f"{base} jest {strength} i dwubiegunowy."
+    if shape == "core":
+        return f"{base} jest {strength} i ma czytelny rdzeń."
     return f"{base} jest {strength} i dość rozproszony."
 
 
-def _shape_sentence(shape: str, strength: str, primary_label: str, supporting_label: str) -> str:
-    if shape == "tri":
-        return f"To profil {strength} i trójbiegunowy."
-    if shape == "bi":
-        if strength in {"umiarkowany", "wyraźny"}:
-            return f"To profil {strength}, z miękkim rdzeniem opartym głównie na {primary_label} i {supporting_label}."
-        return "To profil wyraźny, ale dwubiegunowy."
+def _roles_sentence(
+    shape: str,
+    primary_label: str,
+    primary_intensity: str,
+    supporting_label: str,
+    supporting_intensity: str,
+    tertiary: ArchetypeStrength | None,
+) -> str:
+    if shape == "tri" and tertiary is not None and _to_score(tertiary.get("score")) >= 70.0:
+        tertiary_label = str(tertiary.get("label") or "").strip() or "archetyp poboczny"
+        return (
+            f"Archetypem głównym jest {primary_label}, archetypem wspierającym {supporting_label}, "
+            f"a archetypem pobocznym {tertiary_label} — wszystkie trzy współtworzą wyraźny rdzeń profilu."
+        )
+
+    def _intensity_locative(label: str) -> str:
+        mapping = {
+            "marginalne natężenie": "marginalnym natężeniu",
+            "słabe natężenie": "słabym natężeniu",
+            "umiarkowane natężenie": "umiarkowanym natężeniu",
+            "znaczące natężenie": "znaczącym natężeniu",
+            "wysokie natężenie": "wysokim natężeniu",
+            "bardzo wysokie natężenie (rdzeń)": "bardzo wysokim natężeniu (rdzeń)",
+            "ekstremalne natężenie": "ekstremalnym natężeniu",
+        }
+        return mapping.get(label, label)
+
+    sentence = (
+        f"Archetypem głównym jest {primary_label} o {_intensity_locative(primary_intensity)}, "
+        f"natomiast archetypem wspierającym jest {supporting_label} o {_intensity_locative(supporting_intensity)}"
+    )
     if shape in {"soft", "spread"}:
-        return "To profil dość rozproszony, bez jednego bardzo dominującego rdzenia."
-    if strength in {"silny", "bardzo silny"}:
-        return "To profil silny, z czytelnym rdzeniem."
-    return f"To profil {strength}, z wyraźnym rdzeniem."
+        sentence += ", co pokazuje profil bez jednego bardzo dominującego rdzenia."
+    else:
+        sentence += "."
+    return sentence
 
 
-def _needs_balance_sentence(group_values: NeedGroupsResult, ordered_keys: list[str]) -> tuple[str, str]:
+def _pair_style_phrase(top: str, second: str) -> str:
+    pair = {top, second}
+    if pair == {"niezaleznosc", "zmiana"}:
+        return "autonomiczny i nastawiony na uruchamianie ruchu"
+    if pair == {"ludzie", "porzadek"}:
+        return "wspólnotowy, relacyjny i porządkujący"
+    if pair == {"zmiana", "ludzie"}:
+        return "zmianowy i relacyjny"
+    if pair == {"niezaleznosc", "porzadek"}:
+        return "autonomiczny, samodzielny i porządkujący"
+    return f"{_GROUP_STYLE_SHORT[top]} oraz {_GROUP_STYLE_SHORT[second]}"
+
+
+def _should_mention_weakest(shape: str, spread: float, top_gap: float) -> bool:
+    if spread > 10.0:
+        return True
+    if spread >= 8.0 and shape in {"soft", "spread"}:
+        return True
+    if spread >= 8.0 and top_gap > 3.0:
+        return True
+    return False
+
+
+def _needs_balance_sentence(group_values: NeedGroupsResult, ordered_keys: list[str], shape: str) -> tuple[str, str]:
     top = ordered_keys[0]
     second = ordered_keys[1]
     weakest = ordered_keys[-1]
     spread = float(group_values[top] - group_values[weakest])
+    top_gap = float(group_values[top] - group_values[second])
     top_label = _ID_TO_DISPLAY_LABEL[top]
     second_label = _ID_TO_DISPLAY_LABEL[second]
-    weakest_label = _ID_TO_DISPLAY_LABEL[weakest]
+    top_gen = _GROUP_LABEL_GENITIVE[top]
+    weakest_gen = _GROUP_LABEL_GENITIVE[weakest]
+
+    if top_gap < 1.5:
+        lead_txt = ", na zbliżonym poziomie"
+    elif top_gap <= 5.0:
+        lead_txt = f", z lekką przewagą {top_gen}"
+    else:
+        lead_txt = f", z wyraźną przewagą {top_gen}"
+
+    weakest_txt = ""
+    if _should_mention_weakest(shape, spread, top_gap):
+        weakest_txt = f", przy słabszym akcencie {weakest_gen}"
+
+    intro_txt = f"W układzie potrzeb najmocniej zaznaczają się obszary {top_label} i {second_label}{lead_txt}{weakest_txt}."
+
+    pair_style = _pair_style_phrase(top, second)
+    weak_contrast = _GROUP_WEAK_CONTRAST[weakest]
 
     if spread < 5.0:
-        balance_txt = "Profil jest dość zrównoważony między czterema obszarami potrzeb."
-    elif spread <= 10.0:
         balance_txt = (
-            f"Lekko przeważają potrzeby związane z obszarami {top_label} i {second_label}, "
-            f"przy słabszym akcencie grupy {weakest_label}."
+            "Różnice między grupami nie są duże, a profil jest dość zrównoważony między czterema obszarami potrzeb. "
+            f"W praktyce oznacza to połączenie akcentu {_GROUP_STYLE_SHORT[top]} i {_GROUP_STYLE_SHORT[second]} bez wyraźnych skrajności."
+        )
+    elif spread <= 10.0:
+        weak_contrast_soft = _GROUP_WEAK_CONTRAST_SOFT[weakest]
+        if {top, second} == {"niezaleznosc", "zmiana"}:
+            practical_txt = (
+                "W praktyce oznacza to profil bardziej autonomiczny i nastawiony na uruchamianie ruchu "
+                "niż czysto administracyjno-porządkujący, przy zachowaniu wyraźnego komponentu porządkowego i relacyjnego."
+            )
+        else:
+            practical_txt = (
+                f"W praktyce oznacza to profil bardziej {pair_style} niż {weak_contrast_soft}, "
+                "przy zachowaniu obecności pozostałych obszarów."
+            )
+        balance_txt = (
+            "Układ jest lekko przechylony, ale różnice między czterema grupami nie są duże. "
+            f"{practical_txt}"
         )
     else:
-        balance_txt = f"Wyraźnie dominuje {top_label}, a najsłabiej wypada obszar {weakest_label}."
-
-    practical_txt = (
-        f"W praktyce oznacza to profil bardziej {_GROUP_STYLE[top]} "
-        f"niż {_GROUP_STYLE[weakest]}."
-    )
-    return balance_txt, practical_txt
+        if top_gap <= 3.0:
+            balance_txt = (
+                "Układ jest wyraźnie przechylony, ale bez jednego całkowicie dominującego obszaru. "
+                f"W praktyce oznacza to profil bardziej {pair_style} niż {weak_contrast}."
+            )
+        else:
+            balance_txt = (
+                "Układ jest wyraźnie przechylony. "
+                f"W praktyce oznacza to profil bardziej {_GROUP_STYLE[top]} niż {weak_contrast}."
+            )
+    return intro_txt, balance_txt
 
 
 def generate_strength_profile_description(raw_input: Mapping[str, object]) -> str:
@@ -289,30 +400,13 @@ def generate_strength_profile_description(raw_input: Mapping[str, object]) -> st
 
     first_parts: list[str] = [
         _opening_sentence(subject_gen, strength, shape),
-        (
-            f"Najmocniej zaznacza się archetyp {primary_label} ({primary_int}), "
-            f"a drugi w kolejności jest {supporting_label} ({supporting_int})."
-        ),
+        _roles_sentence(shape, primary_label, primary_int, supporting_label, supporting_int, tertiary),
     ]
-
-    if tertiary is not None and _to_score(tertiary.get("score")) >= 70.0:
-        tertiary_label = str(tertiary.get("label") or "").strip() or "archetyp poboczny"
-        tertiary_int = classifyArchetypeIntensity(_to_score(tertiary.get("score")))["label"]
-        first_parts.append(
-            f"Towarzyszy mu jeszcze archetyp {tertiary_label} ({tertiary_int}), który wzmacnia profil pobocznie."
-        )
-
-    first_parts.append(_shape_sentence(shape, strength, primary_label, supporting_label))
     first_paragraph = " ".join(first_parts)
 
     group_values = aggregateNeedGroups(archetypes)
     ordered_group_keys = sorted(group_values.keys(), key=lambda key: (-float(group_values[key]), key))
-    top_label = _ID_TO_DISPLAY_LABEL[ordered_group_keys[0]]
-    second_label = _ID_TO_DISPLAY_LABEL[ordered_group_keys[1]]
-    balance_txt, practical_txt = _needs_balance_sentence(group_values, ordered_group_keys)
-    second_paragraph = (
-        f"W układzie potrzeb najmocniej zaznaczają się obszary {top_label} i {second_label}. "
-        f"{balance_txt} {practical_txt}"
-    )
+    intro_txt, balance_txt = _needs_balance_sentence(group_values, ordered_group_keys, shape)
+    second_paragraph = f"{intro_txt} {balance_txt}"
 
     return f"{first_paragraph}\n\n{second_paragraph}".strip()
