@@ -456,7 +456,7 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
             last_err = exc
 
     try:
-        sb.rpc("mark_token_completed", {"p_token": tok}).execute()
+        sb.rpc("mark_jst_token_completed", {"p_token": tok}).execute()
         return True, ""
     except Exception as exc:
         last_err = exc
