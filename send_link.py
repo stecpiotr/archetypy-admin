@@ -1,7 +1,7 @@
 # send_link.py — kafel „Wyślij link do ankiety”
 from __future__ import annotations
 
-from typing import List, Dict, Tuple, Optional, Callable
+from typing import Any, List, Dict, Tuple, Optional, Callable
 import os
 import base64
 import json
@@ -169,7 +169,12 @@ def _strip_pl_diacritics(text: str) -> str:
     return (text or "").translate(_PL_MAP)
 
 
-def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
+def _render_live_sms_counter(
+    current_body: str,
+    *,
+    counter_id: str,
+    textarea_placeholder: str = "",
+) -> None:
     """Licznik SMS aktualizowany live (input), bez czekania na blur/rerun Streamlit."""
     ascii_msg = _strip_pl_diacritics(current_body or "")
     seg_len = 160
@@ -203,7 +208,16 @@ def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
         <script>
         (function() {{
           const COUNTER_ID = {json.dumps(str(counter_id or "sms_counter_live"))};
-          const rootDoc = window.parent?.document || document;
+          const TARGET_PLACEHOLDER = {json.dumps(str(textarea_placeholder or "").strip())};
+          const getRootDoc = () => {{
+            try {{
+              if (window.parent && window.parent.document) return window.parent.document;
+            }} catch (e) {{
+              /* fallback do własnego iframe, jeśli parent niedostępny */
+            }}
+            return document;
+          }};
+          const rootDoc = getRootDoc();
           const counter = document.getElementById("sms-live-counter");
           let boundTextarea = null;
           const plMap = {{
@@ -211,6 +225,7 @@ def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
             "Ą":"A","Ć":"C","Ę":"E","Ł":"L","Ń":"N","Ó":"O","Ś":"S","Ż":"Z","Ź":"Z"
           }};
           const toAscii = (txt) => Array.from(String(txt || "")).map((ch) => plMap[ch] || ch).join("");
+          const norm = (txt) => toAscii(String(txt || "").trim().toLowerCase());
           const buildLine = (txt) => {{
             const ascii = toAscii(txt || "");
             const chars = Array.from(ascii);
@@ -223,10 +238,14 @@ def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
           }};
           const isVisible = (el) => !!el && el.offsetParent !== null;
           const pickTargetTextarea = () => {{
-            const byLabel = Array.from(rootDoc.querySelectorAll('textarea[aria-label="Treść wiadomości"]')).filter(isVisible);
-            if (byLabel.length) return byLabel[byLabel.length - 1];
             const allVisible = Array.from(rootDoc.querySelectorAll("textarea")).filter(isVisible);
             if (!allVisible.length) return null;
+            if (TARGET_PLACEHOLDER) {{
+              const byPlaceholder = allVisible.filter((ta) => String(ta.getAttribute("placeholder") || "").trim() === TARGET_PLACEHOLDER);
+              if (byPlaceholder.length) return byPlaceholder[byPlaceholder.length - 1];
+            }}
+            const byLabel = allVisible.filter((ta) => norm(ta.getAttribute("aria-label")) === "tresc wiadomosci");
+            if (byLabel.length) return byLabel[byLabel.length - 1];
             allVisible.sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight));
             return allVisible[0];
           }};
@@ -246,10 +265,12 @@ def _render_live_sms_counter(current_body: str, *, counter_id: str) -> None:
               if (boundTextarea) {{
                 boundTextarea.removeEventListener("input", onInput);
                 boundTextarea.removeEventListener("keyup", onInput);
+                boundTextarea.removeEventListener("change", onInput);
               }}
               boundTextarea = ta;
               boundTextarea.addEventListener("input", onInput, {{ passive: true }});
               boundTextarea.addEventListener("keyup", onInput, {{ passive: true }});
+              boundTextarea.addEventListener("change", onInput, {{ passive: true }});
             }}
             return renderFromText(boundTextarea.value || "");
           }};
@@ -353,6 +374,8 @@ def _status_icon(row: Dict) -> str:
 
     if row.get("rejected_at"):
         return "🚫"
+    if status == "revoked":
+        return "🚫"
     if row.get("completed_at"):
         return "✅"
     if row.get("started_at"):
@@ -379,6 +402,9 @@ def _build_link(base_url: str, slug: str, token: str) -> str:
 
 
 def _can_resend_row(row: Dict) -> bool:
+    status = str(row.get("status") or "").strip().lower()
+    if status == "revoked":
+        return False
     if row.get("completed_at") or row.get("rejected_at"):
         return False
     if not str(row.get("token") or "").strip():
@@ -480,13 +506,16 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
     now_iso = pd.Timestamp.utcnow().isoformat()
     last_err: Optional[Exception] = None
 
+    status_marked = False
+
     for payload in (
         {"rejected_at": now_iso, "status": "revoked"},
-        {"rejected_at": now_iso},
+        {"status": "revoked"},
     ):
         try:
             sb.table(table_name).update(payload).eq("id", rid).execute()
-            return True, ""
+            status_marked = True
+            break
         except Exception as exc:
             last_err = exc
 
@@ -496,8 +525,11 @@ def _revoke_token_access(sb, *, table_name: str, row_id: str, token: str) -> Tup
     except Exception as exc:
         last_err = exc
 
+    if status_marked:
+        return True, ""
+
     for payload in (
-        {"completed_at": now_iso, "status": "completed"},
+        {"completed_at": now_iso, "status": "revoked"},
         {"completed_at": now_iso},
     ):
         try:
@@ -527,6 +559,22 @@ def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = No
     """
     rows = (list_sms_for_study if mode == "sms" else list_email_for_study)(sb, study_id) or []
 
+    def _is_revoked(row: Dict[str, Any]) -> bool:
+        status_txt = str(row.get("status") or "").strip().lower()
+        return bool(row.get("rejected_at")) or status_txt == "revoked"
+
+    def _revoked_at(row: Dict[str, Any]) -> str:
+        if row.get("rejected_at"):
+            return _fmt_dt(row.get("rejected_at"))
+        status_txt = str(row.get("status") or "").strip().lower()
+        if status_txt != "revoked":
+            return ""
+        for key in ("updated_at", "status_changed_at", "completed_at", "created_at"):
+            txt = _fmt_dt(row.get(key))
+            if txt:
+                return txt
+        return ""
+
     def _dur_str(click_iso, done_iso) -> str:
         """mm:ss + 🔴 jeśli < 2 min."""
         try:
@@ -542,21 +590,24 @@ def _logs_dataframe(sb, study_id: str, mode: str, cache_bust: Optional[int] = No
 
     out: List[Dict[str, str]] = []
     for r in rows:
+        status_txt = str(r.get("status") or "").lower()
+        revoked = _is_revoked(r)
         out.append(
             {
                 "Data": _fmt_dt(r.get("created_at") or r.get("created_at_pl")),
                 ("Telefon" if mode == "sms" else "E-mail"): r.get("phone", "") if mode == "sms" else r.get("email", ""),
                 "Status": _status_icon(r),
                 "Czas wyp.": _dur_str(r.get("clicked_at"), r.get("completed_at")),
-                "Wysłano": "✓" if (r.get("status") or "").lower() in ("sent", "delivered") else "",
+                "Wysłano": "✓" if status_txt in ("sent", "delivered") else "",
                 "Kliknięto": _fmt_dt(r.get("clicked_at")),
                 "Rozpoczęto": _fmt_dt(r.get("started_at")),
-                "Zakończono": _fmt_dt(r.get("completed_at")),
-                "Błąd": "✖" if (r.get("status") or "").lower() == "failed" else "",
+                "Zakończono": "" if revoked else _fmt_dt(r.get("completed_at")),
+                "Usunięto": _revoked_at(r) if revoked else "",
+                "Błąd": "✖" if status_txt == "failed" else "",
             }
         )
     cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Czas wyp.", "Wysłano",
-            "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
+            "Kliknięto", "Rozpoczęto", "Zakończono", "Usunięto", "Błąd"]
     return pd.DataFrame(out, columns=cols)
 
 
@@ -650,6 +701,7 @@ def _df_to_pdf_bytes(df: pd.DataFrame, title: str = "Statusy") -> bytes | None:
             "🔗": "kliknięto",
             "🏁": "rozpoczęto",
             "✅": "zakończono",
+            "🚫": "usunięto",
             "✖": "błąd",
             "⏳": "w kolejce",
             "•":  "inny",
@@ -892,13 +944,17 @@ def render(back_btn: Callable[[], None]) -> None:
 
     st.markdown('<div class="field-label">Odbiorcy</div>', unsafe_allow_html=True)
     placeholder = "48500123456, 48600111222" if method == "SMS" else "jan@firma.pl, ola@urzad.gov.pl"
-    recipients_key = "sendlink_recipients"
+    recipients_key_prefix = "sendlink_recipients"
+    recipients_nonce_key = "sendlink_recipients_widget_nonce"
     clear_recipients_flag_key = "sendlink_clear_recipients_pending"
+    if recipients_nonce_key not in st.session_state:
+        st.session_state[recipients_nonce_key] = 0
     if st.session_state.pop(clear_recipients_flag_key, False):
-        st.session_state[recipients_key] = ""
+        st.session_state[recipients_nonce_key] = int(st.session_state.get(recipients_nonce_key, 0)) + 1
+    recipients_widget_key = f"{recipients_key_prefix}_{int(st.session_state.get(recipients_nonce_key, 0))}"
     recipients = st.text_area(
         "Odbiorcy",
-        key=recipients_key,
+        key=recipients_widget_key,
         placeholder=placeholder,
         height=100,
         label_visibility="collapsed",
@@ -1008,13 +1064,21 @@ def render(back_btn: Callable[[], None]) -> None:
     cols = st.columns([3, 3], gap="medium")
     with cols[0]:
         st.markdown('<div class="field-label">Treść wiadomości:</div>', unsafe_allow_html=True)
-        st.text_area("Treść wiadomości", key="sms_body", height=240, label_visibility="collapsed")
+        body_placeholder = "Wpisz treść wiadomości..."
+        st.text_area(
+            "Treść wiadomości",
+            key="sms_body",
+            height=240,
+            label_visibility="collapsed",
+            placeholder=body_placeholder,
+        )
 
         # licznik tylko dla SMS; e-mail nie pokazuje licznika i zachowuje polskie znaki
         if method == "SMS":
             _render_live_sms_counter(
                 str(st.session_state.get("sms_body") or ""),
                 counter_id="sendlink_sms_counter_live",
+                textarea_placeholder=body_placeholder,
             )
 
         # przyciski – „Przywróć” wyżej, „Wyślij” dużo niżej
@@ -1403,7 +1467,7 @@ def render(back_btn: Callable[[], None]) -> None:
     from streamlit import column_config as cc
     wanted_cols = ["Data", ("Telefon" if mode == "sms" else "E-mail"), "Status", "Czas wyp.",
                    "Wysłano",
-                   "Kliknięto", "Rozpoczęto", "Zakończono", "Błąd"]
+                   "Kliknięto", "Rozpoczęto", "Zakończono", "Usunięto", "Błąd"]
     for c in wanted_cols:
         if c not in df_logs.columns:
             df_logs[c] = ""
@@ -1416,6 +1480,7 @@ def render(back_btn: Callable[[], None]) -> None:
     def _status_icon_fixed(row: Dict) -> str:
         status = (row.get("status") or "").lower()
         if row.get("rejected_at"): return "🚫"
+        if status == "revoked": return "🚫"
         if status == "failed": return "✖"
         if row.get("completed_at"): return "✅"
         if row.get("started_at"): return "🏁"

@@ -2969,16 +2969,36 @@ _JST_CASE_LABELS = {
 }
 
 
+def _safe_check_jst_slug_availability(slug: str, exclude_id: Optional[str] = None) -> Optional[bool]:
+    s = (slug or "").strip()
+    if not s:
+        return False
+    result, err, _attempts = _call_with_retry(
+        lambda: check_jst_slug_availability(sb, s, exclude_id=exclude_id),
+        max_attempts=3,
+        base_sleep_seconds=0.2,
+    )
+    if err is not None:
+        return None
+    return bool(result)
+
+
 def _next_free_jst_slug(base: str, exclude_id: Optional[str] = None) -> str:
     stem = (base or "").strip()
     if not stem:
         return ""
-    if check_jst_slug_availability(sb, stem, exclude_id=exclude_id):
+    stem_free = _safe_check_jst_slug_availability(stem, exclude_id=exclude_id)
+    if stem_free is None:
+        return stem
+    if stem_free:
         return stem
     n = 2
     while n < 200:
         cand = f"{stem}-{n}"
-        if check_jst_slug_availability(sb, cand, exclude_id=exclude_id):
+        cand_free = _safe_check_jst_slug_availability(cand, exclude_id=exclude_id)
+        if cand_free is None:
+            return stem
+        if cand_free:
             return cand
         n += 1
     return stem
@@ -3032,8 +3052,16 @@ def _jst_url_editor(prefix: str, jst_type: str, jst_name: str, study_id: Optiona
     with col_r:
         slug_val = st.text_input(slug_key, value=st.session_state.get(slug_key, ""), disabled=(not allow_custom), placeholder="np. lublin", label_visibility="collapsed").strip()
     chosen = slug_val if allow_custom else (current_slug or suggested)
-    free = check_jst_slug_availability(sb, chosen, exclude_id=study_id) if chosen else False
-    st.caption(f"Wybrany: **/{chosen or '—'}** – {'✅ wolny' if free else ('❌ zajęty' if chosen else '—')}")
+    free_check = _safe_check_jst_slug_availability(chosen, exclude_id=study_id) if chosen else False
+    free_unknown = bool(chosen) and free_check is None
+    free = bool(free_check) if not free_unknown else bool(current_slug and chosen == current_slug)
+    if free_unknown:
+        st.caption(
+            f"Wybrany: **/{chosen or '—'}** – ⚠️ nie udało się chwilowo potwierdzić dostępności linku. "
+            "Spróbuj ponownie za chwilę."
+        )
+    else:
+        st.caption(f"Wybrany: **/{chosen or '—'}** – {'✅ wolny' if free else ('❌ zajęty' if chosen else '—')}")
     return chosen, free
 
 

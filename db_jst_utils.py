@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
 import re
+import time
 import unicodedata
 import uuid
 
@@ -80,6 +81,50 @@ _AUX_METRY_SUFFIXES: tuple[str, ...] = (
     "_DESC",
     "_COMMENT",
 )
+_T = TypeVar("_T")
+_TRANSIENT_DB_ERROR_TOKENS: tuple[str, ...] = (
+    "remoteprotocolerror",
+    "server disconnected",
+    "connection reset",
+    "connection aborted",
+    "connection refused",
+    "broken pipe",
+    "remote end closed connection",
+    "read timed out",
+    "timed out",
+    "timeout",
+    "temporarily unavailable",
+    "temporary failure",
+    "econnreset",
+)
+
+
+def _is_transient_db_error(exc: Exception) -> bool:
+    msg = f"{type(exc).__name__}: {exc}".strip().lower()
+    if not msg:
+        return False
+    return any(token in msg for token in _TRANSIENT_DB_ERROR_TOKENS)
+
+
+def _execute_with_retry(
+    call_fn: Callable[[], _T],
+    *,
+    max_attempts: int = 4,
+    base_sleep_seconds: float = 0.35,
+) -> _T:
+    attempts = max(1, int(max_attempts))
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return call_fn()
+        except Exception as exc:
+            last_exc = exc
+            if (not _is_transient_db_error(exc)) or attempt >= attempts:
+                raise
+            time.sleep(float(base_sleep_seconds) * (2 ** (attempt - 1)))
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Nie udało się wykonać zapytania do bazy.")
 
 
 def _is_aux_metry_column(col: Any) -> bool:
@@ -1558,11 +1603,23 @@ def check_jst_slug_availability(sb: Client, slug: str, exclude_id: Optional[str]
     s = (slug or "").strip()
     if not s:
         return False
-    _release_inactive_slug_conflicts(sb, s, exclude_id=exclude_id)
-    q = sb.table("jst_studies").select("id").eq("slug", s).eq("is_active", True).limit(1)
-    if exclude_id:
-        q = q.neq("id", str(exclude_id))
-    res = q.execute()
+    try:
+        _execute_with_retry(
+            lambda: _release_inactive_slug_conflicts(sb, s, exclude_id=exclude_id),
+            max_attempts=3,
+            base_sleep_seconds=0.2,
+        )
+    except Exception:
+        # Nie blokujemy dalszego sprawdzenia – to tylko próba "odblokowania" sluga.
+        pass
+
+    def _run_check():
+        q = sb.table("jst_studies").select("id").eq("slug", s).eq("is_active", True).limit(1)
+        if exclude_id:
+            q = q.neq("id", str(exclude_id))
+        return q.execute()
+
+    res = _execute_with_retry(_run_check, max_attempts=4, base_sleep_seconds=0.25)
     return len(res.data or []) == 0
 
 
