@@ -8894,11 +8894,15 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 safe_text = str(text or "").strip()
                 if not safe_text or safe_text in {"0", "0.0"}:
                     return
+                normalized = safe_text.replace("\r\n", "\n").replace("\r", "\n")
+                escaped = html.escape(normalized)
+                # Utrzymujemy cały opis w jednym kontenerze stylu, także przy podziale na akapity.
+                escaped = escaped.replace("\n\n", "<br><br>").replace("\n", "<br>")
                 st.markdown(
                     (
                         "<div style='margin-top:10px;margin-bottom:16px;"
                         "font-size:0.92em;line-height:1.58;color:var(--text-color,#334155);'>"
-                        f"{html.escape(safe_text)}"
+                        f"{escaped}"
                         "</div>"
                     ),
                     unsafe_allow_html=True,
