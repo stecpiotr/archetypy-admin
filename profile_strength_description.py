@@ -31,6 +31,17 @@ class ProfileStrengthInput(TypedDict, total=False):
     subjectGenitive: str | None
 
 
+class ProfileStrengthClassification(TypedDict):
+    overall_strength_label: str
+    concentration_label: Literal["spread", "core", "bi", "tri"]
+    top1: float
+    top2: float
+    top3: float
+    count_ge50: int
+    count_lt45: int
+    reasons: list[str]
+
+
 _LABEL_TO_ID: dict[str, str] = {
     "niewinny": "niewinny",
     "niewinna": "niewinny",
@@ -219,33 +230,78 @@ def aggregateNeedGroups(archetypes: list[ArchetypeStrength]) -> NeedGroupsResult
     }
 
 
-def _strength_label(primary_score: float) -> str:
-    if primary_score < 50:
-        return "słaby"
-    if primary_score < 60:
-        return "umiarkowany"
-    if primary_score < 70:
-        return "wyraźny"
-    if primary_score < 80:
-        return "silny"
-    return "bardzo silny"
+def classify_profile_strength(
+    archetypes: list[ArchetypeStrength],
+    tertiary: ArchetypeStrength | None = None,
+) -> ProfileStrengthClassification:
+    scores = sorted([_to_score(item.get("score")) for item in archetypes], reverse=True)
+    padded = scores + [0.0, 0.0, 0.0]
+    top1, top2, top3 = float(padded[0]), float(padded[1]), float(padded[2])
+    count_ge50 = sum(1 for score in scores if score >= 50.0)
+    count_lt45 = sum(1 for score in scores if score < 45.0)
+    majority_lt45 = count_lt45 >= 7
+    reasons: list[str] = []
 
-
-def _profile_shape(top1: float, top2: float, tertiary: ArchetypeStrength | None) -> str:
-    diff = float(top1) - float(top2)
-    has_tri_core = bool(tertiary and _to_score(tertiary.get("score")) >= 70.0)
+    has_tri_core = bool(tertiary and _to_score(tertiary.get("score")) >= 70.0) or top3 >= 70.0
     if has_tri_core:
-        return "tri"
-    if diff <= 5.0 and top1 < 60.0:
-        return "soft"
-    if diff <= 5.0:
-        return "bi"
+        concentration_label: Literal["spread", "core", "bi", "tri"] = "tri"
+        reasons.append("TOP3>=70 -> trójbiegunowy")
+    elif top1 >= 60.0 and (top1 - top2) <= 5.0:
+        concentration_label = "bi"
+        reasons.append("TOP1 i TOP2 blisko siebie przy TOP1>=60 -> dwubiegunowy")
+    elif count_ge50 <= 1 and top2 < 50.0:
+        concentration_label = "spread"
+        reasons.append("Tylko jeden archetyp >=50 i TOP2<50 -> rozproszony")
+    elif top1 < 60.0 and top2 < 55.0:
+        concentration_label = "spread"
+        reasons.append("Brak mocnego duetu TOP1/TOP2 -> rozproszony")
+    else:
+        concentration_label = "core"
+        reasons.append("Czytelny rdzeń TOP1/TOP2")
+
     if top1 < 50.0:
-        return "spread"
-    return "core"
+        overall = "słaby"
+        reasons.append("TOP1<50")
+    elif top1 >= 80.0 and (top2 >= 70.0 or top3 >= 70.0):
+        overall = "bardzo silny"
+        reasons.append("TOP1>=80 i silne wsparcie TOP2/TOP3")
+    elif top1 >= 70.0 and (top2 >= 60.0 or top3 >= 60.0 or count_ge50 >= 3):
+        overall = "silny"
+        reasons.append("TOP1>=70 i rdzeń 2-3 archetypów")
+    elif top1 >= 70.0:
+        overall = "silny"
+        reasons.append("TOP1>=70")
+    elif top1 >= 60.0 and (top2 >= 50.0 or count_ge50 >= 3):
+        overall = "wyraźny"
+        reasons.append("TOP1>=60 i czytelna oś")
+    elif top1 >= 60.0:
+        overall = "wyraźny"
+        reasons.append("TOP1>=60")
+    else:
+        # TOP1 w paśmie 50-59: oddzielamy natężenie lidera od siły całego profilu.
+        if top2 <= 45.0 and count_ge50 <= 1 and majority_lt45:
+            overall = "raczej słaby"
+            reasons.append("TOP1 umiarkowany, ale TOP2 słaby i większość archetypów nisko")
+        elif top2 <= 46.0 and count_ge50 <= 1 and count_lt45 >= 6:
+            overall = "słabo zarysowany"
+            reasons.append("TOP1 umiarkowany bez stabilnego wsparcia TOP2")
+        else:
+            overall = "umiarkowany"
+            reasons.append("TOP1 umiarkowany i niezałamany rozkład")
+
+    return {
+        "overall_strength_label": overall,
+        "concentration_label": concentration_label,
+        "top1": top1,
+        "top2": top2,
+        "top3": top3,
+        "count_ge50": int(count_ge50),
+        "count_lt45": int(count_lt45),
+        "reasons": reasons,
+    }
 
 
-def _opening_sentence(subject_genitive: str | None, strength: str, shape: str) -> str:
+def _opening_sentence(subject_genitive: str | None, strength: str, shape: Literal["spread", "core", "bi", "tri"]) -> str:
     subject_txt = str(subject_genitive or "").strip()
     base = f"Układ siły archetypów {subject_txt}" if subject_txt else "Układ siły archetypów"
     if shape == "tri":
@@ -258,7 +314,7 @@ def _opening_sentence(subject_genitive: str | None, strength: str, shape: str) -
 
 
 def _roles_sentence(
-    shape: str,
+    shape: Literal["spread", "core", "bi", "tri"],
     primary_label: str,
     primary_intensity: str,
     supporting_label: str,
@@ -288,7 +344,7 @@ def _roles_sentence(
         f"Archetypem głównym jest {primary_label} o {_intensity_locative(primary_intensity)}, "
         f"natomiast archetypem wspierającym jest {supporting_label} o {_intensity_locative(supporting_intensity)}"
     )
-    if shape in {"soft", "spread"}:
+    if shape == "spread":
         sentence += ", co pokazuje profil bez jednego bardzo dominującego rdzenia."
     else:
         sentence += "."
@@ -308,17 +364,21 @@ def _pair_style_phrase(top: str, second: str) -> str:
     return f"{_GROUP_STYLE_SHORT[top]} oraz {_GROUP_STYLE_SHORT[second]}"
 
 
-def _should_mention_weakest(shape: str, spread: float, top_gap: float) -> bool:
+def _should_mention_weakest(shape: Literal["spread", "core", "bi", "tri"], spread: float, top_gap: float) -> bool:
     if spread > 10.0:
         return True
-    if spread >= 8.0 and shape in {"soft", "spread"}:
+    if spread >= 8.0 and shape == "spread":
         return True
     if spread >= 8.0 and top_gap > 3.0:
         return True
     return False
 
 
-def _needs_balance_sentence(group_values: NeedGroupsResult, ordered_keys: list[str], shape: str) -> tuple[str, str]:
+def _needs_balance_sentence(
+    group_values: NeedGroupsResult,
+    ordered_keys: list[str],
+    shape: Literal["spread", "core", "bi", "tri"],
+) -> tuple[str, str]:
     top = ordered_keys[0]
     second = ordered_keys[1]
     third = ordered_keys[2]
@@ -349,8 +409,8 @@ def _needs_balance_sentence(group_values: NeedGroupsResult, ordered_keys: list[s
 
     if spread < 5.0:
         balance_txt = (
-            "Różnice między grupami nie są duże, a profil jest dość zrównoważony między czterema obszarami potrzeb. "
-            f"W praktyce oznacza to połączenie akcentu {_GROUP_STYLE_SHORT[top]} i {_GROUP_STYLE_SHORT[second]} bez wyraźnych skrajności."
+            "Różnice między czterema grupami nie są duże, a profil jest dość zrównoważony między czterema obszarami potrzeb. "
+            f"W praktyce oznacza to profil bez wyraźnych skrajności, łączący akcenty {top_label} i {second_label}."
         )
     elif spread <= 10.0:
         weak_contrast_soft = _GROUP_WEAK_CONTRAST_SOFT[weakest]
@@ -405,8 +465,9 @@ def generate_strength_profile_description(raw_input: Mapping[str, object]) -> st
     primary_int = classifyArchetypeIntensity(primary_score)["label"]
     supporting_int = classifyArchetypeIntensity(supporting_score)["label"]
 
-    strength = _strength_label(primary_score)
-    shape = _profile_shape(primary_score, supporting_score, tertiary)
+    profile_strength = classify_profile_strength(archetypes, tertiary)
+    strength = str(profile_strength["overall_strength_label"])
+    shape = profile_strength["concentration_label"]
 
     first_parts: list[str] = [
         _opening_sentence(subject_gen, strength, shape),
