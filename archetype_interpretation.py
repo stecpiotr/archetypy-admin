@@ -341,6 +341,14 @@ DIM_LABELS_NOMINATIVE: dict[str, str] = {
     "kreatywnosc": "kreatywność",
 }
 
+DIM_LABELS_INSTRUMENTAL: dict[str, str] = {
+    "empatia": "empatią",
+    "sprawczosc": "sprawczością",
+    "racjonalnosc": "racjonalnością",
+    "niezaleznosc": "niezależnością",
+    "kreatywnosc": "kreatywnością",
+}
+
 ACTION_DIMENSIONS: tuple[str, ...] = (
     "empatia",
     "sprawczosc",
@@ -488,8 +496,13 @@ def _join_with_and(parts: list[str]) -> str:
     return f"{', '.join(cleaned[:-1])} i {cleaned[-1]}"
 
 
-def _format_dimension_names(dims: list[str], case: Literal["genitive", "nominative"]) -> str:
-    labels = DIM_LABELS if case == "genitive" else DIM_LABELS_NOMINATIVE
+def _format_dimension_names(dims: list[str], case: Literal["genitive", "nominative", "instrumental"]) -> str:
+    if case == "genitive":
+        labels = DIM_LABELS
+    elif case == "instrumental":
+        labels = DIM_LABELS_INSTRUMENTAL
+    else:
+        labels = DIM_LABELS_NOMINATIVE
     return _join_with_and([labels[dim] for dim in dims if dim in labels])
 
 
@@ -536,36 +549,6 @@ def buildActionProfileNarrative(
     tertiary = topArchetypes["tertiary"]
     subject_forms = topArchetypes.get("subjectForms")
     subject = getPreferredGenitive(subject_forms) or "tego układu"
-
-    sentence1 = f"Rdzeń działania {subject} tworzą {primary.label} i {supporting.label}."
-    if tertiary is not None:
-        sentence1 += f" Dodatkowy ton wnosi {tertiary.label}."
-        tertiary_gen = _label_genitive(tertiary.label)
-        if maybeComparisonToTwoArchetypes:
-            changed_dims_list = [
-                dim
-                for dim in sorted(
-                    set(
-                        list(maybeComparisonToTwoArchetypes.get("changed_by_5_or_more", []))
-                        + list(maybeComparisonToTwoArchetypes.get("changed_band", []))
-                    ),
-                    key=lambda name: blendedDims.get(name, 0.0),
-                    reverse=True,
-                )
-                if dim in DIM_LABELS
-            ]
-            if changed_dims_list:
-                if len(changed_dims_list) == 1:
-                    sentence1 += (
-                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznacza się komponent "
-                        f"{DIM_LABELS[changed_dims_list[0]]}."
-                    )
-                else:
-                    sentence1 += (
-                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznaczają się komponenty "
-                        f"{_format_dimension_names(changed_dims_list, 'genitive')}."
-                    )
-
     ranked = sorted(blendedDims.items(), key=lambda item: item[1], reverse=True)
     dominant_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "dominant"]
     supporting_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "supporting"]
@@ -577,7 +560,48 @@ def buildActionProfileNarrative(
     else:
         dominant_list = [ranked[0][0], ranked[1][0]]
 
-    sentence2 = f"W praktyce daje to układ oparty przede wszystkim na {_format_dimension_names(dominant_list, 'genitive')}"
+    sentence1 = f"Rdzeń działania {subject} tworzą {primary.label} i {supporting.label}."
+    if tertiary is not None:
+        sentence1 += f" Dodatkowy ton wnosi {tertiary.label}."
+        tertiary_gen = _label_genitive(tertiary.label)
+        if maybeComparisonToTwoArchetypes:
+            changed_by_5 = [dim for dim in list(maybeComparisonToTwoArchetypes.get("changed_by_5_or_more", [])) if dim in DIM_LABELS]
+            changed_band = [dim for dim in list(maybeComparisonToTwoArchetypes.get("changed_band", [])) if dim in DIM_LABELS]
+            priority_dims = changed_band or changed_by_5
+            unique_priority_dims: list[str] = []
+            for dim in priority_dims:
+                if dim not in unique_priority_dims:
+                    unique_priority_dims.append(dim)
+
+            anchor_candidates = [
+                dim
+                for dim in changed_by_5
+                if dim in dominant_list and dim not in unique_priority_dims
+            ]
+            if not anchor_candidates:
+                anchor_candidates = [dim for dim in dominant_list if dim not in unique_priority_dims]
+
+            anchor_dim = anchor_candidates[0] if anchor_candidates else None
+            if unique_priority_dims:
+                if len(unique_priority_dims) == 1:
+                    sentence1 += (
+                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznacza się komponent "
+                        f"{DIM_LABELS[unique_priority_dims[0]]}"
+                    )
+                else:
+                    sentence1 += (
+                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznaczają się komponenty "
+                        f"{_format_dimension_names(unique_priority_dims, 'genitive')}"
+                    )
+                if anchor_dim is not None:
+                    sentence1 += (
+                        f", podczas gdy {DIM_LABELS_NOMINATIVE[anchor_dim]} pozostaje "
+                        "jednym z głównych filarów tego układu."
+                    )
+                else:
+                    sentence1 += "."
+
+    sentence2 = f"W praktyce daje to profil oparty przede wszystkim na {_format_dimension_names(dominant_list, 'genitive')}"
 
     if supporting_dims:
         if len(supporting_dims) == 1 and blendedDims[supporting_dims[0]] < 60:
@@ -587,7 +611,13 @@ def buildActionProfileNarrative(
 
     if visible_dims:
         if len(visible_dims) == 1:
-            sentence2 += f", oraz {DIM_LABELS_NOMINATIVE[visible_dims[0]]} obecną w wyraźnym, ale niedominującym stopniu"
+            if supporting_dims:
+                sentence2 += (
+                    f" oraz {DIM_LABELS_INSTRUMENTAL[visible_dims[0]]} obecną w wyraźnym, "
+                    "ale niedominującym stopniu"
+                )
+            else:
+                sentence2 += f", oraz {DIM_LABELS_NOMINATIVE[visible_dims[0]]} obecną w wyraźnym, ale niedominującym stopniu"
         else:
             sentence2 += f", a {_format_dimension_names(visible_dims, 'nominative')} obecne w wyraźnym, ale niedominującym stopniu"
     sentence2 += "."
