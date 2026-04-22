@@ -6057,7 +6057,7 @@ def _append_generated_descriptions_page(
         strength_title = re.sub(
             r"\s{2,}",
             " ",
-            f"Profil siły archetypów {subject_gen} (skala: 0-100)",
+            f"Profil siły archetypów {subject_gen} (skala: 0-100%)",
         ).strip()
         _doc_add_paragraph(doc_obj, strength_title, "Heading 2")
         _doc_add_paragraph(doc_obj, strength_desc)
@@ -9849,7 +9849,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
                 st.markdown(
                     ap_section_heading(
-                        f"Profil siły archetypów {personGen} (skala: 0-100)",
+                        f"Profil siły archetypów {personGen} (skala: 0-100%)",
                         center=False,
                         margin_bottom_px=12,
                         margin_top_px=mobile_section_margin_top,
@@ -9895,8 +9895,8 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 )
                 role_legend_html = "".join(
                     (
-                        "<span style=\"display:inline-flex;align-items:center;gap:7px;\">"
-                        f"<span style=\"width:14px;height:14px;border-radius:50%;border:2px solid #1f2937;background:{dot_color};display:inline-block;\"></span>"
+                        "<span style=\"display:inline-flex;align-items:center;gap:6px;\">"
+                        f"<span style=\"width:12px;height:12px;border-radius:50%;border:1.8px solid #1f2937;background:{dot_color};display:inline-block;\"></span>"
                         f"<span>{html.escape(dot_label)}</span>"
                         "</span>"
                     )
@@ -9907,7 +9907,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:center;justify-content:flex-start;"
                         "margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:var(--text-color,#475569);\">"
                         f"<div style='display:inline-flex;gap:24px;flex-wrap:wrap;align-items:center;'>{axis_legend_html}</div>"
-                        f"<div style='display:inline-flex;gap:16px;flex-wrap:wrap;align-items:center;'>{role_legend_html}</div>"
+                        f"<div style='display:inline-flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:0.92em;'>{role_legend_html}</div>"
                         "</div>"
                     ),
                     unsafe_allow_html=True,
