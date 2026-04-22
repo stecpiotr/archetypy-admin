@@ -9872,16 +9872,31 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                         img_css_class="ap-strength-wheel-img",
                         force_dark=force_dark_assets,
                     )
+                axis_legend_items = [
+                    ("#de4b43", "Zmiana"),
+                    ("#2d5ad5", "Ludzie"),
+                    ("#2f8a45", "Porządek"),
+                    ("#6f53d4", "Niezależność"),
+                ]
                 role_legend_items = [
                     ("#ff1d1d", "Archetyp główny"),
                     ("#f4cc2c", "Archetyp wspierający"),
                 ]
                 if bool(SHOW_SUPP):
                     role_legend_items.append(("#4ac10f", "Archetyp poboczny"))
+                axis_legend_html = "".join(
+                    (
+                        "<span style=\"display:inline-flex;align-items:center;gap:7px;\">"
+                        f"<span style=\"width:11px;height:11px;background:{swatch_color};border-radius:2px;display:inline-block;\"></span>"
+                        f"<span>{html.escape(swatch_label)}</span>"
+                        "</span>"
+                    )
+                    for swatch_color, swatch_label in axis_legend_items
+                )
                 role_legend_html = "".join(
                     (
-                        "<span style=\"display:inline-flex;align-items:center;gap:11px;\">"
-                        f"<span style=\"width:24px;height:24px;border-radius:50%;border:2px solid #1f2937;background:{dot_color};display:inline-block;\"></span>"
+                        "<span style=\"display:inline-flex;align-items:center;gap:7px;\">"
+                        f"<span style=\"width:14px;height:14px;border-radius:50%;border:2px solid #1f2937;background:{dot_color};display:inline-block;\"></span>"
                         f"<span>{html.escape(dot_label)}</span>"
                         "</span>"
                     )
@@ -9889,9 +9904,10 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 )
                 st.markdown(
                     (
-                        "<div style=\"display:flex;gap:28px;flex-wrap:wrap;align-items:center;justify-content:flex-start;"
+                        "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:center;justify-content:flex-start;"
                         "margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:var(--text-color,#475569);\">"
-                        f"{role_legend_html}"
+                        f"<div style='display:inline-flex;gap:24px;flex-wrap:wrap;align-items:center;'>{axis_legend_html}</div>"
+                        f"<div style='display:inline-flex;gap:16px;flex-wrap:wrap;align-items:center;'>{role_legend_html}</div>"
                         "</div>"
                     ),
                     unsafe_allow_html=True,
