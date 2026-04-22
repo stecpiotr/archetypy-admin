@@ -91,6 +91,13 @@ class ActionTopArchetypes(TypedDict):
     subjectForms: SubjectForms | None
 
 
+class ActionDimensionRoles(TypedDict):
+    dominantDims: list[str]
+    supportingDims: list[str]
+    visibleButNonDominantDims: list[str]
+    weakestDims: list[str]
+
+
 ARCHETYPE_META: dict[ArchetypeId, ArchetypeMeta] = {
     "niewinny": {
         "valueKey": "bezpieczeństwo",
@@ -512,6 +519,31 @@ def _sentence_case(text: str) -> str:
     return text[0].upper() + text[1:]
 
 
+def splitActionDimensionRoles(blendedDims: dict[str, float]) -> ActionDimensionRoles:
+    ranked = sorted(blendedDims.items(), key=lambda item: item[1], reverse=True)
+    dominant = [dim for dim, value in ranked if classifyDimensionBand(value) == "dominant"]
+    supporting = [dim for dim, value in ranked if classifyDimensionBand(value) == "supporting"]
+    visible = [dim for dim, value in ranked if classifyDimensionBand(value) == "visible_non_dominant"]
+    weakest = [dim for dim, value in ranked if classifyDimensionBand(value) == "weaker"]
+
+    # Gdy brak twardych dominantów, bierzemy dwa najwyższe jako filary opisu.
+    if not dominant and ranked:
+        dominant = [dim for dim, _ in ranked[:2]]
+
+    seen: set[str] = set()
+    dominant = [dim for dim in dominant if dim not in seen and not seen.add(dim)]
+    supporting = [dim for dim in supporting if dim not in seen and not seen.add(dim)]
+    visible = [dim for dim in visible if dim not in seen and not seen.add(dim)]
+    weakest = [dim for dim in weakest if dim not in seen and not seen.add(dim)]
+
+    return {
+        "dominantDims": dominant,
+        "supportingDims": supporting,
+        "visibleButNonDominantDims": visible,
+        "weakestDims": weakest,
+    }
+
+
 def compareTwoVsThreeArchetypes(blend2: dict[str, float], blend3: dict[str, float]) -> ActionProfileComparison:
     changed_by_5_or_more: list[str] = []
     changed_band: list[str] = []
@@ -550,15 +582,13 @@ def buildActionProfileNarrative(
     subject_forms = topArchetypes.get("subjectForms")
     subject = getPreferredGenitive(subject_forms) or "tego układu"
     ranked = sorted(blendedDims.items(), key=lambda item: item[1], reverse=True)
-    dominant_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "dominant"]
-    supporting_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "supporting"]
-    visible_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "visible_non_dominant"]
-    weaker_dims = [dim for dim, value in ranked if classifyDimensionBand(value) == "weaker"]
-
-    if dominant_dims:
-        dominant_list = dominant_dims[:2] if len(dominant_dims) >= 2 else dominant_dims
-    else:
-        dominant_list = [ranked[0][0], ranked[1][0]]
+    roles = splitActionDimensionRoles(blendedDims)
+    dominant_list = list(roles["dominantDims"])
+    supporting_dims = list(roles["supportingDims"])
+    visible_dims = list(roles["visibleButNonDominantDims"])
+    weaker_dims = list(roles["weakestDims"])
+    if not dominant_list and ranked:
+        dominant_list = [dim for dim, _ in ranked[:2]]
 
     sentence1 = f"Rdzeń działania {subject} tworzą {primary.label} i {supporting.label}."
     if tertiary is not None:
@@ -567,32 +597,22 @@ def buildActionProfileNarrative(
         if maybeComparisonToTwoArchetypes:
             changed_by_5 = [dim for dim in list(maybeComparisonToTwoArchetypes.get("changed_by_5_or_more", [])) if dim in DIM_LABELS]
             changed_band = [dim for dim in list(maybeComparisonToTwoArchetypes.get("changed_band", [])) if dim in DIM_LABELS]
-            priority_dims = changed_band or changed_by_5
-            unique_priority_dims: list[str] = []
-            for dim in priority_dims:
-                if dim not in unique_priority_dims:
-                    unique_priority_dims.append(dim)
+            focus_dim = (changed_band[0] if changed_band else (changed_by_5[0] if changed_by_5 else None))
+            anchor_dim = None
+            if "niezaleznosc" in dominant_list and focus_dim != "niezaleznosc":
+                anchor_dim = "niezaleznosc"
+            for dim in dominant_list:
+                if anchor_dim is None and dim != focus_dim:
+                    anchor_dim = dim
+                    break
+            if anchor_dim is None and dominant_list:
+                anchor_dim = dominant_list[0]
 
-            anchor_candidates = [
-                dim
-                for dim in changed_by_5
-                if dim in dominant_list and dim not in unique_priority_dims
-            ]
-            if not anchor_candidates:
-                anchor_candidates = [dim for dim in dominant_list if dim not in unique_priority_dims]
-
-            anchor_dim = anchor_candidates[0] if anchor_candidates else None
-            if unique_priority_dims:
-                if len(unique_priority_dims) == 1:
-                    sentence1 += (
-                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznacza się komponent "
-                        f"{DIM_LABELS[unique_priority_dims[0]]}"
-                    )
-                else:
-                    sentence1 += (
-                        f" Po dołożeniu {tertiary_gen} wyraźniej zaznaczają się komponenty "
-                        f"{_format_dimension_names(unique_priority_dims, 'genitive')}"
-                    )
+            if focus_dim:
+                sentence1 += (
+                    f" Po dołożeniu {tertiary_gen} wyraźniej zaznacza się komponent "
+                    f"{DIM_LABELS[focus_dim]}"
+                )
                 if anchor_dim is not None:
                     sentence1 += (
                         f", a {DIM_LABELS_NOMINATIVE[anchor_dim]} "
@@ -601,45 +621,47 @@ def buildActionProfileNarrative(
                 else:
                     sentence1 += "."
 
-    sentence2 = f"W praktyce daje to profil oparty przede wszystkim na {_format_dimension_names(dominant_list, 'genitive')}"
+    sentence2 = f"W praktyce daje to profil oparty przede wszystkim na {_format_dimension_names(dominant_list, 'genitive')}."
 
+    sentence_support = ""
     if supporting_dims:
-        if len(supporting_dims) == 1 and blendedDims[supporting_dims[0]] < 60:
-            sentence2 += f", z dodatkowym ważnym komponentem {DIM_LABELS[supporting_dims[0]]}"
+        support_text = _format_dimension_names(supporting_dims, "genitive")
+        if min(float(blendedDims.get(dim, 0.0)) for dim in supporting_dims) >= 60.0:
+            sentence_support = f"Przy solidnym wsparciu {support_text}."
         else:
-            sentence2 += f", przy solidnym wsparciu {_format_dimension_names(supporting_dims, 'genitive')}"
+            sentence_support = f"Z dodatkowym ważnym komponentem {support_text}."
 
+    sentence_visible = ""
     if visible_dims:
         if len(visible_dims) == 1:
-            if supporting_dims:
-                sentence2 += (
-                    f" oraz {DIM_LABELS_INSTRUMENTAL[visible_dims[0]]} obecną w wyraźnym, "
-                    "ale niedominującym stopniu"
-                )
-            else:
-                sentence2 += f", oraz {DIM_LABELS_NOMINATIVE[visible_dims[0]]} obecną w wyraźnym, ale niedominującym stopniu"
+            sentence_visible = (
+                f"{_sentence_case(DIM_LABELS_NOMINATIVE[visible_dims[0]])} "
+                "pozostaje obecna w wyraźnym, ale niedominującym stopniu."
+            )
         else:
-            sentence2 += f", a {_format_dimension_names(visible_dims, 'nominative')} obecne w wyraźnym, ale niedominującym stopniu"
-    sentence2 += "."
+            sentence_visible = (
+                f"{_sentence_case(_format_dimension_names(visible_dims, 'nominative'))} "
+                "pozostają obecne w wyraźnym, ale niedominującym stopniu."
+            )
 
-    sentence3 = ""
+    sentence_weak = ""
     weak_sorted = sorted(weaker_dims, key=lambda dim: blendedDims.get(dim, 0.0))
     if len(weak_sorted) == 1:
-        sentence3 = f"Najsłabszym wymiarem pozostaje {DIM_LABELS_NOMINATIVE[weak_sorted[0]]}."
+        sentence_weak = f"Najsłabszym wymiarem pozostaje {DIM_LABELS_NOMINATIVE[weak_sorted[0]]}."
     elif len(weak_sorted) >= 2:
         lowest = weak_sorted[0]
         second_lowest = weak_sorted[1]
         if blendedDims.get(second_lowest, 0.0) - blendedDims.get(lowest, 0.0) >= 5.0:
-            sentence3 = f"Najsłabszym wymiarem pozostaje {DIM_LABELS_NOMINATIVE[lowest]}."
+            sentence_weak = f"Najsłabszym wymiarem pozostaje {DIM_LABELS_NOMINATIVE[lowest]}."
             remaining = weak_sorted[1:]
             if remaining:
                 remaining_text = _format_dimension_names(remaining, "nominative")
                 verb = "pozostaje słabszym wymiarem działania" if len(remaining) == 1 else "pozostają słabszymi wymiarami działania"
-                sentence3 += f" {_sentence_case(remaining_text)} {verb}."
+                sentence_weak += f" {_sentence_case(remaining_text)} {verb}."
         else:
             weak_text = _format_dimension_names(weak_sorted, "nominative")
             verb = "pozostaje słabszym wymiarem działania" if len(weak_sorted) == 1 else "pozostają słabszymi wymiarami działania"
-            sentence3 = f"{_sentence_case(weak_text)} {verb}."
+            sentence_weak = f"{_sentence_case(weak_text)} {verb}."
 
     top_dim_a, top_dim_b = ranked[0][0], ranked[1][0]
     summary_base = _pair_interpretation(top_dim_a, top_dim_b)
@@ -651,8 +673,12 @@ def buildActionProfileNarrative(
     summary_sentence = _build_action_summary_sentence(top_dim_a, top_dim_b, summary_base)
 
     first_paragraph_segments = [sentence1, sentence2]
-    if sentence3:
-        first_paragraph_segments.append(sentence3)
+    if sentence_support:
+        first_paragraph_segments.append(sentence_support)
+    if sentence_visible:
+        first_paragraph_segments.append(sentence_visible)
+    if sentence_weak:
+        first_paragraph_segments.append(sentence_weak)
     first_paragraph = " ".join(segment.strip() for segment in first_paragraph_segments if segment.strip())
     return f"{first_paragraph}\n\n{summary_sentence}"
 

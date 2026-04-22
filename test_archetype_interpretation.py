@@ -5,6 +5,7 @@ from archetype_interpretation import (
     generate_archetype_descriptions,
     getNameAwareOpening,
     getPreferredGenitive,
+    splitActionDimensionRoles,
 )
 from public_labels import (
     ARCHETYPE_PUBLIC_VALUES,
@@ -109,7 +110,7 @@ def test_4_profil_dzialania_bohater_wladca_odkrywca():
     assert "po dołożeniu odkrywcy wyraźniej zaznacza się komponent kreatywności" in txt
     assert "a niezależność pozostaje jednym z głównych filarów tego układu" in txt
     assert "w praktyce daje to profil oparty przede wszystkim na sprawczości i niezależności" in txt
-    assert "kreatywnością obecną w wyraźnym, ale niedominującym stopniu" in txt
+    assert "kreatywność pozostaje obecna w wyraźnym, ale niedominującym stopniu" in txt
     assert "najsłabszym wymiarem pozostaje empatia" in txt
     assert "empatia i kreatywność pozostają słabszymi wymiarami działania" not in txt
     assert "\n\ncałość wzmacnia obraz" in txt
@@ -168,7 +169,7 @@ def test_6b_odkrywczyni_tworczyni_nie_zawyza_racjonalnosci():
     action = out["actionProfileDescription"].lower()
     assert "kreatywności" in action
     assert "niezależności" in action
-    assert "racjonalnością obecną w wyraźnym, ale niedominującym stopniu" in action
+    assert "racjonalność pozostaje obecna w wyraźnym, ale niedominującym stopniu" in action
     assert "najsłabszym wymiarem pozostaje empatia" in action
     assert "racjonalności pozostających słabszymi wymiarami działania" not in action
     assert "umiarkowanej racjonalności" not in action
@@ -331,7 +332,50 @@ def test_15_top3_zmienia_opis_wiecej_niz_o_dopisek_o_trzecim_archetypie():
     assert "po dołożeniu odkrywcy wyraźniej zaznacza się komponent kreatywności" in txt_3.lower()
     assert "a niezależność pozostaje jednym z głównych filarów tego układu" in txt_3.lower()
     assert "kreatywność pozostaje słabszym wymiarem działania" in txt_2.lower()
-    assert "kreatywnością obecną w wyraźnym, ale niedominującym stopniu" in txt_3.lower()
+    assert "kreatywność pozostaje obecna w wyraźnym, ale niedominującym stopniu" in txt_3.lower()
     assert "to wzmacnia obraz" not in txt_3.lower()
     assert "\n\ncałość wzmacnia obraz" in txt_3.lower()
     assert txt_3.replace(" Dodatkowy ton wnosi Odkrywca.", "") != txt_2
+
+
+def test_16_niewinny_medrzec_tworca_rozdziela_role_wymiarow_bez_dublowania():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Niewinny", 82.0),
+            _result("Mędrzec", 79.0),
+            _result("Twórca", 71.0),
+            subject_forms={"fullGen": "Emila Steca"},
+        )
+    )
+    txt = out["actionProfileDescription"]
+    txt_l = txt.lower()
+    assert "oparty przede wszystkim na niezależności i racjonalności" in txt_l
+    assert "z dodatkowym ważnym komponentem sprawczości i kreatywności" in txt_l
+    assert "przy solidnym wsparciu niezależności, racjonalności" not in txt_l
+    assert "empatia pozostaje obecna w wyraźnym, ale niedominującym stopniu" in txt_l
+    assert "\n\nCałość wzmacnia obraz" in txt
+
+
+def test_17_split_action_dimension_roles_jest_rozlaczny_i_bez_duplikatow():
+    roles = splitActionDimensionRoles(
+        {
+            "empatia": 44.03,
+            "sprawczosc": 57.39,
+            "racjonalnosc": 62.26,
+            "niezaleznosc": 62.33,
+            "kreatywnosc": 56.96,
+        }
+    )
+
+    assert roles["dominantDims"] == ["niezaleznosc", "racjonalnosc"]
+    assert roles["supportingDims"] == ["sprawczosc", "kreatywnosc"]
+    assert roles["visibleButNonDominantDims"] == ["empatia"]
+    assert roles["weakestDims"] == []
+
+    all_dims = (
+        roles["dominantDims"]
+        + roles["supportingDims"]
+        + roles["visibleButNonDominantDims"]
+        + roles["weakestDims"]
+    )
+    assert len(all_dims) == len(set(all_dims))
