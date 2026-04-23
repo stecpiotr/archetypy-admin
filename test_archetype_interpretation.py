@@ -89,8 +89,7 @@ def test_3_kolo_potrzeb_bohater_wladca_odkrywca():
         )
     )
     txt = out["needsWheelDescription"]
-    assert "niezależności" in txt
-    assert "stabilności" in txt
+    assert "łączy niezależność ze stabilnością" in txt
     assert "Bohatera i Władcy" in txt
     assert "napięcie" not in txt.lower()
 
@@ -132,9 +131,10 @@ def test_5_niewinny_medrzec_tworca():
     needs = out["needsWheelDescription"].lower()
     action = out["actionProfileDescription"].lower()
 
-    assert "lekko ciąży ku niezależności" in needs
-    assert "z lekkim przechyłem ku stabilności" in needs
-    assert "biernym trwaniu przy tym, co zastane" in needs
+    assert "jest przede wszystkim zakorzeniony w stabilności" in needs
+    assert "z lekkim przechyłem ku niezależności" in needs
+    assert "porządkowaniu rzeczywistości, utrzymywaniu kursu i przewidywalności" in needs
+    assert "archetypy niewinnego i mędrca" in needs
     assert "racjonalności" in action
     assert "niskiej empatii" not in action
     assert "umiarkowanej racjonalności" not in action
@@ -151,8 +151,8 @@ def test_6_opiekunka_niewinna_odkrywczyni():
     )
     needs = out["needsWheelDescription"].lower()
     action = out["actionProfileDescription"].lower()
-    assert "przynależności" in needs
-    assert "stabilności" in needs
+    assert "jest przede wszystkim zakorzeniony w przynależności" in needs
+    assert "zrównoważonym układzie na drugiej osi" in needs
     assert "zdecydowanie po stronie stabilności" not in needs
     assert "empatii" in action
     assert "niskiej sprawczości" not in action
@@ -217,8 +217,8 @@ def test_8_fallback_personalizacji_i_helpery():
     assert "tego wyniku" in txt_needs
     assert "tego układu" in txt_action
     assert "wnosi tu Odnowę" in txt_values
-    assert "budowaniu wspólnoty" in txt_needs
-    assert "niż na dystansie i pełnej autonomii" in txt_needs
+    assert "jest przede wszystkim zakorzeniony w zmianie" in txt_needs.lower()
+    assert "szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji" in txt_needs
     assert "Rdzeń działania tego układu tworzą Kochanka i Buntowniczka" in txt_action
     assert "Kochanki i Buntowniczki" in txt_needs
     assert "None" not in txt_values + txt_needs + txt_action
@@ -259,7 +259,7 @@ def test_11_needs_balanced_x_ma_czasownik_pozostaje():
         )
     )
     txt = out["needsWheelDescription"]
-    assert "pozostaje bez wyraźnego przechyłu między niezależnością a przynależnością" in txt
+    assert "łączy zmianę z przynależnością" in txt
 
 
 def test_12_dominant_with_support_ma_naturalne_otwarcie_i_wartosc_publiczna():
@@ -429,3 +429,47 @@ def test_19_emil_i_hetman_drugi_akapit_ma_pelne_zdanie_syntetyzujace():
     assert len(hetman_parts) >= 2
     assert emil_parts[1].startswith("Całość wzmacnia")
     assert hetman_parts[1].startswith("Całość wzmacnia")
+
+
+def test_20_kolo_potrzeb_hierarchia_stabilnosc_ma_pierwszenstwo_nad_centroidem_emil():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Niewinny", 82.0),
+            _result("Mędrzec", 79.0),
+            _result("Twórca", 71.0),
+            subject_forms={"fullGen": "Emila Steca"},
+        )
+    )
+    txt = out["needsWheelDescription"].lower()
+    assert txt.startswith("układ potrzeb emila steca jest przede wszystkim zakorzeniony w stabilności")
+    assert "z lekkim przechyłem ku niezależności" in txt
+    assert "układ potrzeb emila steca lekko ciąży ku niezależności" not in txt
+
+
+def test_21_kolo_potrzeb_hierarchia_para_niezaleznosc_stabilnosc_hetman():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Bohater", 76.0),
+            _result("Władca", 75.9),
+            _result("Odkrywca", 70.1),
+            subject_forms={"fullGen": "Krzysztofa Hetmana"},
+        )
+    )
+    txt = out["needsWheelDescription"].lower()
+    assert "łączy niezależność ze stabilnością" in txt
+    assert "zakorzeniony w zmianie" not in txt
+    assert "a dodatkowy akcent wnosi odkrywca" in txt
+
+
+def test_22_kolo_wartosci_hierarchia_rdzen_glowny_plus_wspierajacy_hetman():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Bohater", 76.0),
+            _result("Władca", 75.9),
+            _result("Odkrywca", 70.1),
+            subject_forms={"fullGen": "Krzysztofa Hetmana"},
+        )
+    )
+    txt = out["valuesWheelDescription"]
+    assert "duet: Odwaga i Porządek" in txt
+    assert "Dodatkowy ton wnosi tu także Wolność" in txt

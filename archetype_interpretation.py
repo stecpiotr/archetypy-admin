@@ -98,6 +98,25 @@ class ActionDimensionRoles(TypedDict):
     weakestDims: list[str]
 
 
+class NeedAxisPriority(TypedDict):
+    mode: Literal["axis_priority", "pair_priority"]
+    priority_axis: Literal["x", "y"] | None
+    priority_side: str | None
+    secondary_side: str | None
+    secondary_strength: str | None
+    primary_side: str | None
+    supporting_side: str | None
+
+
+class ValueCore(TypedDict):
+    primaryValue: str
+    supportingValue: str
+    tertiaryValue: str | None
+    primaryPhrase: str
+    supportingPhrase: str
+    tertiaryPhrase: str | None
+
+
 ARCHETYPE_META: dict[ArchetypeId, ArchetypeMeta] = {
     "niewinny": {
         "valueKey": "bezpieczeństwo",
@@ -865,6 +884,265 @@ def _y_opposite_meaning(y: float) -> str:
     return "trzymaniu się rutyny i przewidywalności"
 
 
+def _need_side_from_axis(value: float, axis: Literal["x", "y"]) -> str:
+    threshold = 0.15
+    if axis == "x":
+        if value <= -threshold:
+            return "niezaleznosc"
+        if value >= threshold:
+            return "przynaleznosc"
+        return "balanced"
+    if value <= -threshold:
+        return "stabilnosc"
+    if value >= threshold:
+        return "zmiana"
+    return "balanced"
+
+
+def _need_side_locative(side: str) -> str:
+    return {
+        "niezaleznosc": "niezależności",
+        "przynaleznosc": "przynależności",
+        "stabilnosc": "stabilności",
+        "zmiana": "zmianie",
+    }.get(side, "równowadze")
+
+
+def _need_side_nominative(side: str) -> str:
+    return {
+        "niezaleznosc": "niezależność",
+        "przynaleznosc": "przynależność",
+        "stabilnosc": "stabilność",
+        "zmiana": "zmiana",
+    }.get(side, "równowaga")
+
+
+def _need_side_accusative(side: str) -> str:
+    return {
+        "niezaleznosc": "niezależność",
+        "przynaleznosc": "przynależność",
+        "stabilnosc": "stabilność",
+        "zmiana": "zmianę",
+    }.get(side, "równowagę")
+
+
+def _need_side_instrumental(side: str) -> str:
+    return {
+        "niezaleznosc": "niezależnością",
+        "przynaleznosc": "przynależnością",
+        "stabilnosc": "stabilnością",
+        "zmiana": "zmianą",
+    }.get(side, "równowagą")
+
+
+def _z_preposition(word: str) -> str:
+    normalized = str(word or "").lower()
+    if normalized.startswith(("s", "z", "sz", "cz", "ś", "ź", "ż")):
+        return "ze"
+    return "z"
+
+
+def _need_side_meaning(side: str) -> str:
+    return {
+        "niezaleznosc": "samodzielnym podejmowaniu decyzji i opieraniu się na własnym kierunku",
+        "przynaleznosc": "relacjach z ludźmi, budowaniu wspólnoty i dostrajaniu się do otoczenia",
+        "stabilnosc": "porządkowaniu rzeczywistości, utrzymywaniu kursu i przewidywalności",
+        "zmiana": "szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji",
+    }.get(side, "łączeniu skrajności w bardziej zrównoważony sposób")
+
+
+def _need_tilt_phrase(side: str, strength: str) -> str:
+    if side == "balanced" or strength == "balanced":
+        return "przy bardziej zrównoważonym układzie na drugiej osi"
+    adjective = {
+        "soft": "lekkim",
+        "clear": "wyraźnym",
+        "strong": "silnym",
+    }.get(strength, "wyraźnym")
+    return f"z {adjective} przechyłem ku {_need_side_locative(side)}"
+
+
+def _dominant_need_side_for_archetype(archetype: _ResolvedResult) -> str:
+    meta = ARCHETYPE_META[archetype.id]
+    x = float(meta["needsX"])
+    y = float(meta["needsY"])
+    side_x = _need_side_from_axis(x, "x")
+    side_y = _need_side_from_axis(y, "y")
+    if side_x == "balanced" and side_y != "balanced":
+        return side_y
+    if side_y == "balanced" and side_x != "balanced":
+        return side_x
+    if abs(x) >= abs(y):
+        return side_x
+    return side_y
+
+
+def resolve_need_axis_priority(
+    primary: _ResolvedResult,
+    supporting: _ResolvedResult,
+    tertiary: _ResolvedResult | None,
+    centroid: tuple[float, float],
+) -> NeedAxisPriority:
+    _ = tertiary
+    primary_meta = ARCHETYPE_META[primary.id]
+    supporting_meta = ARCHETYPE_META[supporting.id]
+    px = float(primary_meta["needsX"])
+    py = float(primary_meta["needsY"])
+    sx = float(supporting_meta["needsX"])
+    sy = float(supporting_meta["needsY"])
+    cx, cy = centroid
+
+    px_side = _need_side_from_axis(px, "x")
+    sx_side = _need_side_from_axis(sx, "x")
+    py_side = _need_side_from_axis(py, "y")
+    sy_side = _need_side_from_axis(sy, "y")
+
+    same_y = py_side == sy_side and py_side != "balanced"
+    same_x = px_side == sx_side and px_side != "balanced"
+
+    if same_y or same_x:
+        if same_y and same_x:
+            y_power = abs(py) + abs(sy)
+            x_power = abs(px) + abs(sx)
+            priority_axis: Literal["x", "y"] = "y" if y_power >= x_power else "x"
+        elif same_y:
+            priority_axis = "y"
+        else:
+            priority_axis = "x"
+
+        priority_side = py_side if priority_axis == "y" else px_side
+        secondary_axis: Literal["x", "y"] = "x" if priority_axis == "y" else "y"
+        secondary_value = cx if secondary_axis == "x" else cy
+        secondary_side = _need_side_from_axis(secondary_value, secondary_axis)
+        secondary_strength = _axis_strength(secondary_value)
+        return {
+            "mode": "axis_priority",
+            "priority_axis": priority_axis,
+            "priority_side": priority_side,
+            "secondary_side": secondary_side,
+            "secondary_strength": secondary_strength,
+            "primary_side": None,
+            "supporting_side": None,
+        }
+
+    return {
+        "mode": "pair_priority",
+        "priority_axis": None,
+        "priority_side": None,
+        "secondary_side": None,
+        "secondary_strength": None,
+        "primary_side": _dominant_need_side_for_archetype(primary),
+        "supporting_side": _dominant_need_side_for_archetype(supporting),
+    }
+
+
+def resolve_need_description_from_hierarchy(
+    subject_forms: SubjectForms | None,
+    primary: _ResolvedResult,
+    supporting: _ResolvedResult,
+    tertiary: _ResolvedResult | None,
+    centroid: tuple[float, float],
+) -> str:
+    opening = getNameAwareOpening("needs", subject_forms)
+    priority = resolve_need_axis_priority(primary, supporting, tertiary, centroid)
+
+    if priority["mode"] == "axis_priority":
+        core_side = str(priority.get("priority_side") or "balanced")
+        first_sentence = f"{opening} jest przede wszystkim zakorzeniony w {_need_side_locative(core_side)}"
+        tilt = _need_tilt_phrase(str(priority.get("secondary_side") or "balanced"), str(priority.get("secondary_strength") or "balanced"))
+        if tilt:
+            first_sentence += f", {tilt}"
+        first_sentence += "."
+        second_sentence = f"W praktyce oznacza to styl działania oparty na {_need_side_meaning(core_side)}."
+    else:
+        primary_side = str(priority.get("primary_side") or "niezaleznosc")
+        supporting_side = str(priority.get("supporting_side") or "stabilnosc")
+        supporting_instr = _need_side_instrumental(supporting_side)
+        first_sentence = (
+            f"{opening} łączy {_need_side_accusative(primary_side)} "
+            f"{_z_preposition(supporting_instr)} {supporting_instr}."
+        )
+        second_sentence = (
+            f"W praktyce oznacza to styl działania oparty na {_need_side_meaning(primary_side)} "
+            f"oraz {_need_side_meaning(supporting_side)}."
+        )
+
+    primary_gen = _label_genitive(primary.label)
+    supporting_gen = _label_genitive(supporting.label)
+    if tertiary is not None:
+        third_sentence = (
+            f"Ten kierunek budują przede wszystkim archetypy {primary_gen} i {supporting_gen}, "
+            f"a dodatkowy akcent wnosi {tertiary.label}."
+        )
+    else:
+        third_sentence = f"Ten kierunek budują przede wszystkim archetypy {primary_gen} i {supporting_gen}."
+
+    return f"{first_sentence} {second_sentence} {third_sentence}"
+
+
+def resolve_value_core_from_hierarchy(
+    primary: _ResolvedResult,
+    supporting: _ResolvedResult,
+    tertiary: _ResolvedResult | None,
+) -> ValueCore:
+    primary_meta = ARCHETYPE_META[primary.id]
+    supporting_meta = ARCHETYPE_META[supporting.id]
+    tertiary_meta = ARCHETYPE_META[tertiary.id] if tertiary is not None else None
+    return {
+        "primaryValue": str(primary_meta["publicValue"]),
+        "supportingValue": str(supporting_meta["publicValue"]),
+        "tertiaryValue": (str(tertiary_meta["publicValue"]) if tertiary_meta else None),
+        "primaryPhrase": str(primary_meta["publicValuePhrase"]),
+        "supportingPhrase": str(supporting_meta["publicValuePhrase"]),
+        "tertiaryPhrase": (str(tertiary_meta["publicValuePhrase"]) if tertiary_meta else None),
+    }
+
+
+def resolve_value_description_from_hierarchy(
+    subject_forms: SubjectForms | None,
+    primary: _ResolvedResult,
+    supporting: _ResolvedResult,
+    tertiary: _ResolvedResult | None,
+    dominance_type: str,
+) -> str:
+    core = resolve_value_core_from_hierarchy(primary, supporting, tertiary)
+    opening = getNameAwareOpening("values", subject_forms)
+    subject = getPreferredGenitive(subject_forms) or "tego układu"
+
+    if dominance_type == "co_dominant":
+        text = (
+            f"{opening} tworzy niemal równorzędny duet: {core['primaryValue']} i {core['supportingValue']}. "
+            f"Oznacza to przywództwo napędzane przede wszystkim {_phrase_case(core['primaryPhrase'], 'instrumental')}, "
+            f"wzmacnianą przez {_phrase_case(core['supportingPhrase'], 'accusative')}."
+        )
+    elif dominance_type == "dominant_with_strong_support":
+        supporting_acc = _public_value_accusative(str(core["supportingValue"]))
+        text = (
+            f"{opening} opiera się przede wszystkim na wartości {core['primaryValue']}, "
+            f"wyraźnie wzmacnianej przez {supporting_acc}. "
+            f"W praktyce oznacza to styl budowany na {_phrase_case(core['primaryPhrase'], 'locative')}, "
+            f"z dodatkowym akcentem na {_phrase_case(core['supportingPhrase'], 'accusative')}."
+        )
+    else:
+        supporting_acc = _public_value_accusative(str(core["supportingValue"]))
+        text = (
+            f"Najsilniejszą motywacją {subject} jest {core['primaryValue']}. "
+            f"Archetyp wspierający wnosi tu {supporting_acc}, "
+            f"ale to {core['primaryValue']} pozostaje głównym źródłem energii i kierunku działania, "
+            f"wzmacniając {_phrase_case(core['primaryPhrase'], 'accusative')}."
+        )
+
+    if tertiary is not None:
+        tertiary_value = str(core["tertiaryValue"] or "")
+        tertiary_phrase = str(core["tertiaryPhrase"] or "")
+        pronoun = PUBLIC_VALUE_PRONOUN.get(tertiary_value, "która")
+        text += (
+            f" Dodatkowy ton wnosi tu także {tertiary_value}, "
+            f"{pronoun} poszerza ten układ o {_phrase_case(tertiary_phrase, 'accusative')}."
+        )
+    return text
+
+
 def _is_female_label(label: str) -> bool:
     return label in FEMALE_LABELS
 
@@ -993,45 +1271,7 @@ def _generate_values_description(
     tertiary: _ResolvedResult | None,
     dominance_type: str,
 ) -> str:
-    primary_meta = ARCHETYPE_META[primary.id]
-    supporting_meta = ARCHETYPE_META[supporting.id]
-    opening = getNameAwareOpening("values", subject_forms)
-    subject = getPreferredGenitive(subject_forms) or "tego układu"
-
-    if dominance_type == "co_dominant":
-        text = (
-            f"{opening} tworzy niemal równorzędny duet: {primary_meta['publicValue']} i {supporting_meta['publicValue']}. "
-            f"Oznacza to przywództwo napędzane przede wszystkim {_phrase_case(primary_meta['publicValuePhrase'], 'instrumental')}, "
-            f"wzmacnianą przez {_phrase_case(supporting_meta['publicValuePhrase'], 'accusative')}."
-        )
-    elif dominance_type == "dominant_with_strong_support":
-        primary_value = str(primary_meta["publicValue"])
-        supporting_value = str(supporting_meta["publicValue"])
-        supporting_acc = _public_value_accusative(supporting_value)
-        text = (
-            f"{opening} opiera się przede wszystkim na wartości {primary_value}, "
-            f"wyraźnie wzmacnianej przez {supporting_acc}. "
-            f"W praktyce oznacza to styl budowany na {_phrase_case(primary_meta['publicValuePhrase'], 'locative')}, "
-            f"z dodatkowym akcentem na {_phrase_case(supporting_meta['publicValuePhrase'], 'accusative')}."
-        )
-    else:
-        supporting_acc = _public_value_accusative(str(supporting_meta["publicValue"]))
-        text = (
-            f"Najsilniejszą motywacją {subject} jest {primary_meta['publicValue']}. "
-            f"Archetyp wspierający wnosi tu {supporting_acc}, "
-            f"ale to {primary_meta['publicValue']} pozostaje głównym źródłem energii i kierunku działania, "
-            f"wzmacniając {_phrase_case(primary_meta['publicValuePhrase'], 'accusative')}."
-        )
-
-    if tertiary is not None:
-        tertiary_meta = ARCHETYPE_META[tertiary.id]
-        tertiary_value = str(tertiary_meta["publicValue"])
-        pronoun = PUBLIC_VALUE_PRONOUN.get(tertiary_value, "która")
-        text += (
-            f" Dodatkowy ton wnosi tu także {tertiary_value}, "
-            f"{pronoun} poszerza ten układ o {_phrase_case(tertiary_meta['publicValuePhrase'], 'accusative')}."
-        )
-    return text
+    return resolve_value_description_from_hierarchy(subject_forms, primary, supporting, tertiary, dominance_type)
 
 
 def _generate_needs_description(
@@ -1044,42 +1284,7 @@ def _generate_needs_description(
     total = sum(item.score for item in active) or 1.0
     x = sum(item.score * ARCHETYPE_META[item.id]["needsX"] for item in active) / total
     y = sum(item.score * ARCHETYPE_META[item.id]["needsY"] for item in active) / total
-
-    opening = getNameAwareOpening("needs", subject_forms)
-    x_strength = _axis_strength(x)
-    y_strength = _axis_strength(y)
-    if x_strength == "balanced" and y_strength == "balanced":
-        second_sentence = (
-            f"W praktyce oznacza to styl działania oparty na {_x_meaning(x)} oraz {_y_meaning(y)}, "
-            "bez wyraźnego przechodzenia w skrajności."
-        )
-    elif x_strength == "balanced":
-        second_sentence = (
-            f"W praktyce oznacza to styl działania oparty na {_x_meaning(x)}, "
-            f"a zarazem bardziej na {_y_meaning(y)} niż na {_y_opposite_meaning(y)}."
-        )
-    elif y_strength == "balanced":
-        second_sentence = (
-            f"W praktyce oznacza to styl działania oparty bardziej na {_x_meaning(x)} niż na {_x_opposite_meaning(x)}, "
-            f"przy jednoczesnym {_y_meaning(y)}."
-        )
-    else:
-        second_sentence = (
-            f"W praktyce oznacza to styl działania oparty bardziej na {_x_meaning(x)} niż na {_x_opposite_meaning(x)}, "
-            f"a zarazem bardziej na {_y_meaning(y)} niż na {_y_opposite_meaning(y)}."
-        )
-
-    text = f"{opening} {_x_description(x)}, {_y_description(y)}. {second_sentence} "
-    primary_gen = _label_genitive(primary.label)
-    supporting_gen = _label_genitive(supporting.label)
-    if tertiary is not None:
-        text += (
-            f"Ten kierunek budują przede wszystkim archetypy {primary_gen} i {supporting_gen}, "
-            f"a dodatkowy akcent wnosi {tertiary.label}."
-        )
-    else:
-        text += f"Ten kierunek budują przede wszystkim archetypy {primary_gen} i {supporting_gen}."
-    return text
+    return resolve_need_description_from_hierarchy(subject_forms, primary, supporting, tertiary, (x, y))
 
 
 def _generate_action_description(
