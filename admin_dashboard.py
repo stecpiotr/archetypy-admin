@@ -9904,7 +9904,7 @@ def show_report(sb, study: dict, wide: bool = True, public_view: bool = False) -
                 )
                 st.markdown(
                     (
-                        "<div style=\"display:flex;gap:64px;flex-wrap:wrap;align-items:center;justify-content:flex-start;"
+                        "<div style=\"display:flex;gap:84px;flex-wrap:wrap;align-items:center;justify-content:flex-start;"
                         "margin-top:8px;margin-bottom:6px;font-size:1.03em;font-weight:600;color:var(--text-color,#475569);\">"
                         f"<div style='display:inline-flex;gap:24px;flex-wrap:wrap;align-items:center;'>{axis_legend_html}</div>"
                         f"<div style='display:inline-flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:0.90em;font-weight:500;'>{role_legend_html}</div>"
