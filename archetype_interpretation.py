@@ -1022,6 +1022,8 @@ def resolve_need_axis_priority(
 
     same_y = py_side == sy_side and py_side != "balanced"
     same_x = px_side == sx_side and px_side != "balanced"
+    primary_side = _dominant_need_side_for_archetype(primary)
+    supporting_side = _dominant_need_side_for_archetype(supporting)
 
     if same_y or same_x:
         if same_y and same_x:
@@ -1044,8 +1046,8 @@ def resolve_need_axis_priority(
             "priority_side": priority_side,
             "secondary_side": secondary_side,
             "secondary_strength": secondary_strength,
-            "primary_side": None,
-            "supporting_side": None,
+            "primary_side": primary_side,
+            "supporting_side": supporting_side,
         }
 
     return {
@@ -1054,8 +1056,8 @@ def resolve_need_axis_priority(
         "priority_side": None,
         "secondary_side": None,
         "secondary_strength": None,
-        "primary_side": _dominant_need_side_for_archetype(primary),
-        "supporting_side": _dominant_need_side_for_archetype(supporting),
+        "primary_side": primary_side,
+        "supporting_side": supporting_side,
     }
 
 
@@ -1072,12 +1074,21 @@ def resolve_need_description_from_hierarchy(
     if priority["mode"] == "axis_priority":
         core_side = str(priority.get("priority_side") or "balanced")
         secondary_side = str(priority.get("secondary_side") or "balanced")
+        primary_side = str(priority.get("primary_side") or "balanced")
+        supporting_side = str(priority.get("supporting_side") or "balanced")
         first_sentence = f"{opening} jest przede wszystkim zakorzeniony w {_need_side_locative(core_side)}"
         tilt = _need_tilt_phrase(secondary_side, str(priority.get("secondary_strength") or "balanced"))
         if tilt:
             first_sentence += f", {tilt}"
         first_sentence += "."
-        if primary.id in {"niewinny", "medrzec", "wladca"} and secondary_side != "balanced":
+        dominant_axis = priority.get("priority_axis")
+        should_expand_with_secondary_axis = (
+            dominant_axis in {"x", "y"}
+            and secondary_side != "balanced"
+            and primary_side == core_side
+            and supporting_side == core_side
+        )
+        if should_expand_with_secondary_axis:
             second_sentence = (
                 "W praktyce oznacza to styl działania oparty bardziej na "
                 f"{_need_side_meaning(core_side)} niż na {_need_side_counter_meaning(core_side)}, "

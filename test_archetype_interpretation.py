@@ -497,3 +497,20 @@ def test_23_kolo_potrzeb_kornelia_zachowuje_styl_glownego_archetypu():
     assert "styl działania oparty na szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji" in txt_l
     assert "ale realizowany bardziej w relacji z ludźmi, bliskości i budowaniu wspólnoty niż w samotnej autonomii" in txt_l
     assert "archetypy kochanki i buntowniczki" in txt_l
+
+
+def test_24_kolo_potrzeb_regula_drugiej_osi_dziala_strukturalnie_bez_listy_id():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Odkrywca", 90.0),
+            _result("Buntownik", 85.0),
+            None,
+            subject_forms={"fullGen": "Mściwoja Pokemona"},
+        )
+    )
+    txt = out["needsWheelDescription"].lower()
+
+    assert txt.startswith("układ potrzeb mściwoja pokemona jest przede wszystkim zakorzeniony w zmianie")
+    assert "z lekkim przechyłem ku niezależności" in txt
+    assert "bardziej na szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji" in txt
+    assert "a zarazem bardziej na samodzielnym podejmowaniu decyzji i opieraniu się na własnym kierunku niż na silnym dostrajaniu się do otoczenia" in txt
