@@ -951,6 +951,20 @@ def _need_side_meaning(side: str) -> str:
     }.get(side, "łączeniu skrajności w bardziej zrównoważony sposób")
 
 
+def _primary_needs_style_clause(primary_id: ArchetypeId, core_side: str) -> str | None:
+    relational_core = {"kochanek", "towarzysz", "opiekun"}
+    order_core = {"niewinny", "medrzec", "wladca"}
+    dynamic_core = {"bohater", "odkrywca", "buntownik", "tworca", "czarodziej", "blazen"}
+
+    if primary_id in relational_core and core_side != "przynaleznosc":
+        return "realizowany bardziej w relacji z ludźmi, bliskości i budowaniu wspólnoty niż w samotnej autonomii"
+    if primary_id in order_core and core_side != "stabilnosc":
+        return "osadzony bardziej w zasadach, odpowiedzialnym osądzie i przewidywalności niż w ciągłym eksperymentowaniu"
+    if primary_id in dynamic_core and core_side not in {"zmiana", "niezaleznosc"}:
+        return "prowadzony bardziej przez sprawczość, własny kierunek i uruchamianie zmiany niż przez zachowawczość"
+    return None
+
+
 def _need_tilt_phrase(side: str, strength: str) -> str:
     if side == "balanced" or strength == "balanced":
         return "przy bardziej zrównoważonym układzie na drugiej osi"
@@ -1053,7 +1067,11 @@ def resolve_need_description_from_hierarchy(
         if tilt:
             first_sentence += f", {tilt}"
         first_sentence += "."
-        second_sentence = f"W praktyce oznacza to styl działania oparty na {_need_side_meaning(core_side)}."
+        second_sentence = f"W praktyce oznacza to styl działania oparty na {_need_side_meaning(core_side)}"
+        style_clause = _primary_needs_style_clause(primary.id, core_side)
+        if style_clause:
+            second_sentence += f", ale {style_clause}"
+        second_sentence += "."
     else:
         primary_side = str(priority.get("primary_side") or "niezaleznosc")
         supporting_side = str(priority.get("supporting_side") or "stabilnosc")

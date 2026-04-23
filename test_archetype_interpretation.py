@@ -219,6 +219,8 @@ def test_8_fallback_personalizacji_i_helpery():
     assert "wnosi tu Odnowę" in txt_values
     assert "jest przede wszystkim zakorzeniony w zmianie" in txt_needs.lower()
     assert "szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji" in txt_needs
+    assert "ale realizowany bardziej w relacji z ludźmi, bliskości i budowaniu wspólnoty niż w samotnej autonomii" in txt_needs
+    assert "szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji. Ten kierunek" not in txt_needs
     assert "Rdzeń działania tego układu tworzą Kochanka i Buntowniczka" in txt_action
     assert "Kochanki i Buntowniczki" in txt_needs
     assert "None" not in txt_values + txt_needs + txt_action
@@ -473,3 +475,23 @@ def test_22_kolo_wartosci_hierarchia_rdzen_glowny_plus_wspierajacy_hetman():
     txt = out["valuesWheelDescription"]
     assert "duet: Odwaga i Porządek" in txt
     assert "Dodatkowy ton wnosi tu także Wolność" in txt
+
+
+def test_23_kolo_potrzeb_kornelia_zachowuje_styl_glownego_archetypu():
+    out = generate_archetype_descriptions(
+        _input(
+            _result("Kochanka", 88.0),
+            _result("Buntowniczka", 80.0),
+            None,
+            subject_forms={"fullGen": "Kornelii Lemańskiej"},
+        )
+    )
+    txt = out["needsWheelDescription"]
+    txt_l = txt.lower()
+
+    assert txt.startswith(
+        "Układ potrzeb Kornelii Lemańskiej jest przede wszystkim zakorzeniony w zmianie, z wyraźnym przechyłem ku przynależności."
+    )
+    assert "styl działania oparty na szukaniu nowych dróg, uruchamianiu ruchu i przełamywaniu stagnacji" in txt_l
+    assert "ale realizowany bardziej w relacji z ludźmi, bliskości i budowaniu wspólnoty niż w samotnej autonomii" in txt_l
+    assert "archetypy kochanki i buntowniczki" in txt_l
