@@ -133,8 +133,10 @@ def test_5_niewinny_medrzec_tworca():
 
     assert "jest przede wszystkim zakorzeniony w stabilności" in needs
     assert "z lekkim przechyłem ku niezależności" in needs
-    assert "porządkowaniu rzeczywistości, utrzymywaniu kursu i przewidywalności" in needs
+    assert "bardziej na porządkowaniu rzeczywistości, utrzymywaniu kursu i przewidywalności niż na ciągłym uruchamianiu zmiany" in needs
+    assert "a zarazem bardziej na samodzielnym podejmowaniu decyzji i opieraniu się na własnym kierunku niż na silnym dostrajaniu się do otoczenia" in needs
     assert "archetypy niewinnego i mędrca" in needs
+    assert "dodatkowy akcent wnosi twórca" in needs
     assert "racjonalności" in action
     assert "niskiej empatii" not in action
     assert "umiarkowanej racjonalności" not in action

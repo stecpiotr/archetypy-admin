@@ -951,6 +951,15 @@ def _need_side_meaning(side: str) -> str:
     }.get(side, "łączeniu skrajności w bardziej zrównoważony sposób")
 
 
+def _need_side_counter_meaning(side: str) -> str:
+    return {
+        "niezaleznosc": "silnym dostrajaniu się do otoczenia",
+        "przynaleznosc": "samotnej autonomii i utrzymywaniu dystansu wobec otoczenia",
+        "stabilnosc": "ciągłym uruchamianiu zmiany",
+        "zmiana": "zachowawczym trzymaniu się tego, co zastane",
+    }.get(side, "pomijaniu drugiego bieguna potrzeb")
+
+
 def _primary_needs_style_clause(primary_id: ArchetypeId, core_side: str) -> str | None:
     relational_core = {"kochanek", "towarzysz", "opiekun"}
     order_core = {"niewinny", "medrzec", "wladca"}
@@ -1062,16 +1071,24 @@ def resolve_need_description_from_hierarchy(
 
     if priority["mode"] == "axis_priority":
         core_side = str(priority.get("priority_side") or "balanced")
+        secondary_side = str(priority.get("secondary_side") or "balanced")
         first_sentence = f"{opening} jest przede wszystkim zakorzeniony w {_need_side_locative(core_side)}"
-        tilt = _need_tilt_phrase(str(priority.get("secondary_side") or "balanced"), str(priority.get("secondary_strength") or "balanced"))
+        tilt = _need_tilt_phrase(secondary_side, str(priority.get("secondary_strength") or "balanced"))
         if tilt:
             first_sentence += f", {tilt}"
         first_sentence += "."
-        second_sentence = f"W praktyce oznacza to styl działania oparty na {_need_side_meaning(core_side)}"
-        style_clause = _primary_needs_style_clause(primary.id, core_side)
-        if style_clause:
-            second_sentence += f", ale {style_clause}"
-        second_sentence += "."
+        if primary.id in {"niewinny", "medrzec", "wladca"} and secondary_side != "balanced":
+            second_sentence = (
+                "W praktyce oznacza to styl działania oparty bardziej na "
+                f"{_need_side_meaning(core_side)} niż na {_need_side_counter_meaning(core_side)}, "
+                f"a zarazem bardziej na {_need_side_meaning(secondary_side)} niż na {_need_side_counter_meaning(secondary_side)}."
+            )
+        else:
+            second_sentence = f"W praktyce oznacza to styl działania oparty na {_need_side_meaning(core_side)}"
+            style_clause = _primary_needs_style_clause(primary.id, core_side)
+            if style_clause:
+                second_sentence += f", ale {style_clause}"
+            second_sentence += "."
     else:
         primary_side = str(priority.get("primary_side") or "niezaleznosc")
         supporting_side = str(priority.get("supporting_side") or "stabilnosc")
